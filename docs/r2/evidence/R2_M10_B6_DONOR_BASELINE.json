@@ -1,0 +1,194 @@
+{
+ "schema_id": "m10.b6-packaging-parity-baseline.v1",
+ "rule": "R2-DEC-031: frozen before any M10-B measurement; every measured row PARITY or IMPROVED in all eight dimensions, or wholly EXCLUDED with an intentional difference",
+ "donors": {
+  "kalinga": {
+   "repository_url": "https://github.com/desaultkhan/Kalinga-Shorts-Factory",
+   "commit_sha": "e4b5a2173ca03d365aad565a89fcc43159b44f9b",
+   "blob_sha256": {
+    "pipeline/src/validate.py": "a34d680faee8d0452a22d3d20794c38f73a9679a2ca19e8ddd0b5daf82bd2b10"
+   }
+  },
+  "openmontage": {
+   "repository_url": "https://github.com/calesthio/OpenMontage",
+   "commit_sha": "08e2151fa02de28a5d6a312b3d575692bf147ad7",
+   "blob_sha256": {
+    "tools/publishers/export_bundle.py": "ae473a27086ad8207b849f0fba857ba6c038152e20418118931ea23ccf09c653"
+   }
+  }
+ },
+ "donor_fixture": {
+  "path": "tests/fixtures/r2/m10_b6_donors/donor_functions.json",
+  "sha256": "21124a2f89c98029cf4a2fef4eab55abd90c2d1281f321b06c7eb3b4547834f4"
+ },
+ "runtime_identity": "CPython 3.13 executing the exact pinned function sources from donor_functions.json in-process against the same metadata and asset fixtures as the M10 packaging check and export",
+ "dimension_criteria": {
+  "functionality": "M10 detects or produces every condition/output the donor does on the same fixture",
+  "correctness": "M10 outcome matches the fixture ground truth; IMPROVED where the donor is wrong or silently drops a defect",
+  "determinism": "two M10 runs give equal digests (IMPROVED when the donor output carries a wall-clock timestamp or is not byte-stable); PARITY for pure rules with equal outputs",
+  "failure_safety": "on defect fixtures M10 never yields a passing/exported outcome where the donor passes, writes partial output or crashes untyped (IMPROVED); PARITY where both refuse",
+  "data_integrity": "M10 binds content digests of every asset and of the metadata (IMPROVED over path-only donors); PARITY for pure text rules",
+  "observability": "M10 returns typed rule/finding codes and receipts (IMPROVED over free-text issues/error strings); PARITY when both are typed",
+  "performance": "PARITY iff M10 median wall time <= donor median + 1500 ms on the fixture; never IMPROVED",
+  "resources": "IMPROVED iff M10 runs under declared byte/runtime ceilings (export in the confined unit); PARITY for pure in-process rules"
+ },
+ "rows": [
+  {
+   "behavior_id": "kalinga_title_length",
+   "donor": "kalinga",
+   "donor_test_refs": [
+    "validate.seo_lint:122-123"
+   ],
+   "m10_rule": "title.length",
+   "measured": true
+  },
+  {
+   "behavior_id": "kalinga_title_terms",
+   "donor": "kalinga",
+   "donor_test_refs": [
+    "validate.seo_lint:124-127"
+   ],
+   "m10_rule": "title.terms",
+   "measured": true
+  },
+  {
+   "behavior_id": "kalinga_description_terms",
+   "donor": "kalinga",
+   "donor_test_refs": [
+    "validate.seo_lint:128-132"
+   ],
+   "m10_rule": "description.terms",
+   "measured": true
+  },
+  {
+   "behavior_id": "kalinga_plain_text",
+   "donor": "kalinga",
+   "donor_test_refs": [
+    "validate.seo_lint:133-138"
+   ],
+   "m10_rule": "text.plain",
+   "measured": true
+  },
+  {
+   "behavior_id": "kalinga_description_min",
+   "donor": "kalinga",
+   "donor_test_refs": [
+    "validate.seo_lint:139-140"
+   ],
+   "m10_rule": "description.length",
+   "measured": true
+  },
+  {
+   "behavior_id": "kalinga_hashtag_count",
+   "donor": "kalinga",
+   "donor_test_refs": [
+    "validate.seo_lint:141-143"
+   ],
+   "m10_rule": "hashtags.bounds",
+   "measured": true
+  },
+  {
+   "behavior_id": "kalinga_tag_min",
+   "donor": "kalinga",
+   "donor_test_refs": [
+    "validate.seo_lint:144-145"
+   ],
+   "m10_rule": "tags.bounds",
+   "measured": true
+  },
+  {
+   "behavior_id": "kalinga_metadata_missing",
+   "donor": "kalinga",
+   "donor_test_refs": [
+    "validate.seo_lint:113-115"
+   ],
+   "m10_rule": "PackagingCandidate contract",
+   "measured": true
+  },
+  {
+   "behavior_id": "kalinga_media_variants",
+   "donor": "kalinga",
+   "donor_test_refs": [
+    "make_video (music/no-music media variants)"
+   ],
+   "measured": false,
+   "intentional_difference": "M10-B variants are metadata/thumbnail alternatives chosen by the showrunner; media variants are separate approved masters governed by M8/M10-A, not packaging alternatives"
+  },
+  {
+   "behavior_id": "openmontage_missing_video",
+   "donor": "openmontage",
+   "donor_test_refs": [
+    "export_bundle.execute:160-162"
+   ],
+   "m10_rule": "asset.required / asset.integrity",
+   "measured": true
+  },
+  {
+   "behavior_id": "openmontage_missing_optional_asset",
+   "donor": "openmontage",
+   "donor_test_refs": [
+    "export_bundle.execute:167-172"
+   ],
+   "m10_rule": "asset.integrity",
+   "measured": true
+  },
+  {
+   "behavior_id": "openmontage_layout",
+   "donor": "openmontage",
+   "donor_test_refs": [
+    "export_bundle.execute:180-197,240-247"
+   ],
+   "m10_rule": "export layout video/output.mp4, metadata/metadata.json, thumbnails/<variant>.<ext>",
+   "measured": true
+  },
+  {
+   "behavior_id": "openmontage_determinism",
+   "donor": "openmontage",
+   "donor_test_refs": [
+    "export_bundle.execute:249-251"
+   ],
+   "m10_rule": "byte-deterministic archive",
+   "measured": true
+  },
+  {
+   "behavior_id": "openmontage_no_upload",
+   "donor": "openmontage",
+   "donor_test_refs": [
+    "export_bundle.execute:250-256 status exported"
+   ],
+   "m10_rule": "ExportBundleReceipt.status EXPORTED",
+   "measured": true
+  },
+  {
+   "behavior_id": "openmontage_metadata_document",
+   "donor": "openmontage",
+   "donor_test_refs": [
+    "export_bundle.execute:202-212"
+   ],
+   "m10_rule": "metadata/metadata.json title/description/tags/hashtags/chapters",
+   "measured": true
+  },
+  {
+   "behavior_id": "openmontage_chapter_text",
+   "donor": "openmontage",
+   "donor_test_refs": [
+    "export_bundle._format_chapter_time",
+    "export_bundle._chapter_lines",
+    "export_bundle.execute:214-237"
+   ],
+   "measured": false,
+   "intentional_difference": "M10 exports structured chapters (start_ms, title) in metadata.json; pasteable description.txt/tags.txt/chapters.txt text is a platform publisher presentation concern outside export-only M10-B"
+  },
+  {
+   "behavior_id": "openmontage_subtitles_path",
+   "donor": "openmontage",
+   "donor_test_refs": [
+    "export_bundle.execute:189-196 video/subtitles.srt"
+   ],
+   "measured": false,
+   "intentional_difference": "M10 places captions per locale under captions/<locale>.<ext> from captions-<locale> roles, so multi-locale captions never collide"
+  }
+ ],
+ "fixtures": "tests/integration/server/services/test_packaging_donor_parity.py (metadata defects and assets built in-test from tests/unit/r2/quality/test_packaging_check.py fixtures)",
+ "frozen_at": "2026-10-29"
+}

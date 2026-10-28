@@ -1,0 +1,55 @@
+{
+  "schema_id": "m10.b6-donor-functions.v1",
+  "donors": {
+    "kalinga": {
+      "repository_url": "https://github.com/desaultkhan/Kalinga-Shorts-Factory",
+      "commit_sha": "e4b5a2173ca03d365aad565a89fcc43159b44f9b",
+      "files": {
+        "pipeline/src/validate.py": "a34d680faee8d0452a22d3d20794c38f73a9679a2ca19e8ddd0b5daf82bd2b10"
+      },
+      "functions": [
+        {
+          "path": "pipeline/src/validate.py",
+          "name": "seo_lint",
+          "lineno": 112,
+          "end_lineno": 149,
+          "sha256": "08a8d579a544caceab9720fed8c493c0acee529ffd436df9fcf8426adc237e24",
+          "source": "def seo_lint(folder: Path, topic: str) -> list[str]:\n    p = folder / \"seo.json\"\n    if not p.exists():\n        return [\"seo.json missing\"]\n    meta = json.loads(p.read_text())\n    cfg = config.channel().seo\n    issues = []\n    # slug-tolerant match: a topic is a folder slug (\"Steve-Jobs\") but a natural\n    # title reads \"Steve Jobs\", so treat - / _ as spaces (and ignore case) — else\n    # title_must_include:[\"{topic}\"] spuriously fails on every hyphenated topic\n    def _norm(s):\n        return re.sub(r\"[-_]+\", \" \", s or \"\").lower()\n    title = meta.get(\"title\", \"\")\n    if len(title) > 80:\n        issues.append(f\"title {len(title)} chars (>80 gets truncated)\")\n    for req in cfg.get(\"title_must_include\", []):\n        kw = req.replace(\"{topic}\", topic)\n        if _norm(kw) not in _norm(title):\n            issues.append(f\"title missing '{kw}'\")\n    desc = meta.get(\"description\", \"\")\n    for req in cfg.get(\"description_must_include\", []):\n        kw = req.replace(\"{topic}\", topic)\n        if _norm(kw) not in _norm(desc):\n            issues.append(f\"description missing '{kw}'\")\n    # plain text only: markdown pastes literally into YouTube and \"looks like\n    # tags\" — flag bold/code/links/headings/bullets in the title or description\n    md = (re.search(r\"\\*\\*|`|\\]\\(\", title + \"\\n\" + desc)\n          or re.search(r\"(?m)^[ \\t]{0,3}(#{1,6}[ \\t]|[-*+][ \\t]|>)\", desc))\n    if md:\n        issues.append(\"title/description has markdown (plain text only)\")\n    if len(desc) < 120:\n        issues.append(f\"description thin ({len(desc)} chars — aim for 200+)\")\n    tags = meta.get(\"hashtags\", [])\n    if not 3 <= len(tags) <= 5:\n        issues.append(f\"{len(tags)} hashtags (want 3-5)\")\n    if len(meta.get(\"tags\", [])) < 12:\n        issues.append(f\"{len(meta.get('tags', []))} search tags (want 15-20)\")\n    return issues\n"
+        }
+      ]
+    },
+    "openmontage": {
+      "repository_url": "https://github.com/calesthio/OpenMontage",
+      "commit_sha": "08e2151fa02de28a5d6a312b3d575692bf147ad7",
+      "files": {
+        "tools/publishers/export_bundle.py": "ae473a27086ad8207b849f0fba857ba6c038152e20418118931ea23ccf09c653"
+      },
+      "functions": [
+        {
+          "path": "tools/publishers/export_bundle.py",
+          "name": "_format_chapter_time",
+          "lineno": 134,
+          "end_lineno": 141,
+          "sha256": "981d6ec5a57121676e6bd1ca31f314ff6fdd4b7490f67e0530d6ba666a258850",
+          "source": "    @staticmethod\n    def _format_chapter_time(seconds: float) -> str:\n        seconds = int(round(seconds))\n        h, rem = divmod(seconds, 3600)\n        m, s = divmod(rem, 60)\n        if h:\n            return f\"{h}:{m:02d}:{s:02d}\"\n        return f\"{m}:{s:02d}\"\n"
+        },
+        {
+          "path": "tools/publishers/export_bundle.py",
+          "name": "_chapter_lines",
+          "lineno": 143,
+          "end_lineno": 154,
+          "sha256": "1817a21f82d0ed4a6e9a809cf29decea0d2f3e167460e887b5047875616fab2f",
+          "source": "    def _chapter_lines(self, chapters: list[dict[str, Any]]) -> list[str]:\n        lines: list[str] = []\n        for ch in chapters:\n            label = ch.get(\"title\") or ch.get(\"label\") or \"\"\n            if \"start_seconds\" in ch or \"time_seconds\" in ch:\n                ts = self._format_chapter_time(ch.get(\"start_seconds\", ch.get(\"time_seconds\", 0)))\n            elif \"time\" in ch:\n                ts = str(ch[\"time\"])\n            else:\n                ts = \"0:00\"\n            lines.append(f\"{ts} - {label}\".rstrip(\" -\"))\n        return lines\n"
+        },
+        {
+          "path": "tools/publishers/export_bundle.py",
+          "name": "execute",
+          "lineno": 158,
+          "end_lineno": 285,
+          "sha256": "0d27b523de8d249210d1c2eddd91be35cedb001053efd767effd5d9c92887356",
+          "source": "    def execute(self, inputs: dict[str, Any]) -> ToolResult:\n        video_path = Path(inputs[\"video_path\"]).expanduser()\n        if not video_path.is_file():\n            return ToolResult(success=False, error=f\"video_path not found: {video_path}\")\n\n        title = inputs[\"title\"]\n        project_name = inputs.get(\"project_name\") or self._infer_project_name(video_path)\n\n        # Explicitly-provided optional assets must exist — silently dropping them\n        # would ship a publish package missing part of an approved deliverable.\n        for key in (\"subtitles_path\", \"thumbnail_path\"):\n            val = inputs.get(key)\n            if val and not Path(val).expanduser().is_file():\n                return ToolResult(success=False, error=f\"{key} provided but not found: {val}\")\n\n        export_root = (\n            Path(inputs[\"export_dir\"]).expanduser()\n            if inputs.get(\"export_dir\")\n            else self._default_export_dir(video_path, project_name)\n        )\n\n        video_dir = export_root / \"video\"\n        meta_dir = export_root / \"metadata\"\n        thumb_dir = export_root / \"thumbnails\"\n        for d in (video_dir, meta_dir, thumb_dir):\n            d.mkdir(parents=True, exist_ok=True)\n\n        files_written: list[str] = []\n\n        # Video\n        out_video = video_dir / f\"output{video_path.suffix or '.mp4'}\"\n        shutil.copy2(video_path, out_video)\n        files_written.append(str(out_video))\n\n        # Subtitles (optional)\n        subs_in = inputs.get(\"subtitles_path\")\n        if subs_in:\n            subs_in = Path(subs_in).expanduser()\n            if subs_in.is_file():\n                out_subs = video_dir / f\"subtitles{subs_in.suffix or '.srt'}\"\n                shutil.copy2(subs_in, out_subs)\n                files_written.append(str(out_subs))\n\n        description = inputs.get(\"description\", \"\")\n        tags = inputs.get(\"tags\", []) or []\n        hashtags = inputs.get(\"hashtags\", []) or []\n        chapters = inputs.get(\"chapters\", []) or []\n        chapter_lines = self._chapter_lines(chapters)\n\n        # metadata.json\n        metadata = {\n            \"title\": title,\n            \"description\": description,\n            \"tags\": tags,\n            \"hashtags\": hashtags,\n            \"chapters\": chapters,\n        }\n        meta_json = meta_dir / \"metadata.json\"\n        meta_json.write_text(json.dumps(metadata, indent=2), encoding=\"utf-8\")\n        files_written.append(str(meta_json))\n\n        # description.txt (description + chapters appended, ready to paste)\n        desc_parts = [description] if description else []\n        if chapter_lines:\n            desc_parts.append(\"\\n\".join(chapter_lines))\n        desc_txt = meta_dir / \"description.txt\"\n        desc_txt.write_text(\"\\n\\n\".join(desc_parts) + (\"\\n\" if desc_parts else \"\"), encoding=\"utf-8\")\n        files_written.append(str(desc_txt))\n\n        # tags.txt (one per line)\n        if tags:\n            tags_txt = meta_dir / \"tags.txt\"\n            tags_txt.write_text(\"\\n\".join(tags) + \"\\n\", encoding=\"utf-8\")\n            files_written.append(str(tags_txt))\n\n        # chapters.txt\n        if chapter_lines:\n            chapters_txt = meta_dir / \"chapters.txt\"\n            chapters_txt.write_text(\"\\n\".join(chapter_lines) + \"\\n\", encoding=\"utf-8\")\n            files_written.append(str(chapters_txt))\n\n        # Thumbnail: real image if given, else concept JSON\n        thumb_in = inputs.get(\"thumbnail_path\")\n        if thumb_in and Path(thumb_in).expanduser().is_file():\n            thumb_in = Path(thumb_in).expanduser()\n            out_thumb = thumb_dir / f\"thumbnail{thumb_in.suffix or '.png'}\"\n            shutil.copy2(thumb_in, out_thumb)\n            files_written.append(str(out_thumb))\n        elif inputs.get(\"thumbnail_concept\"):\n            concept = thumb_dir / \"concept.json\"\n            concept.write_text(json.dumps(inputs[\"thumbnail_concept\"], indent=2), encoding=\"utf-8\")\n            files_written.append(str(concept))\n\n        timestamp = inputs.get(\"timestamp\") or datetime.now(timezone.utc).isoformat()\n        entry: dict[str, Any] = {\n            \"platform\": inputs.get(\"platform\", \"local\"),\n            \"status\": \"exported\",\n            \"export_path\": str(export_root),\n            \"timestamp\": timestamp,\n            \"metadata_used\": {\n                \"title\": title,\n                \"description\": description,\n                \"hashtags\": hashtags,\n                \"chapters\": chapters,\n            },\n        }\n        if inputs.get(\"visibility\"):\n            entry[\"visibility\"] = inputs[\"visibility\"]\n\n        publish_log = {\"version\": \"1.0\", \"entries\": [entry]}\n\n        # Validate against the canonical schema so a bad entry fails here, not at checkpoint.\n        try:\n            from schemas.artifacts import validate_artifact\n\n            validate_artifact(\"publish_log\", publish_log)\n        except Exception as exc:  # pragma: no cover - defensive\n            return ToolResult(success=False, error=f\"publish_log failed schema validation: {exc}\")\n\n        return ToolResult(\n            success=True,\n            data={\n                \"publish_log\": publish_log,\n                \"export_path\": str(export_root),\n                \"files_written\": files_written,\n            },\n            artifacts=[str(out_video)],\n        )\n"
+        }
+      ]
+    }
+  }
+}
