@@ -460,11 +460,14 @@ async def blocked_by(env, gate: Gate, attempts: int = 400) -> str:
 
 
 async def assert_blocked(env, gate: Gate, *tables: str) -> None:
-    """The paused writer blocks a contender on one of ``tables``; the gate is released on any mismatch."""
-    query = await blocked_by(env, gate)
-    if not any(table in query for table in tables):
+    """The paused writer blocks a contender on one of ``tables``; the gate is released on any failure."""
+    try:
+        query = await blocked_by(env, gate)
+        if not any(table in query for table in tables):
+            raise AssertionError(f"blocked on an unexpected lock: {query}")
+    except BaseException:
         gate.release.set()
-        raise AssertionError(f"blocked on an unexpected lock: {query}")
+        raise
 
 
 async def _paused_selection(env, monkeypatch, request):

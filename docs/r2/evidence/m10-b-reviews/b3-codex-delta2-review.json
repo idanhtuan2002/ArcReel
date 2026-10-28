@@ -1,0 +1,185 @@
+{
+  "schema_id": "m10.b3-delta2-review.v1",
+  "reviewed_head": "84f6e32f4",
+  "reviewer": "Codex independent second critical delta review; main agent; source read-only; no staging or commits",
+  "verdict": "ACCEPT_WITH_CONDITIONS",
+  "scope": {
+    "base": "3d96e7dd3",
+    "candidate": "84f6e32f41abdcd46dd9ab34d6b5a13a8bb897ef",
+    "initial_checkout": "Exact candidate and clean at initial verification.",
+    "concurrent_work": "External edits appeared in server/services/quality_package_selection.py and tests/integration/server/services/test_quality_package_selection.py during review, followed by HEAD advancement to 2073f2f7a99c56912bdb17db07afbf38b54888b2 at the last pre-artifact check. Subsequent evidence reads and inline probe method/helper extraction used git show 84f6e32f4:path. Those concurrent changes were preserved and are not accepted by this review.",
+    "changed_paths_at_candidate": [
+      "docs/r2/evidence/m10-b-reviews/b3-codex-delta-review.json",
+      "docs/superpowers/specs/2026-10-28-r2-m10-b-packaging-export-design.md",
+      "tests/integration/server/services/test_quality_package_selection.py"
+    ],
+    "decision": "Accept the B3 implementation and its bounded serialization/refusal evidence with the conditions below. No new High or Medium defect was confirmed. This is not independently executed PostgreSQL acceptance, route/UI activation, export acceptance or a claim that every later head lock was reached in the fixtures.",
+    "graph": "Tier 2 graph status and check_index_coverage were attempted for the evidence paths and test scope. Both returned 'MCP tool call requires approval, but approval policy is never'. Direct pinned source/diff fallback used; no generation/index-completeness claim."
+  },
+  "per_finding_status": {
+    "H1": {
+      "status": "FIXED; prior source closure preserved",
+      "file": "server/services/quality_package_selection.py",
+      "line": 472,
+      "evidence": "Production source is unchanged in this pinned delta. The selector union all run Human assessors is still locked through the sorted helper before readiness and selector admission. The multi-principal/disjoint-master inversion is excluded by this construction, not reproduced by the one-principal fixture. The previous review's distinct-principal mock-execution evidence remains historical evidence, not a fresh PG run."
+    },
+    "M1": {
+      "status": "FIXED; prior implementation closure preserved and regression added",
+      "file": "tests/integration/server/services/test_quality_package_selection.py",
+      "line": 690,
+      "evidence": "The new tamper-after-preview regression disables ordinary triggers in its disposable PG schema, corrupts the packaging observation's stored digest, then requires fresh selection to refuse and leave zero selection/head rows. This exercises the newly shared evidence-resolution boundary rather than trusting the preview alone. It is a digest-column tamper case, not an exhaustive candidate/lineage/closure mutation matrix. Source still explicitly resolves those other inputs."
+    },
+    "M2": {
+      "status": "FIXED within the documented B3 serialization scope; limitations carried",
+      "file": "tests/integration/server/services/test_quality_package_selection.py",
+      "line": 425,
+      "related_locations": [
+        "tests/integration/server/services/test_quality_package_selection.py:417",
+        "tests/integration/server/services/test_quality_package_selection.py:435",
+        "tests/integration/server/services/test_quality_package_selection.py:457",
+        "tests/integration/server/services/test_quality_package_selection.py:492",
+        "tests/integration/server/services/test_quality_package_selection.py:521",
+        "tests/integration/server/services/test_quality_package_selection.py:540",
+        "tests/integration/server/services/test_quality_package_selection.py:560",
+        "tests/integration/server/services/test_quality_package_selection.py:584",
+        "docs/superpowers/specs/2026-10-28-r2-m10-b-packaging-export-design.md:274"
+      ],
+      "verified": "The gate captures the holder's backend PID in its owning transaction before announcing entry. blocked_by filters pg_stat_activity through holder = ANY(pg_blocking_pids(pid)); assert_blocked checks the waiting SQL for the expected table. An unrelated global Lock waiter no longer suffices. Tests now accurately name selection-first disposition's lease/grant wait, reverse disposition's master wait, seal's grant/master wait, same-subject selection's master wait and publication's profile-head wait. The profile repository path requests FOR UPDATE after the held selection FOR SHARE. The updated design explicitly states these actual serialization points and the construction-based multi-principal argument.",
+      "judgment": "It is reasonable to validate the first real serialization point for same-master writers instead of manufacturing unreachable later-head contention. The existing outcome checks plus sequential newer-run and new publication-first invalidation cases cover the opposing currentness outcomes for this bounded packet. The publication fixture still calls the repository append helper, not activated ProfilePublicationService; its result is specifically profile-head serialization. It does not prove publication custody or every grant interaction. The singleton spy remains a weak regression of the general union, although the implementation's union/sort construction is sound. These limits must remain explicit rather than being reported as full writer-mode or multi-principal PG proof.",
+      "execution": "Builder reports 37 PG16 passes. Reviewer inspected the tests but could not run their bodies because sockets are denied. Conditional acceptance relies on that supplied runtime result, not an independent PG pass."
+    },
+    "M3": {
+      "status": "FIXED for the core B3 refusal matrix; additional resilience cases carried",
+      "file": "tests/integration/server/services/test_quality_package_selection.py",
+      "line": 612,
+      "related_locations": [
+        "tests/integration/server/services/test_quality_package_selection.py:625",
+        "tests/integration/server/services/test_quality_package_selection.py:639",
+        "tests/integration/server/services/test_quality_package_selection.py:652",
+        "tests/integration/server/services/test_quality_package_selection.py:659",
+        "tests/integration/server/services/test_quality_package_selection.py:674",
+        "tests/integration/server/services/test_quality_package_selection.py:690",
+        "tests/integration/server/services/test_quality_package_selection.py:705"
+      ],
+      "verified": "The additions assert a preview expires exactly at a shorter disposition deadline; an expired preview refuses while a freshly issued lease is otherwise admissible; master promotion stales selection; source/cohort/surface/project slot confusion refuses; a REEVALUATE_CURRENT publication winning first stales selection; a lease for one preview cannot select another under the same command; corrupted checked evidence after preview refuses; and one chosen alternative per group across title and description survives actual selection. Existing tests already cover waivable/unwaivable failures, incomplete/wrong-rule waivers, lease expiry, newer runs, stale disposition, CAS, command conflict and identical-command replay. Together these close the central previously missing B3 cases.",
+      "limits": "The cross-preview test changes the preview identity/digest but uses the same underlying choices, so it proves exact preview binding rather than a changed-waiver fixture. The tamper test covers the observation digest column only. No separate expired-disposition selection test or existing-head-preservation assertion was added; disposition-capped preview expiry plus the final DB-time check supplies the source argument. Grant revocation after lease, crash-after-lease, API-key/auth-disabled B3 regressions, broader candidate/lineage tamper and partial multi-finding waiver fixtures remain additional coverage, not newly proven cases. Their disposition is recorded below."
+    }
+  },
+  "new_findings": {
+    "H": [],
+    "M": [],
+    "L": [
+      {
+        "id": "N1",
+        "file": "tests/integration/server/services/test_quality_package_selection.py",
+        "line": 459,
+        "related_locations": [
+          "tests/integration/server/services/test_quality_package_selection.py:440",
+          "tests/integration/server/services/test_quality_package_selection.py:453"
+        ],
+        "title": "Gate release does not cover failures in the observation query",
+        "status": "CONFIRMED by pinned helper probe",
+        "scenario": "Unexpected-table and exhausted-poll paths release the gate, but a database/query exception, cancellation, or scalar_one_or_none raising for multiple matching waiters propagates before either release. The paused writer can remain waiting with locks held until outer test teardown cancels it, obscuring the original failure or delaying cleanup. A probe executing the exact pinned blocked_by/assert_blocked functions with an injected observation-query error confirmed that the exception propagates while gate.release remains unset.",
+        "fix": "Release the gate in a finally block around observation/assertion and ensure spawned writer tasks are awaited or cancelled on failure. Prefer fetching PID/query pairs and matching the intended contender when multiple waiters are possible."
+      },
+      {
+        "id": "N2",
+        "file": "docs/superpowers/specs/2026-10-28-r2-m10-b-packaging-export-design.md",
+        "line": 277,
+        "related_locations": [
+          "server/services/quality_runs.py:72",
+          "server/services/quality_runs.py:85"
+        ],
+        "title": "The cross-subject contention claim needs a disjoint-master qualification",
+        "status": "CONFIRMED documentation overstatement",
+        "scenario": "The added paragraph says across subjects contention exists only on profile and grant heads. Distinct assessed subjects can share a root or dependency artifact key, and lock_subject_masters locks all those authority rows. They therefore can also contend on master rows. The intended argument about residual contention applies to disjoint master-row sets. This does not reveal a runtime cycle because the master rows themselves are sorted.",
+        "fix": "Replace 'across subjects' with 'across subjects with disjoint master-row sets' and keep the later-head/fixture limits explicit."
+      }
+    ]
+  },
+  "conditions": [
+    {
+      "id": "REVOCATION_AFTER_LEASE",
+      "status": "CARRIED; not an additional B3 blocker under the inspected custodian/reader reuse",
+      "judgment": "Pinned admit calls the current locked checkpointed grant reader in the owning selection transaction, maps an unavailable/inactive/revoked grant to DispositionUnauthorizedError, and compares current sequence/event digest with the stored lease. The reader rejects non-ISSUE/inactive grants and checkpoint/head disagreement. A fresh function-level probe of the exact pinned admit method admitted an unchanged grant and refused changed sequence, changed digest and revoked/unavailable reader results. This supports carrying the missing integration fixture rather than leaving a demonstrated source defect open.",
+      "requirement": "Persist a real grant transition after lease issuance and assert no selection/head advancement before B5 interactive selection route activation or release acceptance. The mocked probe does not prove signed-ledger/checkpoint transitions or real DB locking."
+    },
+    {
+      "id": "CRASH_AFTER_LEASE",
+      "status": "CARRIED; not an additional B3 blocker",
+      "judgment": "authorize_selection's transaction appends only a lease. It never writes a selection or packaging head. select uses one session.begin transaction for selection append and head CAS, so a crash before select leaves an inert lease, and an uncommitted partial append/head update is a database transaction recovery concern. The accepted A6 shape and source provide a bounded argument; no B3 crash execution is claimed.",
+      "requirement": "Add B3-specific crash-after-lease and failure-between-selection/head-write recovery tests before integrated route/recovery acceptance. Verify unchanged existing head and retry behavior; do not label the current 37 cases as crash coverage."
+    },
+    {
+      "id": "SERIALIZATION_EVIDENCE",
+      "status": "ACCEPTED WITH LIMITS",
+      "requirement": "Use the actual grant/master/profile waits as the B3 evidence boundary. Publication tests remain repository-level; later head modes and multi-principal/disjoint-master schedules are source-construction arguments. Do not advertise them as observed PG interleavings. Keep N1/N2 as Low follow-ups and preserve a distinct-principal regression as a useful hardening task."
+    },
+    {
+      "id": "CLOCK_AND_POLLING",
+      "status": "CARRIED specification/test refinement",
+      "requirement": "Design section 4 still literally says 'no sleeps' while waiter observation polls with sleep(0.05). Events determine ordering, so this is bounded observation polling rather than a sleep used to guess writer order; clarify that distinction in the spec or replace the polling. The new expiry case sleeps 1.2 seconds after a one-second preview, and the cap test derives a 120-second deadline from host time. Prefer DB-time seams for deterministic, clock-skew-independent expiry regressions. No test flakiness was reproduced here."
+    },
+    {
+      "id": "PG_EXECUTION",
+      "status": "BUILDER-SUPPLIED ONLY",
+      "requirement": "Preserve builder's exact candidate/environment/command evidence for the reported 37 PG16 passes. Reviewer PG execution was denied before the first body. The concurrent working-tree edits mean even the reviewer collection command is inventory evidence only; pinned source independently contains the 37 cases."
+    },
+    {
+      "id": "C6_A6_SCHEMA_AND_LATER_PACKETS",
+      "status": "PRESERVED / CARRIED",
+      "requirement": "H1/M1 implementation closures remain. A6 source and schema are unchanged at the candidate; no fresh A6 or full migration acceptance is claimed. Carry B4 private-snapshot/digest verification and export writer pairs, B5 actual Human-only routes and authenticated provenance, and LOCAL_REGULAR_FILE_IO. This B3 judgment does not activate production authority. License issues excluded."
+    }
+  ],
+  "commands_run": [
+    {
+      "command": "git rev-parse HEAD; git show --stat --oneline HEAD; git status --short; git diff --stat 3d96e7dd3..HEAD; git diff 3d96e7dd3..HEAD -- tests/integration/server/services/test_quality_package_selection.py docs/superpowers/specs/2026-10-28-r2-m10-b-packaging-export-design.md",
+      "result": "Initially exact 84f6e32f4 and clean; inspected the requested delta. Subsequent source reads switched to immutable git show after detecting concurrent edits."
+    },
+    {
+      "command": "git diff --check 3d96e7dd3..84f6e32f4",
+      "result": "PASS, exit 0."
+    },
+    {
+      "command": "DATABASE_URL=postgresql+asyncpg://postgres:postgres@127.0.0.1:55491/arcreel_test UV_CACHE_DIR=/tmp/codex-b3-uv-cache uv run pytest -q --maxfail=1 --tb=short tests/integration/server/services/test_quality_package_selection.py",
+      "result": "UNAVAILABLE: one setup error in 1.58s, sandbox socket creation PermissionError [Errno 1] Operation not permitted; exit 1. No product test body ran. Concurrent edits prevent assigning this working-tree attempt to an immutable source snapshot."
+    },
+    {
+      "command": "DATABASE_URL=postgresql+asyncpg://postgres:postgres@127.0.0.1:55491/arcreel_test UV_CACHE_DIR=/tmp/codex-b3-uv-cache uv run pytest --collect-only -q tests/integration/server/services/test_quality_package_selection.py",
+      "result": "37 cases collected in 0.33s, exit 0. Collection only; concurrent edits present. Inventory cross-checked against pinned source."
+    },
+    {
+      "command": "PYTHONDONTWRITEBYTECODE=1 .venv/bin/python - <<'PY' (pinned admission-method probe)",
+      "procedure": "Extracted PackageSelectionCustodian.admit from git show 84f6e32f4:server/services/quality_package_selection.py via AST and executed that method with real request/lease contracts and mocked stored lease, actor authentication and current grant reader. Unchanged grant admitted; changed sequence, changed event digest and reader-unavailable/revoked outcomes each required DispositionUnauthorizedError.",
+      "result": "PASS, exit 0. Function-level authority checks only; no PG/signed-ledger execution."
+    },
+    {
+      "command": "PYTHONDONTWRITEBYTECODE=1 .venv/bin/python - <<'PY' (pinned waiter-helper exception probe)",
+      "procedure": "Extracted blocked_by/assert_blocked from git show 84f6e32f4:test path using AST, injected a session.execute RuntimeError, then asserted gate.release was still unset after propagation.",
+      "result": "CONFIRMED N1, exit 0. Initial probe draft had a misplaced future import and exited with SyntaxError before running; corrected probe produced the stated result."
+    },
+    {
+      "command": "git show 84f6e32f4:path with numbered reads for files_read; git status --short; git diff --name-only 84f6e32f4..HEAD",
+      "result": "Pinned source examined; external source/test edits and later HEAD advancement recorded and preserved. Graph index_status/check_index_coverage attempts were approval-blocked."
+    }
+  ],
+  "not_verified": [
+    "Independent real PG execution of the 37 cases, lock modes/waiters, revocation/checkpoint transition and crash recovery.",
+    "The concurrent source/test edits or later commits; verdict covers 84f6e32f4 only.",
+    "Fresh A6 regression, full schema/migration enforcement, export, route/UI or production activation.",
+    "Graph generation and path coverage; tools required unavailable approval.",
+    "No full suite/static gates or repeat of the unchanged contract suite; this candidate changes tests/docs only."
+  ],
+  "files_read": [
+    "docs/r2/evidence/m10-b-reviews/b3-codex-delta-review.json",
+    "docs/superpowers/specs/2026-10-28-r2-m10-b-packaging-export-design.md (delta and section 4)",
+    "tests/integration/server/services/test_quality_package_selection.py",
+    "server/services/quality_package_selection.py (pinned custody, admission, selection, preview)",
+    "server/services/quality_runs.py (pinned master/profile/grant lock helpers)",
+    "server/services/governance_grants.py (pinned current/checkpointed grant verification)",
+    "lib/db/repositories/quality_packaging.py (pinned append/head CAS transaction seam)",
+    "server/services/quality_profiles.py (pinned publication orchestration)",
+    "tests/integration/lib/db/repositories/test_quality_profiles_repository.py (pinned append helper)",
+    "tests/integration/server/services/test_quality_dispositions.py (existing resilience test inventory)"
+  ]
+}

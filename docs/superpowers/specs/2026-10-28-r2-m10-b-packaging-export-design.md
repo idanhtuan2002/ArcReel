@@ -274,7 +274,8 @@ load_run_observations re-take the same set, which is idempotent) → M7 attempt 
 - Serialization points actually observed (B3 barrier tests identify the blocked backend via `pg_blocking_pids`
   and its statement): for one subject every writer first serializes on the subject's master rows (or, for an
   issuer/sealer, already on the shared Human grant head its lease/grant transaction reads), so the later run,
-  disposition and packaging head modes are reached only by the winner; across subjects contention exists only on
+  disposition and packaging head modes are reached only by the winner; across subjects with disjoint master-row
+  sets contention exists only on
   the profile head (publication FOR UPDATE waits behind selection FOR SHARE) and on grant heads, which every writer
   takes as one sorted set. Multi-principal disjoint-master cycles are excluded by construction (one sorted grant
   set per writer), not by a dedicated fixture.
@@ -288,7 +289,8 @@ load_run_observations re-take the same set, which is idempotent) → M7 attempt 
 - Real PostgreSQL tests for every writer pair (selection × disposition, selection × run seal, export finalize ×
   run seal, selection × export finalize, export finalize × disposition, selection × selection on one slot with
   different commands, profile publication × selection), with barriers and an observed blocked waiter including a
-  queued FOR UPDATE behind FOR SHARE; no sleeps.
+  queued FOR UPDATE behind FOR SHARE; ordering is driven by events, never by sleeps (bounded polling only
+  observes `pg_stat_activity`).
 
 Currentness: a selection is exportable only while master, profile head, the bound run (still the run head), the bound disposition (unexpired, not
 superseded, still the current decision for its run) and the packaging head are exactly as bound. The selected

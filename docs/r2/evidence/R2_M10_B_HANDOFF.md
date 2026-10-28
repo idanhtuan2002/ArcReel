@@ -94,6 +94,10 @@ Rewrite in place; this is the resume entry for M10-B.
   (preview duration seam; note `| tail -1` hid an audit failure once — check gate exit codes directly).
   PG `test_quality_package_selection.py` 37 passed. Codex delta2 running (`b3-codex-delta2-review.json`).
 
+- B3 Codex delta2 ACCEPT_WITH_CONDITIONS (`b3-codex-delta2-review.json`); N1/N2 + polling wording fixed.
+  **B3 accepted with conditions.** Carried named conditions: REVOCATION_AFTER_LEASE and CRASH_AFTER_LEASE tests
+  before B5 route activation; serialization evidence boundary as stated in design §4.
+
 ## Next step
 
 Triage the B3 Codex review. Then B4 export: M7 host-local family `local-zip-package-export@host-export-v1`
