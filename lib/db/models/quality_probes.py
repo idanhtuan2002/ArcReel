@@ -11,9 +11,22 @@ from sqlalchemy.orm import Mapped, mapped_column
 from lib.db.base import Base
 
 
+def json_ceiling(table: str, column: str) -> tuple[sa.CheckConstraint, sa.CheckConstraint]:
+    """The migration-owned 1 MiB JSON ceiling, expressed per dialect so ORM-created schemas match."""
+    name = f"ck_{table}_{column}_bytes"
+    return (
+        sa.CheckConstraint(f"octet_length(CAST({column} AS text)) <= 1048576", name=name).ddl_if(dialect="postgresql"),
+        sa.CheckConstraint(f"length(CAST({column} AS BLOB)) <= 1048576", name=name).ddl_if(dialect="sqlite"),
+    )
+
+
 class QualityProbeInvocationModel(Base):
     __tablename__ = "m10_quality_probe_invocations"
     __table_args__ = (
+        *json_ceiling("m10_quality_probe_invocations", "request_json"),
+        *json_ceiling("m10_quality_probe_invocations", "route_json"),
+        *json_ceiling("m10_quality_probe_invocations", "provider_request_json"),
+        *json_ceiling("m10_quality_probe_invocations", "input_digests_json"),
         sa.PrimaryKeyConstraint(
             "user_id", "project_name", "actor_id", "execution_ref", name="pk_m10_quality_probe_invocations"
         ),
@@ -50,6 +63,7 @@ class QualityProbeInvocationModel(Base):
 class QualityProbeResultModel(Base):
     __tablename__ = "m10_quality_probe_results"
     __table_args__ = (
+        *json_ceiling("m10_quality_probe_results", "result_json"),
         sa.PrimaryKeyConstraint("user_id", "project_name", "execution_id", name="pk_m10_quality_probe_results"),
         sa.ForeignKeyConstraint(
             ["user_id", "project_name", "execution_id"],
@@ -75,6 +89,7 @@ class QualityProbeResultModel(Base):
 class QualityProbeObservationModel(Base):
     __tablename__ = "m10_quality_probe_observations"
     __table_args__ = (
+        *json_ceiling("m10_quality_probe_observations", "observation_json"),
         sa.PrimaryKeyConstraint("user_id", "project_name", "observation_id", name="pk_m10_quality_probe_observations"),
         sa.UniqueConstraint(
             "user_id", "project_name", "actor_id", "execution_ref", name="uq_m10_probe_observations_invocation"
@@ -123,4 +138,9 @@ class QualityProbeObservationModel(Base):
     finalized_at: Mapped[datetime] = mapped_column(sa.DateTime(timezone=True), nullable=False)
 
 
-__all__ = ["QualityProbeInvocationModel", "QualityProbeObservationModel", "QualityProbeResultModel"]
+__all__ = [
+    "QualityProbeInvocationModel",
+    "QualityProbeObservationModel",
+    "QualityProbeResultModel",
+    "json_ceiling",
+]

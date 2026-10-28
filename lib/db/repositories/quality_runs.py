@@ -37,6 +37,16 @@ class RunCommandKey:
 
 
 @dataclass(frozen=True)
+class StoredHumanObservation:
+    observation: q.NarrativeObservation
+    digest: str
+    grant_event_digest: str
+    profile_id: str
+    profile_revision: int
+    profile_digest: str
+
+
+@dataclass(frozen=True)
 class StoredReceipt:
     request_digest: str
     result_ref: str
@@ -113,6 +123,7 @@ class QualityRunRepository:
         observation: q.NarrativeObservation,
         *,
         grant_event_digest: str,
+        profile: q.QualityProfileRevision,
         recorded_at: datetime,
     ) -> None:
         self._require_postgresql()
@@ -127,6 +138,9 @@ class QualityRunRepository:
                 command_id=key.command_id,
                 request_digest=request_digest,
                 grant_event_digest=grant_event_digest,
+                profile_id=profile.profile_id,
+                profile_revision=profile.revision,
+                profile_digest=profile.profile_digest,
                 observation_digest=digest,
                 observation_json=_bounded(observation.model_dump(mode="json")),
                 recorded_at=recorded_at,
@@ -137,8 +151,8 @@ class QualityRunRepository:
 
     async def human_observation(
         self, *, user_id: str, project_name: str, observation_id: str
-    ) -> tuple[q.NarrativeObservation, str, str] | None:
-        """The stored Human observation, its digest and grant digest, recomputed from the complete body."""
+    ) -> StoredHumanObservation | None:
+        """The stored Human observation with its grant and producing-profile provenance, recomputed from its body."""
         row = await self.session.get(QualityHumanObservationModel, (user_id, project_name, observation_id))
         if row is None:
             return None
@@ -151,12 +165,14 @@ class QualityRunRepository:
             raise RequiredEvidenceMissingError()
         if observation.assessor_identity != row.actor_id:
             raise RequiredEvidenceMissingError()
-        return (observation, digest, row.grant_event_digest)
+        return StoredHumanObservation(
+            observation, digest, row.grant_event_digest, row.profile_id, row.profile_revision, row.profile_digest
+        )
 
     async def technical_observation(
         self, *, user_id: str, project_name: str, observation_id: str
-    ) -> q.TechnicalObservation | None:
-        """An A4 observation only after its complete A4 request/result/M7/observation chain replays."""
+    ) -> tuple[q.TechnicalObservation, ProbeRequest] | None:
+        """An A4 observation and its producing request, only after the complete A4 chain replays."""
         row = await self.session.get(QualityProbeObservationModel, (user_id, project_name, observation_id))
         if row is None:
             return None
@@ -172,7 +188,7 @@ class QualityRunRepository:
         replayed = await QualityProbeRepository(self.session).replay(request)
         if replayed is None or replayed.observation_id != observation_id:
             raise RequiredEvidenceMissingError()
-        return replayed
+        return (replayed, request)
 
     async def append_run(
         self,
@@ -255,4 +271,4 @@ class QualityRunRepository:
         return None if row is None else row.current_run_id
 
 
-__all__ = ["MAX_JSON_BYTES", "QualityRunRepository", "RunCommandKey", "StoredReceipt"]
+__all__ = ["MAX_JSON_BYTES", "QualityRunRepository", "RunCommandKey", "StoredHumanObservation", "StoredReceipt"]

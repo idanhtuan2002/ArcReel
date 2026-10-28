@@ -10,7 +10,9 @@ from __future__ import annotations
 from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import datetime, timedelta
-from typing import Literal
+from typing import Literal, Self
+
+from pydantic import model_validator
 
 import r2.contracts.quality as q
 from r2.advanced_creative.digests import digest_canonical
@@ -74,6 +76,17 @@ class HumanObservationRequest(q.M10ContractModel):
     findings: tuple[q.QualityFinding, ...]
     evidence_refs: tuple[q.ExactIdentity, ...]
     evidence_digest: q.Sha256Digest
+
+    @model_validator(mode="after")
+    def coherent_scope(self) -> Self:
+        scope = (self.user_id, self.project_name)
+        binding = self.subject.master_binding
+        if scope != (self.profile.user_id, self.profile.project_name) or scope != (
+            binding.user_id,
+            binding.project_name,
+        ):
+            raise ValueError("human observation scope mismatch")
+        return self
 
 
 def human_request_digest(request: HumanObservationRequest) -> str:

@@ -6,6 +6,7 @@ import sqlite3
 from pathlib import Path
 
 import pytest
+import sqlalchemy as sa
 from alembic.config import Config
 from alembic.script import ScriptDirectory
 
@@ -77,6 +78,12 @@ def test_upgrade_downgrade_upgrade_preserves_predecessor_and_matches_orm(alembic
                 for key in table.foreign_key_constraints
             }
             assert actual == expected
+            sql = connection.execute(
+                "SELECT sql FROM sqlite_master WHERE type='table' AND name=?", (table.name,)
+            ).fetchone()[0]
+            checks = {constraint.name for constraint in table.constraints if isinstance(constraint, sa.CheckConstraint)}
+            assert checks
+            assert all(f"CONSTRAINT {name} CHECK" in sql for name in checks)
         triggers = {
             row[0]
             for row in connection.execute(

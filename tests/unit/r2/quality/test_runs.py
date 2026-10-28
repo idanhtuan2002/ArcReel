@@ -325,3 +325,29 @@ def test_forged_profile_or_subject_cache_is_refused() -> None:
             admitted(forged, "TECHNICAL", "technical-required", "technical"),
             admitted(forged, "NARRATIVE", "review-required", "human"),
         )
+
+
+def test_human_request_scope_must_match_profile_and_subject_scope() -> None:
+    from pydantic import ValidationError
+
+    revision = profile()
+    body = {
+        "user_id": "owner",
+        "project_name": "other-project",
+        "actor_id": "actor",
+        "command_id": "human-1",
+        "subject": valid_subject().model_dump(mode="json"),
+        "profile": revision.model_dump(mode="json"),
+        "requirement_id": "review-required",
+        "slot_id": "human",
+        "status": "PASS",
+        "rubric_id": "rubric",
+        "rubric_digest": DIGEST,
+        "segment_closure_digest": DIGEST,
+        "reviewer_evidence_digest": DIGEST,
+        "findings": [],
+        "evidence_refs": ["notes"],
+        "evidence_digest": DIGEST,
+    }
+    with pytest.raises(ValidationError):
+        runs().HumanObservationRequest.model_validate(body)

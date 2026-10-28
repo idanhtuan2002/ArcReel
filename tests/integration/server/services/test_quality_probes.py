@@ -169,6 +169,7 @@ def probe_request(
     slot_id: str = "technical",
     requirement_id: str = "review-required",
     dependencies: tuple = (),
+    selected: dict[str, str] | None = None,
 ):
     from tests.unit.r2.quality.test_quality_digests import valid_subject
 
@@ -185,7 +186,8 @@ def probe_request(
         if snapshot["artifact_key"] in promoted:
             current = promoted[snapshot["artifact_key"]]
             snapshot["body"]["approved_master"].update(
-                approval_record=current.approval_record, selected_candidate_id=current.candidate_id
+                approval_record=current.approval_record,
+                selected_candidate_id=(selected or {}).get(snapshot["artifact_key"], current.candidate_id),
             )
     bodies = {snapshot["artifact_key"]: snapshot["body"] for snapshot in binding["metadata_snapshots"]}
     for edge in binding["dependency_edges"]:
