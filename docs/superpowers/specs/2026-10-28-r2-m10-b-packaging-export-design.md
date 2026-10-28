@@ -1,7 +1,9 @@
 # M10-B — Packaging, Selection and Deterministic Export (design amendment)
 
-Status: **CANDIDATE r2**, pending delta re-review. r1 (`1751a23bc`) was reviewed REWORK
-(`docs/r2/evidence/m10-b-reviews/design-b0-review.json`); §11 maps every finding to its resolution.
+Status: **ACCEPTED WITH CONDITIONS (r3)**. r1 (`1751a23bc`) REWORK
+(`docs/r2/evidence/m10-b-reviews/design-b0-review.json`); r2 (`4d76003d5`) ACCEPT_WITH_CONDITIONS, no H
+(`design-r2-delta-review.json`); r3 resolves its N1–N7 in place (§11, §12). Same-family review; Codex re-review
+recommended when quota returns (C5).
 Base: `0af66db9e` (M10-A accepted with conditions, `docs/r2/evidence/R2_M10_A_ACCEPTANCE.json`, source `b904bc000`).
 
 Governing: plan Task B (`docs/superpowers/plans/2026-09-16-r2-m10-quality-packaging.md`), design §4.2, §5.2, §6,
@@ -63,7 +65,8 @@ promotion. *Rejected:* a standalone package revision store (duplicates M8 CAS/re
 `PromotionTargetKind` (would route through Production Authority, which M10 must never call).
 
 **D2 PACKAGING never promotes.** `PromotionTargetKind` is unchanged. The existing `promotable_format` refusal covers
-PACKAGING before any lock. Differential tests prove CANVAS/SPATIAL/FORMAT bodies, digests and promotion behavior
+PACKAGING after the M8 command key, candidate head and preview locks but before the slot lock and any Production
+Authority port. Differential tests prove CANVAS/SPATIAL/FORMAT bodies, digests and promotion behavior
 are unchanged and a PACKAGING revision reaches no Production Authority port.
 
 **D3 Package checks are package-scoped observations, not run members.** (Revised from r1.) The M10-A `QualityRun`
@@ -91,8 +94,17 @@ package-scoped run type (doubles A5 closure logic and its migration).
 **D4 Platform constraints are a policy amendment.** `QualityPolicyV2` = every V1 field plus
 `platform_constraints: PlatformConstraintSnapshot` and `packaging_waiverable_rule_ids`. The policy field of
 draft/revision becomes the union `QualityPolicyV1 | QualityPolicyV2` discriminated by `schema_id`; all V1 vectors,
-digests and stored rows are unchanged and V2 carries every V1 attribute, so A code reads both. Profiles publish V2
-through the accepted A3 Human publication path. Packaging requires a V2 profile; a V1 profile refuses with
+digests and stored rows are unchanged. V2 does **not** subclass V1 (its `schema_id` literal would be an incompatible
+override): both subclass one shared `QualityPolicyFields` base holding every V1 field and the V1 `coherent`
+validator, and A code typed against V1 (`r2/quality/runs.py:116`, digests) is retyped to the union. `AssessorKind`
+gains no PACKAGING member, so no run slot can require a packaging observation. Profiles publish V2
+through the accepted A3 Human publication path.
+
+Every packaging rule carries a closed `rule_class`: `INTEGRITY` (asset digest/size/media type), `REQUIRED_ASSET`,
+`CLOSURE` (content/presentation/subject digest), `CURRENTNESS` (master/profile/disposition binding), `DURATION`,
+`METADATA_LINT`, `CHAPTER`, `LOCALE`, `VARIANT`. `INTEGRITY`, `REQUIRED_ASSET`, `CLOSURE` and `CURRENTNESS` are
+non-waivable (rebase: authority, integrity, closure and currentness are never waived); V2 validation refuses a
+`packaging_waiverable_rule_ids` entry naming such a rule (RED test in B1). Packaging requires a V2 profile; a V1 profile refuses with
 `M10_PROFILE_STALE`. A changed constraint is a new profile revision.
 
 `PlatformConstraintSnapshot` (`m10.platform-constraints.v1`): `platform_profile_id`, `platform_profile_revision`,
@@ -124,9 +136,14 @@ poll/cancel/lookup/webhook, `OFFLINE_VERIFIED`), mirroring `local-ffmpeg-format-
 1. **Prepare** (command guard held): resolve and lock the selection closure (§4), stage an append-only
    `m10_export_invocations` row (request digest, execution id, selection receipt id, manifest digest computed in
    advance from the verified closure) and let the M7 submitter commit PLANNED with it.
-2. **Execute** (outside any metadata transaction): the M7 `submit` callback runs the stdlib archive builder in the
-   A4 confined transient unit (same launcher, read-only verified snapshots, one writable scratch dir), which
-   writes `exports/.partial-<uuid>.zip`; the host then fsyncs, renames to the content-addressed
+2. **Execute** (outside any metadata transaction): the M7 `submit` callback runs a fixed stdlib archive-builder
+   worker in a **separate export envelope** — a transient unit built by the A4 unit-property code but with its own
+   identity and limits, not the probe envelope (which precreates three scratch inodes, caps files at 64 MiB and
+   verifies only ffmpeg/ffprobe/vmaf identities): same `SystemCallFilter=~@network-io …` and
+   `SystemCallErrorNumber=EPERM`; read-only bind of the verified snapshot directory; one writable private output
+   directory; `LimitFSIZE` = closure byte total + 1 MiB; runtime cap 30 s + 1 s per 50 MiB; worker file pinned by
+   digest as its tool identity. The worker writes `exports/.partial-<execution_id>.zip`; the host then fsyncs,
+   renames to the content-addressed
    `exports/<sha256>.zip`, fsyncs the directory, re-verifies the bytes and returns
    `provider_job_id = "<execution_id>:<archive digest>"`. M7 records ACCEPTED.
 3. **Finalize** (one transaction, §4 order): recompute the closure, re-verify the published object against the
@@ -139,6 +156,14 @@ with a new command, and because the archive is deterministic the new execution p
 reconciles an already-published identical object. `FAILED_BEFORE_ACCEPTANCE` (validation failed in the callback)
 replays its typed error. Disk-full and rename failures surface as known failures before acceptance; any partial
 file is removed. Status vocabulary is `EXPORTED`; nothing records upload/publish/visibility.
+
+Envelope: closure total and every member must stay below 2^31 bytes, otherwise `M10_OPERATIONAL_ENVELOPE_EXCEEDED`
+before PLANNED, so zipfile never emits ZIP64 extras (`allowZip64=False`). Orphans: a `.partial-<execution_id>.zip`
+is removed at the start of its own execute and by a sweep that removes partials whose attempt is terminal or
+`SUBMIT_OUTCOME_UNKNOWN`. B4 deliverables include `PACKAGE_EXPORT_SUBMIT_FAMILIES` in
+`r2/host_hardening/route_inventory.py`, the `local-zip-package-export@host-export-v1` entry in
+`r2/provider_capabilities/registry.json` with its evidence, and the scope-verifier/route-inventory test updates
+that admit exactly this family.
 
 **D8 F1 persistence** (implemented in B0). Append-only `m10_quality_probe_failures` flushed in the M7 submit session
 so it commits iff the attempt commits `FAILED_BEFORE_ACCEPTANCE`; a staging error turns the outcome into
@@ -169,6 +194,10 @@ Import constraint (resolves an otherwise certain cycle): `r2/contracts/quality.p
   (`m10.packaging-presentation.v1` over the presentation group), recomputed by the server on append and by the check;
 - `provenance: tuple[PackagingProvenance]` per field group: `author_kind` (`HUMAN`|`AGENT`), `actor_id`,
   **set by the server from the authenticated principal**, never accepted from the client.
+
+The kernel does not require a candidate to keep its kind across revisions, so the packaging service refuses to
+append to, check, preview or select from a candidate whose current head revision is not PACKAGING
+(`M10_STALE_HEAD`); a polluted candidate is abandoned for a new candidate id.
 
 M8 `LineageBinding` for PACKAGING: `content_basis_digest` = the master's content basis, `approved_master_id/digest`
 = the bound master (non-null), `creative_profile_id` = quality profile id, `creative_profile_version` =
@@ -210,31 +239,36 @@ identities; a unique constraint covers the five columns. The head stores `select
 `head_version`, `quality_profile_revision` (bound data, not part of the key). Fixtures: delimiter/case/
 cross-cohort/cross-surface/cross-project non-collision, CAS, migration.
 
-**Global order** (one order for every M10 writer, extending the A order "command guard → sorted masters →
-profile head → disposition head → grant heads"):
+**Global order** (one order for every M10 writer; it is the real A5/A6 order — `quality_runs.py` seal and
+`quality_dispositions.py` decide both take command guard → `lock_subject_masters` → `lock_profile_head` (FOR SHARE)
+→ run head → disposition head → `lock_grant_heads` (sorted, FOR UPDATE) — extended by the M10-B rows):
 
-`receipt replay → command guard → sorted master rows → profile head → disposition head → packaging-head advisory
-(m10.packaging-head.v1 over the slot key) → packaging head row → export invocation → grant heads (sorted) →
-M7 attempt row`.
+`receipt replay → command guard → lock_subject_masters (sorted, the existing exclusive no-op UPDATE) →
+lock_profile_head (FOR SHARE) → run head (FOR SHARE) → disposition head (FOR SHARE) → preview row (FOR UPDATE) →
+packaging-head advisory (m10.packaging-head.v1 over the slot key) → packaging head row (FOR UPDATE for selection,
+FOR SHARE for export) → export invocation → lock_grant_heads (sorted, FOR UPDATE, reused helper; validity_in /
+load_run_observations re-take the same set, which is idempotent) → M7 attempt row`.
 
-- Selection: masters, profile head and disposition head **FOR SHARE**; preview row FOR UPDATE (taken after the
-  disposition head, before the packaging-head advisory); packaging head advisory + FOR UPDATE; grant heads
-  FOR SHARE. Absent heads are inserted under the head-keyed advisory lock, so two different commands for the same
+- Masters reuse `lock_subject_masters`; there is no FOR SHARE master helper and M10-B adds none.
+- Selection and export prepare/finalize evaluate currentness with the A `validity_in` inside their own transaction
+  after the packaging-head row and before the attempt row, so its grant-head locks fall at the grant-heads position.
+- **A newer run stales a selection**: the selection binds `quality_run_id`; under the run head lock the head must
+  still name that run and `validity_in` must not report `newer_run`/SUPERSEDED, otherwise `M10_DISPOSITION_STALE`.
+  Because the run head is FOR SHARE-locked, a concurrent run seal (which locks it exclusively) serializes against
+  selection and finalize instead of slipping between read and write.
+- Absent packaging heads are inserted under the head-keyed advisory lock, so two different commands for the same
   slot serialize on the head, not only on their command keys.
-- Export prepare and finalize: the same prefix with masters/profile/disposition/packaging head **FOR SHARE**, then
-  the M7 attempt row (M7's own transition lock). Finalize therefore never takes the packaging head before the
-  disposition head.
-- Disposition writers (A6) never take a packaging lock; M7 workers lock only the attempt row; M8 writers take only
-  M8 command keys and candidate heads, which no M10-B writer locks. Hence no cycle exists across M8, M10-A,
-  M10-B and M7 writers.
+- Disposition writers and run seals never take a preview, packaging or export lock; M7 workers lock only the
+  attempt row; M8 writers take only M8 command keys and candidate heads, which no M10-B writer locks. Every writer
+  that takes two of these locks takes them in the order above, so no cycle exists across M8, M10-A, M10-B and M7.
 - Tentative closure is resolved outside the transaction and recomputed under the guard; if the lock set changed,
   roll back and resolve again; no media/tool I/O while holding locks.
-- Real PostgreSQL tests for every writer pair (selection × disposition, selection × export finalize, export
-  finalize × disposition, selection × selection on one slot with different commands, profile publication ×
-  selection), with barriers and an observed blocked waiter including a queued FOR UPDATE behind FOR SHARE;
-  no sleeps.
+- Real PostgreSQL tests for every writer pair (selection × disposition, selection × run seal, export finalize ×
+  run seal, selection × export finalize, export finalize × disposition, selection × selection on one slot with
+  different commands, profile publication × selection), with barriers and an observed blocked waiter including a
+  queued FOR UPDATE behind FOR SHARE; no sleeps.
 
-Currentness: a selection is exportable only while master, profile head, the bound disposition (unexpired, not
+Currentness: a selection is exportable only while master, profile head, the bound run (still the run head), the bound disposition (unexpired, not
 superseded, still the current decision for its run) and the packaging head are exactly as bound. The selected
 candidate revision is immutable, so a newer candidate revision does not stale an existing selection; it only
 becomes selectable after its own check and selection. Drift → `M10_SUBJECT_STALE` / `M10_DISPOSITION_STALE` /
@@ -270,10 +304,10 @@ waived/superseded/invalidated states; keyboard/focus/reduced-motion; axe-core; a
 - Smallest useful effect: the seeded recall threshold is met **and** at least one of (a real defect caught on a
   clean final, or a confirmed correction made through the panel) is recorded. "Nothing found" on clean finals
   never satisfies the effect on its own.
-- Runtime absence of network: the archive builder runs in the A4 confined transient unit
-  (`server/services/quality_probe_runtime.py`: `SystemCallFilter=~@network-io …`, `SystemCallErrorNumber=EPERM`);
-  evidence records the unit properties and a `socket()` attempt from inside the unit failing with `EPERM`,
-  in addition to the static scan.
+- Runtime absence of network: the archive builder runs in the D7 export envelope (`SystemCallFilter=~@network-io …`,
+  `SystemCallErrorNumber=EPERM`); evidence records the unit properties and a `socket()` attempt from inside the
+  unit failing with `EPERM`. The claim covers only the confined builder and the confined probes; host-side check,
+  rename and verification code is covered by the static scan, and that limit is recorded.
 - Order: Western explainer → vertical factual Short → `zh-shuang`; each needs a published V2 profile, a Human
   disposition and a Human selection. The agent prepares everything and stops at each Human gate.
 
@@ -326,3 +360,15 @@ Human lease, or a parity row that cannot reach PASS under the frozen criteria st
 | L5 M8 → M10 error | D2 uses the existing M8 refusal |
 | L6 RED cases | §8 Contracts/Selection/Export rows |
 | L7 earlier A downgrades | unchanged known limit L5 of M10-A; M10-B downgrades refuse |
+
+## 12. r2 delta review resolution
+
+| Finding | Resolution |
+|---|---|
+| N1 run head / grant heads / master mode / newer run | §4 global order now the real A5/A6 order plus M10-B rows; newer run stales; run-seal pair tests |
+| N2 export cannot use the probe envelope | D7 separate export envelope with its own limits and identity; §7 claim scoped; B4 deliverables listed |
+| N3 unrestricted waivers | D4 closed `rule_class`, non-waivable classes refused by V2 validation |
+| N4 D2 wording, line refs | D2 corrected |
+| N5 kind continuity | §3.1 packaging service refuses a non-PACKAGING head |
+| N6 ZIP64, orphans, deliverables | D7 envelope paragraph |
+| N7 V2 typing, AssessorKind | D4 shared `QualityPolicyFields` base; no PACKAGING assessor kind |

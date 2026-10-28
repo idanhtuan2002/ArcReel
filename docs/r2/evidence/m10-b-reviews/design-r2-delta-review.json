@@ -1,0 +1,159 @@
+{
+  "schema_id": "m10.b-design-r2-delta-review.v1",
+  "reviewed_head": "4d76003d5",
+  "reviewed": {
+    "design_r2": "docs/superpowers/specs/2026-10-28-r2-m10-b-packaging-export-design.md (diff 1751a23bc..4d76003d5)",
+    "b0_c4_tests": "1a93a16e5 tests/integration/server/services/test_quality_probes.py::test_recorded_failure_tamper_refuses_replay, ::test_a_caller_that_saw_planned_replays_the_recorded_failure_after_the_lock",
+    "prior_review": "docs/r2/evidence/m10-b-reviews/design-b0-review.json"
+  },
+  "reviewer": "Separate Claude Opus subagent (claude-opus-5-5), same model family as the builder; sponsor-authorized substitute for Codex (Codex quota exhausted). Not an independent model family.",
+  "verdict": "ACCEPT_WITH_CONDITIONS",
+  "reviewer_reran": [
+    {
+      "command": "disposable postgres:16-alpine on 127.0.0.1:55492; DATABASE_URL=... uv run alembic upgrade head",
+      "result": "PASS: head 4c1f0e2a9b10"
+    },
+    {
+      "command": "DATABASE_URL=... uv run python -m pytest -q tests/integration/server/services/test_quality_probes.py tests/integration/lib/db/migrations/test_4c1f0e2a9b10_quality_probe_failures.py",
+      "result": "35 passed, 7 warnings in 74.76s; --collect-only confirms both C4 tests are collected"
+    }
+  ],
+  "reviewer_not_verified": [
+    "No implementation exists for B1-B8; every lock-order statement is checked against the M10-A/M7/M8 code it would reuse, not against B code",
+    "PG lock-queue behaviour reasoned, not exercised by a both-order test",
+    "Donor pins not re-inspected"
+  ],
+  "finding_status": {
+    "H1": {
+      "status": "PARTIAL",
+      "note": "The packaging/disposition inversion is fixed: §4 gives one global order, with finalize taking the disposition head before the packaging head, and adds writer-pair tests. Still open: the run-head and grant-head positions, and the lock modes, do not match the M10-A code that 'current disposition' would reuse. See N1."
+    },
+    "H2": {
+      "status": "RESOLVED",
+      "note": "D7 drops m10_export_jobs. It binds an append-only m10_export_invocations row to an M7 attempt, and M7 owns state, lease and fence. Capability idempotency NONE / NON_AUTHORITATIVE / no poll-cancel-lookup / OFFLINE_VERIFIED matches r2/provider_capabilities/registry.json:291-333 (format-projection and quality-probe). ACCEPTED-replay via a job-id digest matches format_render._accepted_digest (server/services/format_render.py:318,355). Execution-envelope gap: see N2."
+    },
+    "M1": {
+      "status": "RESOLVED",
+      "note": "PACKAGING_SLOT is a five-tuple key with canonical-JSON encoding and a unique constraint. The head-keyed advisory lock m10.packaging-head.v1 mirrors m10.disposition-head.v1 (lib/db/repositories/quality_dispositions.py:166)."
+    },
+    "M2": {
+      "status": "RESOLVED",
+      "note": "§2 inventory checked against code. It records the APPEND_REVISION receipts, adds a service-level PACKAGING refusal, defines LineageBinding, and needs no get_head lock because selection binds an immutable revision. Minor inaccuracies: ExplorationService.append_revision is def :204 with the SPATIAL refusal at :215, and promotable_format is def :179 with the check at :181. The 'before any lock' claim is wrong; see N4. One missed kernel gap; see N5."
+    },
+    "M3": {
+      "status": "RESOLVED",
+      "note": "The premise is correct: r2/contracts/quality.py:25 imports r2.contracts.advanced_creative directly. Placing the PackagingCandidate payload on M8ContractModel in advanced_creative.py, and the M10 shapes in packaging.py, removes the cycle."
+    },
+    "M4": {
+      "status": "RESOLVED",
+      "note": "D3 now has package-scoped observations in their own table, and run sealing is unchanged. Sealing refuses PACKAGING even before the subject check at r2/quality/runs.py:127, because _ADMITTED (runs.py:37-40, looked up at :120-122) has no PACKAGING entry. The lifecycle and waiver rules are stated. Waiver bounds: see N3. AssessorKind must not gain PACKAGING: see N7."
+    },
+    "M5": {
+      "status": "RESOLVED",
+      "note": "§3.1 restores content_closure_digest, presentation_closure_digest, platform_profile_id/revision and per-asset constraint_rule_id, each with its own domain."
+    },
+    "M6": {
+      "status": "RESOLVED",
+      "note": "§3.3 adds variant_groups covering title/description/tags/chapters/thumbnail. Exactly one variant is chosen per group, bound by preview and selection, and only the chosen variants are exported."
+    },
+    "M7": {
+      "status": "PARTIAL",
+      "note": "Metrics, thresholds and a non-vacuous smallest useful effect are now preregistered. The runtime no-network evidence relies on the A4 confined unit (SystemCallFilter ~@network-io, EPERM at server/services/quality_probe_runtime.py:62-63,159-160). Whether the archive builder can actually run in that unit is N2."
+    },
+    "M8": {
+      "status": "RESOLVED",
+      "note": "Both C4 tests exist and pass on PostgreSQL. The tamper test runs at repository level and covers both the digest and the JSON-body cases. The late-read test forces the PLANNED witness and asserts no tool start and that the recorded evidence comes back."
+    },
+    "L1": {
+      "status": "RESOLVED",
+      "note": "Every ZipInfo field is now pinned. ZIP64 is still open (N6)."
+    },
+    "L2": {
+      "status": "RESOLVED",
+      "note": "Accepted as is. The rationale is acceptable for an append-only, CHECK-bounded column."
+    },
+    "L3": {
+      "status": "RESOLVED",
+      "note": "§8/D8 reworded. Nit: the D8 phrase 'raised before the tool callback ... are ordinary request errors' is inexact. An AttemptIdentityMismatch inside the M7 adapter (r2/host_hardening/host_submit.py submit_observation) commits FAILED_BEFORE_ACCEPTANCE without a row; it is not a request error."
+    },
+    "L4": {
+      "status": "RESOLVED",
+      "note": "Provenance is set by the server from the authenticated principal."
+    },
+    "L5": {
+      "status": "RESOLVED",
+      "note": "D2 uses the existing M8 refusal, so M8 has no dependency on the M10 error code."
+    },
+    "L6": {
+      "status": "RESOLVED",
+      "note": "§8 now lists the RED cases."
+    },
+    "L7": {
+      "status": "RESOLVED",
+      "note": "Carried as the M10-A known limit; M10-B downgrades refuse."
+    }
+  },
+  "new_findings": {
+    "H": [],
+    "M": [
+      {
+        "id": "N1",
+        "where": "design §4 global order and §4 Currentness; server/services/quality_dispositions.py:255-266,386; server/services/quality_runs.py:559-566 (load_run_observations -> lock_grant_heads FOR UPDATE), :637-658 (newer_run); r2/quality/runs.py:327-332; server/services/master_authority.py lock_current_master_rows (no-op UPDATE)",
+        "issue": "Selection (D3a) needs 'a current M10-A PASS/WAIVE disposition'. In code, currentness is project_readiness/validity_in. That path reads the run head (newer_run gives SUPERSEDED), and load_run_observations locks grant heads FOR UPDATE in the middle of the sequence. The r2 global order leaves out the run head, which A6 takes FOR SHARE between profile head and disposition head. It also puts grant heads FOR SHARE after the packaging head. The Currentness text ('still the current decision for its run') does not say whether a newly sealed run stales a selection. The masters 'FOR SHARE' has no helper either: lock_current_master_rows takes an exclusive no-op UPDATE.",
+        "scenario": "Reusing validity_in makes the implemented order differ from the reviewed one: grant FOR UPDATE comes before preview and packaging head. I found no cycle in this, but the both-order tests would be checking a different order than the spec. Separately, if the run head is only read and not locked, a concurrent run seal commits between selection's check and its commit. The selection is then bound to a SUPERSEDED run, while M10-A readiness already reports NOT_READY.",
+        "fix": "Decide the newer-run semantics for packaging. Either follow M10-A readiness (a newer run makes it not exportable), or explicitly exclude newer_run and record that this diverges from A readiness. If you follow A, insert 'run head FOR SHARE' after the profile head and add a run-seal x selection/finalize writer-pair test. State where grant heads are locked and in which mode: either reuse lock_grant_heads FOR UPDATE at the validity step and say so, or add a share-mode helper and use it at the tail. State that master rows use lock_current_master_rows, which is exclusive, or add a share helper."
+      },
+      {
+        "id": "N2",
+        "where": "design D7 step 2 and §7 runtime-network bullet vs server/services/quality_probe_runtime.py:50-67,145-162,185-201",
+        "issue": "D7 says the archive builder runs in 'the A4 confined transient unit (same launcher ...) with one writable scratch dir' and writes exports/.partial-<uuid>.zip. The A4 envelope cannot do this. The worker may not create files: it gets exactly three precreated scratch inodes. LimitFSIZE and SCRATCH_MAX_BYTES are 64 MiB, below a typical master mp4. MAX_RUNTIME_MS is 120 s. The launcher runs a worker that verifies the ffmpeg/ffprobe/vmaf ToolIdentity, not an archive builder.",
+        "scenario": "Building a bundle with a 200 MiB master hits LimitFSIZE (SIGXFSZ or EFBIG) inside the unit, so the bundle never builds. Alternatively the implementer silently widens the A4 envelope, or builds the archive in the host process, and then the §7 runtime no-network evidence no longer covers the builder.",
+        "fix": "Specify a distinct export envelope. It should have one precreated output inode (or one created by the host and passed in) sized from master bytes plus a bounded overhead, an explicit LimitFSIZE and RuntimeMaxSec, and its own worker entry and identity digest. Keep the same SystemCallFilter, and record those properties in the resource evidence. Alternatively, build the archive in the host process and limit the runtime network claim to what is actually confined. Add the new route family to r2/host_hardening/route_inventory.py and r2/provider_capabilities/registry.json with OFFLINE_VERIFIED evidence."
+      },
+      {
+        "id": "N3",
+        "where": "design D3 (packaging_waiverable_rule_ids), D4; rebase audit row 4",
+        "issue": "Selection-time waivers come from a profile-declared list with no restriction. The rebase forbids waiving authority, integrity, closure or currentness. Rule ids that could be listed include asset digest/size re-hash, missing required roles, closure-digest mismatch and duration-window rules.",
+        "scenario": "A published V2 profile lists the asset-digest rule as waivable. A Human selection then waives byte drift, and export packages bytes other than those that were checked. The finalize re-hash would refuse it, but the waiver itself should never be admissible.",
+        "fix": "Define a closed set of non-waivable packaging rule classes: integrity, closure, required asset presence and currentness. Have QualityPolicyV2 validation refuse any of them in packaging_waiverable_rule_ids, and add a RED test. Waivable rules should be metadata-lint only."
+      }
+    ],
+    "L": [
+      {
+        "id": "N4",
+        "where": "design D2 and §2 row 'preview staging / ExplorationPromotion'; r2/advanced_creative/promotion.py:84-104,132; r2/advanced_creative/exploration.py:282-298",
+        "issue": "'promotable_format refusal covers PACKAGING before any lock' is inaccurate. Promotion reaches promotable_format after the M8 command key, the candidate head FOR UPDATE and the preview FOR UPDATE. Preview staging reaches it after the command key and the head read. It does happen before the slot lock and before Production Authority.",
+        "scenario": "A differential test written against the text asserts that no lock was taken, and fails, or gets weakened.",
+        "fix": "Reword to 'before the slot lock and any Production Authority call', and assert that in the test."
+      },
+      {
+        "id": "N5",
+        "where": "lib/db/repositories/advanced_creative.py:263-276; server/routers/advanced_creative.py:97",
+        "issue": "The M8 kernel does not enforce kind continuity across revisions. A client CANVAS append through the generic route, using a PACKAGING candidate_id in the same scope with the right parent and head version, advances that head with a CANVAS revision. Selections are unaffected because they bind immutable revisions. The packaging head and history then mix kinds. The gap exists today for SPATIAL too.",
+        "scenario": "The next M10 packaging append to that candidate gets an unexpected parent kind, and history shows a CANVAS revision in a package lineage.",
+        "fix": "The M10 packaging service refuses when the current head revision's kind is not PACKAGING. Optionally record the kernel gap as a pre-existing M8 limit, or add an additive kind-continuity check under the §2 evolution rule."
+      },
+      {
+        "id": "N6",
+        "where": "design D6/D7",
+        "issue": "Three loose ends. (a) stdlib zipfile adds ZIP64 extra fields once a member reaches ZIP64_LIMIT (2 GiB - 1), which contradicts 'empty extra'. (b) Orphaned exports/.partial-* files after a crash during execute have no cleanup path. (c) The registry/route-inventory entries are not listed among the deliverables.",
+        "scenario": "A long master breaks the golden-field rule, and crash-recovery tests leave partial files behind.",
+        "fix": "Cap the bundle and member size below the ZIP64 limit, refusing with a typed error, or define deterministic ZIP64 fields. Add a startup or reconcile sweep for partials older than the M7 lease. List the registry and route-inventory additions in B4."
+      },
+      {
+        "id": "N7",
+        "where": "design D4; r2/quality/runs.py:29-40,115; r2/contracts/quality.py:293-299",
+        "issue": "M10-A code is typed against QualityPolicyV1, for example _admit(policy: q.QualityPolicyV1), and maps ObservationType to AssessorKind through the exhaustive _KIND table. D4 does not say whether V2 subclasses V1. Nor does it say that AssessorKind stays unchanged. Adding PACKAGING there would let a policy declare a run slot that can never be satisfied.",
+        "scenario": "Pyright errors across the A code, or a profile is published that can never seal a run.",
+        "fix": "Make QualityPolicyV2 a subclass of V1, or widen the A signatures explicitly. State that AssessorKind gains no PACKAGING member, and that a PACKAGING ObservationType has no _KIND or _ADMITTED entry, with a test."
+      }
+    ]
+  },
+  "conditions": [
+    "C1: resolve N1 in the amendment before the B3 (selection) freeze, including the newer-run decision and the run-seal x selection/finalize pair test.",
+    "C2: resolve N2 before B4 (export) starts. The §7 runtime no-network evidence (M7 PARTIAL) is accepted only once the builder's actual execution envelope is specified.",
+    "C3: resolve N3 in the B1 policy-V2 contract, with a RED test.",
+    "C4: N4-N7 are notes to fold into B1/B4 text and tests; they open no review round.",
+    "C5: independence limit unchanged. This is a same-family review; a Codex re-review is recommended when quota allows."
+  ]
+}
