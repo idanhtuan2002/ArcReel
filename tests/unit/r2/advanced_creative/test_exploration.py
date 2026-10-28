@@ -325,6 +325,7 @@ async def test_packaging_revisions_never_reach_a_promotion_preview(target_ref: s
     with pytest.raises(PromotionTargetUnavailableError, match="PACKAGING candidates have no promotable artifact"):
         await _preview(world, _target(target_ref=target_ref))
     assert world.previews == {}
+    assert world.events == ["command", "head"]
     with pytest.raises(PromotionTargetUnavailableError):
         promotable_format(revision)
 

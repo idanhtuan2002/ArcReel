@@ -283,3 +283,36 @@ async def test_a_manifest_slot_is_unavailable() -> None:
     with pytest.raises(PromotionTargetUnavailableError):
         await _promote(world, _authorization(world.preview))
     assert "slot" not in world.events
+
+
+def _packaging_revision() -> ExplorationRevision:
+    from r2.contracts.advanced_creative import PackagingCandidate
+    from tests.unit.r2.contracts.test_packaging import candidate_data
+
+    base = _revision()
+    payload = PackagingCandidate.model_validate(candidate_data())
+    return ExplorationRevision(
+        **(
+            base.model_dump(mode="python")
+            | {
+                "kind": ExplorationKind.PACKAGING,
+                "payload": payload,
+                "payload_digest": digest_payload(payload, base.lineage),
+            }
+        )
+    )
+
+
+class _PackagingWorld(_World):
+    async def get_exact(self, **_: object) -> ExplorationRevision:
+        return _packaging_revision()
+
+
+async def test_a_packaging_revision_is_refused_before_any_slot_lock_or_authority_write() -> None:
+    preview = _preview().model_copy(update={"candidate_payload_digest": _packaging_revision().payload_digest})
+    world = _PackagingWorld(preview)
+
+    with pytest.raises(PromotionTargetUnavailableError, match="PACKAGING candidates have no promotable artifact"):
+        await _promote(world, _authorization(world.preview))
+    assert world.events == ["command", "head", "preview"]
+    assert world.promotion_receipts == {}

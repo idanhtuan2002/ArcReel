@@ -1,0 +1,123 @@
+{
+  "schema_id": "m10.b1-delta-review.v1",
+  "reviewed_head": "83e1f3c2cc3c2d2f98b1243433a47b0533d0945a",
+  "reviewer": "Codex independent delta review; main agent; source read-only",
+  "verdict": "ACCEPT_WITH_CONDITIONS",
+  "finding_status": {
+    "H1": {
+      "status": "RESOLVED",
+      "locations": [
+        "r2/contracts/quality.py:491",
+        "r2/contracts/quality.py:516",
+        "r2/contracts/quality.py:549",
+        "r2/contracts/quality.py:605",
+        "r2/contracts/quality.py:636",
+        "tests/unit/r2/contracts/test_packaging.py:673",
+        "tests/unit/r2/contracts/test_packaging.py:694"
+      ],
+      "evidence": "check_id is a closed literal whose class must match the immutable PACKAGING_CHECK_CLASSES map. All safety-class rules must be BLOCKING. Six safety checks are mandatory, check IDs and rule IDs are unique, and each asset role must reference asset.required when required or asset.integrity otherwise. The V2 waiver validator still refuses every safety-class rule. Additional independent probes refused 28 cases: reclass/advisory/waiver for all seven safety rules in the fixture; removal of each of six mandatory checks; and changing BOTH check_id and class of the required-role rule into valid lint semantics. A valid V2 profile still publishes through the existing pure A path.",
+      "verification_command": "DATABASE_URL=postgresql+asyncpg://postgres:postgres@127.0.0.1:55491/arcreel_test PYTHONDONTWRITEBYTECODE=1 UV_CACHE_DIR=/tmp/m10-b-uv-cache uv run --offline --no-sync python -m pytest -q -p no:cacheprovider tests/unit/r2/contracts tests/unit/r2/quality tests/unit/r2/advanced_creative",
+      "verification_result": "1098 passed in 8.81s, exit 0, at the reviewed HEAD. This includes the persisted repair tests and unchanged A/M8 regressions. The external database URL bypasses temporary database startup; this result is unit coverage, not live PostgreSQL evidence.",
+      "limit": "B2 must execute these server-owned checks and preserve their semantics; B3 must independently enforce selection/currentness/waiver custody. No downstream B2/B3 authorization or export acceptance claimed."
+    },
+    "M1": {
+      "status": "RESOLVED",
+      "locations": [
+        "r2/contracts/quality.py:583",
+        "r2/contracts/quality.py:589",
+        "r2/contracts/quality.py:605",
+        "tests/unit/r2/contracts/test_packaging.py:28"
+      ],
+      "evidence": "The snapshot now represents description min/max, plain_text_only, separate title/description required terms, closed tag_charset, tag/hashtag minimum and maximum counts and explicit max_hashtag_chars. Strict numeric/boolean fields and coherent bounds reject inverted intervals. All fields participate in the constraint and V2 policy projections; updated frozen vectors pass.",
+      "limit": "This resolves the missing contract fields. Actual Kalinga seo_lint behavior/parity is a later B2/B6 gate and was not newly qualified by this schema review."
+    },
+    "M2": {
+      "status": "RESOLVED",
+      "locations": [
+        "r2/contracts/advanced_creative.py:499",
+        "r2/contracts/advanced_creative.py:506",
+        "tests/unit/r2/contracts/test_packaging.py:706"
+      ],
+      "evidence": "Every PackagingVariant requires immutable VariantProvenance(author_kind HUMAN|AGENT, actor_id). The fixture records different authors for its two alternatives. Persisted tests confirm missing provenance is rejected and provenance mutation invalidates the content closure. Since variant_groups is in PACKAGING_CONTENT_FIELDS, both the content closure and candidate projections bind provenance. Updated M10 candidate and M8 PACKAGING payload vectors pass.",
+      "limit": "The future M10 append boundary must derive author identity from the principal. Accepting stored provenance in a pure kernel model is intentional and grants no authority."
+    },
+    "M3": {
+      "status": "RESOLVED",
+      "locations": [
+        "r2/contracts/packaging.py:230",
+        "r2/contracts/packaging.py:235",
+        "r2/contracts/packaging.py:247",
+        "tests/unit/r2/contracts/test_packaging.py:719"
+      ],
+      "evidence": "ExportManifest now requires chosen_variants of group_id/variant_id pairs. Its validator refuses duplicate groups and sorts by UTF-8 group identity, preserving exactly one explicit choice for each represented group. Persisted tests demonstrate canonical ordering, duplicate refusal and a changed manifest digest when the choice changes. The new manifest vector passes.",
+      "limit": "Completeness against candidate groups and equality with the selected preview require external candidate/selection evidence and remain B3/B4 runtime checks; the manifest model alone cannot establish them."
+    },
+    "M4": {
+      "status": "RESOLVED",
+      "locations": [
+        "r2/contracts/packaging.py:265",
+        "r2/quality/digests.py:57",
+        "r2/quality/digests.py:106",
+        "tests/unit/r2/contracts/test_packaging.py:358",
+        "tests/unit/r2/contracts/test_packaging.py:377",
+        "tests/unit/r2/contracts/test_packaging.py:732"
+      ],
+      "evidence": "ExportExecutionIdentity binds slot, selection ID/digest, manifest digest, builder identity and adapter version under the newly registered m10.export-execution.v1 domain. Independent enumeration/recomputation confirms all 13 M10-B domains listed in design section 3.1 have frozen passing vectors, plus the M8 PACKAGING payload vector. The four previously missing observation/selection-request/selection/export-request vectors are present. Execution identity mutations to manifest digest, builder identity and adapter version change the digest. Both request domains retain cache exclusion and subject-binding regression tests. The obsolete reserved-domain refusal test was removed."
+    },
+    "C3": {
+      "status": "PARTIAL",
+      "locations": [
+        "docs/r2/evidence/m10-b-reviews/b1-pg-migration-roundtrip.json:5",
+        "docs/r2/evidence/m10-b-reviews/b1-pg-migration-roundtrip.json:11",
+        "tests/integration/lib/db/migrations/test_5d2a7c3e8b11_m8_packaging_candidate_kind.py:48"
+      ],
+      "evidence": "The committed record reports a live PostgreSQL downgrade refusal preserving version and PACKAGING history, then empty-witness downgrade and re-upgrade CHECK definitions; it also reports 32 passes for the two changed repository files and includes SQLite migration tests in a 3164-pass run. This addresses much of the missing evidence, but is supplied execution evidence, not an independent rerun. It contains no exact runnable commands, executed source SHA, raw command output, predecessor-row/FK preservation witness or explicit SQLite test count. The focused SQLite test source covers predecessor FORMAT-row preservation and CHECK round trips, with FK enforcement disabled for its witness inserts.",
+      "independent_probe": "AF_INET socket construction/connect probe for 127.0.0.1:55491 failed PermissionError [Errno 1] Operation not permitted. No live PostgreSQL test rerun or migration mutation was attempted after this failure.",
+      "remaining": "At shared-schema acceptance, attach reproducible exact commands and executed SHA/output, with a predecessor revision and a referencing FK row preserved across upgrade and allowed downgrade, and identify the focused SQLite round-trip results. Preserve the supplied refusal/history and 32-repository-test results; do not represent them as independently rerun here."
+    },
+    "C5": {
+      "status": "PARTIAL",
+      "locations": [
+        "tests/unit/r2/advanced_creative/test_exploration.py:319",
+        "tests/unit/r2/advanced_creative/test_exploration_promotion.py:190",
+        "r2/advanced_creative/promotion.py:132"
+      ],
+      "evidence": "Two persisted tests now exercise PACKAGING preview refusal for m8-slot:x and m8-format:abc:square@1 and call promotable_format directly; both pass in the 1098-test run. They do not call ExplorationPromotion.promote or explicitly assert no slot/authority events. An independent in-memory probe used the real ExplorationPromotion with an internally consistent PACKAGING-bound preview/authorization for both targets: it refused PromotionTargetUnavailableError and recorded exactly [command, head, preview], with no slot lock, authority invocation, authorization staging, promotion receipt or commit.",
+      "remaining": "Persist that full promotion regression in test_exploration_promotion.py and explicitly assert no slot/authority calls in the preview test. Runtime behavior is independently observed sound; the original durable regression-evidence condition is only partly closed."
+    }
+  },
+  "new_findings": {
+    "H": [],
+    "M": [],
+    "L": []
+  },
+  "conditions": [
+    {
+      "id": "C3",
+      "status": "PARTIAL",
+      "gate": "Shared-schema evidence acceptance",
+      "requirement": "Close the remaining reproducibility and predecessor/FK preservation evidence described in finding_status.C3. Live PostgreSQL was unavailable to this reviewer; the committed reported results are acknowledged with provenance limits."
+    },
+    {
+      "id": "C5",
+      "status": "PARTIAL",
+      "gate": "Shared-schema regression evidence",
+      "requirement": "Persist PACKAGING rejection through ExplorationPromotion.promote, with no slot lock/authority call, and strengthen preview event assertions. The independent runtime probe passes, so this is a durable regression-evidence condition, not a reproduced product defect."
+    },
+    {
+      "id": "C4_C6_carried",
+      "gate": "B2/B3/B4 reviews",
+      "requirement": "The original role/asset/provenance/currentness RED cases and explicit verify_packaging_closures use remain later runtime gates. This delta closes contract findings only; it does not accept later packet behavior."
+    },
+    {
+      "id": "review_scope",
+      "gate": "Review interpretation",
+      "requirement": "Candidate HEAD exactly matched 83e1f3c2cc3c2d2f98b1243433a47b0533d0945a and the worktree was initially clean. Concurrent work appeared during review: untracked r2/quality/packaging_check.py, untracked tests/unit/r2/quality/test_packaging_check.py, and a modified docs/superpowers/specs/2026-10-28-r2-m10-b-packaging-export-design.md at final status. These concurrent files/edits were left untouched and excluded from this candidate delta review; the B2 test appeared after the recorded unit run. Reviewed contract/digest/repair-test paths still match the candidate. No source was edited or committed. Only this requested delta JSON was written."
+    },
+    {
+      "id": "coverage_limit",
+      "gate": "Evidence interpretation",
+      "requirement": "Graph list_projects exposed no index rooted at this worktree and check_index_coverage was denied by the approval policy. Direct candidate diff and numbered source fallback used. No graph completeness, full suite, static-gate, real custodian, donor parity, production or live DB acceptance claim."
+    }
+  ]
+}
