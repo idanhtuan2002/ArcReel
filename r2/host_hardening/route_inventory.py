@@ -136,8 +136,21 @@ QUALITY_PROBE_SUBMIT_FAMILIES = (
         "server.services.quality_probes:QualityProbeService.observe",
     ),
 )
+HOST_EXPORT_ADAPTER_VERSION = "host-export-v1"
+#: Local deterministic package export archives (M10-B): no spend, no network, the same M7 attempt custody.
+PACKAGE_EXPORT_SUBMIT_FAMILIES = (
+    PaidAsyncSubmitFamily(
+        SubmitRouteKey("local-zip", "package-export", HOST_EXPORT_ADAPTER_VERSION),
+        "local-zip-package-export@host-export-v1",
+        "server.services.package_export:PackageExportService.export",
+    ),
+)
 _ALL_SUBMIT_FAMILIES = (
-    PAID_ASYNC_SUBMIT_FAMILIES + SPATIAL_SUBMIT_FAMILIES + FORMAT_RENDER_SUBMIT_FAMILIES + QUALITY_PROBE_SUBMIT_FAMILIES
+    PAID_ASYNC_SUBMIT_FAMILIES
+    + SPATIAL_SUBMIT_FAMILIES
+    + FORMAT_RENDER_SUBMIT_FAMILIES
+    + QUALITY_PROBE_SUBMIT_FAMILIES
+    + PACKAGE_EXPORT_SUBMIT_FAMILIES
 )
 
 #: Built-in video provider ids (backend spec registry) -> the provider id their backend submits as.

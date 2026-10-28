@@ -1,0 +1,41 @@
+{
+  "schema_id": "m10.b4-route-qualification.v1",
+  "status": "LOCAL_PACKAGE_EXPORT_ROUTE_OFFLINE_VERIFIED",
+  "route": {
+    "provider_id": "local-zip",
+    "endpoint_id": "package-export",
+    "adapter_version": "host-export-v1",
+    "capability_profile_ref": "local-zip-package-export@host-export-v1",
+    "idempotency_mode": "NONE",
+    "not_found_semantics": "NON_AUTHORITATIVE",
+    "poll_cancel_lookup_webhook": false,
+    "network": false,
+    "spend": false
+  },
+  "recovery_properties": [
+    "invocation staged inside M7 PLANNED commit under the export command lock and the design §4 lock order",
+    "archive built from verified private snapshots with no transaction open, published content-addressed after re-verification",
+    "ACCEPTED-but-not-finalized replays finalize from the job id; SUBMIT_OUTCOME_UNKNOWN is never rebuilt under the same command",
+    "finalize re-verifies currentness and the published bytes, then commits SUCCEEDED with the receipt"
+  ],
+  "source_sha256": {
+    "server/services/package_export.py": "f7f794e633976d1b129b8f2bb75a7c39c46f59b9c55c10081085fdfdfaa9d9d6",
+    "server/services/package_export_worker.py": "731ee09b1fe6602a72865c5163a665ed901bd684f02a5aa14be32230ff7d48d0",
+    "lib/db/repositories/quality_packaging.py": "9a794452b4611d2963aa0aa51be0dd73e8c7eec882334f07b4e9b8906a9308e9",
+    "lib/db/models/quality_packaging.py": "f38c36e9ef24eda3788c195f17da9c72058db75e68107b457ff0b44284a10521",
+    "alembic/versions/8a5d0f6b1e44_m10_export_custody.py": "18fac0a9ccba8b3810aaf724c07be49e2b16635244d74c4ededcae14f02fc762",
+    "r2/contracts/packaging.py": "60fdae42779f83cb806f7e3ee06de9dc9917f52837d6734771833aa8f9f65e9c"
+  },
+  "environment": {
+    "postgresql": "16 disposable container (m10b-test-pg)",
+    "python_zipfile": "stdlib, golden archive sha256:99ff4053bdedabf824dc89031201703b2c6a875ab619e5bfc3a777d7a567dbc1"
+  },
+  "suite": {
+    "selection": [
+      "tests/integration/server/services/test_package_export.py",
+      "tests/unit/server/services/test_package_export_worker.py",
+      "tests/integration/lib/db/migrations/test_8a5d0f6b1e44_m10_export_custody.py"
+    ],
+    "result": "export 10 passed; worker 12 passed; migration 3 passed; related M10-B/A PG suites 139 passed"
+  }
+}
