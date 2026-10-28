@@ -1,0 +1,159 @@
+{
+  "schema_id": "m10.b4-delta3-review.v1",
+  "reviewed_head": "ebd28007d",
+  "reviewed_head_full": "ebd28007d02ef3568ca023fa796e7f99fffaec09",
+  "reviewer": "Codex; independent primary-agent source review; no subagents",
+  "verdict": "ACCEPT_WITH_CONDITIONS",
+  "reviewed_range": "fdb666848..ebd28007d",
+  "verdict_scope": "Accept the B4 delta source fixes and the explicit D7 replay amendment. No remaining or newly confirmed High/Medium source defect in the reviewed delta. This closes this defect-review round under the user stopping rule; it is not independent execution of the PG/systemd acceptance suite, a waiver of carried integration gates, B5 activation or full M10/release acceptance.",
+  "per_finding_status": {
+    "H1": {
+      "status": "FIXED",
+      "location": "server/services/package_export.py:140-142,184-197,960-967",
+      "evidence": "_same_builder hashes the reported worker/confinement file map in the same m10.export-builder.v1 domain as admission, and _accept compares it with plan.manifest.builder_identity_digest rather than rereading current host files. The prior version-B report/version-A manifest acceptance path is closed. A fresh probe accepted the admitted file map, rejected a foreign map and observed AmbiguousSubmitError with no publication for a foreign-builder report. The real-worker foreign-builder regression is present at tests/integration/server/services/test_package_export.py:573-591; its PG execution is builder-supplied."
+    },
+    "M3": {
+      "status": "FIXED",
+      "location": "server/services/package_export.py:859-889,919-946,977-990; docs/superpowers/specs/2026-10-28-r2-m10-b-packaging-export-design.md:169-173",
+      "evidence": "Known typed errors remain preserved for the initial call. Supervisor errors, unverified cleanup and now cancellation retain potentially live scratch; cancellation is re-raised. _accept parsing/unexpected failures are guarded into AmbiguousSubmitError, while typed M10 refusals retain their intended classification. D7 now explicitly defines generic integrity on later replay of a failed export command, resolving the previous typed-replay contract mismatch without inventing a failure row. Ordinary work-constructor rollback/store-finally fixes are unchanged."
+    },
+    "M4": {
+      "status": "FIXED",
+      "location": "server/services/package_export.py:465-468,919-940,1086-1117",
+      "evidence": "The already-owned .creating-to-.work publication remains intact. mark_launch refreshes owner.lock while held immediately before launch and in the launch finally on success, exception or cancellation. Consequently long snapshot/prepare time does not consume the grace for a newly started or abandoned worker. Fresh probes deliberately aged the lock before and during launch; both marks refreshed it, and a kept cancelled/unclean directory survived an immediate sweep. Assumes the supported host clock and local metadata operations; see non-blocking notes for timestamp-update failures."
+    },
+    "M7": {
+      "status": "FIXED",
+      "location": "server/services/package_export.py:163-181,1005-1015; lib/db/repositories/quality_probes.py:74-76",
+      "evidence": "Finalize now requires invocation.task_id to equal the deterministic export_task_id of the command, the attempt request_digest to equal attempt_request_digest(provider_request(invocation)), and the attempt route to equal export_route of the persisted manifest builder. These supplement the prior request/manifest binding, member hashing and generation/currentness checks. A fresh probe exercised the actual _finalize predicates with a fake repository: the valid identity reached the file-verification boundary; wrong request, route and jointly wrong invocation/attempt task id each raised RequiredEvidenceMissingError before file verification. The reused digest helper exactly matched the actual M7 host_submit canonical-JSON digest in the probe."
+    },
+    "N3": {
+      "status": "FIXED",
+      "location": "server/services/package_export.py:919-946,948-975",
+      "evidence": "The entire _accept path is now inside a guard that preserves typed M10/Ambiguous errors and maps other exceptions to AmbiguousSubmitError. The earlier malformed status=[] TypeError no longer escapes as a definite M7 failure: the fresh actual-call probe returned AmbiguousSubmitError. CancelledError has an explicit keep-and-reraise branch; unverified cleanup and ordinary supervisor exceptions still keep scratch. Cleaned-up unknown worker outcomes may remove scratch because termination is already verified; the M7 attempt remains unknown and is not rebuilt."
+    },
+    "N4": {
+      "status": "FIXED",
+      "location": "server/services/package_export.py:614-662,724-732,910-918; tests/unit/server/services/test_package_export_plan.py:79-92",
+      "evidence": "admit_worker_config runs immediately after work creation and before snapshot_assets/_submit, hence before copying and invocation/PLANNED staging. It uses the same worker_config factory and exact planned source names, with unsigned 64-bit maximum dev/ino values and fixed-width placeholder digests to upper-bound actual JSON on the supported host. The runtime length check remains defense in depth. The new boundary test passes a short root and refuses the long-root config; all ten planner cases passed freshly. The earlier serialized-config refusal after PLANNED is closed."
+    },
+    "N6": {
+      "status": "FIXED",
+      "location": "server/services/package_export.py:465-468,919,936-937,1107-1117",
+      "evidence": "The sweep grace is renewed at the last possible launch and at return/abandonment, while the flock is held, rather than relying on constructor mtime. Both cancellation and unclean-result probes retained scratch and observed sweep_work()==0 immediately after closing ownership, even after artificially old staging/runtime mtimes. This is function-level lifecycle evidence, not a fresh process-death/systemd interleaving."
+    },
+    "N7": {
+      "status": "FIXED",
+      "location": "server/services/package_export.py:929-937; tests/integration/server/services/test_package_export.py:538-556",
+      "evidence": "The explicit asyncio.CancelledError branch sets work.keep(), re-raises cancellation and executes grace renewal in finally. A fresh cancelled launch probe confirmed kept=True, retained scratch after close, and no immediate sweep. The added PG fixture test asserts cancellation and retained .work scratch. No claim is made that await cancellation terminates unrelated thread-based snapshot work."
+    },
+    "TYPED_FAILED_REPLAY": {
+      "status": "FIXED",
+      "resolution": "Resolved by the explicit reviewed D7 contract amendment, not by adding durable failure evidence.",
+      "location": "docs/superpowers/specs/2026-10-28-r2-m10-b-packaging-export-design.md:169-173; server/services/package_export.py:887-889,984-989",
+      "evidence": "The governing text now states: the initial known refusal preserves its typed error; a later replay of the same failed command returns M10_EXPORT_INTEGRITY_FAILED; a new command re-plans. This matches implementation and preserves the no-rebuild boundary. The change is explicit and does not convert export refusals into quality evidence or authorize publish/upload state. No additional approval or hidden typed-failure storage requirement is inferred."
+    },
+    "M7_ATTEMPT_BINDING": {
+      "status": "FIXED",
+      "location": "server/services/package_export.py:1005-1015; tests/integration/server/services/test_package_export.py:594-619",
+      "evidence": "The complete requested task/request/route comparison is present before archive verification/finalization. Source tests tamper an accepted attempt route/request after an injected pre-receipt crash and require refusal. Reviewer function-level probes additionally refuse a mutually matching but wrong stored task id. The valid case reached only the archive-verification boundary in that probe; no fake PG success was reported."
+    },
+    "PRIOR_FIXED_ITEMS": {
+      "status": "FIXED",
+      "evidence": "M1/M2/M5/M6/L1, N1/N2/N5 and the persisted CAPTION_ROLE_E2E fixture are unchanged by this delta. Their source closures are preserved: inode checks before byte use, path claims/layout, archive size admission, ctime, semantic ZIP/member verification and constructor rollback remain. Fresh worker/planner tests passed. The 30-case PG report includes the inherited two-locale caption/output-substitution cases; reviewer PG execution remains unavailable."
+    }
+  },
+  "new_findings": {
+    "H": [],
+    "M": [],
+    "L": []
+  },
+  "conditions": [
+    {
+      "id": "REVIEW_STOPPING_RULE",
+      "status": "APPLIED",
+      "requirement": "No remaining High/Medium source defect was confirmed in the reviewed delta. Do not reopen this B4 defect-review loop for the Low notes below. This verdict does not erase the distinction between code review and unexecuted integration/release acceptance."
+    },
+    {
+      "id": "LOW_NOTES",
+      "status": "NON-BLOCKING; no repair/re-review round requested",
+      "notes": [
+        {
+          "location": "server/services/package_export.py:204-217,941-946",
+          "note": "_worker_report still advertises exact keys while allowing subsets and may raise for a non-string status. The new guard converts such exceptions to unknown, so this is now parser clarity/hardening rather than an ordinary-failure custody defect."
+        },
+        {
+          "location": "server/services/package_export.py:579",
+          "note": "Inherited verifier comparison checks external_attr high permission/type bits rather than exact equality of all DOS low bits. The deterministic writer and content verification are unchanged. Exact equality would make the frozen-field claim more precise."
+        },
+        {
+          "location": "server/services/package_export.py:465-468",
+          "note": "mark_launch suppresses timestamp-update OSError. Making failure visible or conservatively refusing sweep eligibility is useful storage-fault hardening. No live metadata-write failure was reproduced; the proven long-staging schedule is fixed under ordinary supported local metadata operations."
+        },
+        {
+          "location": "server/services/package_export.py:440-456,1094-1096",
+          "note": "Inherited crash-before-rename .creating residues and documentation distinguishing retained unclean work from cleaned-up unknown work remain housekeeping notes. Do not sweep live constructors by filename alone."
+        }
+      ]
+    },
+    {
+      "id": "PG_AND_SYSTEMD_EVIDENCE",
+      "status": "BUILDER-SUPPLIED; reviewer execution unavailable",
+      "requirement": "Preserve the builder report of 30 PG16 export passes with the real confined worker, including cancelled launch, foreign-builder report, accepted route/request tamper and inherited caption/output tests. Reviewer PG attempt failed during AF_INET socket creation with PermissionError before a product body. Fresh source/function probes do not claim PostgreSQL locking, process death, effective systemd/seccomp/FSIZE/network controls or complete concurrent recovery."
+    },
+    {
+      "id": "CARRIED_INTEGRATION_ACCEPTANCE",
+      "status": "PRESERVED; not silently closed or waived",
+      "requirement": "Keep the historical disk-full/write/fsync/rename crash cuts, before/after-publication interruption, unknown recovery with an already-published deterministic object and actual finalize-versus-run-seal/disposition/selection commit-order evidence as named recovery/system acceptance coverage. The inherited two writer tests pause prepare. This delta supplies bounded code fixes and new targeted cases, not fresh proof of every original section 8 scenario. These execution limits are carried separately from the now-closed source defects."
+    },
+    {
+      "id": "B2_B3_AND_SCOPE",
+      "status": "PRESERVED",
+      "requirement": "Carry LOCAL_REGULAR_FILE_IO/trusted project-root constraints, authenticated server-derived append provenance, REVOCATION_AFTER_LEASE and CRASH_AFTER_LEASE before B5 activation, and prior serialization evidence limits. B4 review does not activate routes/UI, authorize Human gates, upload/publish, Production Authority or provider/network calls. License issues remain excluded."
+    },
+    {
+      "id": "SCHEMA_A4_AND_REGISTRY",
+      "status": "PRESERVED / qualification checks passed",
+      "requirement": "This delta changes no ORM/migration or A4 launcher/worker implementation. Prior schema and real-A4 execution boundaries are not requalified. All eight recorded source hashes match the candidate; registry evidence/digest tests passed and submit_route_inventory_problems() returned []. The attempt digest helper is reused with its actual canonical call surface, not a new serialization contract."
+    },
+    {
+      "id": "GRAPH_AND_PIN",
+      "status": "DIRECT SOURCE FALLBACK / candidate preserved",
+      "requirement": "Initial HEAD was exact ebd28007d02ef3568ca023fa796e7f99fffaec09 and clean; reviewed source/tests/design/qualification remained identical at the final pin check. index_status/search_graph/check_index_coverage were approval-blocked under approval_policy=never. No graph generation or completeness assertion is made. No subagent, source edit, formatting, staging or commit was performed; only this requested review JSON is written."
+    }
+  ],
+  "commands_run": [
+    {
+      "command": "git rev-parse HEAD && git status --short && git show --stat --oneline HEAD && git diff --stat fdb666848..HEAD && git log fdb666848..HEAD --oneline; git diff fdb666848..ebd28007d -- server/services/package_export.py docs/superpowers/specs/2026-10-28-r2-m10-b-packaging-export-design.md tests/unit/server/services/test_package_export_plan.py tests/integration/server/services/test_package_export.py",
+      "result": "Pinned clean candidate ebd28007d02ef3568ca023fa796e7f99fffaec09. Inspected the complete implementation/design/test diff and the prior review conditions; preceding c25f338e4 is a handoff-only commit."
+    },
+    {
+      "command": "index_status(project=home-anhtuan-content-production-os, verbose=true); search_graph(_same_builder/attempt/admission/accept/launch symbols); check_index_coverage(material source/test/design/qualification paths)",
+      "result": "Approval-blocked: MCP tool call requires approval, but approval policy is never. Direct source/numbered reads supplied all material evidence; no graph freshness or exhaustive-coverage claim."
+    },
+    {
+      "command": "nl/sed source reads of package_export.py admission, launch, _accept, finalize and sweep; lib/db/repositories/quality_probes.py attempt_request_digest; r2/contracts/fingerprints.py canonical_json_bytes; r2/host_hardening/host_submit.py request hashing; D7 lines 160-204",
+      "result": "Verified actual reuse/serialization, call order, immutable request/route comparisons, worker-result exception boundary, grace renewal and documented typed-replay semantics."
+    },
+    {
+      "command": "DATABASE_URL=sqlite+aiosqlite:////tmp/codex-b4-delta3-unused.db timeout 45s .venv/bin/python -m pytest -q -p no:cacheprovider --tb=short tests/unit/server/services/test_package_export_plan.py tests/unit/server/services/test_package_export_worker.py tests/unit/r2/host_hardening/test_provider_capabilities.py tests/integration/server/services/test_package_export.py::test_only_unowned_work_directories_are_swept tests/integration/server/services/test_package_export.py::test_the_worker_refuses_to_build_when_it_is_not_confined tests/integration/server/services/test_package_export.py::test_the_bundle_layout_maps_roles_to_fixed_paths",
+      "result": "PASS: 59 passed in 1.43s, exit 0. Includes all 10 planner cases, 23 worker cases, capability tests and seven non-PG export cases. No full or unrelated suite run."
+    },
+    {
+      "command": "DATABASE_URL=postgresql+asyncpg://postgres:postgres@127.0.0.1:55491/arcreel_test timeout 30s .venv/bin/python -m pytest -q -p no:cacheprovider --maxfail=1 --tb=short tests/integration/server/services/test_package_export.py",
+      "result": "UNAVAILABLE: 1 setup error in 1.69s, AF_INET socket PermissionError [Errno 1] Operation not permitted, exit 1. Stopped before first PG-dependent product test body. Builder 30 passes were not presented as reviewer execution."
+    },
+    {
+      "command": "timeout 25s .venv/bin/python -u - (actual _build_and_publish lifecycle probes with temporary work, scripted cancellation/unclean/foreign/malformed runtime outcomes; actual _finalize identity predicates with fake read repository and file-boundary sentinel)",
+      "result": "Admitted builder map matched; foreign map refused. CancelledError and unclean outcome renewed lock both before/after launch, kept scratch and survived immediate sweep after close. Foreign builder and malformed status raised AmbiguousSubmitError rather than ordinary failure. Shared attempt_request_digest exactly matched M7 canonical request hashing. Valid finalize identity reached file verification; altered request_digest, route and jointly wrong stored task id all raised RequiredEvidenceMissingError beforehand. Thread calls were inlined only for the fake-repository identity-boundary probe. No metadata transaction, real unit or PG success was simulated as production evidence; temporary work cleaned up."
+    },
+    {
+      "command": ".venv/bin/python - (export-route-qualification source_sha256 verification and submit_route_inventory_problems())",
+      "result": "All eight source hashes match; route inventory problems []. The focused capability tests also validated qualification/registry digests."
+    },
+    {
+      "command": "git diff --check fdb666848..ebd28007d; git diff --quiet ebd28007d -- [reviewed implementation/test/design/qualification paths]; git rev-parse HEAD; git status --short; git log ebd28007d..HEAD --oneline",
+      "result": "Whitespace check passed. Candidate and reviewed material paths unchanged; clean before creating the requested artifact. No source reset, formatting, staging or commit."
+    }
+  ]
+}

@@ -120,9 +120,16 @@ Rewrite in place; this is the resume entry for M10-B.
   PG export 26 passed (real confined worker); related M10 PG 101 passed; unit/scripts/migrations 5608 passed;
   gates clean. Codex delta2 running (`b4-codex-delta2-review.json`).
 
+- B4 delta2 REWORK → `ebd28007d`; delta3 **ACCEPT_WITH_CONDITIONS** (`b4-codex-delta3-review.json`, no H/M).
+  **B4 accepted with conditions.** Carried to B8 integrated acceptance: disk-full/write/fsync/rename crash cuts,
+  before/after-publication interruption, unknown recovery against an already-published object, finalize × run-seal
+  writer pair; LOCAL_REGULAR_FILE_IO / trusted project root.
+
 ## Next step
 
-Triage the B4 Codex review. Then B5: authenticated routes under `/projects/{project_name}/packaging` (append
-candidate revision with server-set provenance — closes B2 C4; check; preview; select via Human custodian;
-export; status/history; download token `m10-export`) + REVOCATION_AFTER_LEASE / CRASH_AFTER_LEASE tests (B3) +
-projection-only UI with i18n for all locales and axe-core. Then B6 donor parity, B7 pilots (Human), B8 seal.
+B5: authenticated routes under `/projects/{project_name}/packaging` (find the V2 router pattern for M10-A quality
+routes first): append candidate revision with server-set provenance (closes B2 C4, refuse client provenance),
+check, preview, select via `PackageSelectionCustodian` (interactive Human only), export, status/history, download
+(scoped short-lived token purpose `m10-export`, revalidate currentness). Plus REVOCATION_AFTER_LEASE and
+CRASH_AFTER_LEASE tests (B3). Then projection-only UI panel in the V2 project workflow with i18n keys for every
+locale in `frontend/src/i18n/` and axe-core; then B6 donor parity, B7 pilots (sponsor as Human), B8 seal.
