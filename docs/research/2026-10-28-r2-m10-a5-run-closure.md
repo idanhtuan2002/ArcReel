@@ -78,3 +78,51 @@ original A3 readiness, accessibility and factual admission.
 
 Write the A5 design spec (owned paths, tables, lock order, closure algorithm, validity projection,
 Human observation submission, qualification resolution) and resolve U2–U4 against code before freeze.
+
+## Extended research (2026-10-28, after sponsor asked for research-backed decisions)
+
+### Factual authority — sources reviewed
+
+- Frozen responsibility matrix `docs/r2/R2_02_FROZEN_RESPONSIBILITY_MATRIX.md`: factual claim truth is owned
+  by `FactualAuthorityService` (R2 Factual Authority: source capture, research synthesis, claims). M10 is a
+  consumer, never an owner (rule A forbids Claim → Canon writes; quality may only reference).
+- Decided expansion order `docs/r2/R2_V2_CAPABILITY_AND_V3_BOUNDARY.md` §V3: (1) M9 research with factual
+  authority and Gate A, then (2) M10, "one authority packet at a time, in the decided order".
+- M10 design (2026-10-23) §1: M9 paused; M10 consumes approved-master/candidate infrastructure only and is
+  prohibited from consuming any planned M9 call surface; acceptance gate "Sequencing" repeats this.
+- A2 reuse research (2026-10-26): `r2/contracts/factual.py` ResearchPack/ClaimLedger are mutable objects,
+  not a durable current-authority reader; they must not enter frozen M10 ports.
+- Code: no `FactualAuthorityService` in this tree; paused M9 branches `impl/r2-m9a-*` (04b1b9218),
+  `impl/r2-m9b-*` (b0de59b22) and `design/r2-m9-v2-revalidation` (39b9c5dab) contain only the same
+  contracts, M3 fixtures and opportunity ports — no persisted correction head or withdrawal state.
+- M10 design §4/§5: the first (export-only) profile requires deterministic media/package checks and an
+  authenticated Human semantic rubric; factual assessment is not a first-packet requirement.
+
+### Reviewer qualification — sources reviewed
+
+- Existing authority: signed governance grant events with role `HUMAN_SHOWRUNNER` scoped by
+  user/project/principal (`r2/governance/grant_transition.py`), read through
+  `CheckpointedShowrunnerGrantReader` with governance-activated startup; A3 profile publication already
+  depends on it (`server/services/quality_profile_custodian.py`).
+- M10 design §4: the Human rubric is recorded by an authenticated Human; "the same human may later issue
+  the disposition explicitly" — one accountable Human operator per project in the first packet.
+- Donors: OpenMontage review data carries one `ReviewerType` and a timestamp, no qualification binding
+  (2026-09-16 research); Kalinga quality fixtures concern lint/profile parity, not reviewer identity.
+  Neither offers a stronger qualification mechanism to reuse.
+- No other reviewer/qualification registry exists in code or ADRs.
+
+### Decisions (main adjudication, research-backed)
+
+- D1 Factual: A5 ships the `FactualReadPort` consumer seam with **no authoritative implementation**; every
+  FACTUAL slot fails closed with `M10_REQUIRED_EVIDENCE_MISSING` and cannot satisfy, waive or be marked
+  INAPPLICABLE. No Factual Authority, write port or M3/M9 fixture data is introduced. Factual admission
+  becomes possible only after M9's Factual Authority is accepted (decided order). This does not block the
+  first export-only profile, which has no factual requirement.
+- D2 Human qualification: a HUMAN slot is qualified only by a current signed `HUMAN_SHOWRUNNER` grant for
+  the exact user/project/principal, read under governance-activated startup through the existing reader,
+  bound by a code-embedded qualification policy (`m10.qualification.human-showrunner.v1`) whose digest the
+  slot's `qualification_policy_digest` must equal. MODEL and AUTHORITY slots have no qualified adapter in the
+  first packet and fail closed; model evidence never satisfies a HUMAN slot. DETERMINISTIC slots are
+  satisfied only by A4 receipts.
+- Consequence for U3/U4: ACCESSIBILITY beyond A4 caption timing, CONTINUITY and PERCEPTUAL slots have no
+  qualified producer in the first packet and fail closed the same way.
