@@ -1,0 +1,172 @@
+{
+  "schema_id": "m10.b2-review.v1",
+  "reviewed_head": "bc47ac5a6",
+  "reviewer": "Codex independent critical review; main agent; source read-only; no commits",
+  "verdict": "REWORK",
+  "commands_run": [
+    {
+      "command": "git rev-parse HEAD; git status --short; git branch --show-current; git diff --stat 652540024..bc47ac5a6; git log --oneline -5; git diff --name-only bc47ac5a6 HEAD; git diff --check 652540024..bc47ac5a6",
+      "result": "Initially clean at bc47ac5a6cf79037a0555d1101befaf0022eb31c on design/r2-m10-b. During review HEAD advanced externally to b7a69bc3de0185cea233f25df307a2b4c4adc693; only docs/r2/evidence/R2_M10_B_HANDOFF.md differs. Reviewed implementation/design/tests remain candidate-equivalent. Diff whitespace check passed. The requested range excludes the earlier df9ada5df pure-check addition; the complete pure-check source was nevertheless reviewed as explicitly requested."
+    },
+    {
+      "command": "codebase-memory list_projects; search_graph Packaging; check_index_coverage for reviewed source, test and design paths",
+      "result": "list_projects exposed no index rooted at this worktree. Search and both coverage attempts denied: MCP tool call requires approval, but approval policy is never. Used complete direct source reads of the checker, service, observation repository/model/migration and permitted test files, plus targeted source reads of contract, digest, M8, profile, run and probe dependencies. No graph completeness claim. Critical review stayed on the main agent; no child reviewer with an unverifiable Sol model was used."
+    },
+    {
+      "command": "Read D3/D4, sections 3.1/3.3/5/8, B1 review C4/C6, relevant source/diffs and CONTRIBUTING.md; git -C /home/anhtuan/Kalinga-Shorts-Factory show e4b5a217:pipeline/src/validate.py",
+      "result": "Compared the actual pinned seo_lint implementation: title/description terms, slug normalization, title length, description minimum, markdown and tag/hashtag counts. ArcReel uses policy-supplied limits and adds locale/variant/safety rules. No license review performed. Full executable same-fixture donor parity remains B6, not established by the single slug fixture."
+    },
+    {
+      "command": "DATABASE_URL=postgresql+asyncpg://postgres:postgres@127.0.0.1:55491/arcreel_test UV_CACHE_DIR=/tmp/m10-b-review-uv PYTHONDONTWRITEBYTECODE=1 timeout -k 2 50 uv run --offline --no-sync python -m pytest -q -p no:cacheprovider tests/unit/r2/quality/test_packaging_check.py tests/unit/r2/contracts/test_packaging.py tests/unit/r2/quality/test_runs.py tests/integration/lib/db/migrations/test_6e3b8d4f9c22_m10_packaging_observations.py",
+      "result": "Exit 124 after progress dots; no completed suite summary. Migration round trip not verified by this run."
+    },
+    {
+      "command": "DATABASE_URL=postgresql+asyncpg://postgres:postgres@127.0.0.1:55491/arcreel_test UV_CACHE_DIR=/tmp/m10-b-review-uv PYTHONDONTWRITEBYTECODE=1 uv run --offline --no-sync python -m pytest -q -p no:cacheprovider tests/unit/r2/quality/test_packaging_check.py tests/unit/r2/contracts/test_packaging.py tests/unit/r2/quality/test_runs.py",
+      "result": "PASS: 123 passed in 2.12s. Includes both base/package-subject PACKAGING refusal by run sealing. No PostgreSQL coverage implied."
+    },
+    {
+      "command": "Python socket.create_connection((127.0.0.1, 55491), timeout=2)",
+      "result": "PermissionError: [Errno 1] Operation not permitted. PostgreSQL unreachable in this sandbox; permitted PG service pytest was not started."
+    },
+    {
+      "command": "Inline Python using actual test_packaging_check.run/clean_body: replace variant_groups with tags value containing 30 duplicate bad! tags, chapters value with start_ms=300000 and empty title, and tags value with an unexpected key",
+      "result": "CONFIRMED M1: all three fully resealed candidates return PASS with no findings under every declared check."
+    },
+    {
+      "command": "Inline Python using actual _measure in a TemporaryDirectory: ancestor symlink; patch os.open to swap a checked ancestor directory to an outside symlink immediately before the real open; UTF-8 prefix probes",
+      "result": "CONFIRMED H1: an ancestor symlink is followed; deterministic resolve/open interleaving hashes outside-secret bytes outside the root. CONFIRMED M3: 64 ASCII bytes followed by invalid UTF-8 is accepted as text/plain; 63 ASCII bytes followed by a valid three-byte Han character is rejected as application/octet-stream. Invalid JSON text is also labeled application/json; this last observation alone is not treated as a separate finding."
+    },
+    {
+      "command": "Inline Python creates a FIFO under a temporary root and runs actual _measure in a subprocess with a four-second timeout",
+      "result": "CONFIRMED M2: subprocess hangs in open before regular-file fstat; timeout kills it. No persistent worker or FIFO left behind."
+    },
+    {
+      "command": "Inline synchronous SQLite probe loads actual migration with importlib and Alembic Operations/MigrationContext; creates minimal users/M8 predecessor tables; upgrades/inserts; tries UPDATE/DELETE, invalid status, oversized JSON and nonempty downgrade; compiles ORM CreateTable for PostgreSQL and SQLite",
+      "result": "PASS within minimal-schema scope: UPDATE/DELETE reject M10_IMMUTABLE_PACKAGING_ROW; invalid status and >1 MiB JSON reject named CHECKs; nonempty downgrade rejects M10_PACKAGING_HISTORY_PRESENT. ORM JSON ceiling compiles to octet_length(CAST(observation_json AS text)) on PostgreSQL and length(CAST(observation_json AS BLOB)) on SQLite, both <=1048576, matching migration source. Does not prove full predecessor migration/FK behavior or live PG triggers."
+    }
+  ],
+  "not_verified": [
+    "Live PostgreSQL service, advisory-lock interleavings, command conflict/concurrent replay, append-only triggers and migration round trips: sockets denied. Passing unit tests and compiled DDL do not substitute for these gates.",
+    "Full SQLite predecessor-schema upgrade/downgrade/re-upgrade and FK preservation: allowed migration pytest timed out. Minimal synchronous migration probe only; no full-schema acceptance claim.",
+    "No B3 selection/export acceptance, production qualification, providers, network calls, frontend or whole-suite/static gates. No source, tests, staging or commits changed by this review.",
+    "No full frozen donor parity execution; pinned Kalinga source compared directly. casefold versus donor lower and title-block markdown scope are implementation differences to classify under preregistered B6 parity criteria.",
+    "M8 semantic lineage mismatch finding M4 is source-confirmed; no live database reproduction. No currentness race is asserted merely because checking occurs outside a final head-lock transaction: selection owns currentness, and historical candidate revisions may legitimately be checked.",
+    "Graph generation/coverage unavailable after tool denial. No exhaustive architecture claim."
+  ],
+  "findings": {
+    "H": [
+      {
+        "id": "H1",
+        "file": "server/services/quality_packaging.py",
+        "line": 88,
+        "related_locations": [
+          "server/services/quality_packaging.py:85",
+          "server/services/quality_packaging.py:97",
+          "server/services/quality_packaging.py:173"
+        ],
+        "title": "Ancestor symlinks and resolve/open races escape the asset root",
+        "status": "CONFIRMED by deterministic filesystem probe",
+        "scenario": "_measure resolves a path and checks containment, then separately opens the original pathname. O_NOFOLLOW protects only its final component. Replacing root/dir with a symlink to an outside directory after line 86 but before line 88 causes root/dir/x.txt to hash outside-root bytes. A stable in-root ancestor symlink is also followed. The service reads live project files rather than the verified private snapshots required by section 5, and master identity is checked by another later pathname resolution. Optional assets can therefore be treated as verified from an escaped source; the root boundary is already violated even when a later digest comparison fails.",
+        "fix": "Reuse the existing verified-snapshot boundary after inspecting its actual call surface, or open from a pinned root directory descriptor and traverse every component with no-follow directory-relative opens (or an equivalent beneath/no-symlink primitive), then materialize and measure a private immutable snapshot. Bind the master object check to the opened/snapshotted object rather than another pathname lookup. Add deterministic ancestor-swap, nested-symlink and root-swap RED tests; do not rely on resolve plus final-component O_NOFOLLOW.",
+        "design_basis": "Section 5 verified private snapshots; asset.integrity and master-object binding are non-waivable safety checks."
+      }
+    ],
+    "M": [
+      {
+        "id": "M1",
+        "file": "r2/quality/packaging_check.py",
+        "line": 93,
+        "related_locations": [
+          "r2/quality/packaging_check.py:99",
+          "r2/quality/packaging_check.py:304",
+          "r2/contracts/advanced_creative.py:510"
+        ],
+        "title": "Tag and chapter alternatives bypass primary-value lint and shape validation",
+        "status": "CONFIRMED by resealed-candidate probes",
+        "scenario": "_tag_sets and _chapter_sets enumerate only primary/localized metadata. _variants checks counts, duplicate ids and asset presence, but never parses or checks inline tags/chapters. Under all rules, a tags alternative with 30 duplicate bad! entries and a chapter alternative starting beyond the master with an empty title both PASS without findings. Even a tags value containing only an unexpected key passes. Section 3.3 permits these alternatives to be selected and requires every alternative to be checked like the primary value.",
+        "fix": "Define/validate a canonical value shape for every variant field, enumerate validated tag/chapter alternatives through the same bound/charset/duplicate/banned-phrase/chapter functions, and refuse malformed values. Add RED cases for malformed alternatives, count/length/charset/duplicates and chapter ordering/first-zero/end bounds, plus clean alternatives.",
+        "design_basis": "Section 3.3 every variant is checked like the primary value; section 5 metadata/chapter/variant rules; section 8 seeded defects."
+      },
+      {
+        "id": "M2",
+        "file": "server/services/quality_packaging.py",
+        "line": 88,
+        "related_locations": [
+          "server/services/quality_packaging.py:95",
+          "server/services/quality_packaging.py:97",
+          "server/services/quality_packaging.py:149"
+        ],
+        "title": "Nonregular assets can block before the regular-file guard",
+        "status": "CONFIRMED with a temporary FIFO and killed subprocess",
+        "scenario": "A candidate source_ref naming an existing FIFO reaches blocking os.open(O_RDONLY) before fstat can reject it. With no writer, a packaging check never completes; asyncio.to_thread has no timeout or cancellable worker boundary. Multiple commands can occupy executor threads. Regular-file reads also have no measured-size/deadline bound before fully hashing, so an undersized declaration does not cap the work.",
+        "fix": "Use the verified snapshot reader with bounded work, reject nonregular descriptors without a blocking open (for example no-follow O_NONBLOCK then fstat), enforce measured size limits while copying/hashing and provide a bounded worker/deadline. Add FIFO/nonregular, oversized actual file and cancellation RED cases without hanging the test process.",
+        "design_basis": "Section 5 verified private asset snapshots and byte ceilings; cheap deterministic local check."
+      },
+      {
+        "id": "M3",
+        "file": "server/services/quality_packaging.py",
+        "line": 99,
+        "related_locations": [
+          "server/services/quality_packaging.py:69",
+          "server/services/quality_packaging.py:71",
+          "server/services/quality_packaging.py:102"
+        ],
+        "title": "UTF-8 media verification examines only a potentially split 64-byte prefix",
+        "status": "CONFIRMED for both false acceptance and false rejection",
+        "scenario": "Only the first 64 bytes reach _sniff. A text asset with 64 ASCII bytes followed by invalid UTF-8 is labeled text/plain and can satisfy integrity when the candidate declares the matching bytes. Conversely, a valid UTF-8 SRT with 63 ASCII bytes followed by a three-byte Han character is labeled application/octet-stream because the prefix cuts the character. Thus declared text media type is not established by the full bytes, and valid localized captions can fail packaging.",
+        "fix": "Validate UTF-8 incrementally across every measured chunk and flush the decoder at EOF; keep magic-byte sniffing separate from full text validation. Add boundary-split Unicode and invalid-tail RED cases for every supported text type. Use a reused parser if semantic JSON/SRT validity is part of the promised type evidence.",
+        "design_basis": "Section 5 verified media types and asset integrity; source _sniff explicitly promises valid UTF-8."
+      },
+      {
+        "id": "M4",
+        "file": "server/services/quality_packaging.py",
+        "line": 212,
+        "related_locations": [
+          "server/services/quality_packaging.py:227",
+          "server/services/quality_packaging.py:240",
+          "r2/quality/packaging_check.py:160"
+        ],
+        "title": "M8 lineage is hashed but never bound to the run/master/profile it claims",
+        "status": "CONFIRMED by source inspection; live database scenario not executed",
+        "scenario": "An intact PACKAGING revision can have payload fields correctly naming master A/profile A while its LineageBinding names master B, another content basis or another creative profile/policy. Recomputing digest_payload(payload, lineage) only proves the two bodies were hashed together. _inputs never compares revision.lineage to the verified run/profile; the pure check receives only revision.payload, so its mandatory master/profile checks also cannot see this mismatch. Such a revision can produce PASS despite violating the explicit PACKAGING lineage definition. This is a semantic binding defect, not a claim that an unmodified digest can be forged.",
+        "fix": "Before measuring assets, compare every specified PACKAGING lineage field to the verified run subject and profile: content_basis_digest, approved_master_id/digest, creative_profile_id/version and policy_digest. Refuse mismatches with a typed stale/evidence error; enforce the same binding on append and load. Add one-field-at-a-time RED cases with freshly recomputed legitimate M8 payload digests.",
+        "design_basis": "Section 3.1 explicitly defines M8 LineageBinding for PACKAGING; D3 exact candidate/base-subject evidence; mandatory master/profile binding."
+      }
+    ],
+    "L": []
+  },
+  "conditions": [
+    {
+      "id": "C1",
+      "gate": "B2 re-review",
+      "requirement": "Resolve H1 and M1-M4 with persisted RED regressions, rerun the three permitted unit files and reachable PostgreSQL service tests, and pin the repair SHA. Do not accept B2 on the 123 passing existing cases alone."
+    },
+    {
+      "id": "C2",
+      "gate": "Persistence acceptance",
+      "requirement": "Complete the permitted full migration round trip and live PostgreSQL tests. Add missing deterministic same-command concurrent replay and changed-command conflict cases, replay with live inputs unavailable, observation/probe/result-digest tamper cases, missing CONTAINER_STREAM evidence and invalid run digest. Verify FK/unique enforcement and JSON ceiling semantics on PostgreSQL, not only names or compilation."
+    },
+    {
+      "id": "C4",
+      "gate": "Carried B1 Contracts/Packaging checks",
+      "status": "PARTIAL",
+      "requirement": "Seeded undeclared/missing roles and closure-content/constraint mismatch tests exist, and both PACKAGING run-sealing refusal cases pass. Still persist duplicate-asset, duplicate-role, presentation-closure, malformed inline variant and filesystem-race regressions. Server-derived candidate/variant provenance needs an authenticated append boundary (future host packet); neither pure construction nor the check establishes who authored client data."
+    },
+    {
+      "id": "C6",
+      "gate": "Carried B1 closure check/load/append",
+      "status": "PARTIAL; check semantics implemented",
+      "requirement": "The check independently recomputes both closure caches through mandatory BLOCKING closure.content/presentation rules, alongside the service M8 payload+lineage digest recomputation. Although it does not call verify_packaging_closures by name, this is equivalent closure checking and is not itself a bypass. Add a presentation-only tamper RED test at the service boundary. Append/load/preview/selection consumers remain separately responsible for closure verification and semantic lineage (M4)."
+    },
+    {
+      "id": "C7",
+      "gate": "B6 donor parity",
+      "requirement": "Preserve the distinction between source comparison and executable pinned same-fixture donor parity. The single slug-tolerance test is not a full Kalinga parity proof. B6 remains the named parity gate."
+    },
+    {
+      "id": "SOUND",
+      "gate": "Verified sound within stated coverage",
+      "requirement": "Closed server-owned check/class mappings and blocking safety severity prevent B1 relabel/advisory downgrade. Required-role bindings force declaration of asset.required. Pure rule order, locator/failure ordering and rule-result canonicalization are deterministic for identical inputs; new observation/finding UUIDs and timestamps intentionally differ across commands. Exact request digest/scope validation, two command-lock/replay phases, stored-observation digest verification, M8 exact payload digest and head-kind checks, run digest, published V2 profile verification and the A4 technical replay plus expected probe-result digest chain are present in source. No success claim for unexecuted PG concurrency. Model/migration columns, PK/unique/FK targets, status and byte-ceiling expressions match in inspected source; minimal SQLite enforcement passed."
+    }
+  ]
+}

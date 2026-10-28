@@ -10,10 +10,11 @@ import re
 import unicodedata
 from collections.abc import Callable, Iterator, Mapping
 from dataclasses import dataclass
-from typing import Literal
+from itertools import pairwise
+from typing import Literal, cast
 
 from r2.contracts import quality as q
-from r2.contracts.advanced_creative import PackagingCandidate, PackagingChapter
+from r2.contracts.advanced_creative import PackagingCandidate, PackagingChapter, PackagingVariant
 from r2.quality.digests import compute_digest
 
 
@@ -81,13 +82,40 @@ def _descriptions(candidate: PackagingCandidate) -> Iterator[tuple[str, str]]:
     yield from _variant_texts(candidate, "description")
 
 
-def _variant_texts(candidate: PackagingCandidate, field: str) -> Iterator[tuple[str, str]]:
+#: The one canonical inline value shape per variant field; thumbnails reference an asset role instead.
+_VALUE_KEYS = {"title": "text", "description": "text", "tags": "tags", "chapters": "chapters"}
+
+
+def variant_value(field: str, variant: PackagingVariant) -> object:
+    """The parsed inline value of one alternative, or None when its shape is not the canonical one."""
+    if variant.value is None:
+        return None
+    body = variant.value.model_dump(mode="json")
+    key = _VALUE_KEYS.get(field)
+    if key is None or set(body) != {key}:
+        return None
+    value = body[key]
+    if field in {"title", "description"}:
+        return value if isinstance(value, str) else None
+    if field == "tags":
+        return tuple(value) if isinstance(value, list) and all(isinstance(t, str) for t in value) else None
+    try:
+        return tuple(PackagingChapter.model_validate(item) for item in value) if isinstance(value, list) else None
+    except ValueError:
+        return None
+
+
+def _alternatives(candidate: PackagingCandidate, field: str) -> Iterator[tuple[str, object]]:
     for group in candidate.variant_groups:
-        if group.field != field:
-            continue
-        for variant in group.variants:
-            text = None if variant.value is None else dict(variant.value.model_dump(mode="python")).get("text")
-            yield f"variants[{group.group_id}/{variant.variant_id}]", text if isinstance(text, str) else ""
+        if group.field == field:
+            for variant in group.variants:
+                parsed = variant_value(field, variant)
+                if parsed is not None:
+                    yield f"variants[{group.group_id}/{variant.variant_id}]", parsed
+
+
+def _variant_texts(candidate: PackagingCandidate, field: str) -> Iterator[tuple[str, str]]:
+    yield from ((locator, cast(str, value)) for locator, value in _alternatives(candidate, field))
 
 
 def _tag_sets(candidate: PackagingCandidate) -> Iterator[tuple[str, tuple[str, ...], tuple[str, ...]]]:
@@ -96,10 +124,20 @@ def _tag_sets(candidate: PackagingCandidate) -> Iterator[tuple[str, tuple[str, .
         yield f"locales[{item.locale}].", item.tags, item.hashtags
 
 
+def _tag_alternatives(candidate: PackagingCandidate) -> Iterator[tuple[str, tuple[str, ...]]]:
+    yield "tags", candidate.tags
+    for item in candidate.localization_variants:
+        yield f"locales[{item.locale}].tags", item.tags
+    yield from ((locator, cast(tuple[str, ...], value)) for locator, value in _alternatives(candidate, "tags"))
+
+
 def _chapter_sets(candidate: PackagingCandidate) -> Iterator[tuple[str, tuple[PackagingChapter, ...]]]:
     yield "chapters", candidate.chapters
     for item in candidate.localization_variants:
         yield f"locales[{item.locale}].chapters", item.chapters
+    yield from (
+        (locator, cast(tuple[PackagingChapter, ...], value)) for locator, value in _alternatives(candidate, "chapters")
+    )
 
 
 def _asset_integrity(candidate, constraints, facts) -> Iterator[tuple[str, str]]:
@@ -241,16 +279,16 @@ def _tag_text_ok(text: str, charset: str) -> bool:
 
 
 def _tags(candidate, constraints, facts) -> Iterator[tuple[str, str]]:
-    for prefix, tags, _ in _tag_sets(candidate):
+    for locator, tags in _tag_alternatives(candidate):
         if not constraints.min_tags <= len(tags) <= constraints.max_tags:
-            yield f"{prefix}tags", "TAG_COUNT_OUT_OF_BOUNDS"
+            yield locator, "TAG_COUNT_OUT_OF_BOUNDS"
         if len({tag.casefold() for tag in tags}) != len(tags):
-            yield f"{prefix}tags", "DUPLICATE_TAG"
+            yield locator, "DUPLICATE_TAG"
         for index, tag in enumerate(tags):
             if len(tag) > constraints.max_tag_chars:
-                yield f"{prefix}tags[{index}]", "TAG_TOO_LONG"
+                yield f"{locator}[{index}]", "TAG_TOO_LONG"
             elif not _tag_text_ok(tag, constraints.tag_charset):
-                yield f"{prefix}tags[{index}]", "TAG_CHARSET"
+                yield f"{locator}[{index}]", "TAG_CHARSET"
 
 
 def _hashtags(candidate, constraints, facts) -> Iterator[tuple[str, str]]:
@@ -269,8 +307,10 @@ def _hashtags(candidate, constraints, facts) -> Iterator[tuple[str, str]]:
 
 def _banned(candidate, constraints, facts) -> Iterator[tuple[str, str]]:
     texts = [*_titles(candidate), *_descriptions(candidate)]
-    for prefix, tags, hashtags in _tag_sets(candidate):
-        texts.extend((f"{prefix}tags", tag) for tag in (*tags, *hashtags))
+    for prefix, _, hashtags in _tag_sets(candidate):
+        texts.extend((f"{prefix}hashtags", tag) for tag in hashtags)
+    for locator, tags in _tag_alternatives(candidate):
+        texts.extend((locator, tag) for tag in tags)
     for locator, text in texts:
         if any(phrase.casefold() in text.casefold() for phrase in constraints.banned_phrases):
             yield locator, "BANNED_PHRASE"
@@ -284,6 +324,8 @@ def _chapters(candidate, constraints, facts) -> Iterator[tuple[str, str]]:
             yield locator, "TOO_MANY_CHAPTERS"
         if chapters[0].start_ms != 0:
             yield locator, "FIRST_CHAPTER_NOT_AT_ZERO"
+        if any(earlier.start_ms >= later.start_ms for earlier, later in pairwise(chapters)):
+            yield locator, "CHAPTERS_NOT_ASCENDING"
         bounds = [chapter.start_ms for chapter in chapters] + [facts.duration_ms]
         for index, chapter in enumerate(chapters):
             if not chapter.title.strip():
@@ -319,6 +361,8 @@ def _variants(candidate, constraints, facts) -> Iterator[tuple[str, str]]:
             item = f"{locator}/{variant.variant_id}"
             if (group.field == "thumbnail") != (variant.asset_role is not None):
                 yield item, "VARIANT_SOURCE_MISMATCH"
+            elif group.field != "thumbnail" and variant_value(group.field, variant) is None:
+                yield item, "VARIANT_VALUE_MALFORMED"
             elif variant.asset_role is not None and (
                 variant.asset_role not in roles or (variant.asset_role, variant.variant_id) not in asset_keys
             ):
@@ -367,4 +411,12 @@ def check_package(
     )
 
 
-__all__ = ["CHECKS", "PackagingCheckResult", "PackagingFacts", "RuleOutcome", "VerifiedAsset", "check_package"]
+__all__ = [
+    "CHECKS",
+    "PackagingCheckResult",
+    "PackagingFacts",
+    "RuleOutcome",
+    "VerifiedAsset",
+    "check_package",
+    "variant_value",
+]

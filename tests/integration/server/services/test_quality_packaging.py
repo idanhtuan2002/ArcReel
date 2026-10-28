@@ -346,3 +346,110 @@ async def test_unsafe_asset_paths_are_never_measured(packaging_host, source_ref:
     candidate = await append_candidate(env, candidate_for(env, assets=[asset]))
     observation = await service(env).check(check_request(env, candidate))
     assert observation.status is q.ObservationStatus.FAIL
+
+
+async def append_with_lineage(env, payload: PackagingCandidate, **lineage_changes: Any) -> ExplorationRevision:
+    lineage = _lineage(env).model_copy(update=lineage_changes)
+    candidate = ExplorationRevision(
+        candidate_id="package",
+        revision=1,
+        kind=ExplorationKind.PACKAGING,
+        parent_revision=None,
+        payload=payload,
+        payload_digest=digest_payload(payload, lineage),
+        lineage=lineage,
+        created_by="default",
+        created_at=NOW,
+    )
+    async with env["factory"]() as session:
+        await ExplorationRepository(session).append_revision(
+            user_id="default",
+            project_name="project",
+            candidate=candidate,
+            expected_head_version=None,
+            command_id="append-1",
+        )
+        await session.commit()
+    return candidate
+
+
+@pytest.mark.parametrize(
+    "change",
+    [
+        {"content_basis_digest": "sha256:" + "e" * 64},
+        {"approved_master_id": "another-master"},
+        {"approved_master_digest": "sha256:" + "e" * 64},
+        {"creative_profile_id": "0199f00d-0000-7000-8000-00000000abcd"},
+        {"creative_profile_version": "2"},
+        {"policy_digest": "sha256:" + "e" * 64},
+    ],
+)
+async def test_m8_lineage_must_name_the_verified_run_master_and_profile(packaging_host, change) -> None:
+    env = packaging_host
+    candidate = await append_with_lineage(env, candidate_for(env), **change)
+    with pytest.raises(SubjectStaleError):
+        await service(env).check(check_request(env, candidate))
+
+
+async def test_a_wrong_run_digest_is_stale(packaging_host) -> None:
+    env = packaging_host
+    candidate = await append_candidate(env, candidate_for(env))
+    request = check_request(env, candidate)
+    body = request.model_dump(mode="python")
+    body["subject"]["quality_run_digest"] = "sha256:" + "e" * 64
+    body["command"]["request_digest"] = compute_digest("m10.package-check-request.v1", body)
+    with pytest.raises(SubjectStaleError):
+        await service(env).check(p.PackageCheckRequest.model_validate(body))
+
+
+async def test_a_run_without_a_container_probe_has_no_master_facts(packaging_host, monkeypatch) -> None:
+    from lib.db.repositories.quality_runs import QualityRunRepository
+    from r2.quality.errors import RequiredEvidenceMissingError
+
+    env = packaging_host
+    candidate = await append_candidate(env, candidate_for(env))
+
+    async def none(self, **_: Any):
+        return None
+
+    monkeypatch.setattr(QualityRunRepository, "technical_observation", none)
+    with pytest.raises(RequiredEvidenceMissingError):
+        await service(env).check(check_request(env, candidate))
+
+
+async def test_replay_needs_no_live_inputs_and_a_tampered_row_refuses(packaging_host) -> None:
+    from r2.quality.errors import RequiredEvidenceMissingError
+
+    env = packaging_host
+    candidate = await append_candidate(env, candidate_for(env))
+    request = check_request(env, candidate)
+    observation = await service(env).check(request)
+    os.unlink(env["root"].object_ref)
+    assert await service(env).check(request) == observation
+    for statement in (
+        "UPDATE m10_packaging_observations SET observation_digest = 'sha256:' || repeat('0', 64)",
+        "UPDATE m10_packaging_observations SET observation_json = "
+        "jsonb_set(observation_json::jsonb, '{status}', '\"FAIL\"')::json",
+    ):
+        async with env["factory"]() as session, session.begin():
+            await session.execute(sa.text("SET LOCAL session_replication_role = replica"))
+            savepoint = await session.begin_nested()
+            await session.execute(sa.text(statement))
+            from lib.db.repositories.quality_packaging import PackagingObservationRepository
+
+            with pytest.raises(RequiredEvidenceMissingError):
+                await PackagingObservationRepository(session).replay(request)
+            await savepoint.rollback()
+
+
+async def test_concurrent_exact_checks_record_one_observation(packaging_host) -> None:
+    import asyncio
+
+    env = packaging_host
+    candidate = await append_candidate(env, candidate_for(env))
+    request = check_request(env, candidate)
+    first, second = await asyncio.gather(service(env).check(request), service(env).check(request))
+    assert first == second
+    async with env["factory"]() as session:
+        rows = (await session.execute(sa.select(sa.func.count()).select_from(PackagingObservationModel))).scalar_one()
+    assert rows == 1

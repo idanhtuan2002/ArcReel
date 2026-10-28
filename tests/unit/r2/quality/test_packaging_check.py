@@ -205,3 +205,85 @@ def test_slug_tolerant_terms_match_kalinga_seo_lint() -> None:
     body["localization_variants"][0]["title"] = body["title"]
     body["variant_groups"] = []
     assert not {f.code for f in run(body, constraints).failures} & {"TITLE_TERM_MISSING"}
+
+
+def _variant(field: str, variant_id: str, value: dict[str, Any] | None) -> dict[str, Any]:
+    return {
+        "group_id": f"g-{field}",
+        "field": field,
+        "variants": [
+            {
+                "variant_id": variant_id,
+                "value": value,
+                "asset_role": None,
+                "provenance": {"author_kind": "AGENT", "actor_id": "agent"},
+            }
+        ],
+    }
+
+
+def _with_variant(field: str, value: dict[str, Any] | None) -> dict[str, Any]:
+    body = clean_body()
+    body["variant_groups"] = [_variant(field, "v1", value)]
+    return body
+
+
+@pytest.mark.parametrize(
+    ("field", "value", "code"),
+    [
+        ("tags", {"tags": ["river", "River"]}, "DUPLICATE_TAG"),
+        ("tags", {"tags": ["bad!"]}, "TAG_CHARSET"),
+        ("tags", {"tags": ["history"] * 0}, "TAG_COUNT_OUT_OF_BOUNDS"),
+        ("tags", {"tags": ["click here"]}, "BANNED_PHRASE"),
+        ("chapters", {"chapters": [{"start_ms": 5000, "title": "Late"}]}, "FIRST_CHAPTER_NOT_AT_ZERO"),
+        ("chapters", {"chapters": [{"start_ms": 0, "title": " "}]}, "CHAPTER_TITLE_EMPTY"),
+        (
+            "chapters",
+            {"chapters": [{"start_ms": 0, "title": "A"}, {"start_ms": 500000, "title": "B"}]},
+            "CHAPTER_TOO_SHORT",
+        ),
+        (
+            "chapters",
+            {"chapters": [{"start_ms": 0, "title": "A"}, {"start_ms": 0, "title": "B"}]},
+            "CHAPTERS_NOT_ASCENDING",
+        ),
+        ("title", {"text": "history " * 20}, "TITLE_TOO_LONG"),
+        ("tags", {"tags": "history"}, "VARIANT_VALUE_MALFORMED"),
+        ("tags", {"tags": ["history"], "extra": 1}, "VARIANT_VALUE_MALFORMED"),
+        ("chapters", {"chapters": [{"start_ms": -1, "title": "A"}]}, "VARIANT_VALUE_MALFORMED"),
+        ("title", {"tags": ["history"]}, "VARIANT_VALUE_MALFORMED"),
+    ],
+)
+def test_every_alternative_is_checked_like_the_primary_value(field: str, value: dict[str, Any], code: str) -> None:
+    result = run(_with_variant(field, value))
+    assert code in {f.code for f in result.failures}
+    assert any(f.locator.startswith(("variants[g-", "variant_groups[g-")) for f in result.failures if f.code == code)
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("tags", {"tags": ["river history", "valley"]}),
+        ("chapters", {"chapters": [{"start_ms": 0, "title": "Source"}, {"start_ms": 60000, "title": "Delta"}]}),
+        ("description", {"text": "The river carved the valley, a history of ten thousand years."}),
+    ],
+)
+def test_clean_alternatives_pass(field: str, value: dict[str, Any]) -> None:
+    assert run(_with_variant(field, value)).failures == ()
+
+
+def test_duplicate_assets_and_a_presentation_only_tamper_are_refused() -> None:
+    body = clean_body()
+    body["assets"].append(copy.deepcopy(body["assets"][0]))
+    assert "DUPLICATE_ASSET" in {f.code for f in run(body).failures}
+    constraints = all_rules_constraints()
+    candidate = sealed(clean_body(), constraints)
+    forged = PackagingCandidate.model_validate(
+        candidate.model_dump(mode="python")
+        | {"assets": [candidate.assets[0].model_dump(mode="python") | {"source_ref": "elsewhere.mp4"}]}
+    )
+    codes = {
+        (f.check_id, f.code)
+        for f in check_package(forged, q.PlatformConstraintSnapshot.model_validate(constraints), facts(forged)).failures
+    }
+    assert codes == {("closure.presentation", "CLOSURE_MISMATCH")}

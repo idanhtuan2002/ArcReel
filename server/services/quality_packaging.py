@@ -8,6 +8,7 @@ profile and host re-hashed asset bytes. Nothing here selects, exports or writes 
 from __future__ import annotations
 
 import asyncio
+import codecs
 import dataclasses
 import hashlib
 import os
@@ -59,47 +60,110 @@ _SIGNATURES = (
     (b"ftyp", 4, "video/mp4"),
 )
 _TEXT_TYPES = frozenset({"application/json", "text/plain", "application/x-subrip"})
+_OVERSIZED = "sha256:" + "0" * 64
+_NOFOLLOW = getattr(os, "O_NOFOLLOW", 0)
+_DIRECTORY = getattr(os, "O_DIRECTORY", 0)
+_NONBLOCK = getattr(os, "O_NONBLOCK", 0)
+
+type FileIdentity = tuple[int, int]
 
 
-def _sniff(prefix: bytes, declared: str) -> str:
-    """The media type the bytes prove; text types are accepted only as valid UTF-8."""
+@dataclasses.dataclass(frozen=True)
+class MeasuredAsset:
+    asset: VerifiedAsset
+    identity: FileIdentity
+
+
+def _media_type(prefix: bytes, declared: str, utf8_valid: bool) -> str:
+    """The media type the bytes prove: a signature, or a declared text type whose every byte is UTF-8."""
     for signature, offset, media_type in _SIGNATURES:
         if prefix[offset : offset + len(signature)] == signature:
             return media_type
-    if declared in _TEXT_TYPES:
-        try:
-            prefix.decode("utf-8")
-        except UnicodeDecodeError:
-            return "application/octet-stream"
+    if declared in _TEXT_TYPES and utf8_valid:
         return declared
     return "application/octet-stream"
 
 
-def _measure(root: Path, source_ref: str, declared: str) -> VerifiedAsset | None:
-    """Hash one regular file under the project root without following links; None when it is not safe."""
+def _open_beneath(root: Path, parts: tuple[str, ...]) -> int | None:
+    """Open a regular file by walking each component from a pinned root descriptor without following links."""
+    if os.name != "posix" or not parts:
+        return None
+    flags = os.O_RDONLY | _NOFOLLOW | _NONBLOCK
+    try:
+        directory = os.open(root, os.O_RDONLY | _DIRECTORY | _NOFOLLOW)
+    except OSError:
+        return None
+    try:
+        for part in parts[:-1]:
+            child = os.open(part, os.O_RDONLY | _DIRECTORY | _NOFOLLOW, dir_fd=directory)
+            os.close(directory)
+            directory = child
+        descriptor = os.open(parts[-1], flags, dir_fd=directory)
+    except OSError:
+        return None
+    finally:
+        os.close(directory)
+    if not stat.S_ISREG(os.fstat(descriptor).st_mode):
+        os.close(descriptor)
+        return None
+    return descriptor
+
+
+def _measure(root: Path, source_ref: str, declared: str, limit: int) -> MeasuredAsset | None:
+    """Hash at most ``limit`` bytes of one regular file beneath the project root; None when it is not safe.
+
+    Every component is opened relative to its parent's descriptor with no-follow, so neither a final nor an
+    ancestor symlink, nor a component swapped after a check, can redirect the read. A FIFO or device is rejected
+    by fstat before any read, and the open itself never blocks. More than ``limit`` bytes yields a size above the
+    limit and a digest that matches no declaration.
+    """
     relative = PurePosixPath(source_ref)
     if relative.is_absolute() or any(part in {"", ".", ".."} for part in relative.parts):
         return None
-    path = root.joinpath(*relative.parts)
-    try:
-        resolved = path.resolve(strict=True)
-        if not resolved.is_relative_to(root.resolve(strict=True)):
-            return None
-        descriptor = os.open(path, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0))
-    except OSError:
+    descriptor = _open_beneath(root, relative.parts)
+    if descriptor is None:
         return None
     digest = hashlib.sha256()
+    decoder = codecs.getincrementaldecoder("utf-8")()
+    utf8_valid = True
     size = 0
     prefix = b""
     with os.fdopen(descriptor, "rb") as handle:
-        if not stat.S_ISREG(os.fstat(handle.fileno()).st_mode):
-            return None
+        info = os.fstat(handle.fileno())
         for chunk in iter(lambda: handle.read(1 << 20), b""):
             if not prefix:
                 prefix = chunk[:64]
-            digest.update(chunk)
             size += len(chunk)
-    return VerifiedAsset("sha256:" + digest.hexdigest(), size, _sniff(prefix, declared))
+            if size > limit:
+                return MeasuredAsset(VerifiedAsset(_OVERSIZED, limit + 1, "application/octet-stream"), (0, 0))
+            digest.update(chunk)
+            if utf8_valid:
+                try:
+                    decoder.decode(chunk)
+                except UnicodeDecodeError:
+                    utf8_valid = False
+        if utf8_valid:
+            try:
+                decoder.decode(b"", final=True)
+            except UnicodeDecodeError:
+                utf8_valid = False
+    return MeasuredAsset(
+        VerifiedAsset("sha256:" + digest.hexdigest(), size, _media_type(prefix, declared, utf8_valid)),
+        (info.st_dev, info.st_ino),
+    )
+
+
+def _identity(path: str) -> FileIdentity | None:
+    """The inode of the approved master object, opened without following a final link."""
+    try:
+        descriptor = os.open(path, os.O_RDONLY | _NOFOLLOW | _NONBLOCK)
+    except OSError:
+        return None
+    try:
+        info = os.fstat(descriptor)
+    finally:
+        os.close(descriptor)
+    return (info.st_dev, info.st_ino) if stat.S_ISREG(info.st_mode) else None
 
 
 def _master_facts(result_facts: ContainerFacts) -> tuple[int, int, int]:
@@ -129,7 +193,7 @@ class PackagingCheckService:
         sessions: Sessions,
         project_root: Path,
         clock: Callable[[], datetime],
-        measure: Callable[[Path, str, str], VerifiedAsset | None] = _measure,
+        measure: Callable[[Path, str, str, int], MeasuredAsset | None] = _measure,
     ) -> None:
         self._sessions = sessions
         self._project_root = project_root
@@ -146,7 +210,7 @@ class PackagingCheckService:
         if replayed is not None:
             return replayed
         candidate, facts, constraints, master = await self._inputs(request)
-        measured = await asyncio.to_thread(self._assets, candidate, master)
+        measured = await asyncio.to_thread(self._assets, candidate, constraints, master)
         facts = dataclasses.replace(facts, assets=measured)
         result = check_package(candidate, constraints, facts)
         observation = self._observation(request, candidate, result, facts)
@@ -160,22 +224,24 @@ class PackagingCheckService:
         return observation
 
     def _assets(
-        self, candidate: PackagingCandidate, master: tuple[str, str]
+        self, candidate: PackagingCandidate, constraints: q.PlatformConstraintSnapshot, master: tuple[str, str]
     ) -> dict[tuple[str, str | None], VerifiedAsset]:
-        """Re-hash every declared asset; the primary video must be the approved master object itself."""
+        """Re-hash every declared asset; the primary video must be the approved master inode itself."""
         master_path, master_digest = master
+        master_identity = _identity(master_path)
+        limits = {role.role: role.max_bytes for role in constraints.asset_roles}
         measured: dict[tuple[str, str | None], VerifiedAsset] = {}
         for asset in candidate.assets:
-            verified = self._measure(self._project_root, asset.source_ref, asset.media_type)
-            if verified is None:
+            found = self._measure(self._project_root, asset.source_ref, asset.media_type, limits.get(asset.role, 0))
+            if found is None:
                 continue
             if (asset.role, asset.variant_id) == ("video", None) and (
-                self._project_root.joinpath(*PurePosixPath(asset.source_ref).parts).resolve()
-                != Path(master_path).resolve()
-                or verified.content_digest != master_digest
+                master_identity is None
+                or found.identity != master_identity
+                or found.asset.content_digest != master_digest
             ):
                 continue
-            measured[(asset.role, asset.variant_id)] = verified
+            measured[(asset.role, asset.variant_id)] = found.asset
         return measured
 
     async def _inputs(
@@ -223,6 +289,25 @@ class PackagingCheckService:
                 raise ProfileStaleError()
             if not isinstance(profile.policy, q.QualityPolicyV2):
                 raise ProfileStaleError()
+            lineage = revision.lineage
+            if (
+                lineage.project_name,
+                lineage.content_basis_digest,
+                lineage.approved_master_id,
+                lineage.approved_master_digest,
+                lineage.creative_profile_id,
+                lineage.creative_profile_version,
+                lineage.policy_digest,
+            ) != (
+                project_name,
+                run.subject.content_basis_digest,
+                run.subject.master_binding.root.candidate_id,
+                run.subject.artifact_digest,
+                run.profile_id,
+                str(run.profile_revision),
+                profile.policy_digest,
+            ):
+                raise SubjectStaleError()
             duration_ms, width, height = await self._container_facts(session, run, user_id, project_name)
         facts = PackagingFacts(
             approved_master_id=run.subject.master_binding.root.candidate_id,
