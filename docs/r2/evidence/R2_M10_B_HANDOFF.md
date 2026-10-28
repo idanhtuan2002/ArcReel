@@ -75,8 +75,26 @@ Rewrite in place; this is the resume entry for M10-B.
   r2/scripts/server + SQLite migrations 5555 passed, gates clean. Codex delta re-review running
   (`b2-codex-delta-review.json`).
 
+- B2 Codex delta reviews: delta1 REWORK → `509a13f02`; delta2 REWORK (M2 worker) → `b4c88db6a`; delta3
+  ACCEPT_WITH_CONDITIONS (`b2-codex-delta3-review.json`) → `8089ed056` closes N4, records LOCAL_REGULAR_FILE_IO,
+  adds PG probe-tamper/FK/unique/status/JSON-ceiling tests. PG `test_quality_packaging.py` 27 passed;
+  `test_quality_packaging_measure.py` 18 passed. **B2 accepted with conditions.** Carried: C4 authenticated
+  server-derived provenance at the B5 append boundary; C6 closure+lineage verification in every B3/B4 consumer;
+  D5 B4 must materialize and re-verify private snapshots.
+
 ## Next step
 
-Triage the B2 Codex review. Then B3: preview + Human selection into `PACKAGING_SLOT` (§4 global lock order,
-custodian lease like A6, `m10_package_previews`/`m10_package_selections`/`m10_packaging_heads`, writer-pair PG
-tests), then B4 export, B5 routes+UI, B6 parity, B7 pilots (Human gates), B8 seal.
+B3: preview + Human selection into `PACKAGING_SLOT`.
+- Contracts exist (`PackagePreview`, `PackageSelectionRequest`, `PackagingSelectionAuthorizationLease`,
+  `PackageSelection`, `PackagingSlotKey`); add a `PREVIEW_PACKAGE` request contract + frozen vector.
+- Tables: `m10_package_previews`, `m10_package_selections` (append-only), `m10_packaging_heads` (CAS, unique slot
+  five-tuple); migration after `6e3b8d4f9c22`.
+- Custodian: mirror `server/services/quality_dispositions.py` `DispositionCustodian` (authorize → DB-time lease
+  ≤30 s, `admit` under the write tx) with action `PACKAGING_SELECTION`.
+- Preview binds: exact M8 revision (closures + lineage, C6), current PASS/WAIVE disposition of the run (A
+  `validity_in` CURRENT), packaging observation PASS or only waivable BLOCKING findings listed with reasons,
+  chosen variant per group.
+- Selection lock order (design §4): receipt replay → command guard → `lock_subject_masters` → `lock_profile_head`
+  (FOR SHARE) → run head (FOR SHARE) → disposition head (FOR SHARE) → preview (FOR UPDATE) → packaging-head
+  advisory + row (FOR UPDATE) → `lock_grant_heads` → (validity_in inside). Newer run stales.
+- PG writer-pair tests per §4. Then Codex review, B4 export.
