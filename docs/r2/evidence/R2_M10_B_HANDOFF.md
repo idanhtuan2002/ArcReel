@@ -133,9 +133,18 @@ Rewrite in place; this is the resume entry for M10-B.
 - `27f90c235` UI: `frontend/src/features/packaging/` (route `packaging`, sidebar entry, en/vi/zh copy, axe-core
   test); `pnpm check` exit 0 (235 files / 2637 tests).
 
+- B5 delta → `73022b4f6`; delta2 **ACCEPTED WITH VERIFICATION LIMITS** (`b5-codex-delta2-review.json`).
+  The embedded-agent token now carries `via` and is refused by every interactive Human check (A3/A6 too).
+- B6: baseline frozen `988321186` → measured `f4509c145` → `R2_M10_B6_DONOR_PARITY.json` (`109279660`):
+  Kalinga PASS, OpenMontage PASS (17 same-fixture tests; real confined export performance measured).
+- B7: preregistration + runbook frozen `59576994e` (`R2_M10_B7_PILOT_PREREGISTRATION.json`,
+  `R2_M10_B7_PILOT_RUNBOOK.md`). **Pilots need the sponsor as Human** (profile publication, disposition,
+  selection in an interactive session).
+- `8df2456ac` finalize × run-seal writer pair (carried B4 condition). Codex pre-seal review running
+  (`preseal-codex-review.json`: UI, B6, B7 prereg).
+
 ## Next step
 
-Triage the B5 delta review (then Codex review of the UI if needed). Then B6 donor parity (OpenMontage export_bundle
-+ Kalinga seo_lint/variants, pinned donors, frozen-before-measure, A7 pattern in `scripts/r2/build_m10_a7_parity.py`),
-B7 pilot preregistration + agent-side preparation (sponsor must make the Human disposition/selection decisions),
-B8 seal with the carried B4 crash-cut conditions.
+Triage the pre-seal review. Then write `R2_M10_B_CANDIDATE.json` (seal candidate: HEAD, packets, reviews, gates run,
+carried conditions, the Human-gated B7 pilots as the only open item) and stop for the sponsor: pilots per the runbook,
+then B8 seal (M10-B acceptance) and M10 integrated acceptance. Nothing pushed; merge/tag/deploy are Human gates.
