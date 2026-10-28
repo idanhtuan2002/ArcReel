@@ -54,6 +54,7 @@ DIGEST_DOMAINS = (
     "m10.package-selection.v1",
     "m10.export-request.v1",
     "m10.export-manifest.v1",
+    "m10.export-execution.v1",
 )
 PACKAGING_CONTENT_FIELDS = (
     "title",
@@ -102,6 +103,7 @@ _MODELS = MappingProxyType(
         "m10.package-selection.v1": p.PackageSelection,
         "m10.export-request.v1": p.ExportRequest,
         "m10.export-manifest.v1": p.ExportManifest,
+        "m10.export-execution.v1": p.ExportExecutionIdentity,
     }
 )
 _GROUPS = MappingProxyType(

@@ -1,0 +1,176 @@
+{
+  "schema_id": "m10.b1-review.v1",
+  "reviewed_head": "eb70e4c3faa100990b09d7f97016245641587896",
+  "reviewer": "Codex independent critical review; main agent; source read-only",
+  "verdict": "REWORK",
+  "commands_run": [
+    {
+      "command": "git rev-parse HEAD; git status --short; git branch --show-current; git show -s --format=\"%H %P %s\" eb70e4c3f; git diff --stat eb70e4c3f HEAD; git show eb70e4c3f",
+      "result": "Checkout HEAD 71d16934c5c1ee225457d2859ad6fc5f39d71b7c on design/r2-m10-b; initially clean. Candidate parent 9a16ddf91be4253b5ebdf702f0e3a6e32668b2a6. HEAD differs from candidate only in docs/r2/evidence/R2_M10_B_HANDOFF.md; reviewed source, design and tests match candidate."
+    },
+    {
+      "command": "Read accepted design sections 2, D1-D4, 3.1, 3.3, 8, and docs/r2/evidence/m10-b-reviews/design-b0-review.json and design-r2-delta-review.json; inspect full B1 source/test diff and numbered source",
+      "result": "Completed. D3 amendment correctly keeps PackagingObservation outside the run observation union. Prior N3 safety resolution is incomplete at the semantic rule boundary: H1."
+    },
+    {
+      "command": "codebase-memory list_projects; index_status(home-anhtuan-content-production-os); search_graph(name_pattern=\".*(PackagingCandidate|QualityPolicyV2).*\"); check_index_coverage for B1 source paths and bounded test scopes",
+      "result": "list_projects succeeded but exposed no index rooted at this worktree. Status, search and coverage calls denied: MCP tool call requires approval, but approval policy is never. Direct source/diff fallback used; no graph completeness claim."
+    },
+    {
+      "command": "UV_CACHE_DIR=/tmp/m10-b-uv-cache PYTHONDONTWRITEBYTECODE=1 uv run python -m pytest -q -p no:cacheprovider tests/unit/r2/contracts tests/unit/r2/quality tests/unit/r2/advanced_creative tests/integration/lib/db/migrations/test_5d2a7c3e8b11_m8_packaging_candidate_kind.py",
+      "result": "Interrupted with exit 130 without test output. Offline/no-sync repeat with the same paths also interrupted without output. No pass/fail claim from these attempts."
+    },
+    {
+      "command": "DATABASE_URL=postgresql+asyncpg://postgres:postgres@127.0.0.1:55491/arcreel_test PYTHONDONTWRITEBYTECODE=1 UV_CACHE_DIR=/tmp/m10-b-uv-cache uv run --offline --no-sync python -m pytest -q -p no:cacheprovider tests/unit/r2/contracts tests/unit/r2/quality",
+      "result": "PASS: 926 passed in 8.48s. External DATABASE_URL bypasses the session fixture temporary SQLite migration; these selected tests do not prove PostgreSQL migration or repository behavior."
+    },
+    {
+      "command": "DATABASE_URL=postgresql+asyncpg://postgres:postgres@127.0.0.1:55491/arcreel_test PYTHONDONTWRITEBYTECODE=1 timeout -k 2 45 .venv/bin/python -m pytest -q -p no:cacheprovider tests/unit/r2/contracts/test_packaging.py tests/unit/r2/quality/test_quality_digests.py tests/unit/r2/quality/test_quality_profiles.py tests/unit/r2/quality/test_runs.py",
+      "result": "PASS: 242 passed in 6.89s; subset overlapping the 926, not additional coverage count."
+    },
+    {
+      "command": "DATABASE_URL=postgresql+asyncpg://postgres:postgres@127.0.0.1:55491/arcreel_test PYTHONDONTWRITEBYTECODE=1 UV_CACHE_DIR=/tmp/m10-b-uv-cache uv run --offline --no-sync python -m pytest -q -p no:cacheprovider tests/unit/r2/advanced_creative",
+      "result": "PASS: 154 passed in 1.28s. Non-overlapping total with contract/quality run: 1080 passed."
+    },
+    {
+      "command": "DATABASE_URL=postgresql+asyncpg://postgres:postgres@127.0.0.1:55491/arcreel_test PYTHONDONTWRITEBYTECODE=1 UV_CACHE_DIR=/tmp/m10-b-uv-cache uv run --offline --no-sync python -m pytest -q -x -p no:cacheprovider tests/integration/lib/db/repositories/test_quality_profiles_repository.py tests/integration/lib/db/repositories/test_advanced_creative.py tests/integration/lib/db/migrations/test_5d2a7c3e8b11_m8_packaging_candidate_kind.py",
+      "result": "Interrupted exit 130, no completed results. Direct AF_INET socket construction independently fails PermissionError: [Errno 1] Operation not permitted; live PostgreSQL unavailable in this sandbox."
+    },
+    {
+      "command": "DATABASE_URL=postgresql+asyncpg://postgres:postgres@127.0.0.1:55491/arcreel_test PYTHONDONTWRITEBYTECODE=1 UV_CACHE_DIR=/tmp/m10-b-uv-cache timeout -k 2 40 uv run --offline --no-sync python -m pytest -q -p no:cacheprovider tests/integration/lib/db/migrations/test_5d2a7c3e8b11_m8_packaging_candidate_kind.py",
+      "result": "Exit 124 timeout after one dot; full SQLite migration pytest round trip not completed. Earlier packaging-only default-fixture diagnostic also timed out; startup migration stall root cause not established."
+    },
+    {
+      "command": "In-memory Python probe: load actual migration 5d2a7c3e8b11 using importlib; apply upgrade/downgrade with Alembic Operations/MigrationContext on synchronous sqlite://; compile upgrade using PostgreSQL dialect as_sql=True",
+      "result": "PASS on minimal SQLite table: FORMAT row preserved, PACKAGING admitted, downgrade with PACKAGING refused M10_PACKAGING_HISTORY_PRESENT, removal permits downgrade/re-upgrade. PostgreSQL emits DROP CONSTRAINT ck_m8_candidate_revisions_kind followed by ADD CHECK admitting exactly CANVAS/SPATIAL/FORMAT/PACKAGING. Minimal-table probe does not prove full predecessor-schema/FK preservation or live PostgreSQL behavior."
+    },
+    {
+      "command": "In-memory Python differential probe: git show eb70e4c3f^:r2/contracts/{advanced_creative,quality}.py loaded into temporary module namespaces; compare canonical bodies and digest_payload using existing contract/exploration fixtures",
+      "result": "PASS: CANVAS/SPATIAL/FORMAT parent/current canonical bodies and payload+lineage digests identical. CANVAS sha256:9f6390d79f64bc8694fdcca6b2cf697c627382a4178d25de24bb17ef5b9ea489; SPATIAL sha256:d10e61b76c441aca2a605bce833714d35a2c9372de3571636cff868fd1369cc3; FORMAT sha256:e559d9b532f298e2cb371e1231805871218dbb57414151b6b52733b78095bfc7. QualityPolicyV1, QualityProfileDraft and original PUBLISH_PROFILE CommandEnvelope canonical bodies identical. Existing A digest tests passed unchanged vectors; no A receipt regression observed."
+    },
+    {
+      "command": "In-memory Python probe using test_runs.profile/admitted/close and test_quality_profiles.publication_request/publish: replace the V1 policy with V2 while preserving run assessment requirements; publish, close technical+Human run, verify_caches",
+      "result": "PASS: V2 publication, run closure and recursive cache verification. No live custodian or database authority inferred from test leases."
+    },
+    {
+      "command": "In-memory Python safety/shape probes using test_packaging policy_v2_data/candidate_data/manifest_data and Pydantic model_validate; publish relabeled policy through existing pure publication helper",
+      "result": "CONFIRMED H1: required video constraint references asset-video; relabel asset-video from REQUIRED_ASSET to METADATA_LINT and include it in packaging_waiverable_rule_ids: V2 validation, pure publication and cache verification all accept. REQUIRED_ASSET severity ADVISORY also accepted. CONFIRMED M1/M2/M3: charset, max_hashtag_chars, per-variant provenance and manifest selected_variant_ids are rejected as extra_forbidden. CONFIRMED M4: export-execution domain raises unregistered; four registered new domains lack GOLDEN entries."
+    },
+    {
+      "command": "In-memory Python request probes: compute and seal SELECT_PACKAGE / EXPORT_PACKAGE request_digest, verify_caches, mutate preview_digest / selection_digest",
+      "result": "PASS: both valid requests verify; semantic mutation refuses with digest mismatch. Scope/operation negative tests also passed in contract suite. Request hashing follows A semantics excluding command_id and cached request_digest."
+    },
+    {
+      "command": "In-memory Python preview probe: construct PACKAGING ExplorationRevision with existing _World/_preview fixtures, call promotable_format and ExplorationService preview",
+      "result": "PASS: both refuse PromotionTargetUnavailableError. Preview events exactly [command, head], no slot authority call or commit. Promotion source calls promotable_format at r2/advanced_creative/promotion.py:132 before format evidence, slot lock and authority. End-to-end promote with PACKAGING was not executed."
+    }
+  ],
+  "not_verified": [
+    "Live PostgreSQL CHECK upgrade/downgrade/history refusal and repository replay/CAS tests: sandbox denies AF_INET sockets. Compiled DDL is not live execution.",
+    "Full SQLite predecessor-schema migration round trip: targeted pytest timed out. Only the actual migration on a minimal synchronous SQLite table completed.",
+    "Graph generation/freshness and per-file coverage unavailable after tool denial. All material conclusions use actual candidate-matching source, diffs and probes.",
+    "No full suite, frontend suite, static lint/type/import/dependency gates, provider calls, donor parity, release or production qualification were run. Source was not modified, staged or committed.",
+    "No B2-B8 implementation exists in this packet: selection/export exploits, lease custody, currentness/concurrency and archive execution were not executed. H1 downstream acceptance risk is conditional on B2/B3 trusting the admitted policy.",
+    "Review ran on checkout 71d16934; candidate source/test/design equivalence established by git diff. Handoff-only descendant was not treated as part of candidate."
+  ],
+  "findings": {
+    "H": [
+      {
+        "id": "H1",
+        "file": "r2/contracts/quality.py",
+        "line": 534,
+        "related_locations": [
+          "r2/contracts/quality.py:490",
+          "r2/contracts/quality.py:547"
+        ],
+        "title": "Required-asset safety can be relabeled into a waivable or advisory rule",
+        "status": "CONFIRMED contract/publication admission; downstream selection bypass is a conditional risk, not an executed exploit",
+        "scenario": "Start with the shipped policy_v2_data fixture: video.required=True and video.constraint_rule_id=asset-video. Change that referenced rule_class to METADATA_LINT and list asset-video as waivable. PlatformConstraintSnapshot checks only ID existence; QualityPolicyV2 checks only the supplied class. Validation and the A pure publication path accept the policy. Independently, a REQUIRED_ASSET rule with severity ADVISORY is admitted. D3 selection allows listed blocking waivers and ignores advisory findings, so a B2/B3 implementation following these admitted labels can make missing required video selectable. This leaves the prior N3 non-waivable safety resolution incomplete.",
+        "fix": "Before B2, bind safety semantics to policy structure/server-owned rule definitions rather than caller-supplied labels. Validate that required-role presence rules have the mandatory safety class and blocking severity; likewise ensure integrity/closure/currentness checks cannot be downgraded to waivable/advisory semantics. Add RED cases for misclassification, advisory downgrade and publication admission. B2 must enforce these invariants independently of waiver input.",
+        "design_basis": "D4; prior design-r2-delta-review N3; non-waivable integrity/required-asset/closure/currentness boundary."
+      }
+    ],
+    "M": [
+      {
+        "id": "M1",
+        "file": "r2/contracts/quality.py",
+        "line": 512,
+        "title": "Constraint snapshot cannot express charset and per-hashtag length policy",
+        "status": "CONFIRMED",
+        "scenario": "D4 requires tag/hashtag count, charset and per-item length in the published snapshot. The model has max_tags, max_tag_chars and max_hashtags, but no charset setting or explicit hashtag item limit. Supplying charset or max_hashtag_chars is extra_forbidden. A platform revision that changes allowed metadata characters or hashtag length therefore cannot be represented or bound by its constraint digest; B2 would need an undocumented hardcoded setting or another schema change.",
+        "fix": "Add explicit character policy and hashtag item-length fields, or document and approve an exact shared tag/hashtag character/length policy represented by named fields. Freeze the updated vectors and add field-mutation/invalid-policy cases before freezing B2 input contracts.",
+        "design_basis": "D4 PlatformConstraintSnapshot field inventory."
+      },
+      {
+        "id": "M2",
+        "file": "r2/contracts/advanced_creative.py",
+        "line": 499,
+        "related_locations": [
+          "r2/contracts/advanced_creative.py:531"
+        ],
+        "title": "Variant alternatives cannot carry their required provenance",
+        "status": "CONFIRMED",
+        "scenario": "Section 3.3 specifies each variant as variant_id, value/asset reference and provenance. PackagingVariant has only variant_id/value/asset_role and rejects provenance. Candidate provenance identifies only content or presentation, with no group/variant key. If an agent authors one title and a Human authors another, the immutable payload cannot record which principal authored which selectable alternative.",
+        "fix": "Add immutable per-variant provenance with server-derived author identity, include it in closure/candidate digests, and update vectors. Prove both alternative authors survive round trip and provenance changes alter the bound digest. Reject client authority claims at the later append input boundary.",
+        "design_basis": "Section 3.3 variants; section 3.1 server-set provenance."
+      },
+      {
+        "id": "M3",
+        "file": "r2/contracts/packaging.py",
+        "line": 230,
+        "title": "Export manifest omits the explicitly required chosen variant identities",
+        "status": "CONFIRMED",
+        "scenario": "The preview has selected_variant_ids, but ExportManifest contains no chosen-variant field and rejects selected_variant_ids as extra_forbidden. Section 3.3 requires the manifest itself to record the chosen ids. A detached bundle reader can see only opaque selection_digest and candidate_payload_digest, not the selected alternatives; adding the required record in B4 would change the supposedly frozen B1 manifest shape/vector.",
+        "fix": "Add a canonical chosen-variant representation to ExportManifest, preferably group-to-variant bindings, and require B4 construction/finalization to match the selection preview exactly. Freeze the vector and add missing/duplicate/wrong-choice cases.",
+        "design_basis": "Section 3.3: manifest records the chosen ids."
+      },
+      {
+        "id": "M4",
+        "file": "r2/quality/digests.py",
+        "line": 46,
+        "related_locations": [
+          "tests/unit/r2/contracts/test_packaging.py:274",
+          "tests/unit/r2/quality/test_quality_digests.py:185"
+        ],
+        "title": "B1 domain/vector freeze is incomplete",
+        "status": "CONFIRMED",
+        "scenario": "Section 3.1 includes m10.export-execution.v1 and freezes the B domains in B1. The domain is absent and an existing test still requires it to be unregistered. The registered packaging-observation, package-selection-request, package-selection and export-request domains also have no frozen GOLDEN vector in test_packaging. Their projections can change while the current golden tests remain green; B4 cannot use the specified execution binding through compute_digest.",
+        "fix": "Complete the export execution contract/projection and freeze all listed domain vectors, including request cache exclusion and scalar mutation checks. If export-execution is deliberately deferred, record an explicit accepted B1 scope exception with B4 as its gate; still freeze the four already implemented domains in this packet.",
+        "design_basis": "Section 3.1 Domains / Golden vectors frozen in B1; section 8 Contracts."
+      }
+    ],
+    "L": []
+  },
+  "conditions": [
+    {
+      "id": "C1",
+      "gate": "Before B2",
+      "requirement": "Resolve H1 and re-review semantic safety admission. REWORK is driven by H1; existing 1080 passing unit tests do not cover its relabel/advisory cases."
+    },
+    {
+      "id": "C2",
+      "gate": "B1 repair / named contract gate before consumers are frozen",
+      "requirement": "Resolve M1-M3 and the four missing vectors in M4. Any export-execution deferral needs an explicit accepted scope amendment and a named B4 closure gate."
+    },
+    {
+      "id": "C3",
+      "gate": "Shared-schema acceptance",
+      "requirement": "Run actual SQLite and PostgreSQL migration round trips with predecessor data/FKs, refusal preserving version/history, and the two changed repository test files. Current review has no live PostgreSQL pass or completed full-schema SQLite pass."
+    },
+    {
+      "id": "C4",
+      "gate": "B2 Contracts/Packaging checks",
+      "requirement": "Track the currently missing design RED cases at the M10 runtime boundary: undeclared/duplicate/missing roles, duplicate assets, server-derived provenance, closure mismatch, package-scoped subject without circular binding, and PACKAGING refusal by run sealing. Pure M8 payload construction accepting role/provenance data is not itself an authorization defect: the design deliberately leaves those checks to M10."
+    },
+    {
+      "id": "C5",
+      "gate": "Shared-schema regression evidence",
+      "requirement": "Persist PACKAGING-specific preview and promotion refusal tests proving no slot lock/Production Authority call; B1 only adds a generic append test. Independent preview/direct-dispatch probes passed; full promotion refusal was source-inspected. Preserve predecessor CANVAS/SPATIAL/FORMAT behavior and A receipt vectors."
+    },
+    {
+      "id": "C6",
+      "gate": "B3/B4 implementation reviews",
+      "requirement": "PackagingCandidate is an M8 model, so verify_caches rejects it. Both closure caches are excluded from the M10 candidate projection and verified only by verify_packaging_closures. Call that helper explicitly on append/check/load before trusting a candidate, alongside the M8 payload+lineage digest. Current separate helper is correct; no current runtime bypass claimed."
+    }
+  ]
+}

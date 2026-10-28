@@ -227,6 +227,11 @@ class ExportManifestEntry(M10ContractModel):
         return value
 
 
+class VariantChoice(M10ContractModel):
+    group_id: ExactIdentity
+    variant_id: ExactIdentity
+
+
 class ExportManifest(M10ContractModel):
     schema_id: Literal["m10.export-manifest.v1"]
     slot: PackagingSlotKey
@@ -236,7 +241,14 @@ class ExportManifest(M10ContractModel):
     disposition_digest: Sha256Digest
     candidate_payload_digest: Sha256Digest
     builder_identity_digest: Sha256Digest
+    chosen_variants: tuple[VariantChoice, ...]
     entries: tuple[ExportManifestEntry, ...] = Field(min_length=1)
+
+    @field_validator("chosen_variants")
+    @classmethod
+    def choice_order(cls, value: tuple[VariantChoice, ...]) -> tuple[VariantChoice, ...]:
+        _unique(choice.group_id for choice in value)
+        return tuple(sorted(value, key=lambda choice: choice.group_id.encode("utf-8")))
 
     @field_validator("entries")
     @classmethod
@@ -248,6 +260,18 @@ class ExportManifest(M10ContractModel):
         if sum(entry.byte_size for entry in value) > EXPORT_MEMBER_MAX_BYTES:
             raise ValueError("export closure exceeds the archive envelope")
         return tuple(sorted(value, key=lambda entry: entry.path.encode("ascii")))
+
+
+class ExportExecutionIdentity(M10ContractModel):
+    """The M7 request identity of one export: exactly what the builder materializes and with which builder."""
+
+    schema_id: Literal["m10.export-execution.v1"]
+    slot: PackagingSlotKey
+    selection_id: M10Uuid7
+    selection_digest: Sha256Digest
+    manifest_digest: Sha256Digest
+    builder_identity_digest: Sha256Digest
+    adapter_version: ExactIdentity
 
 
 class ExportBundleReceipt(M10ContractModel):
@@ -267,6 +291,7 @@ class ExportBundleReceipt(M10ContractModel):
 __all__ = [
     "EXPORT_MEMBER_MAX_BYTES",
     "ExportBundleReceipt",
+    "ExportExecutionIdentity",
     "ExportManifest",
     "ExportManifestEntry",
     "ExportRequest",
@@ -280,4 +305,5 @@ __all__ = [
     "PackagingObservation",
     "PackagingSelectionAuthorizationLease",
     "PackagingSlotKey",
+    "VariantChoice",
 ]

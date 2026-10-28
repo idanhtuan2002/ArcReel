@@ -24,6 +24,10 @@ from tests.unit.r2.contracts.test_quality import DIGEST, NOW, OTHER_UUID, UUID, 
 OTHER_DIGEST = "sha256:" + "b" * 64
 
 
+def rule(rule_id: str, check_id: str, rule_class: str, severity: str = "BLOCKING") -> dict[str, str]:
+    return {"rule_id": rule_id, "check_id": check_id, "rule_class": rule_class, "severity": severity}
+
+
 def constraints_data() -> dict[str, Any]:
     return {
         "schema_id": "m10.platform-constraints.v1",
@@ -34,12 +38,19 @@ def constraints_data() -> dict[str, Any]:
         "width": 1920,
         "height": 1080,
         "title_max_chars": 100,
+        "description_min_chars": 20,
         "description_max_chars": 5000,
+        "plain_text_only": True,
+        "title_required_terms": ["history"],
+        "description_required_terms": ["river"],
+        "banned_phrases": ["click here"],
+        "tag_charset": "UNICODE_LETTERS_DIGITS_SPACE",
+        "min_tags": 1,
         "max_tags": 15,
         "max_tag_chars": 30,
+        "min_hashtags": 0,
         "max_hashtags": 3,
-        "required_topic_terms": ["history"],
-        "banned_phrases": ["click here"],
+        "max_hashtag_chars": 30,
         "chapter_min_ms": 10000,
         "max_chapters": 20,
         "required_locales": ["en"],
@@ -62,12 +73,16 @@ def constraints_data() -> dict[str, Any]:
             },
         ],
         "rules": [
-            {"rule_id": "asset-video", "rule_class": "REQUIRED_ASSET", "severity": "BLOCKING"},
-            {"rule_id": "asset-thumbnail", "rule_class": "INTEGRITY", "severity": "BLOCKING"},
-            {"rule_id": "title-length", "rule_class": "METADATA_LINT", "severity": "BLOCKING"},
-            {"rule_id": "duration", "rule_class": "DURATION", "severity": "BLOCKING"},
-            {"rule_id": "closure", "rule_class": "CLOSURE", "severity": "BLOCKING"},
-            {"rule_id": "current", "rule_class": "CURRENTNESS", "severity": "BLOCKING"},
+            rule("asset-video", "asset.required", "REQUIRED_ASSET"),
+            rule("asset-thumbnail", "asset.integrity", "INTEGRITY"),
+            rule("closure", "closure.content", "CLOSURE"),
+            rule("closure-presentation", "closure.presentation", "CLOSURE"),
+            rule("closure-subject", "closure.subject", "CLOSURE"),
+            rule("current", "binding.master", "CURRENTNESS"),
+            rule("current-profile", "binding.profile", "CURRENTNESS"),
+            rule("title-length", "title.length", "METADATA_LINT"),
+            rule("duration", "duration.window", "DURATION"),
+            rule("tone", "phrases.banned", "METADATA_LINT", "ADVISORY"),
         ],
     }
 
@@ -118,8 +133,18 @@ def candidate_body() -> dict[str, Any]:
                 "group_id": "titles",
                 "field": "title",
                 "variants": [
-                    {"variant_id": "t1", "value": {"text": "A history of the river"}, "asset_role": None},
-                    {"variant_id": "t2", "value": {"text": "The river that made a valley"}, "asset_role": None},
+                    {
+                        "variant_id": "t1",
+                        "value": {"text": "A history of the river"},
+                        "asset_role": None,
+                        "provenance": {"author_kind": "AGENT", "actor_id": "agent"},
+                    },
+                    {
+                        "variant_id": "t2",
+                        "value": {"text": "The river that made a valley"},
+                        "asset_role": None,
+                        "provenance": {"author_kind": "HUMAN", "actor_id": "owner"},
+                    },
                 ],
             }
         ],
@@ -247,6 +272,7 @@ def manifest_data() -> dict[str, Any]:
         "disposition_digest": DIGEST,
         "candidate_payload_digest": DIGEST,
         "builder_identity_digest": DIGEST,
+        "chosen_variants": [{"group_id": "titles", "variant_id": "t2"}],
         "entries": [
             {"path": "video/output.mp4", "media_type": "video/mp4", "byte_size": 1048576, "content_digest": DIGEST},
             {
@@ -270,17 +296,81 @@ def command_data(operation: str) -> dict[str, Any]:
     }
 
 
+def selection_subject_data() -> dict[str, Any]:
+    return {
+        "user_id": "owner",
+        "project_name": "project",
+        "actor_id": "owner",
+        "preview_id": UUID,
+        "preview_digest": DIGEST,
+        "expected_head_version": 0,
+    }
+
+
+def export_subject_data() -> dict[str, Any]:
+    return {
+        "user_id": "owner",
+        "project_name": "project",
+        "actor_id": "owner",
+        "slot": slot_data(),
+        "selection_id": UUID,
+        "selection_digest": DIGEST,
+    }
+
+
+def selection_request_data() -> dict[str, Any]:
+    return {"command": command_data("SELECT_PACKAGE"), "subject": selection_subject_data()}
+
+
+def export_request_data() -> dict[str, Any]:
+    return {"command": command_data("EXPORT_PACKAGE"), "subject": export_subject_data()}
+
+
+def selection_data() -> dict[str, Any]:
+    return {
+        "selection_id": OTHER_UUID,
+        "command_id": "command",
+        "request_digest": DIGEST,
+        "preview": preview_data(),
+        "preview_digest": compute_digest("m10.package-preview.v1", p.PackagePreview.model_validate(preview_data())),
+        "head_version": 1,
+        "selector_id": "owner",
+        "custodian_authorization_id": "lease",
+        "custodian_policy_id": "custody",
+        "custodian_policy_version": "1",
+        "custodian_evidence_digest": DIGEST,
+        "selected_at": NOW,
+    }
+
+
+def execution_data() -> dict[str, Any]:
+    return {
+        "schema_id": "m10.export-execution.v1",
+        "slot": slot_data(),
+        "selection_id": UUID,
+        "selection_digest": DIGEST,
+        "manifest_digest": DIGEST,
+        "builder_identity_digest": DIGEST,
+        "adapter_version": "host-export-v1",
+    }
+
+
 # Frozen B1 digest vectors: a change here is a contract change and needs a reviewed amendment.
 GOLDEN = {
-    "m10.platform-constraints.v1": "sha256:a06104de8445f05b5695c79f6a228702e19c793ccc1c81345597e1b721a33213",
-    "m10.quality-policy.v2": "sha256:73b68d6d5bc898051e59706e42a43f5c70858f7bb6692ebdac6707e79d2fe8b1",
-    "m10.packaging-content.v1": "sha256:7b2bc131715a0465066b1d1fd2442d7738c89c400a7b2fa1e8834008e0ff4c5f",
+    "m10.platform-constraints.v1": "sha256:3ce7b28f33a0981256555d1cbd9db35dddb40892b114f7453c8ab4a77fde71da",
+    "m10.quality-policy.v2": "sha256:f804c9eabf17bdc089b3a70d7b55388db3c9454220a1576062008a960dd921c8",
+    "m10.packaging-content.v1": "sha256:5272efe2dfcea555de9d5661fbe21f2fd85b6f044ffd740f648820026fa111ee",
     "m10.packaging-presentation.v1": "sha256:1f4bd51e0917fa9f48f5071eb025c63495d29a4605a1bf0ea51318486223fe32",
-    "m10.packaging-candidate.v1": "sha256:ec2005e040ed401686b1eb161da8569267663aebe8ae0b9b675cbda4b555c96d",
+    "m10.packaging-candidate.v1": "sha256:af3f525fe6021b2dc16fca8b248d38b0d03bfc6e2f8503d04683983b2051b4e9",
     "m10.packaging-subject.v1": "sha256:f208230301d3d046a0d3ef218d1a093b708caf69f95caa932e267de5987fadf1",
     "m10.package-preview.v1": "sha256:0793a828d317d220e3d890e6b0124fb98fab6503b93d051e9c1e291aeac8b21c",
-    "m10.export-manifest.v1": "sha256:de44826bd665d57065919d6d665fa0dffa70f5db64b8a22c96e6119a37d44a9d",
-    "m8.packaging-payload": "sha256:6bab64988f88fff35d00c20db9479b686e46a55dc3e540e4508d2078b2b3aaae",
+    "m10.packaging-observation.v1": "sha256:813d52209fa4aa9b0963652aa4ec5317cf7f079a8dd76dcca8a2708a845df2d4",
+    "m10.package-selection-request.v1": "sha256:ebba74e34d7f90494fbb6d701f0b01dbd40487c1dc1b7e1af78791970bd19407",
+    "m10.package-selection.v1": "sha256:abbdb9846b39a3f1b86dd745663bfc5e21bfa9e6ac31bbf390c41bedabc4334c",
+    "m10.export-request.v1": "sha256:e384613a6d1316a4108a3ef76136c8ff4275b9c53723048e0332d7d7cb5497bc",
+    "m10.export-execution.v1": "sha256:d7421be947924cc3675b320a89c6e8dc5de3c88e49992045bb70e89def229ce2",
+    "m10.export-manifest.v1": "sha256:0854151c809e896faddca8db3b8382afa299bd5d36bc89a76b500c2cf8aed013",
+    "m8.packaging-payload": "sha256:f324f8e7c15c3ed7883349bdff1c1a50e5fcd36334cf74838fb3f6f910e1ab7d",
 }
 
 
@@ -295,6 +385,11 @@ def golden_inputs() -> dict[str, tuple[str, object]]:
         "m10.packaging-subject.v1": ("m10.packaging-subject.v1", packaging_subject_data()),
         "m10.package-preview.v1": ("m10.package-preview.v1", preview_data()),
         "m10.export-manifest.v1": ("m10.export-manifest.v1", manifest_data()),
+        "m10.packaging-observation.v1": ("m10.packaging-observation.v1", packaging_observation_data()),
+        "m10.package-selection-request.v1": ("m10.package-selection-request.v1", selection_request_data()),
+        "m10.package-selection.v1": ("m10.package-selection.v1", selection_data()),
+        "m10.export-request.v1": ("m10.export-request.v1", export_request_data()),
+        "m10.export-execution.v1": ("m10.export-execution.v1", execution_data()),
     }
 
 
@@ -487,22 +582,8 @@ def test_export_manifest_orders_entries_by_path_regardless_of_input_order() -> N
 
 @pytest.mark.parametrize("operation", ["SELECT_PACKAGE", "EXPORT_PACKAGE"])
 def test_package_requests_bind_their_own_operation_and_scope(operation: str) -> None:
-    selection_subject = {
-        "user_id": "owner",
-        "project_name": "project",
-        "actor_id": "owner",
-        "preview_id": UUID,
-        "preview_digest": DIGEST,
-        "expected_head_version": 0,
-    }
-    export_subject = {
-        "user_id": "owner",
-        "project_name": "project",
-        "actor_id": "owner",
-        "slot": slot_data(),
-        "selection_id": UUID,
-        "selection_digest": DIGEST,
-    }
+    selection_subject = selection_subject_data()
+    export_subject = export_subject_data()
     model, subject = (
         (p.PackageSelectionRequest, selection_subject)
         if operation == "SELECT_PACKAGE"
@@ -521,21 +602,7 @@ def test_package_requests_bind_their_own_operation_and_scope(operation: str) -> 
 
 
 def test_selection_is_the_previews_successor_and_its_cache_is_verified() -> None:
-    preview = p.PackagePreview.model_validate(preview_data())
-    selection = {
-        "selection_id": OTHER_UUID,
-        "command_id": "command",
-        "request_digest": DIGEST,
-        "preview": preview_data(),
-        "preview_digest": compute_digest("m10.package-preview.v1", preview),
-        "head_version": 1,
-        "selector_id": "owner",
-        "custodian_authorization_id": "lease",
-        "custodian_policy_id": "custody",
-        "custodian_policy_version": "1",
-        "custodian_evidence_digest": DIGEST,
-        "selected_at": NOW,
-    }
+    selection = selection_data()
     verify_caches(p.PackageSelection.model_validate(selection))
     with pytest.raises(ValidationError, match="successor"):
         p.PackageSelection.model_validate(selection | {"head_version": 2})
@@ -589,3 +656,86 @@ def test_selection_lease_window_is_thirty_seconds() -> None:
         p.PackagingSelectionAuthorizationLease.model_validate(lease | {"admit_not_after": NOW + timedelta(seconds=31)})
     with pytest.raises(ValidationError):
         p.PackagingSelectionAuthorizationLease.model_validate(lease | {"action": "QUALITY_DISPOSITION"})
+
+
+@pytest.mark.parametrize(
+    "change",
+    [
+        "relabel_required_asset",
+        "advisory_safety",
+        "role_bound_to_lint",
+        "required_role_on_integrity_rule",
+        "missing_mandatory_check",
+        "duplicate_check",
+        "empty_tag_bound",
+    ],
+)
+def test_safety_semantics_follow_server_owned_checks_not_author_labels(change: str) -> None:
+    data = constraints_data()
+    rules = {r["rule_id"]: r for r in data["rules"]}
+    if change == "relabel_required_asset":
+        rules["asset-video"]["rule_class"] = "METADATA_LINT"
+    elif change == "advisory_safety":
+        rules["asset-video"]["severity"] = "ADVISORY"
+    elif change == "role_bound_to_lint":
+        data["asset_roles"][0]["constraint_rule_id"] = "title-length"
+    elif change == "required_role_on_integrity_rule":
+        data["asset_roles"][1]["required"] = True
+    elif change == "missing_mandatory_check":
+        data["rules"] = [r for r in data["rules"] if r["check_id"] != "closure.subject"]
+    elif change == "duplicate_check":
+        data["rules"].append(rule("title-again", "title.length", "METADATA_LINT"))
+    else:
+        data["min_tags"] = data["max_tags"] + 1
+    with pytest.raises(ValidationError):
+        q.PlatformConstraintSnapshot.model_validate(data)
+
+
+def test_a_relabelled_required_asset_cannot_be_published_as_waivable() -> None:
+    data = policy_v2_data()
+    for item in data["platform_constraints"]["rules"]:
+        if item["rule_id"] == "asset-video":
+            item["rule_class"] = "METADATA_LINT"
+    data["packaging_waiverable_rule_ids"] = ["asset-video"]
+    with pytest.raises(ValidationError):
+        q.QualityPolicyV2.model_validate(data)
+    with pytest.raises(ValidationError):
+        q.QualityProfileDraft.model_validate(draft_data() | {"policy": data})
+
+
+def test_every_alternative_keeps_its_own_author_and_binds_the_content_closure() -> None:
+    candidate = PackagingCandidate.model_validate(candidate_data())
+    authors = [variant.provenance.author_kind for variant in candidate.variant_groups[0].variants]
+    assert authors == ["AGENT", "HUMAN"]
+    data = candidate_data()
+    data["variant_groups"][0]["variants"][1]["provenance"] = {"author_kind": "AGENT", "actor_id": "agent"}
+    with pytest.raises(ValueError, match="digest mismatch"):
+        verify_packaging_closures(PackagingCandidate.model_validate(data))
+    data["variant_groups"][0]["variants"][1].pop("provenance")
+    with pytest.raises(ValidationError):
+        PackagingCandidate.model_validate(data)
+
+
+def test_manifest_records_one_canonical_choice_per_variant_group() -> None:
+    data = manifest_data()
+    data["chosen_variants"] = [{"group_id": "titles", "variant_id": "t2"}, {"group_id": "thumbs", "variant_id": "a"}]
+    manifest = p.ExportManifest.model_validate(data)
+    assert [choice.group_id for choice in manifest.chosen_variants] == ["thumbs", "titles"]
+    data["chosen_variants"].append({"group_id": "titles", "variant_id": "t1"})
+    with pytest.raises(ValidationError, match="duplicate"):
+        p.ExportManifest.model_validate(data)
+    assert compute_digest("m10.export-manifest.v1", manifest_data()) != compute_digest(
+        "m10.export-manifest.v1", manifest_data() | {"chosen_variants": [{"group_id": "titles", "variant_id": "t1"}]}
+    )
+
+
+@pytest.mark.parametrize("domain", ["m10.package-selection-request.v1", "m10.export-request.v1"])
+def test_request_digests_exclude_their_own_cache_and_bind_every_subject_field(domain: str) -> None:
+    body = selection_request_data() if domain == "m10.package-selection-request.v1" else export_request_data()
+    base = compute_digest(domain, body)
+    cached = copy.deepcopy(body)
+    cached["command"]["request_digest"] = OTHER_DIGEST
+    assert compute_digest(domain, cached) == base
+    changed = copy.deepcopy(body)
+    changed["subject"]["selection_id" if "selection_id" in changed["subject"] else "preview_id"] = OTHER_UUID
+    assert compute_digest(domain, changed) != base

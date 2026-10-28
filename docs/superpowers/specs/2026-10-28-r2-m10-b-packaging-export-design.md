@@ -101,7 +101,15 @@ validator, and A code typed against V1 (`r2/quality/runs.py:116`, digests) is re
 gains no PACKAGING member, so no run slot can require a packaging observation. Profiles publish V2
 through the accepted A3 Human publication path.
 
-Every packaging rule carries a closed `rule_class`: `INTEGRITY` (asset digest/size/media type), `REQUIRED_ASSET`,
+Rule semantics are server-owned: every `PackagingRule` names one closed `check_id` (`asset.integrity`,
+`asset.required`, `closure.content|presentation|subject`, `binding.master|profile`, `duration.window`,
+`video.dimensions`, `title.length|terms`, `description.length|terms`, `text.plain`, `tags.bounds`,
+`hashtags.bounds`, `phrases.banned`, `chapters.rules`, `locales.coverage`, `variants.bounds`); its `rule_class`
+must equal the fixed class of that check, each check is declared at most once, the six safety checks
+(`asset.integrity`, three closures, two bindings) must be declared, safety-class rules are always BLOCKING, and
+each asset role's `constraint_rule_id` must name the `asset.required` rule (required role) or the
+`asset.integrity` rule (optional role). A policy therefore cannot relabel or downgrade a safety rule. The classes
+are: `INTEGRITY` (asset digest/size/media type), `REQUIRED_ASSET`,
 `CLOSURE` (content/presentation/subject digest), `CURRENTNESS` (master/profile/disposition binding), `DURATION`,
 `METADATA_LINT`, `CHAPTER`, `LOCALE`, `VARIANT`. `INTEGRITY`, `REQUIRED_ASSET`, `CLOSURE` and `CURRENTNESS` are
 non-waivable (rebase: authority, integrity, closure and currentness are never waived); V2 validation refuses a
@@ -109,10 +117,11 @@ non-waivable (rebase: authority, integrity, closure and currentness are never wa
 `M10_PROFILE_STALE`. A changed constraint is a new profile revision.
 
 `PlatformConstraintSnapshot` (`m10.platform-constraints.v1`): `platform_profile_id`, `platform_profile_revision`,
-duration window (min/max ms), aspect + exact dimensions, title/description length, tag/hashtag count, charset and
-per-item length, required topic terms, banned phrases, chapter rules (first at 0, ascending, min length, max
-count), required/optional asset roles each with `constraint_rule_id`, accepted media types and byte ceiling,
-required locales, variant group rules (§3.3).
+duration window (min/max ms), exact dimensions, title max length, description min/max length, `plain_text_only`,
+title and description required terms (matched slug-tolerantly, Kalinga `seo_lint`), banned phrases, `tag_charset`
+(closed enum), tag and hashtag min/max count and per-item max length, chapter rules (first at 0, ascending, min
+length, max count), required/optional asset roles each with `constraint_rule_id`, accepted media types and byte
+ceiling, required locales, variant group bounds (§3.3), and the declared `rules`.
 
 **D5 Selection custody mirrors disposition.** `PackagingSelectionCustodianPort.authorize_selection` returns a
 `PackagingSelectionAuthorizationLease` (`action = PACKAGING_SELECTION`, ≤30 s, DB-time admission) from the signed
@@ -213,16 +222,18 @@ M10 shapes: `PackagingAssessedSubject`, `PackagingObservation` (`ObservationBase
 Domains: `m10.platform-constraints.v1`, `m10.packaging-content.v1`, `m10.packaging-presentation.v1`,
 `m10.packaging-candidate.v1`, `m10.packaging-subject.v1`, `m10.packaging-observation.v1`, `m10.package-preview.v1`,
 `m10.package-selection-request.v1`, `m10.package-selection.v1`, `m10.export-request.v1`,
-`m10.export-manifest.v1`, `m10.export-execution.v1`, `m10.quality-policy.v2`. Golden vectors frozen in B1;
+`m10.export-manifest.v1`, `m10.export-execution.v1` (`ExportExecutionIdentity`: slot, selection, manifest digest,
+builder identity, adapter version), `m10.quality-policy.v2`. Golden vectors for every domain frozen in B1;
 M10-A and M8 vectors re-verified unchanged.
 
 ## 3.3 Variants
 
 `variant_groups: tuple[VariantGroup]`, each `{group_id, field ∈ {title, description, tags, chapters, thumbnail},
-variants: tuple[{variant_id, value | asset role ref, provenance}]}` with 1..N variants. Constraint rules bound the
+variants: tuple[{variant_id, value | asset role ref, provenance{author_kind, actor_id}}]}` with 1..N variants. Constraint rules bound the
 group count and per-group variant count; every variant is checked like the primary value. The selection request
 names exactly one `variant_id` per group; the preview and selection bind the chosen set, and export materializes
-only the chosen variants (the manifest records the chosen ids). This covers Kalinga's title/thumbnail variant
+only the chosen variants (`ExportManifest.chosen_variants`: one `{group_id, variant_id}` per group, canonical
+order). This covers Kalinga's title/thumbnail variant
 behavior in the parity set.
 
 ## 4. Persistence, slot identity, locks and replay

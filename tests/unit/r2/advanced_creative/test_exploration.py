@@ -299,6 +299,36 @@ async def test_public_append_rejects_packaging_revisions_before_write() -> None:
     assert world.events == []
 
 
+def _packaging_revision() -> ExplorationRevision:
+    from r2.contracts.advanced_creative import PackagingCandidate
+    from tests.unit.r2.contracts.test_packaging import candidate_data
+
+    packaging = PackagingCandidate.model_validate(candidate_data())
+    return ExplorationRevision(
+        **(
+            _revision().model_dump(mode="python")
+            | {
+                "kind": ExplorationKind.PACKAGING,
+                "payload": packaging,
+                "payload_digest": digest_payload(packaging, LINEAGE),
+            }
+        )
+    )
+
+
+@pytest.mark.parametrize("target_ref", ["m8-slot:x", "m8-format:abc:square@1"])
+async def test_packaging_revisions_never_reach_a_promotion_preview(target_ref: str) -> None:
+    from r2.advanced_creative.exploration import promotable_format
+
+    revision = _packaging_revision()
+    world = _World(revision)
+    with pytest.raises(PromotionTargetUnavailableError, match="PACKAGING candidates have no promotable artifact"):
+        await _preview(world, _target(target_ref=target_ref))
+    assert world.previews == {}
+    with pytest.raises(PromotionTargetUnavailableError):
+        promotable_format(revision)
+
+
 def test_uuid7_ids_are_version_7_and_time_ordered() -> None:
     first, second = uuid7(), uuid7()
 

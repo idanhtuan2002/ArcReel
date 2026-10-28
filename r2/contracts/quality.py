@@ -6,6 +6,7 @@ import re
 from collections.abc import Iterable, Mapping
 from datetime import datetime
 from enum import StrEnum
+from types import MappingProxyType
 from typing import Annotated, Any, Literal, Self, get_origin
 from uuid import UUID
 
@@ -487,10 +488,79 @@ NON_WAIVABLE_PACKAGING_CLASSES = frozenset(
 )
 
 
+PACKAGING_CHECK_CLASSES = MappingProxyType(
+    {
+        "asset.integrity": PackagingRuleClass.INTEGRITY,
+        "asset.required": PackagingRuleClass.REQUIRED_ASSET,
+        "closure.content": PackagingRuleClass.CLOSURE,
+        "closure.presentation": PackagingRuleClass.CLOSURE,
+        "closure.subject": PackagingRuleClass.CLOSURE,
+        "binding.master": PackagingRuleClass.CURRENTNESS,
+        "binding.profile": PackagingRuleClass.CURRENTNESS,
+        "duration.window": PackagingRuleClass.DURATION,
+        "video.dimensions": PackagingRuleClass.DURATION,
+        "title.length": PackagingRuleClass.METADATA_LINT,
+        "title.terms": PackagingRuleClass.METADATA_LINT,
+        "description.length": PackagingRuleClass.METADATA_LINT,
+        "description.terms": PackagingRuleClass.METADATA_LINT,
+        "text.plain": PackagingRuleClass.METADATA_LINT,
+        "tags.bounds": PackagingRuleClass.METADATA_LINT,
+        "hashtags.bounds": PackagingRuleClass.METADATA_LINT,
+        "phrases.banned": PackagingRuleClass.METADATA_LINT,
+        "chapters.rules": PackagingRuleClass.CHAPTER,
+        "locales.coverage": PackagingRuleClass.LOCALE,
+        "variants.bounds": PackagingRuleClass.VARIANT,
+    }
+)
+#: Safety checks every packaging snapshot must declare; the check runs them regardless of the candidate.
+MANDATORY_PACKAGING_CHECKS = (
+    "asset.integrity",
+    "closure.content",
+    "closure.presentation",
+    "closure.subject",
+    "binding.master",
+    "binding.profile",
+)
+
+type PackagingCheckId = Literal[
+    "asset.integrity",
+    "asset.required",
+    "closure.content",
+    "closure.presentation",
+    "closure.subject",
+    "binding.master",
+    "binding.profile",
+    "duration.window",
+    "video.dimensions",
+    "title.length",
+    "title.terms",
+    "description.length",
+    "description.terms",
+    "text.plain",
+    "tags.bounds",
+    "hashtags.bounds",
+    "phrases.banned",
+    "chapters.rules",
+    "locales.coverage",
+    "variants.bounds",
+]
+
+
 class PackagingRule(M10ContractModel):
+    """A declared rule; its class follows from the server-owned check it names, never from the author."""
+
     rule_id: ExactIdentity
+    check_id: PackagingCheckId
     rule_class: PackagingRuleClass
     severity: Literal["BLOCKING", "ADVISORY"]
+
+    @model_validator(mode="after")
+    def server_owned_semantics(self) -> Self:
+        if self.rule_class != PACKAGING_CHECK_CLASSES[self.check_id]:
+            raise ValueError("rule class does not match its check")
+        if self.rule_class in NON_WAIVABLE_PACKAGING_CLASSES and self.severity != "BLOCKING":
+            raise ValueError("safety rules are always blocking")
+        return self
 
 
 class PackagingAssetRole(M10ContractModel):
@@ -510,12 +580,19 @@ class PlatformConstraintSnapshot(M10ContractModel):
     width: StrictInt = Field(gt=0)
     height: StrictInt = Field(gt=0)
     title_max_chars: StrictInt = Field(gt=0)
+    description_min_chars: StrictInt = Field(ge=0)
     description_max_chars: StrictInt = Field(gt=0)
+    plain_text_only: StrictBool
+    title_required_terms: tuple[NonBlankText, ...]
+    description_required_terms: tuple[NonBlankText, ...]
+    banned_phrases: tuple[NonBlankText, ...]
+    tag_charset: Literal["UNICODE_LETTERS_DIGITS_SPACE", "ASCII_LETTERS_DIGITS_SPACE"]
+    min_tags: StrictInt = Field(ge=0)
     max_tags: StrictInt = Field(ge=0)
     max_tag_chars: StrictInt = Field(gt=0)
+    min_hashtags: StrictInt = Field(ge=0)
     max_hashtags: StrictInt = Field(ge=0)
-    required_topic_terms: tuple[NonBlankText, ...]
-    banned_phrases: tuple[NonBlankText, ...]
+    max_hashtag_chars: StrictInt = Field(gt=1)
     chapter_min_ms: StrictInt = Field(gt=0)
     max_chapters: StrictInt = Field(ge=0)
     required_locales: tuple[ExactIdentity, ...]
@@ -528,11 +605,23 @@ class PlatformConstraintSnapshot(M10ContractModel):
     def coherent(self) -> Self:
         if self.min_duration_ms >= self.max_duration_ms:
             raise ValueError("empty duration window")
+        if (
+            self.description_min_chars > self.description_max_chars
+            or self.min_tags > self.max_tags
+            or self.min_hashtags > self.max_hashtags
+        ):
+            raise ValueError("empty metadata bound")
         _unique(self.required_locales)
         _unique(r.role for r in self.asset_roles)
         _unique(r.rule_id for r in self.rules)
-        if not {r.constraint_rule_id for r in self.asset_roles} <= {r.rule_id for r in self.rules}:
-            raise ValueError("unknown asset rule")
+        _unique(r.check_id for r in self.rules)
+        checks = {r.rule_id: r.check_id for r in self.rules}
+        if not set(MANDATORY_PACKAGING_CHECKS) <= set(checks.values()):
+            raise ValueError("a mandatory packaging safety check is not declared")
+        for role in self.asset_roles:
+            expected = "asset.required" if role.required else "asset.integrity"
+            if checks.get(role.constraint_rule_id) != expected:
+                raise ValueError("asset role is not bound to its safety rule")
         return self
 
 
@@ -1044,7 +1133,9 @@ class CompleteRunCommand(M10ContractModel):
 
 
 __all__ = [
+    "MANDATORY_PACKAGING_CHECKS",
     "NON_WAIVABLE_PACKAGING_CLASSES",
+    "PACKAGING_CHECK_CLASSES",
     "AccessibilityObservation",
     "AccessibilityRule",
     "ArtifactMetadataSnapshot",
@@ -1076,6 +1167,7 @@ __all__ = [
     "ObservationStatus",
     "ObservationType",
     "PackagingAssetRole",
+    "PackagingCheckId",
     "PackagingRule",
     "PackagingRuleClass",
     "PerceptualRegressionObservation",

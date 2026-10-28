@@ -496,12 +496,20 @@ class LocalizedPackagingMetadata(M8ContractModel):
     chapters: tuple[PackagingChapter, ...]
 
 
+class VariantProvenance(M8ContractModel):
+    """Who authored one alternative; the server sets it from the authenticated principal."""
+
+    author_kind: Literal["HUMAN", "AGENT"]
+    actor_id: str
+
+
 class PackagingVariant(M8ContractModel):
     """One alternative for a variant group: inline text/list/chapters, or a reference to an asset by role."""
 
     variant_id: str
     value: CanonicalJsonObject | None
     asset_role: str | None
+    provenance: VariantProvenance
 
     @model_validator(mode="after")
     def exactly_one_source(self) -> Self:

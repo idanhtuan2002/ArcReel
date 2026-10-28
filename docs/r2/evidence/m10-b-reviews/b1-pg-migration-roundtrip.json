@@ -1,0 +1,15 @@
+{
+  "schema_id": "m10.b1-pg-migration-roundtrip.v1",
+  "database": "disposable postgres:16-alpine container m10b-test-pg (127.0.0.1:55491)",
+  "migration": "5d2a7c3e8b11 (down 4c1f0e2a9b10)",
+  "steps": [
+    {"action": "insert one PACKAGING revision + head at 5d2a7c3e8b11, then alembic downgrade 4c1f0e2a9b10",
+     "result": "refused with M10_PACKAGING_HISTORY_PRESENT; alembic_version stayed 5d2a7c3e8b11; PACKAGING row count stayed 1"},
+    {"action": "delete the witness rows, downgrade", "result": "ck_m8_candidate_revisions_kind = CANVAS, SPATIAL, FORMAT"},
+    {"action": "upgrade head", "result": "ck_m8_candidate_revisions_kind = CANVAS, SPATIAL, FORMAT, PACKAGING"}
+  ],
+  "tests_on_pg": [
+    "tests/integration/lib/db/repositories/test_advanced_creative.py + tests/integration/lib/db/repositories/test_quality_profiles_repository.py: 32 passed"
+  ],
+  "sqlite": "tests/integration/lib/db/migrations (incl. test_5d2a7c3e8b11_m8_packaging_candidate_kind.py): part of 3164 passed run"
+}
