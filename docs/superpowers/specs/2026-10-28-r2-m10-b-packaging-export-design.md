@@ -291,7 +291,12 @@ becomes selectable after its own check and selection. Drift → `M10_SUBJECT_STA
 Cheap-first inside the packaging check: asset digest/size re-hash from verified private snapshots → required roles,
 media types, byte ceilings → duration window vs master facts → metadata lint (lengths, tag/hashtag count and
 charset, required topic terms, banned phrases, chapter ordering/first-at-zero/min length) → locale coverage →
-variant group rules. Kalinga `seo_lint` and OpenMontage chapter formatting are reimplemented as pure functions;
+variant group rules. Master facts (duration, video width/height) come from the bound run's verified `CONTAINER_STREAM` probe result
+(M10-A replay with digest verification), never re-measured; a run without that probe refuses with
+`M10_REQUIRED_EVIDENCE_MISSING`. Asset facts come from host re-hashing verified private snapshots of each
+`source_ref`; the `video` role must be the master object itself. The pure check lives in
+`r2/quality/packaging_check.py`: every declared rule runs in declaration order and the observation is FAIL iff a
+BLOCKING rule failed. Kalinga `seo_lint` and OpenMontage chapter formatting are reimplemented as pure functions;
 the donors run only in parity tests from digest-checked pinned sources (A7 pattern).
 
 ## 6. Host surface and UI
