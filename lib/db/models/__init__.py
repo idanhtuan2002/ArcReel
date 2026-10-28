@@ -98,6 +98,13 @@ from lib.db.models.quality import (
     QualityProfileHeadModel,
     QualityProfileRevisionModel,
 )
+from lib.db.models.quality_dispositions import (
+    DispositionAuthorizationModel,
+    DispositionCommandModel,
+    DispositionHeadModel,
+    DispositionOutboxModel,
+    QualityDispositionModel,
+)
 from lib.db.models.quality_probes import (
     QualityProbeInvocationModel,
     QualityProbeObservationModel,
@@ -167,6 +174,10 @@ __all__ = [
     "CustomEndpoint",
     "CustomProvider",
     "CustomProviderModel",
+    "DispositionAuthorizationModel",
+    "DispositionCommandModel",
+    "DispositionHeadModel",
+    "DispositionOutboxModel",
     "ExecutionAttemptModel",
     "FinalCutReceiptModel",
     "FormatPlanModel",
@@ -216,6 +227,7 @@ __all__ = [
     "ProviderObservationModel",
     "PublishApprovalDecisionModel",
     "QualityCommandModel",
+    "QualityDispositionModel",
     "QualityHumanObservationModel",
     "QualityOutboxModel",
     "QualityProbeInvocationModel",

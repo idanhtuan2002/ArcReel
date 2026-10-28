@@ -1,0 +1,186 @@
+"""The M10 disposition migration preserves predecessor data and installs append-only custody."""
+
+from __future__ import annotations
+
+import sqlite3
+from pathlib import Path
+
+import pytest
+import sqlalchemy as sa
+from alembic.config import Config
+from alembic.script import ScriptDirectory
+
+from alembic import command
+from lib.db.models.quality_dispositions import (
+    DispositionAuthorizationModel,
+    DispositionCommandModel,
+    DispositionHeadModel,
+    DispositionOutboxModel,
+    QualityDispositionModel,
+)
+
+REVISION = "bed415be3608"
+MIGRATION_SUFFIX = "quality_disposition"
+PREDECESSOR = "57f67bae0cb4"
+MODELS = (
+    DispositionAuthorizationModel,
+    QualityDispositionModel,
+    DispositionCommandModel,
+    DispositionOutboxModel,
+    DispositionHeadModel,
+)
+TABLES = {model.__tablename__ for model in MODELS}
+IMMUTABLE = TABLES - {"m10_disposition_heads"}
+
+
+def test_exact_singleton_head_and_predecessor(alembic_cfg: tuple[Config, Path]) -> None:
+    cfg, _ = alembic_cfg
+    script = ScriptDirectory.from_config(cfg)
+    heads = script.get_heads()
+    assert len(heads) == 1
+    assert REVISION in {item.revision for item in script.walk_revisions(base="base", head=heads[0])}
+    assert script.get_revision(REVISION).down_revision == PREDECESSOR
+
+
+def test_upgrade_downgrade_upgrade_preserves_predecessor_and_matches_orm(alembic_cfg: tuple[Config, Path]) -> None:
+    cfg, database = alembic_cfg
+    command.upgrade(cfg, PREDECESSOR)
+    with sqlite3.connect(database) as connection:
+        before = {row[0] for row in connection.execute("SELECT name FROM sqlite_master WHERE type='table'")}
+        connection.execute(
+            "INSERT INTO users (id,username,created_at,updated_at) VALUES ('m10-witness','m10-witness','2026-10-27 00:00:00','2026-10-27 00:00:00')"
+        )
+    command.upgrade(cfg, REVISION)
+    with sqlite3.connect(database) as connection:
+        after = {row[0] for row in connection.execute("SELECT name FROM sqlite_master WHERE type='table'")}
+        assert after - before == TABLES
+        for model in MODELS:
+            table = model.__table__
+            reflected = connection.execute(f'PRAGMA table_info("{table.name}")').fetchall()
+            assert {row[1] for row in reflected} == {column.name for column in table.columns}
+            assert [row[1] for row in sorted(reflected, key=lambda row: row[5]) if row[5]] == [
+                column.name for column in table.primary_key
+            ]
+            assert {row[1]: not bool(row[3]) for row in reflected} == {
+                column.name: column.nullable for column in table.columns
+            }
+            foreign = connection.execute(f'PRAGMA foreign_key_list("{table.name}")').fetchall()
+            assert any(row[2:5] == ("users", "user_id", "id") and row[6] == "RESTRICT" for row in foreign)
+            groups: dict[int, list[tuple]] = {}
+            for row in foreign:
+                groups.setdefault(row[0], []).append(row)
+            actual = {
+                (
+                    tuple(row[3] for row in sorted(rows, key=lambda row: row[1])),
+                    rows[0][2],
+                    tuple(row[4] for row in sorted(rows, key=lambda row: row[1])),
+                )
+                for rows in groups.values()
+            }
+            expected = {
+                (
+                    tuple(column.name for column in key.columns),
+                    key.referred_table.name,
+                    tuple(element.column.name for element in key.elements),
+                )
+                for key in table.foreign_key_constraints
+            }
+            assert actual == expected
+            sql = connection.execute(
+                "SELECT sql FROM sqlite_master WHERE type='table' AND name=?", (table.name,)
+            ).fetchone()[0]
+            checks = {constraint.name for constraint in table.constraints if isinstance(constraint, sa.CheckConstraint)}
+            assert checks
+            assert all(f"CONSTRAINT {name} CHECK" in sql for name in checks)
+        triggers = {
+            row[0]
+            for row in connection.execute(
+                "SELECT name FROM sqlite_master WHERE type='trigger' AND name LIKE 'm10_disposition%' OR name LIKE 'm10_quality_dispositions%'"
+            )
+        }
+        expected_triggers = {f"{table}_{action}" for table in IMMUTABLE for action in ("no_update", "no_delete")}
+        assert expected_triggers <= triggers
+        assert not {name for name in triggers if name.startswith("m10_disposition_heads")}
+    command.downgrade(cfg, PREDECESSOR)
+    with sqlite3.connect(database) as connection:
+        remaining = {row[0] for row in connection.execute("SELECT name FROM sqlite_master WHERE type='table'")}
+        assert remaining == before
+        assert connection.execute("SELECT username FROM users WHERE id='m10-witness'").fetchone() == ("m10-witness",)
+        assert connection.execute(
+            "SELECT count(*) FROM sqlite_master WHERE type='trigger' AND name LIKE 'm10_disposition%' OR name LIKE 'm10_quality_dispositions%'"
+        ).fetchone() == (0,)
+    command.upgrade(cfg, REVISION)
+    with sqlite3.connect(database) as connection:
+        assert connection.execute("SELECT version_num FROM alembic_version").fetchone() == (REVISION,)
+        assert connection.execute("SELECT username FROM users WHERE id='m10-witness'").fetchone() == ("m10-witness",)
+
+
+def _insert(connection: sqlite3.Connection, table: str, *, json_value: str = "{}") -> None:
+    columns = connection.execute(f'PRAGMA table_info("{table}")').fetchall()
+    values: dict[str, object] = {}
+    for _, name, _kind, notnull, _, primary in columns:
+        if name == "decision":
+            values[name] = "PASS"
+        elif name in {"grant_sequence", "version"}:
+            values[name] = 1
+        elif name == "admit_not_after":
+            values[name] = "2026-10-28 00:00:30"
+        elif name.endswith("_at"):
+            values[name] = "2026-10-28 00:00:00"
+        elif name.endswith("_json"):
+            values[name] = json_value
+        elif notnull or primary:
+            values[name] = "fixture"
+    names = ",".join(f'"{name}"' for name in values)
+    connection.execute(
+        f'INSERT INTO "{table}" ({names}) VALUES ({",".join("?" for _ in values)})', tuple(values.values())
+    )
+
+
+@pytest.mark.parametrize("table", sorted(IMMUTABLE))
+@pytest.mark.parametrize("operation", ["UPDATE", "DELETE"])
+def test_immutable_rows_refuse_raw_update_and_delete(
+    alembic_cfg: tuple[Config, Path], table: str, operation: str
+) -> None:
+    cfg, database = alembic_cfg
+    command.upgrade(cfg, REVISION)
+    with sqlite3.connect(database) as connection:
+        connection.execute("PRAGMA foreign_keys=OFF")
+        _insert(connection, table)
+        connection.commit()
+        statement = f'UPDATE "{table}" SET user_id=user_id' if operation == "UPDATE" else f'DELETE FROM "{table}"'
+        with pytest.raises(sqlite3.IntegrityError, match="M10_IMMUTABLE_DISPOSITION_ROW"):
+            connection.execute(statement)
+        assert connection.execute(f'SELECT count(*) FROM "{table}"').fetchone() == (1,)
+
+
+@pytest.mark.parametrize("table", sorted(IMMUTABLE))
+def test_json_bodies_are_bounded_to_one_mebibyte(alembic_cfg: tuple[Config, Path], table: str) -> None:
+    cfg, database = alembic_cfg
+    command.upgrade(cfg, REVISION)
+    with sqlite3.connect(database) as connection:
+        connection.execute("PRAGMA foreign_keys=OFF")
+        with pytest.raises(sqlite3.IntegrityError, match="bytes"):
+            _insert(connection, table, json_value='"' + "x" * 1048576 + '"')
+
+
+@pytest.mark.parametrize("dialect", ["postgresql", "sqlite"])
+def test_orm_json_ceilings_compile_to_the_migration_expressions(dialect: str) -> None:
+    import importlib.util
+
+    from sqlalchemy.dialects import postgresql, sqlite
+    from sqlalchemy.schema import CreateTable
+
+    path = Path(__file__).resolve().parents[5] / "alembic/versions" / f"{REVISION}_{MIGRATION_SUFFIX}.py"
+    spec = importlib.util.spec_from_file_location("m10_ceiling_migration", path)
+    assert spec is not None
+    assert spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    compiler = postgresql.dialect() if dialect == "postgresql" else sqlite.dialect()
+    for table, columns in module._JSON_COLUMNS.items():
+        model = next(m for m in MODELS if m.__tablename__ == table)
+        ddl = str(CreateTable(model.__table__).compile(dialect=compiler))
+        for constraint in module._json_ceilings(table, dialect):
+            assert f"CONSTRAINT {constraint.name} CHECK ({constraint.sqltext})" in ddl
+        assert len(columns) == ddl.count("<= 1048576")
