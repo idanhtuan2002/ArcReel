@@ -70,6 +70,11 @@ Rewrite in place; this is the resume entry for M10-B.
   Verified: PG16 `tests/integration/server/services/test_quality_packaging.py` 10 passed; unit r2/scripts/server +
   SQLite migrations 5526 passed; static gates clean. Codex B2 review running (`b2-codex-review.json`).
 
+- B2 Codex review REWORK (`b2-codex-review.json`: H1 ancestor-symlink/resolve-open race, M1 variant lint, M2 FIFO,
+  M3 UTF-8 prefix, M4 lineage binding) → fixed in `7484328bf`; PG `test_quality_packaging.py` 20 passed, unit
+  r2/scripts/server + SQLite migrations 5555 passed, gates clean. Codex delta re-review running
+  (`b2-codex-delta-review.json`).
+
 ## Next step
 
 Triage the B2 Codex review. Then B3: preview + Human selection into `PACKAGING_SLOT` (§4 global lock order,
