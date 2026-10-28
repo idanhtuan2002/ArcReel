@@ -1,0 +1,156 @@
+{
+  "schema_id": "m10.b5-delta2-review.v1",
+  "reviewed_head": "73022b4f6",
+  "reviewed_head_full": "73022b4f691af05ec5d2f0a2eaff4c60ea5b4431",
+  "reviewer": "Codex independent critical source re-review; main agent",
+  "verdict": "ACCEPTED WITH VERIFICATION LIMITS",
+  "scope": "Bounded second B5 backend repair review against b5-codex-delta-review.json M1, N1 and N2. Source read-only except this review JSON. No commit. No UI, B6 donor parity, production or license acceptance.",
+  "per_finding_status": {
+    "M1": {
+      "status": "FIXED",
+      "file": "server/services/packaging_candidates.py",
+      "line": 164,
+      "related_locations": [
+        "server/services/packaging_candidates.py:171",
+        "server/services/packaging_candidates.py:194",
+        "server/services/packaging_candidates.py:200",
+        "server/services/packaging_candidates.py:240",
+        "lib/db/repositories/advanced_creative.py:154",
+        "tests/integration/server/routers/test_packaging_routes.py:428",
+        "tests/integration/server/routers/test_packaging_routes.py:442"
+      ],
+      "evidence": "The transaction takes ExplorationRepository.lock_command_key before _replay, candidate UUID/time construction and append. Its user/project/actor_scope=user_id/APPEND_REVISION/command_id scope exactly matches the existing M8 append guard because candidate.created_by=user_id. PostgreSQL advisory transaction-lock acquisition therefore serializes same-command callers; the later repository acquisition is reentrant in the same transaction. After the first caller commits, the waiter reads the receipt and reconstructs the stored revision rather than generating a competing identity. Replay now requires candidate_id=None for genesis, the exact recorded candidate id for updates, and the corresponding expected version. Both previously accepted shape changes are rejected. Changed draft/actor/author class still rebuild to a different payload and conflict. The new PG route tests cover simultaneous identical calls returning equal 200 responses and genesis reshaping refusal.",
+      "probe": "A deterministic in-memory transaction-lock model executed the real append/replay/build functions with real contracts. Two identical concurrent calls produced one repository append and equal responses. Genesis-to-explicit-update and update-to-omitted-candidate changes each raised CommandReplayConflictError. The fake repository models command ownership and receipt visibility; this is not an observed PG interleaving.",
+      "run_id_equivalence_judgment": "ACCEPTED by construction. PackagingCandidate binds assessed subject, master and profile/constraints/closures, not a unique quality_run_id. For the same verified subject/profile and identical authored input/provenance, two runs yield the same candidate payload and M8 lineage. An actual build_payload probe confirmed equality when only run_id changed. Treating this lookup identity as necessarily distinct command intent in the prior review was stronger than the implemented domain contract requires. Packaging checks and previews independently bind exact quality_run_id and quality_run_digest, and selection/export revalidate that bound run; append replay cannot replace that later authority. Different derived subject/profile/content/provenance still conflicts. No run-ID-specific receipt/schema expansion is required to close this finding.",
+      "limits": "Run/profile lookup still precedes the command guard and replay. These are immutable historical reads and take no opposing writer locks here; this is not a fresh demonstrated failure. No unsupported SQLite concurrency guarantee is inferred from the PG-only advisory helper."
+    },
+    "N1": {
+      "status": "FIXED",
+      "file": "server/services/package_export.py",
+      "line": 696,
+      "related_locations": [
+        "server/services/package_export.py:697",
+        "server/services/package_export.py:717",
+        "tests/unit/server/services/test_package_export_plan.py:95"
+      ],
+      "evidence": "The source is owned by os.fdopen before work.create(DOWNLOAD_FILE). An exception creating the target unwinds the source context; errors after target creation also close target. The regression injects ENOSPC after opening a real archive and checks the process fd count is unchanged. The complete plan suite passed independently: 11 tests. A separate injected-ENOSPC function probe verified the acquired source descriptor raises EBADF afterwards. The failed target-create path no longer leaks that source fd."
+    },
+    "N2": {
+      "status": "FIXED for the reported response cleanup defect",
+      "file": "server/routers/packaging.py",
+      "line": 412,
+      "related_locations": [
+        "server/routers/packaging.py:415",
+        "server/routers/packaging.py:438",
+        "server/services/package_export.py:676",
+        "tests/unit/server/routers/test_packaging_download_stream.py:24",
+        "tests/unit/server/routers/test_packaging_download_stream.py:41"
+      ],
+      "evidence": "_ClosingStream wraps the complete StreamingResponse ASGI call in try/finally and dispatches Download.close there, so cleanup is no longer a trailing BackgroundTask skipped by a stream exception. This also covers an exception before chunk iteration. Download.close marks itself closed before releasing snapshot/work/store, so a later sequential close cannot close recycled descriptor numbers. The new tests assert one close on normal completion, send OSError and RuntimeError. A real-fd probe called Download.close twice and verified both fds were closed with one work.close. Bounded _ClosingStream probes confirmed its finally runs once for completion, OSError, RuntimeError and CancelledError.",
+      "limits": "The focused stream pytest run did not complete locally (45-second timeout); no threaded runtime pass is claimed. The response probes used async content and replaced loop.run_in_executor with an immediately completed future, keeping the actual _ClosingStream and asyncio.to_thread control flow but deliberately removing worker-thread scheduling. They prove ownership/control flow, not real-executor cancellation races. The builder-reported PG route result exercises successful HTTP streaming but is supplied evidence, not a reviewer execution."
+    }
+  },
+  "new_findings": {
+    "H": [],
+    "M": [],
+    "L": []
+  },
+  "conditions": [
+    {
+      "id": "STOPPING_RULE",
+      "status": "SATISFIED",
+      "evidence": "No remaining High/Medium defect was established in the bounded M1/N1/N2 repair scope. The prior Low asset-role authorship clarification and unmarked pre-change credential rollout note remain notes only. Neither reopens this review round. No further repair/re-review round is requested on the basis of those notes or optional coverage refinements."
+    },
+    {
+      "id": "RUN_EQUIVALENCE",
+      "status": "ACCEPTED",
+      "evidence": "Candidate append equivalence is defined by its immutable subject/profile bindings and authored payload, not by the run used to look them up. Exact run identity remains part of check/preview and subsequent currentness authority. This judgment corrects the overly strict run-ID interpretation in the first delta review rather than adding a new persistence requirement."
+    },
+    {
+      "id": "PG_EXECUTION",
+      "status": "BUILDER-SUPPLIED; INDEPENDENT EXECUTION UNAVAILABLE",
+      "evidence": "User reports 13 PG16 route tests passed. Current source collection confirms 13 route cases. Reviewer attempt failed in fixture setup at socket creation with PermissionError [Errno 1] Operation not permitted; no test body ran. The source closure and modeled replay evidence support this bounded acceptance, but do not constitute observed PostgreSQL lock-waiter/concurrency proof."
+    },
+    {
+      "id": "LOCAL_UNIT_EVIDENCE",
+      "status": "PLAN SUITE PASSED; STREAM SUITE INCOMPLETE",
+      "evidence": "tests/unit/server/services/test_package_export_plan.py: 11 passed in 1.25s. A combined run including test_packaging_download_stream.py timed out at 45s without a completed summary. Bounded cleanup probes are explicitly qualified; no fabricated 14-test or completed stream-suite pass is reported."
+    },
+    {
+      "id": "CANCELLATION_COVERAGE",
+      "status": "COVERAGE LIMIT ONLY",
+      "evidence": "The reported N2 was the BackgroundTask-only response owner, which is fixed by the response-wide finally. Real thread-executor cancellation, cancellation during pre-response snapshot acquisition and abrupt process termination were not reproduced. No new Medium failure is inferred from these unexecuted schedules. The new pytest file covers completed/send-error paths; the bounded probe also exercises CancelledError with inline executor dispatch."
+    },
+    {
+      "id": "PRIOR_CLOSURES_AND_SCOPE",
+      "status": "PRESERVED WITHIN THIS DELTA",
+      "evidence": "This review does not reopen the earlier H1-H3/M2/M3/L1 source closures or re-run their entire acceptance matrix. The source changes reviewed here are command serialization/shape comparison, snapshot ownership and response cleanup. B5 status/history/UI/later packet and production activation judgments remain outside this repair acceptance."
+    },
+    {
+      "id": "WORKSPACE_PRESERVATION",
+      "status": "PRESERVED",
+      "evidence": "Review started and the pre-artifact check remained at 73022b4f691af05ec5d2f0a2eaff4c60ea5b4431. Unrelated untracked tests/integration/server/services/test_packaging_donor_parity.py and later scripts/r2/build_m10_b6_parity.py were preserved. No reviewed backend/test source edits, staging or commit were performed."
+    }
+  ],
+  "commands_run": [
+    {
+      "command": "git rev-parse HEAD; git status --short; git show --stat --oneline 73022b4f6; git diff ccc4bb4da..73022b4f6 -- reviewed backend/test paths; numbered direct source reads",
+      "result": "Exact requested full HEAD confirmed; reviewed M1/N1/N2 source and regressions, preserving unrelated untracked B6 work."
+    },
+    {
+      "command": "git diff --check ccc4bb4da..73022b4f6",
+      "result": "PASS, exit 0."
+    },
+    {
+      "command": "PYTHONDONTWRITEBYTECODE=1 DATABASE_URL=postgresql+asyncpg://postgres:postgres@127.0.0.1:55491/arcreel_test UV_CACHE_DIR=/tmp/codex-uv-cache timeout 45s uv run pytest -q --tb=short tests/unit/server/routers/test_packaging_download_stream.py tests/unit/server/services/test_package_export_plan.py",
+      "result": "INCOMPLETE: timeout exit 124, no completed pytest result. No product pass/fail or completed stream test execution claimed."
+    },
+    {
+      "command": "PYTHONDONTWRITEBYTECODE=1 DATABASE_URL=postgresql+asyncpg://postgres:postgres@127.0.0.1:55491/arcreel_test UV_CACHE_DIR=/tmp/codex-uv-cache timeout 20s uv run pytest -q --tb=short tests/unit/server/services/test_package_export_plan.py",
+      "result": "PASS: 11 passed in 1.25s, exit 0, including real-file snapshot-target ENOSPC fd-count regression."
+    },
+    {
+      "command": "PYTHONDONTWRITEBYTECODE=1 DATABASE_URL=postgresql+asyncpg://postgres:postgres@127.0.0.1:55491/arcreel_test UV_CACHE_DIR=/tmp/codex-uv-cache uv run pytest -q --maxfail=1 --tb=short tests/integration/server/routers/test_packaging_routes.py",
+      "result": "UNAVAILABLE: exit 1, one setup error in 1.42s, socket creation PermissionError [Errno 1] Operation not permitted. No PG body ran."
+    },
+    {
+      "command": "PYTHONDONTWRITEBYTECODE=1 DATABASE_URL=postgresql+asyncpg://postgres:postgres@127.0.0.1:55491/arcreel_test UV_CACHE_DIR=/tmp/codex-uv-cache uv run pytest --collect-only -q tests/integration/server/routers/test_packaging_routes.py",
+      "result": "13 route cases collected; collection only, not execution."
+    },
+    {
+      "command": "PYTHONDONTWRITEBYTECODE=1 .venv/bin/python - <<'PY' (snapshot/close/response ownership probes)",
+      "procedure": "Injected an opened /dev/null source fd and work.create ENOSPC into real _snapshot_archive and required EBADF afterwards. Constructed Download with real memfd descriptors and a counted work.close, called close twice, and required one work close plus EBADF for both fds. Ran real _ClosingStream on async content with normal, OSError, RuntimeError and CancelledError send outcomes, replacing loop.run_in_executor with an immediately completed future to avoid worker-thread scheduling.",
+      "result": "PASS, exit 0: source reclaimed, Download sequentially idempotent, response finally closed once in all four control-flow outcomes. Inline executor dispatch is not a real-thread or live-server cancellation test."
+    },
+    {
+      "command": "PYTHONDONTWRITEBYTECODE=1 .venv/bin/python - <<'PY' (serialized append and equivalence probes)",
+      "procedure": "Executed real append_packaging_revision/_replay/build_payload using real contracts, two equal-binding run stand-ins with distinct run_id, in-memory receipt/revision repository and asyncio command-lock ownership released at commit/session exit. Compared concurrent identical results and append count; then tested genesis reshaping and omitted candidate on an update replay.",
+      "result": "PASS, exit 0: equal-binding runs produced equal payloads; two identical concurrent calls yielded one append/equal responses; both shape changes refused with CommandReplayConflictError. Models repository serialization/visibility; not real PG locking."
+    },
+    {
+      "command": "codebase-memory list_projects; search_graph; check_index_coverage for all reviewed backend/test/dependency paths",
+      "result": "List returned main-checkout project; search and both coverage calls were approval-blocked under approval_policy=never. Direct source fallback used; no graph-generation/completeness assertion."
+    }
+  ],
+  "not_verified": [
+    "Independent PG execution of builder-reported 13 route passes, actual advisory-lock waiters, cross-command concurrency or full prior B3/B4 suites.",
+    "Completed focused download stream pytest execution, real worker-thread cancellation races, live ASGI disconnects or cancellation during pre-response snapshot creation.",
+    "Full suite/static gates, migrations, external donor parity/B6, UI, pilots and production activation. No license issues considered.",
+    "Graph freshness/path coverage: tools were approval-blocked."
+  ],
+  "files_read": [
+    "docs/r2/evidence/m10-b-reviews/b5-codex-delta-review.json",
+    "server/services/packaging_candidates.py (payload, append, replay)",
+    "lib/db/repositories/advanced_creative.py (lock_command_key, append guard/CAS and replay conflict)",
+    "server/services/package_export.py (Download, snapshot, currentness seams)",
+    "server/routers/packaging.py (_ClosingStream and download route)",
+    "tests/integration/server/routers/test_packaging_routes.py (delta/tests inventory)",
+    "tests/unit/server/routers/test_packaging_download_stream.py",
+    "tests/unit/server/services/test_package_export_plan.py",
+    "r2/contracts/packaging.py (exact run identity in check/preview subjects)",
+    "server/services/quality_packaging.py (require_packaging_lineage)",
+    "docs/superpowers/specs/2026-10-28-r2-m10-b-packaging-export-design.md (candidate bindings)",
+    "tests/unit/r2/contracts/test_packaging.py (probe fixtures)",
+    "tests/unit/r2/contracts/test_quality.py (probe constants)"
+  ]
+}

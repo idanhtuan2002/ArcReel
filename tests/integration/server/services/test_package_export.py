@@ -617,3 +617,42 @@ async def test_an_accepted_attempt_bound_to_another_route_or_request_is_not_fina
         )
     with pytest.raises(RequiredEvidenceMissingError):
         await exporter(env).export(request)
+
+
+class SecondCallGate(Gate):
+    """Pauses only the second call through the seam (export finalize, after prepare)."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.calls = 0
+
+    def wrap(self, real):
+        inner = super().wrap(real)
+
+        async def counted(session, *args, **kwargs):
+            self.calls += 1
+            if self.calls == 2:
+                return await inner(session, *args, **kwargs)
+            return await real(session, *args, **kwargs)
+
+        return counted
+
+
+async def test_a_run_sealed_during_export_finalize_waits_for_it(selected_host, monkeypatch) -> None:
+    from server.services import package_export as module
+    from tests.integration.server.services.test_quality_runs import completion, human, human_request, seal, technical
+
+    env = selected_host
+    probe = await technical(env)
+    review = await human(env, human_request(env, command_id="human-2"))
+    gate = SecondCallGate()
+    monkeypatch.setattr(module, "readiness_in", gate.wrap(module.readiness_in))
+    exporting = asyncio.create_task(exporter(env).export(export_request(env)))
+    await asyncio.wait_for(gate.entered.wait(), 60)
+    sealing = asyncio.create_task(seal(env, completion(env, [probe, review], command_id="seal-2")))
+    await assert_blocked(env, gate, "master_authorities", "r2_showrunner_grant_heads")
+    assert not sealing.done()
+    gate.release.set()
+    receipt = await asyncio.wait_for(exporting, 120)
+    assert receipt.status == "EXPORTED"
+    assert (await asyncio.wait_for(sealing, 60)).run_id != env["run"].run_id
