@@ -13,7 +13,7 @@
     "donor_test_inventory_digest": "sha256:c1c3fa291e0e85535d085ceeb4522af24571f06071874af6aab030bef8575aa9",
     "fixture_set_digest": "sha256:f01585ba5817a1dd1783b780b55f5abdb43c321a0385700823f5d7d8348cc188"
   },
-  "integrated_head": "4bc2bb9ee8107ee32edb612d7eaf3cde631bea68",
+  "integrated_head": "b8238b197db330f167ec828e3bb2b47215c2e553",
   "rows": [
     {
       "behavior_id": "missing_master",
@@ -153,7 +153,7 @@
       "data_integrity": "PARITY",
       "observability": "IMPROVED",
       "performance": "PARITY",
-      "resources": "UNVERIFIED",
+      "resources": "IMPROVED",
       "evidence_refs": [
         "tests/integration/server/services/test_quality_kalinga_parity.py::test_truncated_or_unqualified_media_is_a_typed_probe_failure"
       ]
@@ -230,38 +230,34 @@
   ],
   "commands": [
     {
-      "command": "pytest tests/integration/server/services/test_quality_kalinga_parity.py tests/unit/scripts/r2/test_verify_m10_a_candidate.py -q -s",
-      "code_head": "4bc2bb9ee8107ee32edb612d7eaf3cde631bea68",
-      "result": "37 passed, 0 failed, 0 skipped",
-      "median_ms_donor_vs_m10": {
+      "command": "pytest tests/unit/server/services/test_quality_probe_runtime.py tests/integration/server/services/test_quality_kalinga_parity.py tests/integration/server/services/test_quality_runs.py tests/unit/scripts/r2/test_verify_m10_a_candidate.py tests/unit/scripts/r2/test_verify_m10_a4_scope.py",
+      "result": "118 passed",
+      "timings_ms": {
         "CONTAINER_STREAM": [
-          107,
-          191
+          106,
+          190
         ],
         "LOUDNESS": [
-          108,
-          267
+          110,
+          261
         ],
         "CAPTIONS": [
-          108,
-          195
+          106,
+          194
         ],
-        "FAILURE_truncated": [
+        "failure_truncated": [
           31,
-          271
+          260
         ],
-        "FAILURE_mpeg4": [
-          64,
-          262
+        "failure_mpeg4": [
+          62,
+          263
         ]
-      },
-      "performance_budget_ms": 1500
+      }
     }
   ],
   "required_skips": [],
-  "material_unknowns": [
-    "tool_failure_typed.resources: Failed probes return no ResourceEvidence from QualityProbeRuntime or the M7 attempt; the frozen criterion only admits IMPROVED with ResourceEvidence and PARITY for pure rules."
-  ],
+  "material_unknowns": [],
   "reviewer": "Claude Opus 5.5 main agent (recomputed fold; not an independent acceptance)",
-  "verdict": "BLOCKED"
+  "verdict": "PASS"
 }
