@@ -39,13 +39,19 @@ Rewrite in place; this is the resume entry for M10-B.
 
 ## Progress
 
-- `1751a23bc` design amendment `docs/superpowers/specs/2026-10-28-r2-m10-b-packaging-export-design.md` (CANDIDATE).
-- `d59be1e11` B0/F1: `m10_quality_probe_failures` + migration `4c1f0e2a9b10`, replay returns recorded evidence.
-  Verified on PG16 (disposable container :55491): `tests/integration/server/services/test_quality_probes.py`
-  + `tests/integration/lib/db/repositories/test_quality_probes.py` 27 passed; SQLite
-  `tests/integration/lib/db/migrations` 218 passed; ruff/basedpyright/lint-imports/deptry/audit_tests clean.
-- Independent review of design + B0: `docs/r2/evidence/m10-b-reviews/design-b0-review.json` (pending).
+- `1751a23bc` design r1 → independent review REWORK (`docs/r2/evidence/m10-b-reviews/design-b0-review.json`;
+  H1 finalize lock order, H2 second job truth, M1–M8, L1–L7; B0 accepted with condition C4).
+- `d59be1e11` B0/F1: `m10_quality_probe_failures` + migration `4c1f0e2a9b10`; `1a93a16e5` C4 tests.
+  Verified on PG16 (disposable container `m10b-test-pg` :55491): `tests/integration/server/services/test_quality_probes.py`
+  27 passed (+ `tests/integration/lib/db/repositories/test_quality_probes.py`); SQLite `tests/integration/lib/db/migrations`
+  218 passed; ruff/basedpyright/lint-imports/deptry/audit_tests clean.
+- `4d76003d5` design r2 (§11 resolution table). Delta re-review pending:
+  `docs/r2/evidence/m10-b-reviews/design-r2-delta-review.json`.
+- Review substitute: separate Claude Opus subagent (Codex quota out until 2026-11-02 15:12); condition C5 = Codex
+  re-review when quota returns.
 
 ## Next step
 
-Triage the design/B0 review, then B1 (contracts + M8 PACKAGING evolution + policy V2).
+Triage the r2 delta review; on ACCEPT start B1 (contracts in `r2/contracts/advanced_creative.py` kernel +
+`r2/contracts/packaging.py`, `ExplorationKind.PACKAGING` + CHECK migration, `QualityPolicyV2` union, golden vectors,
+differential M8/M10-A vector tests).
