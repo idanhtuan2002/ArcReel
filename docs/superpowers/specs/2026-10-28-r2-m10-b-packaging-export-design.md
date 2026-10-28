@@ -170,6 +170,21 @@ reconciles an already-published identical object. `FAILED_BEFORE_ACCEPTANCE` (va
 replays its typed error. Disk-full and rename failures surface as known failures before acceptance; any partial
 file is removed. Status vocabulary is `EXPORTED`; nothing records upload/publish/visibility.
 
+Implementation (B4 review): the worker is `server/services/package_export_worker.py` launched through the A4
+`QualityProbeRuntime.launch` (unit prefix `m10-export`, `LimitFSIZE` = exact archive size + 1 MiB, runtime
+30 s + 1 s per 50 MiB, the A4 cgroup envelope and seccomp filter). It verifies the envelope with the A4 `confine`
+(Landlock: read-only snapshot files, one output inode precreated by the host, no network) before writing. Host
+scratch lives in `exports/.work-<uuid>/` held by an exclusive `owner.lock` flock; all host directory work
+(snapshots, rename, fsync) goes through descriptors pinned no-follow from the project root. The plan (layout,
+documents, manifest and exact archive size including headers and the zipfile no-ZIP64 member margin) is computed
+before any byte is copied; paths are claimed case-insensitively and never overwrite (`metadata/metadata.json` is
+reserved). Caption assets declare their locale in the role (`captions-<locale>` → `captions/<locale>.<ext>`).
+Finalize verifies outside locks that the published object is exactly the stored manifest's archive (member names,
+fixed fields, manifest bytes, digest) and that the stored request reproduces the execution identity and M7 task,
+then rechecks the pinned file generation under the lock. Worker refusals (`INTEGRITY_FAILED`,
+`ENVELOPE_EXCEEDED`) fail the attempt; any other worker result is `SUBMIT_OUTCOME_UNKNOWN` and is never rebuilt
+under that command. The sweep removes only work directories whose owner lock it can take.
+
 Envelope: closure total and every member must stay below 2^31 bytes, otherwise `M10_OPERATIONAL_ENVELOPE_EXCEEDED`
 before PLANNED, so zipfile never emits ZIP64 extras (`allowZip64=False`). Orphans: a `.partial-<execution_id>.zip`
 is removed at the start of its own execute and by a sweep that removes partials whose attempt is terminal or

@@ -428,6 +428,8 @@ class ExportRepository:
             return None
         if row.request_digest != compute_digest("m10.export-request.v1", request):
             raise CommandReplayConflictError()
+        if row.request_json != request.model_dump(mode="json") or row.selection_id != request.subject.selection_id:
+            raise RequiredEvidenceMissingError()
         try:
             manifest = p.ExportManifest.model_validate(row.manifest_json)
         except (ValueError, TypeError):

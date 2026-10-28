@@ -23,7 +23,7 @@ from r2.quality.errors import (
     StaleHeadError,
 )
 from server import auth
-from server.services.package_export import PackageExportService, archive_ref, sweep_partials
+from server.services.package_export import PackageExportService, archive_ref, sweep_work
 from tests.integration.server.services.test_quality_dispositions import issue
 from tests.integration.server.services.test_quality_dispositions import request_for as disposition_request
 from tests.integration.server.services.test_quality_package_selection import (
@@ -187,13 +187,24 @@ async def test_a_crash_before_finalize_is_completed_by_the_same_command(selected
         assert (await session.execute(sa.select(sa.func.count()).select_from(ExportReceiptModel))).scalar_one() == 1
 
 
-def test_orphaned_partials_and_snapshots_are_swept(tmp_path: Path) -> None:
+def test_only_unowned_work_directories_are_swept(tmp_path: Path) -> None:
+    import fcntl
+    import os
+
     store = tmp_path / "exports"
-    (store / ".snapshot-abc").mkdir(parents=True)
-    (store / ".partial-x.zip").write_bytes(b"x")
+    for name in (".work-active", ".work-orphan", ".work-creating"):
+        (store / name).mkdir(parents=True)
+    for name in (".work-active", ".work-orphan"):
+        (store / name / "owner.lock").write_bytes(b"")
+        (store / name / "archive.partial").write_bytes(b"x")
     (store / "keep.zip").write_bytes(b"k")
-    assert sweep_partials(tmp_path) == 2
-    assert [entry.name for entry in store.iterdir()] == ["keep.zip"]
+    held = os.open(store / ".work-active" / "owner.lock", os.O_RDWR)
+    fcntl.flock(held, fcntl.LOCK_EX)
+    try:
+        assert sweep_work(tmp_path) == 1
+    finally:
+        os.close(held)
+    assert sorted(entry.name for entry in store.iterdir()) == [".work-active", ".work-creating", "keep.zip"]
 
 
 async def test_a_disposition_issued_during_export_prepare_waits_for_it(selected_host, monkeypatch) -> None:
@@ -241,3 +252,173 @@ async def test_a_selection_during_export_prepare_waits_and_the_export_still_fina
     # The new selection committed after PLANNED; finalize sees the slot head moved and refuses the receipt.
     with pytest.raises(StaleHeadError):
         await asyncio.wait_for(exporting, 120)
+
+
+async def test_an_exports_link_out_of_the_project_is_refused(selected_host, tmp_path: Path) -> None:
+    import os
+
+    env = selected_host
+    outside = tmp_path / "outside"
+    os.mkdir(outside)
+    os.symlink(outside, env["project"] / "exports")
+    with pytest.raises(ExportIntegrityFailedError):
+        await exporter(env).export(export_request(env))
+    assert os.listdir(outside) == []
+    assert await _attempt_states(env) == []
+
+
+@pytest.mark.parametrize("locales", [["en", "EN"], ["metadata"]])
+async def test_colliding_metadata_paths_never_overwrite_each_other(ready_host, locales: list[str]) -> None:
+    from tests.integration.server.services.test_quality_packaging import append_candidate, candidate_for, check_request
+    from tests.integration.server.services.test_quality_packaging import service as check_service
+
+    env = ready_host
+    localized = [
+        {
+            "locale": locale,
+            "title": "A history of the river",
+            "description": "How the river shaped the valley.",
+            "tags": ["history"],
+            "hashtags": [],
+            "chapters": [],
+        }
+        for locale in locales
+    ]
+    candidate = await append_candidate(env, candidate_for(env, localization_variants=localized), revision=2)
+    env["candidate"] = candidate
+    env["observation"] = await check_service(env).check(check_request(env, candidate, command_id="check-2"))
+    env["selection"] = await select(env, selection_request(env, await preview(env)))
+    with pytest.raises(ExportIntegrityFailedError):
+        await exporter(env).export(export_request(env))
+    assert await _attempt_states(env) == []
+
+
+class ScriptedRuntime:
+    """A runtime whose worker reports a fixed status, standing in for a failed or lost confined unit."""
+
+    def __init__(self, status: str) -> None:
+        self.status = status
+        self.launches = 0
+
+    async def launch(self, payload: bytes, **_: object):
+        import json
+
+        from server.services.quality_probe_runtime import WorkerOutcome
+
+        self.launches += 1
+        body = json.dumps({"schema": "m10.export-worker-output.v1", "status": self.status, "digest": None}).encode()
+        return WorkerOutcome(body, 0, 1, "EXIT_CODE", False, False, True, 1, (0,))
+
+
+def scripted(env, status: str) -> tuple[PackageExportService, ScriptedRuntime]:
+    runtime = ScriptedRuntime(status)
+    service = PackageExportService(
+        sessions=env["factory"],
+        grant_reader=env["reader"],
+        project_root=env["project"],
+        interactive_token=auth.create_token(ACTOR),
+        runtime=runtime,
+    )
+    return service, runtime
+
+
+async def test_a_known_worker_refusal_fails_the_attempt_and_leaves_no_scratch(selected_host) -> None:
+    import os
+
+    env = selected_host
+    service, runtime = scripted(env, "INTEGRITY_FAILED")
+    request = export_request(env)
+    with pytest.raises(ExportIntegrityFailedError):
+        await service.export(request)
+    assert await _attempt_states(env) == ["FAILED_BEFORE_ACCEPTANCE"]
+    assert os.listdir(env["project"] / "exports") == []
+    with pytest.raises(ExportIntegrityFailedError):
+        await service.export(request)
+    assert runtime.launches == 1
+
+
+async def test_an_unknown_worker_outcome_is_never_rebuilt_but_a_new_command_recovers(selected_host) -> None:
+    env = selected_host
+    service, runtime = scripted(env, "WORKER_FAILED")
+    request = export_request(env)
+    with pytest.raises(RequiredEvidenceMissingError):
+        await service.export(request)
+    assert await _attempt_states(env) == ["SUBMIT_OUTCOME_UNKNOWN"]
+    with pytest.raises(RequiredEvidenceMissingError):
+        await service.export(request)
+    assert runtime.launches == 1
+    receipt = await exporter(env).export(export_request(env, command_id="export-2"))
+    assert receipt.status == "EXPORTED"
+
+
+async def test_a_published_archive_changed_before_finalize_is_refused(selected_host, monkeypatch) -> None:
+    env = selected_host
+    request = export_request(env)
+    real = ExportRepository.stage_receipt
+    failed = {"once": True}
+
+    async def crash_once(self, **kwargs):
+        if failed.pop("once", False):
+            raise RuntimeError("crash between acceptance and the receipt")
+        return await real(self, **kwargs)
+
+    monkeypatch.setattr(ExportRepository, "stage_receipt", crash_once)
+    with pytest.raises(RuntimeError):
+        await exporter(env).export(request)
+    (archive,) = (env["project"] / "exports").glob("*.zip")
+    data = bytearray(_read(archive))
+    data[len(data) // 2] ^= 0xFF
+    _write(archive, bytes(data))
+    with pytest.raises(ExportIntegrityFailedError):
+        await exporter(env).export(request)
+    assert await _attempt_states(env) == ["ACCEPTED"]
+
+
+def test_the_worker_refuses_to_build_when_it_is_not_confined(tmp_path: Path) -> None:
+    import json
+    import subprocess
+    import sys
+
+    from server.services import package_export_worker
+
+    config = {
+        "schema": "m10.export-worker-config.v1",
+        "envelope": {},
+        "read_files": [],
+        "exec_files": [],
+        "read_dirs": [],
+        "scratch": [],
+        "members": [],
+        "manifest": "/dev/null",
+        "output": str(tmp_path / "out"),
+    }
+    launcher = (
+        "import importlib.util as u,sys;s=u.spec_from_file_location('w',sys.argv[1]);"
+        "m=u.module_from_spec(s);sys.modules[s.name]=m;s.loader.exec_module(m);raise SystemExit(m.main())"
+    )
+    result = subprocess.run(
+        [sys.executable, "-I", "-c", launcher, package_export_worker.__file__],
+        input=json.dumps(config).encode(),
+        capture_output=True,
+        check=False,
+        timeout=60,
+    )
+    assert result.returncode == 1
+    assert json.loads(result.stdout)["status"] != "OK"
+    assert not (tmp_path / "out").exists()
+
+
+@pytest.mark.parametrize(
+    ("role", "variant", "media", "path"),
+    [
+        ("video", None, "video/mp4", "video/output.mp4"),
+        ("thumbnail", "T2", "image/png", "thumbnails/t2.png"),
+        ("captions-en", None, "application/x-subrip", "captions/en.srt"),
+        ("captions-zh-Hans", None, "application/x-subrip", "captions/zh-hans.srt"),
+        ("poster", "a", "image/jpeg", "assets/poster-a.jpg"),
+    ],
+)
+def test_the_bundle_layout_maps_roles_to_fixed_paths(role: str, variant: str | None, media: str, path: str) -> None:
+    from server.services.package_export import member_path
+
+    assert member_path(role, variant, media) == path

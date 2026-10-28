@@ -1,0 +1,211 @@
+{
+  "schema_id": "m10.b4-review.v1",
+  "reviewed_head": "795d6a399",
+  "reviewer": "Codex, independent critical source review; primary agent; no subagents",
+  "verdict": "REWORK",
+  "commands_run": [
+    {
+      "command": "git rev-parse HEAD && git status --short && git branch --show-current && git diff --stat 7283fdaab..795d6a399",
+      "result": "Initially clean at 795d6a39970acc56ff1d3e9da56196866c6c8a6b on design/r2-m10-b. Reviewed the requested two-dot range, including all changed implementation/schema/registry/test files."
+    },
+    {
+      "command": "git log 7283fdaab..795d6a399 --oneline; git diff 7283fdaab..795d6a399 -- lib/db/repositories/quality_packaging.py lib/db/models/quality_packaging.py alembic/versions/8a5d0f6b1e44_m10_export_custody.py server/services/quality_packaging.py; git diff 7283fdaab..795d6a399 -- r2/host_hardening/route_inventory.py r2/provider_capabilities/registry.json tests/unit/r2/host_hardening/test_provider_capabilities.py",
+      "result": "Read changed custody, persistence, route and capability code; direct numbered reads covered package_export.py, package_export_worker.py and the complete three export-specific test files."
+    },
+    {
+      "command": "nl -ba / sed / rg reads of the supplied design, CONTRIBUTING.md, B2/B3 accepted review conditions, package selection/evidence resolvers, quality runs/dispositions, format_render.py, quality_probes.py, quality_probe_runtime.py, host_submit.py, execution.py, execution_adapter.py, host_hardening repository and packaging contracts/checker",
+      "result": "Compared D6/D7, section 4 and section 8 with actual M7 plan/submit/commit and A5/A6/B3 lock/currentness paths. Graph tool discovery returned no callable graph tools; no project generation or coverage result was available. All material findings use direct source reads."
+    },
+    {
+      "command": "git diff --check 7283fdaab..795d6a399",
+      "result": "PASS, exit 0."
+    },
+    {
+      "command": "UV_CACHE_DIR=/tmp/codex-b4-uv-cache uv run --no-sync pytest -q -p no:cacheprovider tests/unit/server/services/test_package_export_worker.py tests/integration/lib/db/migrations/test_8a5d0f6b1e44_m10_export_custody.py tests/unit/r2/host_hardening/test_provider_capabilities.py",
+      "result": "UNAVAILABLE as a combined run: shared_db_schema stalled in the Alembic/aiosqlite setup and pytest timed out; 34 setup errors, exit 1, 122.36s. This is not 34 product failures. Separate unit execution below passed."
+    },
+    {
+      "command": ".venv/bin/python -m pytest -q -p no:cacheprovider --tb=short tests/unit/server/services/test_package_export_worker.py tests/unit/r2/host_hardening/test_provider_capabilities.py",
+      "result": "PASS: 31 passed, 1 existing SQLAlchemy reflection warning, 1.68s, exit 0. Includes worker golden vector and two-clean-root byte equality."
+    },
+    {
+      "command": "DATABASE_URL=postgresql+asyncpg://postgres:postgres@127.0.0.1:55491/arcreel_test UV_CACHE_DIR=/tmp/codex-b4-uv-cache uv run --no-sync pytest -q -p no:cacheprovider tests/integration/server/services/test_package_export.py",
+      "result": "PG UNAVAILABLE: sandbox AF_INET socket construction denied with PermissionError [Errno 1] Operation not permitted. 9 setup errors, 1 passed (filesystem-only sweep), 3.72s, exit 1. No PostgreSQL-dependent test body ran."
+    },
+    {
+      "command": "timeout 50s .venv/bin/python -m pytest -vv -p no:cacheprovider --tb=short tests/integration/lib/db/migrations/test_8a5d0f6b1e44_m10_export_custody.py",
+      "result": "Timed out during shared schema setup, exit 124; no completed migration test."
+    },
+    {
+      "command": "DATABASE_URL=sqlite+aiosqlite:////tmp/codex-b4-unused.db timeout 45s .venv/bin/python -m pytest -q -p no:cacheprovider --tb=short tests/integration/lib/db/migrations/test_8a5d0f6b1e44_m10_export_custody.py",
+      "result": "Bypassed the unrelated owned shared-schema initialization: first test passed, then migration execution stalled; exit 124. Full-chain upgrade/downgrade remains unverified; no underlying cause assigned."
+    },
+    {
+      "command": "DATABASE_URL=sqlite+aiosqlite:////tmp/codex-b4-unused.db .venv/bin/python -m pytest -q -p no:cacheprovider --tb=short tests/unit/r2/host_hardening/test_route_inventory.py tests/unit/scripts/r2/test_verify_m7_scope.py",
+      "result": "PASS: 22 passed in 1.85s, exit 0."
+    },
+    {
+      "command": ".venv/bin/python - (inline temporary-directory fault/path probes using the actual PackageExportService._build_and_publish, sweep_partials, build_archive and member_path; unittest.mock.patch only in the probe process)",
+      "result": "ENOSPC injected after partial creation left .partial-disk-full.zip. Injected os.replace EIO left .partial-rename-fail.zip. sweep_partials removed both active-looking snapshot and partial without consulting M7. Worker accepted A.txt/a.txt together, a//b, a/./b, backslash, colon and NUL-containing paths; NUL was truncated by ZipInfo. member_path(captions,en,application/x-subrip) returned assets/captions-en.srt. All probe files were in TemporaryDirectory and removed."
+    },
+    {
+      "command": ".venv/bin/python - (inline localization probe using clean_body/run from test_packaging_check and actual materialize with a validated PackageSelection and candidate)",
+      "result": "en and EN together passed every declared packaging rule (failures=()), but exported only metadata/en.json plus the primary document. Locale metadata overwrote metadata/metadata.json, whose keys then omitted audience and disclosure and included locale. No database acceptance claimed."
+    },
+    {
+      "command": ".venv/bin/python - (inline symlink probe: project/exports -> sibling outside directory; actual _build_and_publish with one digest-verified member)",
+      "result": "CONFIRMED: successful publication wrote the content-addressed ZIP in the outside directory."
+    },
+    {
+      "command": ".venv/bin/python - (inline ZIP limit probes using actual ZipFile/_info and materialize/build_archive; snapshot copying mocked to avoid allocating multi-GB files)",
+      "result": "A 2,100,000,000-byte ZipInfo, below 2^31, raised LargeZipFile before writing because zipfile reserves its size margin. A materialized closure with exactly 2,147,483,647 payload bytes and a 1,255-byte manifest was accepted by materialize and rejected only by build_archive. An initial max-member probe was rejected by materialize because metadata already pushed the closure over its limit; the second probe adjusted for metadata. No large media was allocated."
+    },
+    {
+      "command": ".venv/bin/python - (inline synchronous SQLite MigrationContext/Operations probe invoking the actual 8a5d0f6b1e44 upgrade with minimal predecessor tables; ORM CreateTable compilation for SQLite/PostgreSQL)",
+      "result": "PASS within this bounded setup: both tables created; SQLite CHECK expressions matched ORM compilation; PostgreSQL ORM compilation contained octet_length ceilings and excluded SQLite BLOB expressions. UPDATE and DELETE on both export tables raised M10_IMMUTABLE_EXPORT_ROW. Oversized invocation request_json and non-positive receipt size were refused. This is not full-chain migration, PostgreSQL trigger/FK/concurrency or complete schema parity proof."
+    },
+    {
+      "command": ".venv/bin/python - (inline SHA256 verification of export-route-qualification.json source_sha256 and submit_route_inventory_problems())",
+      "result": "All six recorded source hashes matched; submit_route_inventory_problems() returned []. Capability evidence digest/entry digests also passed the registry unit test."
+    },
+    {
+      "command": "git rev-parse HEAD; git log 795d6a399..HEAD --oneline; git diff --stat 795d6a399..HEAD; git diff --name-only 795d6a399..HEAD; git diff --quiet 795d6a399 -- [reviewed implementation/schema/contract/registry/design/test paths]",
+      "result": "Concurrent HEAD advance to eed57b069ee88b44216db91648f3a06180a9f0f7 changed only docs/r2/evidence/R2_M10_B_HANDOFF.md. All reviewed code, tests, qualification and governing design remained byte-identical to the requested candidate. No checkout/reset/commit performed."
+    }
+  ],
+  "not_verified": [
+    "No graph tools were exposed, so list_projects/index_status/check_index_coverage and graph pagination/generation verification were unavailable. Discovery and call-chain verification used source fallback; no graph completeness claim.",
+    "Reviewer did not reproduce builder-reported 10 PostgreSQL export passes or related 139 passes. Sandbox forbids sockets and approval escalation; no database server, governance attestor, provider, network, upload or Production Authority action was started.",
+    "Full migration pytest execution did not complete. Synchronous SQLite isolated-migration checks and PostgreSQL DDL compilation do not establish PostgreSQL enforcement, full predecessor/head round trip, all FK/unique semantics, downgrade recovery or ORM/migration parity in every dimension.",
+    "No confined export unit exists in the reviewed implementation; effective seccomp/network denial, read-only snapshot mounts, output restrictions, runtime/FSIZE limits, cancellation and process lifecycle were not executed or qualified.",
+    "No fresh PostgreSQL finalize-versus-run-seal/disposition/selection writer-pair schedules, profile publication contention, multi-principal/disjoint-master schedules or crash-cut recovery were executed. The two supplied concurrency cases gate prepare, not finalize.",
+    "No exhaustive tamper qualification of persisted invocation/request/manifest/receipt/attempt cross-bindings, no hostile root/mount swap coverage, no real disk exhaustion, process kill or multi-GB archive build. Fault injection and header-only probes are identified as such.",
+    "Read-only source review: no implementation edits, formatting, staging or commits. Only the requested review JSON is written in the repository. License analysis excluded."
+  ],
+  "findings": {
+    "H": [
+      {
+        "id": "H1",
+        "severity": "H",
+        "status": "CONFIRMED",
+        "location": "server/services/package_export.py:490-491; server/services/package_export_worker.py:51; docs/superpowers/specs/2026-10-28-r2-m10-b-packaging-export-design.md:152-161",
+        "title": "The required D7 export confinement is absent",
+        "scenario": "The M7 callback invokes _build_and_publish through asyncio.to_thread in the server process. There is no separate worker process/unit, worker entry point, runtime cap, LimitFSIZE, read-only snapshot bind, restricted output directory or kernel network denial. The module digest is recorded but no launched worker identity is verified. Cancellation cannot terminate this thread; export work can continue while export() removes its snapshots. A large or blocked export can occupy the host executor indefinitely and has server filesystem/network authority. The stdlib-only comment says the module can run confined, which does not supply confinement.",
+        "fix": "Implement the separate digest-pinned export worker and supervisor with the D7 limits and effective-control validation, reusing the actual A4 service-property/lifecycle seams with export-specific identity and mounts. Add network-denial, output-boundary, runtime/FSIZE and cancellation/crash tests. D7 states this in B4 execute and section 7 relies on it; no accepted named deferral was found. Carrying LOCAL_REGULAR_FILE_IO from B2 does not amend D7. Any deferral requires an explicit design/acceptance amendment before route activation."
+      }
+    ],
+    "M": [
+      {
+        "id": "M1",
+        "severity": "M",
+        "status": "CONFIRMED",
+        "location": "server/services/package_export.py:342-345,518-539",
+        "title": "Host publication follows an exports symlink outside the project",
+        "scenario": "mkdir(exist_ok=True), Path opens, os.replace and directory fsync all use pathname resolution through project/exports. O_NOFOLLOW on the worker destination protects only its final component. A pre-existing exports symlink to an outside directory is accepted; the live probe successfully published the archive there. The safe open_beneath used for source assets does not protect snapshots or publication. A confined builder alone will not fix this host-side publisher.",
+        "fix": "Pin and validate the project/export directories with descriptor-relative no-follow traversal; use the owned directory descriptor for private snapshot/partial creation, rename and directory fsync. Open and verify published regular files without following links, and reject root/ancestor swaps. Add pre-existing and raced exports-symlink regressions."
+      },
+      {
+        "id": "M2",
+        "severity": "M",
+        "status": "CONFIRMED",
+        "location": "server/services/package_export.py:224-227",
+        "title": "Localization path collisions silently replace metadata",
+        "scenario": "Localized documents are inserted into a dict after lossy lowercase slugging, before the manifest can reject duplicate paths. A checked candidate containing en and EN has no packaging-rule failures but exports just one metadata/en.json. Locale metadata also overwrites the mandatory metadata/metadata.json, dropping its audience/disclosure fields. The resulting archive and manifest agree on the silently reduced set, so digest verification does not catch the loss.",
+        "fix": "Reserve the primary metadata path and validate every normalized, case-folded destination before inserting any entry. Reject collisions rather than overwriting. Add valid-candidate service/materialization RED cases for en/EN, slug collisions and the reserved metadata locale, asserting no invocation/receipt."
+      },
+      {
+        "id": "M3",
+        "severity": "M",
+        "status": "CONFIRMED",
+        "location": "server/services/package_export.py:521-537",
+        "title": "Disk-full and publication errors leave partial archives",
+        "scenario": "Only ExportBuildError triggers unlink. OSError from build/write/fsync and errors from os.replace occur outside that cleanup policy. Fault probes left partial files for both ENOSPC after partial creation and EIO at rename. M7 then records FAILED_BEFORE_ACCEPTANCE via its generic Exception handler, but export() removes only snapshots; repeated failed commands accumulate potentially multi-GB partials. This violates D7 known-failure cleanup.",
+        "fix": "Own the partial in a try/finally spanning build, rename and verification, removing it on every ordinary failure and cancellation once worker termination is established. Map known disk/rename failures to the typed export failure while preserving unexpected/ambiguous outcome classification. Retain content-addressed objects where outcome recovery requires them. Persist ENOSPC, fsync, rename and cleanup-error regressions."
+      },
+      {
+        "id": "M4",
+        "severity": "M",
+        "status": "CONFIRMED",
+        "location": "server/services/package_export.py:625-637",
+        "title": "The orphan sweep deletes active export work",
+        "scenario": "sweep_partials deletes every matching partial and snapshot without an attempt lookup, ownership/lease check or exclusion of active materialization. A probe with .snapshot-active/member and .partial-active.zip removed both. Running the documented sweep while another command is snapshotting/building can destroy its inputs or unlink its live output. D7 permits sweeping terminal/unknown attempts, not all attempts; snapshot names do not even encode an execution id.",
+        "fix": "Associate scratch ownership with an invocation/execution and safely determine terminal or SUBMIT_OUTCOME_UNKNOWN eligibility, accounting for pre-PLANNED materialization and workers that may still be running. Alternatively enforce a provable exclusive offline sweep boundary. Add concurrent active/sweep and eligible-orphan tests; do not infer orphanhood solely from a filename."
+      },
+      {
+        "id": "M5",
+        "severity": "M",
+        "status": "CONFIRMED",
+        "location": "server/services/package_export.py:221-258,484-509; server/services/package_export_worker.py:62-66; r2/contracts/packaging.py:327",
+        "title": "The complete ZIP operational envelope is not admitted before PLANNED",
+        "scenario": "The manifest bounds entry payloads, excluding manifest bytes and ZIP headers/central directory. A probe materialized exactly 2,147,483,647 payload bytes plus a 1,255-byte manifest; only build_archive refused it, after invocation/PLANNED in the real service. The refusal is ExportIntegrityFailedError instead of M10_OPERATIONAL_ENVELOPE_EXCEEDED. Separately, stdlib zipfile.open reserves a 5 percent size margin: a 2,100,000,000-byte member, below the documented cap, already raises LargeZipFile with allowZip64=False. The source-only module digest also does not identify a Python runtime change affecting ZIP behavior.",
+        "fix": "Preflight selected members plus canonical manifest and exact archive overhead, the writer count/offset limits and zipfile size-margin behavior before copying large inputs and before PLANNED. Raise OperationalEnvelopeExceededError for envelope refusal. Adjust the writer or explicitly amend the supported limit, and pin/qualify the runtime as needed for deterministic bytes. Add allocation-free boundary tests asserting no invocation/attempt on rejection."
+      },
+      {
+        "id": "M6",
+        "severity": "M",
+        "status": "CONFIRMED",
+        "location": "server/services/package_export.py:135-146,218-223",
+        "title": "No production asset path reaches the required captions locale layout",
+        "scenario": "member_path has a locale parameter but materialize and _media_of never pass it; PackagingAsset supplies no locale field. A captions SRT asset therefore becomes assets/captions.srt (or assets/captions-en.srt for variant en), never the D6 captions/<locale>.srt path. The worker golden vector manually supplies captions/en.srt and therefore does not exercise this missing service mapping.",
+        "fix": "Define an unambiguous authoritative caption-locale mapping using the existing domain contract if available, or an explicit reviewed contract amendment. Apply it consistently in materialization and media lookup. Add an end-to-end selected-caption export test that inspects both ZIP names and manifest entries, including multiple locales."
+      },
+      {
+        "id": "M7",
+        "severity": "M",
+        "status": "CONFIRMED source validation gap; corruption scenario not exercised on PG",
+        "location": "server/services/package_export.py:575-615; lib/db/repositories/quality_packaging.py:429-438",
+        "title": "Recovery does not bind the accepted archive back to the persisted execution manifest",
+        "scenario": "Finalize checks only that the published blob hashes to the digest in provider_job_id. It does not read manifest.json or verify its bytes/member set against invocation.manifest. The invocation reader validates a manifest against its own stored digest but ignores stored request_json, does not recompute identity_digest and does not compare that identity/task/request with the M7 attempt. Thus a cross-bound or corrupt ACCEPTED record pointing at a different self-consistent blob can be receipted alongside this invocation’s manifest; even a non-ZIP blob with its matching accepted digest passes the file check. This is a missing D7 independent recovery invariant, not a claim that SHA256 can be bypassed or that ordinary untampered builds produce wrong bytes.",
+        "fix": "Reconstruct and verify the full stored request/execution identity and its selection/manifest bindings on read; validate attempt task/route/request identity against it. Verify the accepted archive’s exact canonical manifest and member closure before SUCCEEDED/receipt. Do bulk archive verification outside locks against a pinned object, then revalidate authoritative identities and currentness in the final transaction. Add cross-bound attempt, altered identity, wrong embedded manifest, extra/missing member and non-ZIP recovery refusals."
+      }
+    ],
+    "L": [
+      {
+        "id": "L1",
+        "severity": "L",
+        "status": "CONFIRMED; service manifest validation narrows exposure",
+        "location": "server/services/package_export_worker.py:35-38,57-61",
+        "title": "The standalone worker accepts paths outside the frozen archive contract",
+        "scenario": "The builder rejects absolute paths, non-ASCII, trailing slash and literal .. segments, but accepts uppercase/case-colliding names, doubled separators, dot segments, backslash, colon and NUL. The probe accepted A.txt with a.txt; a NUL filename was truncated by ZipInfo. Current service-generated ExportManifest paths are stricter, so this is a worker-boundary gap rather than a demonstrated export-service path escape. It matters when this module becomes the D7 separate worker.",
+        "fix": "Validate the complete lowercase normalized path grammar, reserved manifest path and case-folded uniqueness at the worker boundary before opening the destination. Persist the missing RED vectors and reject NUL explicitly."
+      }
+    ]
+  },
+  "conditions": [
+    {
+      "id": "D7_ENVELOPE",
+      "status": "BLOCKING B4 requirement, not silently deferred",
+      "requirement": "H1 must close for acceptance of the design as written. B2 LOCAL_REGULAR_FILE_IO is limited to the packaging checker; it supplies neither export worker confinement nor D7 runtime network-denial evidence."
+    },
+    {
+      "id": "VERIFIED_CORE_CUSTODY",
+      "status": "SOURCE-CONFIRMED with execution limits",
+      "requirement": "Preserve the sound structure: no second M10 job-state table; deferred invocation-to-attempt FK; invocation flushed under command/currentness locks before M7 commits PLANNED (host_submit.py:124, execution.py:129-152); no metadata transaction remains open during the build callback; ACCEPTED recovery uses job id; FAILED/unknown/pending commands are refused instead of rebuilt. SUCCEEDED and immutable receipt are staged together in one finalize transaction. Normal source snapshot hashing, worker member hashing, content-addressed rename, file/directory fsync and published digest verification are present. This does not close the defects above."
+    },
+    {
+      "id": "CURRENTNESS_AND_ORDER",
+      "status": "SOURCE-CONFIRMED construction; PG coverage limited",
+      "requirement": "Prepare and finalize share _require_current: sorted master locks, profile FOR SHARE, run/disposition FOR SHARE with exact bound ids, packaging-head advisory/FOR SHARE naming the selection, evidence re-resolution and READY projection before M7 writes. A5 seal and A6/B3 writer reads showed no new inverse order in this path; the earlier plain attempt read at finalize is not FOR UPDATE. B2 C6 candidate closure/lineage verification is reused through resolve_package_evidence/require_packaging_lineage; D5 private snapshot copy/digest and worker rehash are implemented. Do not call this observed finalize contention coverage."
+    },
+    {
+      "id": "B4_CRASH_AND_RED_MATRIX",
+      "status": "REQUIRED before B4 recovery acceptance",
+      "requirement": "Persist the section 8 cases absent from the supplied export tests: disk-full and rename/fsync cleanup, interruption before rename, after rename but before ACCEPTED commit, unknown outcome refusing same-command rebuild and a new command producing/reconciling identical bytes, case/slug collisions, missing input and worker lifecycle cuts. Existing crash_once injects only stage_receipt after acceptance. Add actual finalize-versus-run-seal, finalize-versus-disposition and finalize-versus-selection barrier schedules; current two tests pause prepare. Include both relevant commit orders, exact blocked-waiter evidence and failed/unknown typed replay checks."
+    },
+    {
+      "id": "SCHEMA_AND_ROUTE_EVIDENCE",
+      "status": "PARTIAL schema execution; route checks passed",
+      "requirement": "Migration/ORM columns, keys, deferred attempt FK, receipt uniqueness/size and dialect-specific JSON ceilings align on source inspection. The isolated SQLite probe additionally enforced both-table immutability and selected checks; full chain and PG FK/unique/trigger/ceiling tests remain required. Route family, registry NONE/NON_AUTHORITATIVE/no lookup capabilities and qualification hashes are coherent and passed unit/inventory checks. OFFLINE_VERIFIED here does not establish D7 effective confinement or runtime network absence."
+    },
+    {
+      "id": "B3_CARRIED_GATES",
+      "status": "PRESERVED",
+      "requirement": "Keep REVOCATION_AFTER_LEASE and CRASH_AFTER_LEASE integration tests before B5 interactive route activation, B2 authenticated server-derived provenance at append, the stated serialization evidence limits, and the distinction between source review, builder PG reports and reviewer execution. B4 does not activate UI/routes, Production Authority, upload or network."
+    },
+    {
+      "id": "PIN_AND_PRESERVATION",
+      "status": "PINNED source despite handoff-only HEAD advance",
+      "requirement": "Review authority remains 7283fdaab..795d6a399. During review HEAD advanced only by the handoff documentation commit eed57b069. All material candidate source/test/design bytes were checked unchanged. Preserve that unrelated change; do not overwrite the handoff or mark this JSON as acceptance of later implementation."
+    }
+  ]
+}

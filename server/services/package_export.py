@@ -11,10 +11,15 @@ receipt. Export writes no upload, publish or visibility state and never touches 
 from __future__ import annotations
 
 import asyncio
+import contextlib
+import fcntl
 import hashlib
+import json
 import os
 import shutil
+import stat
 import uuid
+import zipfile
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -35,6 +40,7 @@ from lib.db.repositories.quality_packaging import (
     selection_digest,
 )
 from lib.db.repositories.quality_runs import QualityRunRepository
+from lib.video_backends.base import AmbiguousSubmitError
 from r2.advanced_creative.digests import canonical_json_bytes, digest_canonical
 from r2.advanced_creative.exploration import uuid7
 from r2.contracts import packaging as p
@@ -58,6 +64,7 @@ from r2.quality.digests import compute_digest
 from r2.quality.errors import (
     DispositionStaleError,
     ExportIntegrityFailedError,
+    OperationalEnvelopeExceededError,
     RequiredEvidenceMissingError,
     StaleHeadError,
 )
@@ -66,10 +73,26 @@ from server.auth import get_current_interactive_user
 from server.services import package_export_worker
 from server.services.execution_attempts import build_execution_attempt_service, capability_resolver
 from server.services.governance_grants import CheckpointedShowrunnerGrantReader
-from server.services.package_export_worker import BundleMember, ExportBuildError, build_archive
+from server.services.package_export_worker import (
+    MANIFEST_PATH,
+    MEMBER_MODE,
+    WORKER_CONFIG_SCHEMA,
+    ZIP_EPOCH,
+    BundleMember,
+    ExportEnvelopeError,
+    archive_size,
+)
 from server.services.quality_dispositions import readiness_in
 from server.services.quality_package_selection import PackageEvidence, resolve_package_evidence
 from server.services.quality_packaging import open_beneath
+from server.services.quality_probe_runtime import (
+    MAX_RUNTIME_MS,
+    READ_DIRS,
+    READ_FILES,
+    ProbeHost,
+    QualityProbeRuntime,
+    worker_envelope,
+)
 from server.services.quality_runs import lock_profile_head, lock_subject_masters
 
 _FAMILY = PACKAGE_EXPORT_SUBMIT_FAMILIES[0]
@@ -82,6 +105,19 @@ _MEDIA_SUFFIX = {
     "text/plain": "txt",
     "application/json": "json",
 }
+
+CAPTIONS_ROLE_PREFIX = "captions-"
+PRIMARY_METADATA = "metadata/metadata.json"
+WORK_PREFIX = ".work-"
+OWNER_LOCK = "owner.lock"
+MANIFEST_FILE = "manifest.bytes"
+PARTIAL_FILE = "archive.partial"
+WORKER_BASE_MS = 30000
+WORKER_BYTES_PER_SECOND = 50 << 20
+WORKER_OUTPUT_CAP = 65536
+_NOFOLLOW = getattr(os, "O_NOFOLLOW", 0)
+_DIRECTORY = getattr(os, "O_DIRECTORY", 0)
+_NONBLOCK = getattr(os, "O_NONBLOCK", 0)
 
 type Sessions = async_sessionmaker[AsyncSession]
 type GrantReaderFactory = Callable[[], Awaitable[CheckpointedShowrunnerGrantReader]]
@@ -111,6 +147,41 @@ def export_route(builder_digest: str) -> ProviderRouteSnapshot:
     )
 
 
+def execution_identity_digest(request: p.ExportRequest, manifest: p.ExportManifest) -> str:
+    """The M7 request identity, recomputed from the stored request and manifest on every read."""
+    identity = p.ExportExecutionIdentity(
+        schema_id="m10.export-execution.v1",
+        slot=request.subject.slot,
+        selection_id=request.subject.selection_id,
+        selection_digest=request.subject.selection_digest,
+        manifest_digest=compute_digest("m10.export-manifest.v1", manifest),
+        builder_identity_digest=manifest.builder_identity_digest,
+        adapter_version=HOST_EXPORT_ADAPTER_VERSION,
+    )
+    return compute_digest("m10.export-execution.v1", identity)
+
+
+def provider_request(invocation: StoredExportInvocation) -> ProviderRequest:
+    return ProviderRequest(
+        id=f"{invocation.task_id}:export",
+        host_task_ref=invocation.task_id,
+        provider=_FAMILY.key.provider_id,
+        model="zip-stored",
+        endpoint=_FAMILY.key.endpoint_id,
+        payload={"schema": "m10.export-execution.v1", "identity_digest": invocation.identity_digest},
+        adapter_version=HOST_EXPORT_ADAPTER_VERSION,
+    )
+
+
+def _publish(store: int, work: WorkDirectory, name: str) -> None:
+    """Rename the worker's output into the store by descriptor and make the rename durable."""
+    try:
+        os.replace(PARTIAL_FILE, name, src_dir_fd=work.descriptor, dst_dir_fd=store)
+        os.fsync(store)
+    except OSError:
+        raise ExportIntegrityFailedError() from None
+
+
 def attempt_submitter(session: AsyncSession, user_id: str, project_name: str, execution_id: str) -> AttemptSubmitter:
     """The M7 submitter whose single attempt uses the execution id reserved by the staged invocation."""
     resolver = capability_resolver()
@@ -132,8 +203,12 @@ def _slug(value: str) -> str:
     return text
 
 
-def member_path(role: str, variant_id: str | None, media_type: str, locale: str | None = None) -> str:
-    """The fixed bundle layout: video/output.mp4, thumbnails/<variant>.<ext>, captions/<locale>.srt, assets/…"""
+def member_path(role: str, variant_id: str | None, media_type: str) -> str:
+    """The fixed layout: video/output.mp4, thumbnails/<variant>.<ext>, captions/<locale>.<ext>, assets/…
+
+    A caption asset declares its locale in its role (`captions-<locale>`), so the profile's asset roles name every
+    caption locale it requires.
+    """
     suffix = _MEDIA_SUFFIX.get(media_type)
     if suffix is None:
         raise ExportIntegrityFailedError()
@@ -141,8 +216,8 @@ def member_path(role: str, variant_id: str | None, media_type: str, locale: str 
         return "video/output.mp4"
     if role == "thumbnail":
         return f"thumbnails/{_slug(variant_id or 'thumbnail')}.{suffix}"
-    if locale is not None:
-        return f"captions/{_slug(locale)}.{suffix}"
+    if role.startswith(CAPTIONS_ROLE_PREFIX) and variant_id is None:
+        return f"captions/{_slug(role.removeprefix(CAPTIONS_ROLE_PREFIX))}.{suffix}"
     return f"assets/{_slug(role)}{'-' + _slug(variant_id) if variant_id else ''}.{suffix}"
 
 
@@ -175,61 +250,66 @@ def metadata_document(candidate: PackagingCandidate, values: dict[str, object]) 
 
 
 @dataclass(frozen=True)
-class Materialized:
-    members: tuple[BundleMember, ...]
+class PlannedAsset:
+    path: str
+    source_ref: str
+    content_digest: str
+    byte_size: int
+
+
+@dataclass(frozen=True)
+class ExportPlan:
+    """Everything an export materializes, computed from immutable evidence before any byte is copied."""
+
+    assets: tuple[PlannedAsset, ...]
+    documents: tuple[tuple[str, bytes], ...]
     manifest: p.ExportManifest
     manifest_bytes: bytes
+    archive_bytes: int
 
 
-def _snapshot(root: Path, source_ref: str, directory: Path, digest: str, size: int) -> Path:
-    """A private copy of one asset read beneath the project root without links, verified while copied."""
-    parts = PurePosixPath(source_ref).parts
-    if str(PurePosixPath(source_ref)) != source_ref or PurePosixPath(source_ref).is_absolute() or ".." in parts:
-        raise ExportIntegrityFailedError()
-    descriptor = open_beneath(root, parts)
-    if descriptor is None:
-        raise ExportIntegrityFailedError()
-    target = directory / uuid.uuid4().hex
-    hasher = hashlib.sha256()
-    copied = 0
-    with os.fdopen(descriptor, "rb", buffering=0) as source, target.open("xb") as sink:
-        while chunk := source.read(min(1 << 20, size + 1 - copied)):
-            copied += len(chunk)
-            if copied > size:
-                raise ExportIntegrityFailedError()
-            hasher.update(chunk)
-            sink.write(chunk)
-        sink.flush()
-        os.fsync(sink.fileno())
-    if (copied, "sha256:" + hasher.hexdigest()) != (size, digest):
-        raise ExportIntegrityFailedError()
-    return target
-
-
-def materialize(
-    root: Path, directory: Path, selection: p.PackageSelection, evidence: PackageEvidence, builder_digest: str
-) -> Materialized:
-    """Snapshot every exported asset and the metadata documents; build the exact manifest they satisfy."""
+def plan_export(selection: p.PackageSelection, evidence: PackageEvidence, builder_digest: str) -> ExportPlan:
+    """Layout, documents, manifest and exact archive size; paths may never collide or overwrite each other."""
     preview = selection.preview
     candidate = evidence.candidate
     chosen, values = _chosen(candidate, preview.selected_variant_ids)
     chosen_ids = set(chosen.values())
-    members: list[BundleMember] = []
+    used: set[str] = set()
+
+    def claim(path: str) -> str:
+        if path.casefold() in used:
+            raise ExportIntegrityFailedError()
+        used.add(path.casefold())
+        return path
+
+    assets: list[PlannedAsset] = []
+    entries: list[p.ExportManifestEntry] = []
     for asset in candidate.assets:
         if asset.variant_id is not None and asset.variant_id not in chosen_ids:
             continue
-        source = _snapshot(root, asset.source_ref, directory, asset.content_digest, asset.byte_size)
-        path = member_path(asset.role, asset.variant_id, asset.media_type)
-        members.append(BundleMember(path, source, asset.content_digest, asset.byte_size))
-    documents = {"metadata/metadata.json": metadata_document(candidate, values)}
-    for localized in candidate.localization_variants:
-        documents[f"metadata/{_slug(localized.locale)}.json"] = localized.model_dump(mode="json")
-    for path, document in documents.items():
-        data = canonical_json_bytes(document)
-        target = directory / uuid.uuid4().hex
-        target.write_bytes(data)
-        members.append(BundleMember(path, target, "sha256:" + hashlib.sha256(data).hexdigest(), len(data)))
-    media = {m.path: m for m in members}
+        path = claim(member_path(asset.role, asset.variant_id, asset.media_type))
+        assets.append(PlannedAsset(path, asset.source_ref, asset.content_digest, asset.byte_size))
+        entries.append(
+            p.ExportManifestEntry(
+                path=path, media_type=asset.media_type, byte_size=asset.byte_size, content_digest=asset.content_digest
+            )
+        )
+    documents: list[tuple[str, bytes]] = [
+        (claim(PRIMARY_METADATA), canonical_json_bytes(metadata_document(candidate, values)))
+    ]
+    documents.extend(
+        (claim(f"metadata/{_slug(localized.locale)}.json"), canonical_json_bytes(localized.model_dump(mode="json")))
+        for localized in candidate.localization_variants
+    )
+    for path, data in documents:
+        entries.append(
+            p.ExportManifestEntry(
+                path=path,
+                media_type="application/json",
+                byte_size=len(data),
+                content_digest="sha256:" + hashlib.sha256(data).hexdigest(),
+            )
+        )
     try:
         manifest = p.ExportManifest(
             schema_id="m10.export-manifest.v1",
@@ -243,42 +323,173 @@ def materialize(
             chosen_variants=tuple(
                 p.VariantChoice(group_id=group, variant_id=variant) for group, variant in chosen.items()
             ),
-            entries=tuple(
-                p.ExportManifestEntry(
-                    path=m.path,
-                    media_type=_media_of(m.path, candidate),
-                    byte_size=m.byte_size,
-                    content_digest=m.content_digest,
-                )
-                for m in media.values()
-            ),
+            entries=tuple(entries),
         )
     except ValueError:
         raise ExportIntegrityFailedError() from None
-    return Materialized(tuple(members), manifest, canonical_json_bytes(manifest.model_dump(mode="json")))
-
-
-def _media_of(path: str, candidate: PackagingCandidate) -> str:
-    if path.startswith("metadata/"):
-        return "application/json"
-    for asset in candidate.assets:
-        if member_path(asset.role, asset.variant_id, asset.media_type) == path:
-            return asset.media_type
-    raise ExportIntegrityFailedError()
+    manifest_bytes = canonical_json_bytes(manifest.model_dump(mode="json"))
+    try:
+        size = archive_size([(e.path, e.byte_size) for e in manifest.entries], len(manifest_bytes))
+    except ExportEnvelopeError:
+        raise OperationalEnvelopeExceededError() from None
+    return ExportPlan(tuple(assets), tuple(documents), manifest, manifest_bytes, size)
 
 
 def archive_ref(digest: str) -> str:
     return f"{EXPORT_DIRECTORY}/{digest.removeprefix('sha256:')}.zip"
 
 
-def _file_digest(path: Path) -> tuple[str, int]:
-    hasher = hashlib.sha256()
-    size = 0
-    with path.open("rb") as handle:
+def _open_directory(parent: int, name: str, *, create: bool) -> int:
+    """A directory below ``parent`` opened without following links (created owner-only when asked)."""
+    if create:
+        with contextlib.suppress(FileExistsError):
+            os.mkdir(name, 0o700, dir_fd=parent)
+    descriptor = os.open(name, os.O_RDONLY | _DIRECTORY | _NOFOLLOW, dir_fd=parent)
+    if not stat.S_ISDIR(os.fstat(descriptor).st_mode):
+        os.close(descriptor)
+        raise ExportIntegrityFailedError()
+    return descriptor
+
+
+def open_export_store(project_root: Path) -> int:
+    """The project's export directory, pinned by descriptor; a link anywhere on the way is refused."""
+    if os.name != "posix":
+        raise ExportIntegrityFailedError()
+    try:
+        root = os.open(project_root, os.O_RDONLY | _DIRECTORY | _NOFOLLOW)
+    except OSError:
+        raise ExportIntegrityFailedError() from None
+    try:
+        return _open_directory(root, EXPORT_DIRECTORY, create=True)
+    except OSError:
+        raise ExportIntegrityFailedError() from None
+    finally:
+        os.close(root)
+
+
+class WorkDirectory:
+    """A private per-export scratch directory under the pinned store, owned through an exclusive flock.
+
+    Snapshots, the manifest file and the partial archive live inside; a sweep removes only directories whose
+    owner lock it can take, so an export in progress is never touched.
+    """
+
+    def __init__(self, store: int, project_root: Path) -> None:
+        self.name = f"{WORK_PREFIX}{uuid.uuid4().hex}"
+        self._store = store
+        self.descriptor = _open_directory(store, self.name, create=True)
+        self.path = project_root / EXPORT_DIRECTORY / self.name
+        self._lock = os.open(OWNER_LOCK, os.O_RDWR | os.O_CREAT | os.O_EXCL | _NOFOLLOW, 0o600, dir_fd=self.descriptor)
+        fcntl.flock(self._lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+
+    def create(self, name: str) -> int:
+        return os.open(name, os.O_RDWR | os.O_CREAT | os.O_EXCL | _NOFOLLOW, 0o600, dir_fd=self.descriptor)
+
+    def close(self) -> None:
+        """Remove everything this export created and release ownership."""
+        with contextlib.suppress(OSError):
+            shutil.rmtree(self.name, dir_fd=self._store)
+        with contextlib.suppress(OSError):
+            os.close(self._lock)
+        with contextlib.suppress(OSError):
+            os.close(self.descriptor)
+
+
+def snapshot_assets(root: Path, work: WorkDirectory, plan: ExportPlan) -> tuple[BundleMember, ...]:
+    """Private verified copies of every planned asset plus the documents; any drift is an integrity failure."""
+    members: list[BundleMember] = []
+    for index, asset in enumerate(plan.assets):
+        relative = PurePosixPath(asset.source_ref)
+        if str(relative) != asset.source_ref or relative.is_absolute() or ".." in relative.parts:
+            raise ExportIntegrityFailedError()
+        source = open_beneath(root, relative.parts)
+        if source is None:
+            raise ExportIntegrityFailedError()
+        name = f"asset-{index}"
+        hasher = hashlib.sha256()
+        copied = 0
+        with os.fdopen(source, "rb", buffering=0) as reader, os.fdopen(work.create(name), "wb") as sink:
+            while chunk := reader.read(min(1 << 20, asset.byte_size + 1 - copied)):
+                copied += len(chunk)
+                if copied > asset.byte_size:
+                    raise ExportIntegrityFailedError()
+                hasher.update(chunk)
+                sink.write(chunk)
+            sink.flush()
+            os.fsync(sink.fileno())
+        if (copied, "sha256:" + hasher.hexdigest()) != (asset.byte_size, asset.content_digest):
+            raise ExportIntegrityFailedError()
+        members.append(BundleMember(asset.path, work.path / name, asset.content_digest, asset.byte_size))
+    for index, (path, data) in enumerate(plan.documents):
+        name = f"document-{index}"
+        with os.fdopen(work.create(name), "wb") as sink:
+            sink.write(data)
+            sink.flush()
+            os.fsync(sink.fileno())
+        members.append(BundleMember(path, work.path / name, "sha256:" + hashlib.sha256(data).hexdigest(), len(data)))
+    with os.fdopen(work.create(MANIFEST_FILE), "wb") as sink:
+        sink.write(plan.manifest_bytes)
+        sink.flush()
+        os.fsync(sink.fileno())
+    return tuple(members)
+
+
+@dataclass(frozen=True)
+class VerifiedArchive:
+    digest: str
+    byte_size: int
+    generation: tuple[int, int, int, int]
+
+
+def _generation(info: os.stat_result) -> tuple[int, int, int, int]:
+    return (info.st_dev, info.st_ino, info.st_size, info.st_mtime_ns)
+
+
+def verify_archive(store: int, name: str, manifest: p.ExportManifest, manifest_bytes: bytes) -> VerifiedArchive:
+    """The published object is exactly this manifest's archive: names, fixed fields, manifest bytes and digests."""
+    try:
+        descriptor = os.open(name, os.O_RDONLY | _NOFOLLOW | _NONBLOCK, dir_fd=store)
+    except OSError:
+        raise ExportIntegrityFailedError() from None
+    with os.fdopen(descriptor, "rb") as handle:
+        before = os.fstat(handle.fileno())
+        if not stat.S_ISREG(before.st_mode):
+            raise ExportIntegrityFailedError()
+        hasher = hashlib.sha256()
         for chunk in iter(lambda: handle.read(1 << 20), b""):
             hasher.update(chunk)
-            size += len(chunk)
-    return "sha256:" + hasher.hexdigest(), size
+        handle.seek(0)
+        expected = sorted([*(e.path for e in manifest.entries), MANIFEST_PATH], key=str.encode)
+        try:
+            with zipfile.ZipFile(handle) as archive:
+                infos = archive.infolist()
+                if [i.filename for i in infos] != expected or archive.comment != b"":
+                    raise ExportIntegrityFailedError()
+                sizes = {e.path: e.byte_size for e in manifest.entries} | {MANIFEST_PATH: len(manifest_bytes)}
+                for info in infos:
+                    if (
+                        info.compress_type != zipfile.ZIP_STORED
+                        or info.date_time != ZIP_EPOCH
+                        or info.external_attr >> 16 != MEMBER_MODE
+                        or info.extra != b""
+                        or info.file_size != sizes[info.filename]
+                    ):
+                        raise ExportIntegrityFailedError()
+                if archive.read(MANIFEST_PATH) != manifest_bytes:
+                    raise ExportIntegrityFailedError()
+        except (zipfile.BadZipFile, KeyError, OSError):
+            raise ExportIntegrityFailedError() from None
+        after = os.fstat(handle.fileno())
+    if _generation(before) != _generation(after):
+        raise ExportIntegrityFailedError()
+    return VerifiedArchive("sha256:" + hasher.hexdigest(), before.st_size, _generation(before))
+
+
+def published_generation(store: int, name: str) -> tuple[int, int, int, int] | None:
+    try:
+        return _generation(os.stat(name, dir_fd=store, follow_symlinks=False))
+    except OSError:
+        return None
 
 
 class PackageExportService:
@@ -293,6 +504,7 @@ class PackageExportService:
         interactive_token: str | None,
         submitter_for: SubmitterFactory = attempt_submitter,
         clock: Callable[[], datetime] | None = None,
+        runtime: QualityProbeRuntime | None = None,
     ) -> None:
         self._sessions = sessions
         self._grant_reader = grant_reader
@@ -300,6 +512,7 @@ class PackageExportService:
         self._token = interactive_token
         self._submitter_for = submitter_for
         self._clock = clock or (lambda: datetime.now(UTC))
+        self._runtime = runtime or QualityProbeRuntime(ProbeHost(tools={}, worker=Path(package_export_worker.__file__)))
 
     async def _require_actor(self, request: p.ExportRequest) -> None:
         try:
@@ -339,17 +552,15 @@ class PackageExportService:
         async with self._sessions() as session:
             selection, evidence = await self._resolve(session, request)
         builder_digest = builder_identity_digest()
-        store = self._project_root / EXPORT_DIRECTORY
-        await asyncio.to_thread(store.mkdir, parents=True, exist_ok=True)
-        snapshots = store / f".snapshot-{uuid.uuid4().hex}"
-        await asyncio.to_thread(snapshots.mkdir, mode=0o700)
+        plan = plan_export(selection, evidence, builder_digest)
+        store = await asyncio.to_thread(open_export_store, self._project_root)
+        work = await asyncio.to_thread(WorkDirectory, store, self._project_root)
         try:
-            built = await asyncio.to_thread(
-                materialize, self._project_root, snapshots, selection, evidence, builder_digest
-            )
-            return await self._submit(request, reader, selection, built, builder_digest, store)
+            members = await asyncio.to_thread(snapshot_assets, self._project_root, work, plan)
+            return await self._submit(request, reader, selection, plan, members, builder_digest, store, work)
         finally:
-            await asyncio.to_thread(shutil.rmtree, snapshots, True)
+            await asyncio.to_thread(work.close)
+            os.close(store)
 
     async def _resolve(
         self, session: AsyncSession, request: p.ExportRequest
@@ -442,37 +653,21 @@ class PackageExportService:
         request: p.ExportRequest,
         reader: CheckpointedShowrunnerGrantReader,
         selection: p.PackageSelection,
-        built: Materialized,
+        plan: ExportPlan,
+        members: tuple[BundleMember, ...],
         builder_digest: str,
-        store: Path,
+        store: int,
+        work: WorkDirectory,
     ) -> p.ExportBundleReceipt:
         command = request.command
-        manifest_digest = compute_digest("m10.export-manifest.v1", built.manifest)
-        identity = p.ExportExecutionIdentity(
-            schema_id="m10.export-execution.v1",
-            slot=request.subject.slot,
-            selection_id=selection.selection_id,
-            selection_digest=selection_digest(selection),
-            manifest_digest=manifest_digest,
-            builder_identity_digest=builder_digest,
-            adapter_version=HOST_EXPORT_ADAPTER_VERSION,
-        )
+        manifest_digest = compute_digest("m10.export-manifest.v1", plan.manifest)
         invocation = StoredExportInvocation(
             request=request,
             execution_id=uuid7(),
             task_id=export_task_id(command.user_id, command.project_name, command.command_id),
-            manifest=built.manifest,
+            manifest=plan.manifest,
             manifest_digest=manifest_digest,
-            identity_digest=compute_digest("m10.export-execution.v1", identity),
-        )
-        provider_request = ProviderRequest(
-            id=f"{invocation.task_id}:export",
-            host_task_ref=invocation.task_id,
-            provider=_FAMILY.key.provider_id,
-            model="zip-stored",
-            endpoint=_FAMILY.key.endpoint_id,
-            payload={"schema": "m10.export-execution.v1", "identity_digest": invocation.identity_digest},
-            adapter_version=HOST_EXPORT_ADAPTER_VERSION,
+            identity_digest=execution_identity_digest(request, plan.manifest),
         )
         async with self._sessions() as session:
             try:
@@ -488,7 +683,7 @@ class PackageExportService:
             submitter = self._submitter_for(session, command.user_id, command.project_name, invocation.execution_id)
 
             async def submit(attempt: AttemptSnapshot) -> ProviderSubmitReceipt[str]:
-                digest = await asyncio.to_thread(self._build_and_publish, attempt.execution_id, built, store)
+                digest = await self._build_and_publish(attempt.execution_id, plan, members, store, work)
                 return ProviderSubmitReceipt(
                     observation=ProviderObservation(
                         observation_id=f"{attempt.execution_id}:accepted",
@@ -504,7 +699,7 @@ class PackageExportService:
                 task_id=invocation.task_id,
                 api_call_id=None,
                 route=export_route(builder_digest),
-                request=provider_request,
+                request=provider_request(invocation),
                 submit=submit,
             )
         if outcome.execution_id != invocation.execution_id:
@@ -515,28 +710,68 @@ class PackageExportService:
             raise ExportIntegrityFailedError()
         raise RequiredEvidenceMissingError()
 
-    @staticmethod
-    def _build_and_publish(execution_id: str, built: Materialized, store: Path) -> str:
-        """Build into a private partial file, then publish it content-addressed after full re-verification."""
-        partial = store / f".partial-{execution_id}.zip"
-        partial.unlink(missing_ok=True)
+    async def _build_and_publish(
+        self, execution_id: str, plan: ExportPlan, members: tuple[BundleMember, ...], store: int, work: WorkDirectory
+    ) -> str:
+        """Build in the confined worker into one precreated output, then publish it content-addressed.
+
+        Known refusals (integrity, envelope) are ordinary failures; anything else after the worker may have run is
+        ambiguous and is never rebuilt under this command.
+        """
+        output = work.create(PARTIAL_FILE)
+        os.close(output)
+        budget_ms = WORKER_BASE_MS + plan.archive_bytes * 1000 // WORKER_BYTES_PER_SECOND
+        if budget_ms > MAX_RUNTIME_MS:
+            raise OperationalEnvelopeExceededError()
+        config = {
+            "schema": WORKER_CONFIG_SCHEMA,
+            "envelope": worker_envelope(),
+            "read_files": [*READ_FILES, str(work.path / MANIFEST_FILE), *(str(m.source) for m in members)],
+            "exec_files": [],
+            "read_dirs": list(READ_DIRS),
+            "scratch": [str(work.path / PARTIAL_FILE)],
+            "members": [
+                {"path": m.path, "source": str(m.source), "digest": m.content_digest, "size": m.byte_size}
+                for m in members
+            ],
+            "manifest": str(work.path / MANIFEST_FILE),
+            "output": str(work.path / PARTIAL_FILE),
+        }
+        outcome = await self._runtime.launch(
+            json.dumps(config, sort_keys=True).encode("utf-8"),
+            budget_ms=budget_ms,
+            output_cap=WORKER_OUTPUT_CAP,
+            scratch=(work.path / PARTIAL_FILE,),
+            fsize=plan.archive_bytes + (1 << 20),
+            unit_prefix="m10-export",
+        )
         try:
-            digest = build_archive(partial, built.members, built.manifest_bytes)
-        except ExportBuildError:
-            partial.unlink(missing_ok=True)
-            raise ExportIntegrityFailedError() from None
-        published = store.parent / archive_ref(digest)
-        if published.exists():
-            partial.unlink()
-        else:
-            os.replace(partial, published)
-        directory = os.open(store, os.O_RDONLY | getattr(os, "O_DIRECTORY", 0))
-        try:
-            os.fsync(directory)
-        finally:
-            os.close(directory)
-        if _file_digest(published)[0] != digest:
+            report = json.loads(outcome.stdout)
+        except ValueError:
+            report = {}
+        status = report.get("status") if isinstance(report, dict) else None
+        if status == "INTEGRITY_FAILED":
             raise ExportIntegrityFailedError()
+        if status == "ENVELOPE_EXCEEDED":
+            raise OperationalEnvelopeExceededError()
+        digest = report.get("digest") if isinstance(report, dict) else None
+        if (
+            status != "OK"
+            or not isinstance(digest, str)
+            or outcome.exit_code != 0
+            or outcome.manager_result != "SUCCESS"
+            or not outcome.group_cleanup_verified
+        ):
+            raise AmbiguousSubmitError(
+                provider=_FAMILY.key.provider_id, message="[create_ambiguous] export outcome unknown"
+            )
+        published = PurePosixPath(archive_ref(digest)).name
+        await asyncio.to_thread(_publish, store, work, published)
+        verified = await asyncio.to_thread(verify_archive, store, published, plan.manifest, plan.manifest_bytes)
+        if verified.digest != digest or verified.byte_size != plan.archive_bytes:
+            raise AmbiguousSubmitError(
+                provider=_FAMILY.key.provider_id, message="[create_ambiguous] export outcome unknown"
+            )
         return digest
 
     async def _resume(self, invocation: StoredExportInvocation) -> p.ExportBundleReceipt:
@@ -560,81 +795,124 @@ class PackageExportService:
         request = invocation.request
         command = request.command
         subject = request.subject
-        async with self._sessions() as session, session.begin():
-            repository = ExportRepository(session)
-            await PackageSelectionRepository(session).lock_command(command)
-            replayed = await repository.receipt(
+        async with self._sessions() as session:
+            attempt = await ExecutionAttemptRepository(session, capability_resolver=capability_resolver()).get_exact(
                 user_id=subject.user_id, project_name=subject.project_name, execution_id=invocation.execution_id
             )
-            if replayed is not None:
-                return replayed
-            attempts = ExecutionAttemptRepository(session, capability_resolver=capability_resolver())
-            attempt = await attempts.get_exact(
-                user_id=subject.user_id, project_name=subject.project_name, execution_id=invocation.execution_id
-            )
-            prefix = f"{invocation.execution_id}:"
-            job = "" if attempt is None or attempt.provider_job_id is None else attempt.provider_job_id
-            digest = job.removeprefix(prefix)
-            if attempt is None or attempt.state is not ExecutionAttemptState.ACCEPTED or not job.startswith(prefix):
-                raise RequiredEvidenceMissingError()
-            selection = await PackageSelectionRepository(session).selection(
-                user_id=subject.user_id, project_name=subject.project_name, selection_id=subject.selection_id
-            )
-            if selection is None:
-                raise RequiredEvidenceMissingError()
-            await self._require_current(session, reader, request, selection)
-            published = self._project_root / archive_ref(digest)
-            try:
-                on_disk, size = await asyncio.to_thread(_file_digest, published)
-            except FileNotFoundError:
-                raise ExportIntegrityFailedError() from None
-            if on_disk != digest:
+        prefix = f"{invocation.execution_id}:"
+        job = "" if attempt is None or attempt.provider_job_id is None else attempt.provider_job_id
+        digest = job.removeprefix(prefix)
+        if (
+            attempt is None
+            or attempt.state is not ExecutionAttemptState.ACCEPTED
+            or not job.startswith(prefix)
+            or attempt.task_id != invocation.task_id
+            or invocation.identity_digest != execution_identity_digest(request, invocation.manifest)
+        ):
+            raise RequiredEvidenceMissingError()
+        manifest_bytes = canonical_json_bytes(invocation.manifest.model_dump(mode="json"))
+        name = PurePosixPath(archive_ref(digest)).name
+        store = await asyncio.to_thread(open_export_store, self._project_root)
+        try:
+            # Bulk verification outside any lock; under the lock only the pinned generation is rechecked.
+            verified = await asyncio.to_thread(verify_archive, store, name, invocation.manifest, manifest_bytes)
+            if verified.digest != digest:
                 raise ExportIntegrityFailedError()
-            succeeded = await attempts.apply_provider_observation(
-                user_id=subject.user_id,
-                project_name=subject.project_name,
-                execution_id=invocation.execution_id,
-                expected_version=attempt.state_version,
-                observation=ProviderObservation(
-                    observation_id=f"{invocation.execution_id}:succeeded",
-                    kind=ProviderObservationKind.SUCCEEDED,
-                    observed_at=self._clock(),
-                    provider_job_id=job,
-                    evidence_digest=digest,
-                ),
-            )
-            if succeeded.state is not ExecutionAttemptState.SUCCEEDED:
-                raise RequiredEvidenceMissingError()
-            receipt = p.ExportBundleReceipt(
-                receipt_id=uuid7(),
-                execution_id=invocation.execution_id,
-                command_id=command.command_id,
-                request_digest=command.request_digest,
-                manifest=invocation.manifest,
-                manifest_digest=invocation.manifest_digest,
-                archive_ref=archive_ref(digest),
-                archive_digest=digest,
-                archive_byte_size=size,
-                status="EXPORTED",
-                exported_at=self._clock(),
-            )
-            await repository.stage_receipt(user_id=subject.user_id, project_name=subject.project_name, receipt=receipt)
-        return receipt
+            async with self._sessions() as session, session.begin():
+                repository = ExportRepository(session)
+                await PackageSelectionRepository(session).lock_command(command)
+                replayed = await repository.receipt(
+                    user_id=subject.user_id, project_name=subject.project_name, execution_id=invocation.execution_id
+                )
+                if replayed is not None:
+                    return replayed
+                attempts = ExecutionAttemptRepository(session, capability_resolver=capability_resolver())
+                current = await attempts.get_exact(
+                    user_id=subject.user_id, project_name=subject.project_name, execution_id=invocation.execution_id
+                )
+                if (
+                    current is None
+                    or current.state is not ExecutionAttemptState.ACCEPTED
+                    or current.provider_job_id != job
+                ):
+                    raise RequiredEvidenceMissingError()
+                selection = await PackageSelectionRepository(session).selection(
+                    user_id=subject.user_id, project_name=subject.project_name, selection_id=subject.selection_id
+                )
+                if selection is None:
+                    raise RequiredEvidenceMissingError()
+                await self._require_current(session, reader, request, selection)
+                if published_generation(store, name) != verified.generation:
+                    raise ExportIntegrityFailedError()
+                succeeded = await attempts.apply_provider_observation(
+                    user_id=subject.user_id,
+                    project_name=subject.project_name,
+                    execution_id=invocation.execution_id,
+                    expected_version=current.state_version,
+                    observation=ProviderObservation(
+                        observation_id=f"{invocation.execution_id}:succeeded",
+                        kind=ProviderObservationKind.SUCCEEDED,
+                        observed_at=self._clock(),
+                        provider_job_id=job,
+                        evidence_digest=digest,
+                    ),
+                )
+                if succeeded.state is not ExecutionAttemptState.SUCCEEDED:
+                    raise RequiredEvidenceMissingError()
+                receipt = p.ExportBundleReceipt(
+                    receipt_id=uuid7(),
+                    execution_id=invocation.execution_id,
+                    command_id=command.command_id,
+                    request_digest=command.request_digest,
+                    manifest=invocation.manifest,
+                    manifest_digest=invocation.manifest_digest,
+                    archive_ref=archive_ref(digest),
+                    archive_digest=digest,
+                    archive_byte_size=verified.byte_size,
+                    status="EXPORTED",
+                    exported_at=self._clock(),
+                )
+                await repository.stage_receipt(
+                    user_id=subject.user_id, project_name=subject.project_name, receipt=receipt
+                )
+            return receipt
+        finally:
+            os.close(store)
 
 
-def sweep_partials(project_root: Path) -> int:
-    """Remove orphaned partial archives and snapshot directories left by an interrupted export."""
-    store = project_root / EXPORT_DIRECTORY
+def sweep_work(project_root: Path) -> int:
+    """Remove scratch directories of exports that no longer run (their owner lock is free)."""
+    try:
+        store = open_export_store(project_root)
+    except ExportIntegrityFailedError:
+        return 0
     removed = 0
-    if not store.is_dir():
-        return removed
-    for entry in store.iterdir():
-        if entry.name.startswith(".partial-") and entry.is_file() and not entry.is_symlink():
-            entry.unlink(missing_ok=True)
-            removed += 1
-        elif entry.name.startswith(".snapshot-") and entry.is_dir() and not entry.is_symlink():
-            shutil.rmtree(entry, ignore_errors=True)
-            removed += 1
+    try:
+        for name in os.listdir(store):
+            if not name.startswith(WORK_PREFIX):
+                continue
+            try:
+                directory = _open_directory(store, name, create=False)
+            except OSError:
+                continue
+            try:
+                # A directory without its lock may still be in creation; it is never inferred to be an orphan.
+                lock = os.open(OWNER_LOCK, os.O_RDWR | _NOFOLLOW, dir_fd=directory)
+            except OSError:
+                os.close(directory)
+                continue
+            try:
+                try:
+                    fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                except BlockingIOError:
+                    continue
+                shutil.rmtree(name, dir_fd=store)
+                removed += 1
+            finally:
+                os.close(lock)
+                os.close(directory)
+    finally:
+        os.close(store)
     return removed
 
 
@@ -645,8 +923,10 @@ __all__ = [
     "builder_identity_digest",
     "export_route",
     "export_task_id",
-    "materialize",
     "member_path",
     "metadata_document",
-    "sweep_partials",
+    "plan_export",
+    "snapshot_assets",
+    "sweep_work",
+    "verify_archive",
 ]
