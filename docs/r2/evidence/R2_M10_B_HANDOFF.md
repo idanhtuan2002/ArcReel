@@ -56,7 +56,17 @@ Rewrite in place; this is the resume entry for M10-B.
   PG16 M8 repo/profile/run/disposition 110 passed, profile repo 16 passed; static gates clean.
   Codex review pending: `docs/r2/evidence/m10-b-reviews/b1-codex-review.json`.
 
+- `83e1f3c2c` B1 fix after Codex REWORK (`b1-codex-review.json`, H1 relabel/downgrade of safety rules, M1–M4):
+  server-owned `check_id` semantics, Kalinga-parity constraint fields, per-variant provenance, manifest
+  `chosen_variants`, `ExportExecutionIdentity`, vectors for every domain; PG round trip
+  `b1-pg-migration-roundtrip.json`. Codex delta re-review running (`b1-codex-delta-review.json`).
+  Codex is available again (user instruction 2026-10-28: call Codex review when needed, don't stop to ask).
+- `df9ada5df` B2 part 1: pure `r2/quality/packaging_check.py` + `tests/unit/r2/quality/test_packaging_check.py` (28 passed).
+
 ## Next step
 
-Triage the B1 Codex review, then B2: pure packaging check (`r2/quality/packaging_check.py`), Kalinga seo_lint port,
-`m10_packaging_observations` table, service + replay, run-sealing refusal test.
+Triage the B1 Codex delta review. Then B2 part 2: `m10_packaging_observations` (append-only, migration after
+`5d2a7c3e8b11`), `PackagingCheckService` (receipt-first replay, CHECK_PACKAGE command, M8 revision + closures
++ head-kind PACKAGING, V2 profile, master facts from the bound run's CONTAINER_STREAM probe result, asset re-hash
+from verified snapshots, finding ids uuid7, rule_results_digest), run-sealing refusal test for PACKAGING
+observations, PG tests; then Codex review of B2.
