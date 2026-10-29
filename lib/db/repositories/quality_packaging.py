@@ -209,8 +209,23 @@ class PackageSelectionRepository:
 
     async def current_head(self, slot: p.PackagingSlotKey) -> tuple[str | None, int]:
         """The slot's current selection and version without locking (read-only projections)."""
-        head = await self.session.get(PackagingHeadModel, tuple(_slot(slot).values()))
-        return (None, 0) if head is None else (head.current_selection_id, head.head_version)
+        row = (
+            await self.session.execute(
+                sa.select(PackagingHeadModel.current_selection_id, PackagingHeadModel.head_version).filter_by(
+                    **_slot(slot)
+                )
+            )
+        ).one_or_none()
+        return (None, 0) if row is None else (row.current_selection_id, row.head_version)
+
+    async def slot_selection_ids(self, slot: p.PackagingSlotKey) -> tuple[str, ...]:
+        """Every selection the slot has held, oldest head version first."""
+        rows = await self.session.execute(
+            sa.select(PackageSelectionModel.selection_id)
+            .filter_by(**_slot(slot))
+            .order_by(PackageSelectionModel.head_version)
+        )
+        return tuple(rows.scalars().all())
 
     async def head_version(self, slot: p.PackagingSlotKey) -> int:
         head = await self.session.get(PackagingHeadModel, tuple(_slot(slot).values()))

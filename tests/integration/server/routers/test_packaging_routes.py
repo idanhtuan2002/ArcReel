@@ -232,6 +232,36 @@ async def test_selection_and_export_need_an_interactive_session(http) -> None:
     assert exported.status_code == 401
 
 
+async def _replace_selection(env, flow: dict[str, Any]) -> Any:
+    """Select the other title variant into the same slot, replacing the flow's selection."""
+    from lib.db.repositories.advanced_creative import ExplorationRepository
+    from lib.db.repositories.quality_packaging import PackagingObservationRepository
+    from tests.integration.server.services.test_quality_package_selection import (
+        preview,
+        preview_request,
+        select,
+        selection_request,
+    )
+
+    async with env["factory"]() as session:
+        env["candidate"] = await ExplorationRepository(session).get_exact(
+            user_id="default", project_name="project", candidate_id=flow["revision"]["candidate_id"], revision=1
+        )
+        env["observation"] = await PackagingObservationRepository(session).get(
+            user_id="default",
+            project_name="project",
+            observation_id=flow["selection"]["preview"]["packaging_observation_id"],
+        )
+    return await select(
+        env,
+        selection_request(
+            env,
+            await preview(env, preview_request(env, command_id="preview-2", selected_variant_ids=["t1"])),
+            command_id="select-2",
+        ),
+    )
+
+
 async def test_a_download_of_a_replaced_selection_is_refused(http) -> None:
     env = http
     flow = await _flow_to_selection(env)
@@ -246,35 +276,7 @@ async def test_a_download_of_a_replaced_selection_is_refused(http) -> None:
         headers=_headers(),
     )
     receipt = exported.json()
-    from lib.db.repositories.advanced_creative import ExplorationRepository
-    from tests.integration.server.services.test_quality_package_selection import (
-        preview,
-        preview_request,
-        select,
-        selection_request,
-    )
-
-    async with env["factory"]() as session:
-        env["candidate"] = await ExplorationRepository(session).get_exact(
-            user_id="default", project_name="project", candidate_id=flow["revision"]["candidate_id"], revision=1
-        )
-    from lib.db.repositories.quality_packaging import PackagingObservationRepository
-
-    async with env["factory"]() as session:
-        found = await PackagingObservationRepository(session).get(
-            user_id="default",
-            project_name="project",
-            observation_id=flow["selection"]["preview"]["packaging_observation_id"],
-        )
-    env["observation"] = found
-    await select(
-        env,
-        selection_request(
-            env,
-            await preview(env, preview_request(env, command_id="preview-2", selected_variant_ids=["t1"])),
-            command_id="select-2",
-        ),
-    )
+    await _replace_selection(env, flow)
     archive_hex = receipt["archive_digest"].removeprefix("sha256:")
     refused = await env["client"].get(
         f"/api/v1/projects/project/packaging/exports/{archive_hex}/archive", params={"token": receipt["download_token"]}
@@ -470,6 +472,7 @@ async def test_an_empty_slot_reports_no_selection_and_is_not_exportable(http) ->
         "head_version": 0,
         "exportable": False,
         "refusal_code": "M10_STALE_HEAD",
+        "readiness": None,
         "selection": None,
         "exports": [],
     }
@@ -501,6 +504,7 @@ async def test_the_slot_reports_the_current_selection_and_its_exports_from_the_s
     after = await _slot_status(env, flow["slot"])
     [listed] = after["exports"]
     assert listed["archive_digest"] == exported.json()["archive_digest"]
+    assert (listed["selection_id"], listed["current"]) == (flow["selection"]["selection_id"], True)
     downloaded = await env["client"].get(
         f"/api/v1/projects/project/packaging/exports/{listed['archive_digest'].removeprefix('sha256:')}/archive",
         params={"token": listed["download_token"]},
@@ -526,6 +530,79 @@ async def test_a_superseded_disposition_makes_the_slot_not_exportable_and_withho
         },
     )
     assert (status["exportable"], status["refusal_code"]) == (False, "M10_DISPOSITION_STALE")
+    assert status["readiness"]["disposition_decision"] == "REWORK"
+    assert status["readiness"]["state"] != "READY"
     assert [(item["archive_digest"], item["download_token"]) for item in status["exports"]] == [
         (receipt["archive_digest"], None)
     ]
+
+
+async def test_a_replaced_selection_keeps_its_exports_as_history_that_cannot_be_downloaded(http) -> None:
+    env = http
+    flow = await _flow_to_selection(env)
+    exported = await env["client"].post(
+        "/api/v1/projects/project/packaging/exports",
+        json={
+            "command_id": "export-1",
+            **flow["slot"],
+            "selection_id": flow["selection"]["selection_id"],
+            "selection_digest": flow["selection"]["selection_digest"],
+        },
+        headers=_headers(),
+    )
+    assert exported.status_code == 200, exported.text
+    replacement = await _replace_selection(env, flow)
+    status = await _slot_status(env, flow["slot"])
+    assert (status["selection"]["selection_id"], status["head_version"], status["exportable"]) == (
+        replacement.selection_id,
+        2,
+        True,
+    )
+    assert [(item["selection_id"], item["current"], item["download_token"]) for item in status["exports"]] == [
+        (flow["selection"]["selection_id"], False, None)
+    ]
+
+
+async def test_a_selection_replaced_during_the_slot_read_is_projected_from_the_replacement(http) -> None:
+    import asyncio
+
+    from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
+
+    from lib.db.models.quality_packaging import PackagingHeadModel
+    from r2.contracts import packaging as p
+    from server.services.package_export import PackageExportService
+
+    env = http
+    flow = await _flow_to_selection(env)
+    head_read, proceed = asyncio.Event(), asyncio.Event()
+
+    class PausingSession(AsyncSession):
+        """Stops once, right after the first unlocked head read, until the test has replaced the selection."""
+
+        async def execute(self, statement, *args, **kwargs):
+            result = await super().execute(statement, *args, **kwargs)
+            descriptions = getattr(statement, "column_descriptions", None) or []
+            names = [item.get("name") for item in descriptions]
+            entities = {item.get("entity") for item in descriptions}
+            if (
+                not head_read.is_set()
+                and names == ["current_selection_id", "head_version"]
+                and entities == {PackagingHeadModel}
+            ):
+                head_read.set()
+                await proceed.wait()
+            return result
+
+    pausing = async_sessionmaker(**{**env["factory"].kw, "class_": PausingSession})
+    service = PackageExportService(
+        sessions=pausing, grant_reader=env["reader"], project_root=env["project"], interactive_token=None
+    )
+    slot = p.PackagingSlotKey(user_id="default", project_name="project", **flow["slot"])
+    reading = asyncio.create_task(service.slot_status(slot, ACTOR))
+    await asyncio.wait_for(head_read.wait(), timeout=30)
+    replacement = await _replace_selection(env, flow)
+    proceed.set()
+    status = await asyncio.wait_for(reading, timeout=60)
+    assert status.selection is not None
+    assert (status.selection.selection_id, status.head_version) == (replacement.selection_id, 2)
+    assert (status.exportable, status.refusal_code) == (True, None)

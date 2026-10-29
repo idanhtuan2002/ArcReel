@@ -391,10 +391,18 @@ async def slot_status(
     status = await _run(lambda: service.slot_status(slot, user.sub))
     downloadable = status.exportable and await _author_kind(token) == "HUMAN"
     selection = status.selection
+    current_id = None if selection is None else selection.selection_id
     return {
         "head_version": status.head_version,
         "exportable": status.exportable,
         "refusal_code": status.refusal_code,
+        "readiness": None
+        if status.readiness_state is None
+        else {
+            "state": status.readiness_state,
+            "reasons": list(status.readiness_reasons),
+            "disposition_decision": status.disposition_decision,
+        },
         "selection": None
         if selection is None
         else selection.model_dump(mode="json")
@@ -402,11 +410,13 @@ async def slot_status(
         "exports": [
             receipt.model_dump(mode="json")
             | {
+                "selection_id": selection_id,
+                "current": selection_id == current_id,
                 "download_token": create_export_token(user.sub, project_name, receipt.archive_digest)
-                if downloadable
-                else None
+                if downloadable and selection_id == current_id
+                else None,
             }
-            for receipt in status.receipts
+            for selection_id, receipt in status.receipts
         ],
     }
 

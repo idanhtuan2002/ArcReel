@@ -725,13 +725,24 @@ def _snapshot_archive(
 
 @dataclass(frozen=True)
 class SlotStatus:
-    """What a PACKAGING_SLOT holds now: its selection, whether export would admit it, and its receipts."""
+    """What a PACKAGING_SLOT holds now and has held.
+
+    `exportable` and `refusal_code` describe the current selection only; `readiness_*` and `disposition_decision`
+    are the quality readiness of that selection's subject. `receipts` is the slot's whole export history as
+    (selection_id, receipt) pairs, oldest first; only receipts of the current selection can be downloaded.
+    """
 
     head_version: int
     selection: p.PackageSelection | None
     exportable: bool
     refusal_code: str | None
-    receipts: tuple[p.ExportBundleReceipt, ...]
+    readiness_state: str | None
+    readiness_reasons: tuple[str, ...]
+    disposition_decision: str | None
+    receipts: tuple[tuple[str, p.ExportBundleReceipt], ...]
+
+
+SLOT_READ_ATTEMPTS = 3
 
 
 class PackageExportService:
@@ -808,39 +819,82 @@ class PackageExportService:
             os.close(store)
 
     async def slot_status(self, slot: p.PackagingSlotKey, actor_id: str) -> SlotStatus:
-        """The slot's current selection checked by the same currentness and readiness rules export applies."""
+        """The slot's current selection checked by the same currentness and readiness rules export applies.
+
+        A selection replaced between the unlocked head read and the locked check is projected again from the
+        replacement, in a new transaction, up to `SLOT_READ_ATTEMPTS` times.
+        """
         reader = await self._grant_reader()
-        async with self._sessions() as session, session.begin():
-            selection_id, version = await PackageSelectionRepository(session).current_head(slot)
-            if selection_id is None:
-                return SlotStatus(version, None, False, StaleHeadError().code, ())
-            selection = await PackageSelectionRepository(session).selection(
-                user_id=slot.user_id, project_name=slot.project_name, selection_id=selection_id
+        for _ in range(SLOT_READ_ATTEMPTS):
+            async with self._sessions() as session, session.begin():
+                status = await self._project_slot(session, reader, slot, actor_id)
+            if status is not None:
+                return status
+        raise StaleHeadError()
+
+    async def _project_slot(
+        self, session: AsyncSession, reader: CheckpointedShowrunnerGrantReader, slot: p.PackagingSlotKey, actor_id: str
+    ) -> SlotStatus | None:
+        """One consistent projection, or None when the head moved after it was read."""
+        selections = PackageSelectionRepository(session)
+        exports = ExportRepository(session)
+        selection_id, version = await selections.current_head(slot)
+        history: list[tuple[str, p.ExportBundleReceipt]] = []
+        for held in await selections.slot_selection_ids(slot):
+            found = await exports.selection_receipts(
+                user_id=slot.user_id, project_name=slot.project_name, selection_id=held
             )
-            if selection is None:
-                raise RequiredEvidenceMissingError()
-            receipts = await ExportRepository(session).selection_receipts(
-                user_id=slot.user_id, project_name=slot.project_name, selection_id=selection_id
-            )
-            subject = p.ExportSubject(
+            history.extend((held, receipt) for receipt in found)
+        receipts = tuple(history)
+        if selection_id is None:
+            return SlotStatus(version, None, False, StaleHeadError().code, None, (), None, receipts)
+        selection = await selections.selection(
+            user_id=slot.user_id, project_name=slot.project_name, selection_id=selection_id
+        )
+        if selection is None:
+            raise RequiredEvidenceMissingError()
+        subject = p.ExportSubject(
+            user_id=slot.user_id,
+            project_name=slot.project_name,
+            actor_id=actor_id,
+            slot=slot,
+            selection_id=selection_id,
+            selection_digest=selection_digest(selection),
+        )
+        refusal: M10Error | None = None
+        try:
+            await self._require_current(session, reader, subject, selection)
+        except StaleHeadError:
+            current, _ = await selections.current_head(slot)
+            if current != selection_id:
+                return None
+            refusal = StaleHeadError()
+        except (DispositionStaleError, ProfileStaleError, SubjectStaleError, WaiverForbiddenError) as error:
+            refusal = error
+        run = await QualityRunRepository(session).run(
+            user_id=slot.user_id, project_name=slot.project_name, run_id=selection.preview.quality_run_id
+        )
+        readiness, disposition = None, None
+        if run is not None:
+            readiness, disposition, _ = await readiness_in(
+                session,
+                reader,
+                project_root=self._project_root,
                 user_id=slot.user_id,
                 project_name=slot.project_name,
-                actor_id=actor_id,
-                slot=slot,
-                selection_id=selection_id,
-                selection_digest=selection_digest(selection),
+                subject_digest=run.subject_digest,
+                profile_id=run.profile_id,
             )
-            try:
-                await self._require_current(session, reader, subject, selection)
-            except (
-                DispositionStaleError,
-                ProfileStaleError,
-                StaleHeadError,
-                SubjectStaleError,
-                WaiverForbiddenError,
-            ) as refusal:
-                return SlotStatus(version, selection, False, refusal.code, receipts)
-            return SlotStatus(version, selection, True, None, receipts)
+        return SlotStatus(
+            version,
+            selection,
+            refusal is None,
+            None if refusal is None else refusal.code,
+            None if readiness is None else readiness.state,
+            () if readiness is None else readiness.reasons,
+            None if disposition is None else disposition.decision,
+            receipts,
+        )
 
     async def open_download(self, user_id: str, project_name: str, archive_digest: str) -> Download:
         """A verified private snapshot of a receipted archive whose selection is still current and READY.

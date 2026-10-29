@@ -35,12 +35,26 @@ interface Slot {
   head_version: number;
   exportable: boolean;
   refusal_code: string | null;
+  readiness: { state: string; reasons: string[]; disposition_decision: string | null } | null;
   selection: typeof SELECTION | null;
-  exports: { archive_digest: string; archive_byte_size: number; download_token: string | null; exported_at: string }[];
+  exports: {
+    archive_digest: string;
+    archive_byte_size: number;
+    download_token: string | null;
+    exported_at: string;
+    selection_id: string;
+    current: boolean;
+  }[];
 }
 
-let routes: Record<string, (body: Record<string, unknown>) => Response> = {};
+const EMPTY: Slot = { head_version: 0, exportable: false, refusal_code: "M10_STALE_HEAD", readiness: null, selection: null, exports: [] };
+const READY = { state: "READY", reasons: [], disposition_decision: "ACCEPT" };
+
+let routes: Record<string, (body: Record<string, unknown>) => Response | Promise<Response>> = {};
+/** The slot the server reports for product surface "youtube-long"; every other surface is empty. */
 let slot: Slot;
+/** When set, slot reads wait for it before answering. */
+let slotGate: Promise<void> | null;
 const requests: { url: string; method: string; body: Record<string, unknown> }[] = [];
 
 function posted(suffix: string): Record<string, unknown>[] {
@@ -49,7 +63,8 @@ function posted(suffix: string): Record<string, unknown>[] {
 
 beforeEach(() => {
   requests.length = 0;
-  slot = { head_version: 0, exportable: false, refusal_code: "M10_STALE_HEAD", selection: null, exports: [] };
+  slot = EMPTY;
+  slotGate = null;
   routes = {
     "/packaging/revisions": (body) =>
       json({
@@ -68,13 +83,22 @@ beforeEach(() => {
         preview_digest: "sha256:pv",
       }),
     "/packaging/selections": () => {
-      slot = { head_version: 1, exportable: true, refusal_code: null, selection: SELECTION, exports: [] };
+      slot = { head_version: 1, exportable: true, refusal_code: null, readiness: READY, selection: SELECTION, exports: [] };
       return json(SELECTION);
     },
     "/packaging/exports": () => {
       slot = {
         ...slot,
-        exports: [{ archive_digest: ARCHIVE, archive_byte_size: 10, download_token: "tok", exported_at: "2026-10-29T09:00:00Z" }],
+        exports: [
+          {
+            archive_digest: ARCHIVE,
+            archive_byte_size: 10,
+            download_token: "tok",
+            exported_at: "2026-10-29T09:00:00Z",
+            selection_id: "sel-1",
+            current: true,
+          },
+        ],
       };
       return json({
         status: "EXPORTED",
@@ -90,7 +114,11 @@ beforeEach(() => {
     const method = init?.method ?? "GET";
     const body = init?.body ? (JSON.parse(String(init.body)) as Record<string, unknown>) : {};
     requests.push({ url, method, body });
-    if (method === "GET" && url.includes("/packaging/slot?")) return Promise.resolve(json(slot));
+    if (method === "GET" && url.includes("/packaging/slot?")) {
+      const surface = new URL(url, "http://test").searchParams.get("product_surface");
+      const answer = () => json(surface === "youtube-long" ? slot : EMPTY);
+      return slotGate ? slotGate.then(answer) : Promise.resolve(answer());
+    }
     const route = Object.keys(routes).find((suffix) => url.endsWith(suffix));
     return Promise.resolve(route ? routes[route](body) : json({}, 404));
   });
@@ -231,8 +259,26 @@ describe("Packaging page", () => {
       head_version: 2,
       exportable: false,
       refusal_code: "M10_DISPOSITION_STALE",
+      readiness: { state: "NOT_READY", reasons: ["DISPOSITION_NOT_ACCEPTED"], disposition_decision: "REWORK" },
       selection: SELECTION,
-      exports: [{ archive_digest: ARCHIVE, archive_byte_size: 10, download_token: null, exported_at: "2026-10-29T09:00:00Z" }],
+      exports: [
+        {
+          archive_digest: ARCHIVE,
+          archive_byte_size: 10,
+          download_token: null,
+          exported_at: "2026-10-29T09:00:00Z",
+          selection_id: "sel-1",
+          current: true,
+        },
+        {
+          archive_digest: `sha256:${"b".repeat(64)}`,
+          archive_byte_size: 10,
+          download_token: null,
+          exported_at: "2026-10-28T09:00:00Z",
+          selection_id: "sel-0",
+          current: false,
+        },
+      ],
     };
     render(<PackagingPage projectName="demo" />);
     fill(/Video artifact key|Khóa artifact|视频工件键/, "masters/ep-1");
@@ -241,7 +287,9 @@ describe("Packaging page", () => {
     expect(await screen.findByText(/M10_DISPOSITION_STALE/)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: EXPORT })).toBeDisabled();
     expect(screen.queryByRole("link", { name: /Download archive|Tải tệp|下载归档/ })).not.toBeInTheDocument();
-    expect(screen.getByText(/only while this selection is current|vẫn là lựa chọn hiện tại|仍为当前选定/)).toBeInTheDocument();
+    expect(screen.getAllByText(/only while this selection is current|vẫn là lựa chọn hiện tại|仍为当前选定/).length).toBe(2);
+    expect(screen.getByText(/From a replaced selection|Thuộc lựa chọn đã bị thay|来自已被取代的选定/)).toBeInTheDocument();
+    expect(screen.getByText(/NOT_READY/)).toHaveTextContent(/REWORK/);
   });
 
   it("shows the server's refusal and rereads the slot when a selection became stale", async () => {
@@ -257,6 +305,54 @@ describe("Packaging page", () => {
       ).toBe(true),
     );
     expect(screen.getByText(/No package is selected|Chưa có gói nào|尚未选定/)).toBeInTheDocument();
+  });
+
+  it("reads the slot being edited when an action started for another slot finishes", async () => {
+    let finishSelection: (response: Response) => void = () => undefined;
+    routes["/packaging/selections"] = () =>
+      new Promise<Response>((resolve) => {
+        finishSelection = (response) => {
+          slot = { head_version: 1, exportable: true, refusal_code: null, readiness: READY, selection: SELECTION, exports: [] };
+          resolve(response);
+        };
+      });
+    render(<PackagingPage projectName="demo" />);
+    await walkToSelection().catch(() => undefined);
+    fill(/Product surface|Bề mặt sản phẩm|产品界面/, "shorts");
+    finishSelection(json(SELECTION));
+    expect(await screen.findByText(/No package is selected|Chưa có gói nào|尚未选定/)).toBeInTheDocument();
+    expect(screen.queryByText(/Loading the slot|Đang tải vị trí|正在加载槽位/)).not.toBeInTheDocument();
+    const surfaces = requests
+      .filter((item) => item.method === "GET" && item.url.includes("/packaging/slot?"))
+      .map((item) => new URL(item.url, "http://test").searchParams.get("product_surface"));
+    expect(surfaces.at(-1)).toBe("shorts");
+  });
+
+  it("shows nothing as exportable while a slot it returns to is being reread", async () => {
+    slot = {
+      head_version: 1,
+      exportable: true,
+      refusal_code: null,
+      readiness: READY,
+      selection: SELECTION,
+      exports: [],
+    };
+    render(<PackagingPage projectName="demo" />);
+    fill(/Video artifact key|Khóa artifact|视频工件键/, "masters/ep-1");
+    fill(/^Cohort$|^Nhóm$|^群组$/, "cohort-a");
+    fill(/Product surface|Bề mặt sản phẩm|产品界面/, "youtube-long");
+    await waitFor(() => expect(screen.getByRole("button", { name: EXPORT })).toBeEnabled());
+    fill(/Product surface|Bề mặt sản phẩm|产品界面/, "shorts");
+    await screen.findByText(/No package is selected|Chưa có gói nào|尚未选定/);
+    let release: () => void = () => undefined;
+    slotGate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    fill(/Product surface|Bề mặt sản phẩm|产品界面/, "youtube-long");
+    expect(screen.getByRole("button", { name: EXPORT })).toBeDisabled();
+    expect(screen.getByText(/Loading the slot|Đang tải vị trí|正在加载槽位/)).toBeInTheDocument();
+    release();
+    await waitFor(() => expect(screen.getByRole("button", { name: EXPORT })).toBeEnabled());
   });
 
   it("has no detectable accessibility violations when empty", async () => {

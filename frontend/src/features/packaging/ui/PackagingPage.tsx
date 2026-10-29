@@ -8,7 +8,7 @@
 import "../../formats/ui/formats.css";
 import "./packaging.css";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import {
@@ -60,35 +60,56 @@ function useStep() {
   return { busy, error, run, fail: setError };
 }
 
+interface SlotScope {
+  key: string;
+  projectName: string;
+  slot: Slot;
+}
+
 /**
- * The server's view of one slot; each refresh aborts the previous one, and an incomplete slot reads nothing.
- * Loading and failure are derived from which slot the last finished read was for.
+ * The server's view of the slot being edited. Reads always target the current scope, so a refresh requested by an
+ * action that finished after the slot changed reads the new slot instead of cancelling it. A scope change or an
+ * explicit refresh drops the previous answer, so nothing is shown as current while its reread is pending.
  */
 function useSlotStatus(projectName: string, artifact: string, cohort: string, surface: string) {
+  const scope = useMemo<SlotScope | null>(
+    () =>
+      artifact && cohort && surface
+        ? {
+            key: JSON.stringify([projectName, artifact, cohort, surface]),
+            projectName,
+            slot: { source_artifact_key: artifact, cohort_id: cohort, product_surface: surface },
+          }
+        : null,
+    [projectName, artifact, cohort, surface],
+  );
+  const scopeRef = useRef<SlotScope | null>(null);
   const current = useRef<AbortController | null>(null);
   useEffect(() => () => current.current?.abort(), []);
-  const key = artifact && cohort && surface ? JSON.stringify([projectName, artifact, cohort, surface]) : null;
   const [result, setResult] = useState<{ key: string; status: SlotStatus | null } | null>(null);
-  const refresh = useCallback((): Promise<void> => {
+  const read = useCallback((): Promise<void> => {
     current.current?.abort();
+    const target = scopeRef.current;
+    if (target === null) return Promise.resolve();
     const controller = new AbortController();
     current.current = controller;
-    if (key === null) return Promise.resolve();
     const settle = (status: SlotStatus | null) => {
-      if (!controller.signal.aborted) setResult({ key, status });
+      if (!controller.signal.aborted && scopeRef.current?.key === target.key) setResult({ key: target.key, status });
     };
-    return getSlotStatus(
-      projectName,
-      { source_artifact_key: artifact, cohort_id: cohort, product_surface: surface },
-      { signal: controller.signal },
-    ).then(settle, () => settle(null));
-  }, [key, projectName, artifact, cohort, surface]);
+    return getSlotStatus(target.projectName, target.slot, { signal: controller.signal }).then(settle, () => settle(null));
+  }, []);
   useEffect(() => {
-    void refresh();
-  }, [refresh]);
-  const settled = key !== null && result?.key === key ? result : null;
-  const state: "idle" | "loading" | "failed" = key === null ? "idle" : !settled ? "loading" : settled.status ? "idle" : "failed";
-  return { status: settled?.status ?? null, state, refresh };
+    scopeRef.current = scope;
+    void read();
+    return () => setResult(null);
+  }, [scope, read]);
+  const refresh = useCallback((): Promise<void> => {
+    setResult(null);
+    return read();
+  }, [read]);
+  const settled = scope !== null && result?.key === scope.key ? result : null;
+  const state: "idle" | "loading" | "failed" = scope === null ? "idle" : !settled ? "loading" : settled.status ? "idle" : "failed";
+  return { status: settled?.status ?? null, state, refresh, scoped: scope !== null };
 }
 
 function splitList(value: string): string[] {
@@ -329,7 +350,7 @@ export default function PackagingPage({ projectName }: PackagingPageProps) {
     {
       key: "export",
       label: t("packaging_step_export"),
-      state: server?.exportable && server.exports.length > 0 ? "done" : "todo",
+      state: server?.exportable && server.exports.some((item) => item.current) ? "done" : "todo",
     },
   ];
   const currentRung = ladder.findIndex((item) => item.state === "todo");
@@ -557,7 +578,25 @@ export default function PackagingPage({ projectName }: PackagingPageProps) {
                 })}
               </p>
             ) : null}
+            {server?.readiness ? (
+              <p>
+                {t("packaging_readiness", { state: server.readiness.state })}
+                {server.readiness.disposition_decision
+                  ? ` · ${t("packaging_disposition", { decision: server.readiness.disposition_decision })}`
+                  : ""}
+              </p>
+            ) : null}
+            {server?.selection && server.selection.preview.waivers.length > 0 ? (
+              <p>
+                {t("packaging_preview_waivers", {
+                  rules: server.selection.preview.waivers.map((waiver) => waiver.rule_id).join(", "),
+                })}
+              </p>
+            ) : null}
           </div>
+          <button type="button" className="fm-btn mt-2" disabled={!slotStatus.scoped} onClick={() => void slotStatus.refresh()}>
+            {t("packaging_refresh_slot")}
+          </button>
         </section>
 
         <section aria-labelledby="pk-export" className="pk-card">
@@ -587,8 +626,9 @@ export default function PackagingPage({ projectName }: PackagingPageProps) {
               <h3 className="text-xs text-text-2">{t("packaging_exports_history")}</h3>
               <ul className="pk-entries text-xs text-text-2">
                 {server.exports.map((item) => (
-                  <li key={item.archive_digest}>
+                  <li key={`${item.selection_id}:${item.archive_digest}`} data-current={item.current}>
                     <span className="font-mono text-[11px]">{item.archive_digest.slice(7, 19)}</span>{" "}
+                    {item.current ? null : <span className="text-text-3">{t("packaging_export_replaced")} </span>}
                     {item.download_token ? (
                       <a className="fm-btn inline-block" href={downloadUrl(projectName, { ...item, download_token: item.download_token })}>
                         {t("packaging_download")}

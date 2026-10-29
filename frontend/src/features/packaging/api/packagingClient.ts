@@ -96,8 +96,15 @@ export interface SlotStatus {
   head_version: number;
   exportable: boolean;
   refusal_code: string | null;
+  readiness: { state: string; reasons: string[]; disposition_decision: string | null } | null;
   selection: Selection | null;
-  exports: (Omit<ExportReceipt, "download_token"> & { download_token: string | null; exported_at: string })[];
+  /** The slot's whole export history; only `current` entries belong to the selection that fills the slot now. */
+  exports: (Omit<ExportReceipt, "download_token"> & {
+    download_token: string | null;
+    exported_at: string;
+    selection_id: string;
+    current: boolean;
+  })[];
 }
 
 function base(projectName: string): string {
