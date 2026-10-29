@@ -65,7 +65,14 @@ export interface Waiver {
 }
 
 export interface Preview {
-  preview: { preview_id: string; expected_head_version: number; expires_at: string; selected_variant_ids: string[] };
+  preview: {
+    preview_id: string;
+    expected_head_version: number;
+    expires_at: string;
+    candidate_revision: number;
+    selected_variant_ids: string[];
+    waivers: Waiver[];
+  };
   preview_digest: string;
 }
 
@@ -73,6 +80,7 @@ export interface Selection {
   selection_id: string;
   selection_digest: string;
   head_version: number;
+  preview: Preview["preview"];
 }
 
 export interface ExportReceipt {
@@ -81,6 +89,15 @@ export interface ExportReceipt {
   status: "EXPORTED";
   download_token: string;
   manifest: { entries: { path: string; byte_size: number; content_digest: string }[] };
+}
+
+/** The slot as the server sees it now; `download_token` is null whenever downloading would be refused. */
+export interface SlotStatus {
+  head_version: number;
+  exportable: boolean;
+  refusal_code: string | null;
+  selection: Selection | null;
+  exports: (Omit<ExportReceipt, "download_token"> & { download_token: string | null; exported_at: string })[];
 }
 
 function base(projectName: string): string {
@@ -151,7 +168,12 @@ export function exportPackage(
   return post(`${base(projectName)}/exports`, body, options);
 }
 
-export function downloadUrl(projectName: string, receipt: ExportReceipt): string {
+export function getSlotStatus(projectName: string, slot: Slot, options: CallOptions = {}): Promise<SlotStatus> {
+  const query = new URLSearchParams({ ...slot }).toString();
+  return API.request(`${base(projectName)}/slot?${query}`, { signal: options.signal });
+}
+
+export function downloadUrl(projectName: string, receipt: { archive_digest: string; download_token: string }): string {
   const hex = receipt.archive_digest.replace(/^sha256:/, "");
   return `/api/v1${base(projectName)}/exports/${hex}/archive?token=${encodeURIComponent(receipt.download_token)}`;
 }

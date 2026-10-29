@@ -2,7 +2,8 @@
  * Packaging of an approved video (route `packaging`): save a package revision, run the package check, preview
  * one choice per alternative group with any allowed waivers, select it as the showrunner, then export and
  * download the archive. Every verdict, binding and refusal comes from the server; nothing here decides whether a
- * package is acceptable.
+ * package is acceptable. The slot's selection, exportability and archives are read back from the server after
+ * every selection or export attempt.
  */
 import "../../formats/ui/formats.css";
 import "./packaging.css";
@@ -15,6 +16,7 @@ import {
   checkPackage,
   downloadUrl,
   exportPackage,
+  getSlotStatus,
   newCommandId,
   previewPackage,
   selectPackage,
@@ -23,8 +25,8 @@ import {
   type PackagingDraft,
   type PackagingObservation,
   type Preview,
-  type Selection,
   type Slot,
+  type SlotStatus,
 } from "../api/packagingClient";
 
 const ZERO_DIGEST = `sha256:${"0".repeat(64)}`;
@@ -55,7 +57,38 @@ function useStep() {
       if (!controller.signal.aborted) setBusy(false);
     }
   }, []);
-  return { busy, error, run };
+  return { busy, error, run, fail: setError };
+}
+
+/**
+ * The server's view of one slot; each refresh aborts the previous one, and an incomplete slot reads nothing.
+ * Loading and failure are derived from which slot the last finished read was for.
+ */
+function useSlotStatus(projectName: string, artifact: string, cohort: string, surface: string) {
+  const current = useRef<AbortController | null>(null);
+  useEffect(() => () => current.current?.abort(), []);
+  const key = artifact && cohort && surface ? JSON.stringify([projectName, artifact, cohort, surface]) : null;
+  const [result, setResult] = useState<{ key: string; status: SlotStatus | null } | null>(null);
+  const refresh = useCallback((): Promise<void> => {
+    current.current?.abort();
+    const controller = new AbortController();
+    current.current = controller;
+    if (key === null) return Promise.resolve();
+    const settle = (status: SlotStatus | null) => {
+      if (!controller.signal.aborted) setResult({ key, status });
+    };
+    return getSlotStatus(
+      projectName,
+      { source_artifact_key: artifact, cohort_id: cohort, product_surface: surface },
+      { signal: controller.signal },
+    ).then(settle, () => settle(null));
+  }, [key, projectName, artifact, cohort, surface]);
+  useEffect(() => {
+    void refresh();
+  }, [refresh]);
+  const settled = key !== null && result?.key === key ? result : null;
+  const state: "idle" | "loading" | "failed" = key === null ? "idle" : !settled ? "loading" : settled.status ? "idle" : "failed";
+  return { status: settled?.status ?? null, state, refresh };
 }
 
 function splitList(value: string): string[] {
@@ -63,6 +96,19 @@ function splitList(value: string): string[] {
     .split(",")
     .map((item) => item.trim())
     .filter(Boolean);
+}
+
+class DraftFieldError extends Error {}
+
+function parseList<T>(text: string, field: string, message: (field: string) => string): T[] {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(text);
+  } catch {
+    throw new DraftFieldError(message(field));
+  }
+  if (!Array.isArray(parsed)) throw new DraftFieldError(message(field));
+  return parsed as T[];
 }
 
 type StepState = "todo" | "done" | "blocked";
@@ -80,47 +126,84 @@ export default function PackagingPage({ projectName }: PackagingPageProps) {
   const [description, setDescription] = useState("");
   const [tags, setTags] = useState("");
   const [hashtags, setHashtags] = useState("");
+  const [chaptersJson, setChaptersJson] = useState("[]");
+  const [localizationsJson, setLocalizationsJson] = useState("[]");
+  const [groupsJson, setGroupsJson] = useState("[]");
   const [assetsJson, setAssetsJson] = useState("[]");
+  const [audience, setAudience] = useState("general");
+  const [ageRestriction, setAgeRestriction] = useState("");
+  const [classificationDigest, setClassificationDigest] = useState(ZERO_DIGEST);
+  const [syntheticMedia, setSyntheticMedia] = useState(true);
+  const [paidPromotion, setPaidPromotion] = useState(false);
+  const [disclosureDigest, setDisclosureDigest] = useState(ZERO_DIGEST);
   const [slot, setSlot] = useState<Slot>({ source_artifact_key: "", cohort_id: "", product_surface: "" });
   const [revision, setRevision] = useState<CandidateRevision | null>(null);
+  const [savedDraft, setSavedDraft] = useState<string | null>(null);
   const [headVersion, setHeadVersion] = useState<number | null>(null);
   const [observation, setObservation] = useState<PackagingObservation | null>(null);
   const [choices, setChoices] = useState<Record<string, string>>({});
   const [reasons, setReasons] = useState<Record<string, string>>({});
-  const [preview, setPreview] = useState<Preview | null>(null);
-  const [selection, setSelection] = useState<Selection | null>(null);
+  const [preview, setPreview] = useState<{ inputs: string; value: Preview } | null>(null);
+  const [mySelectionId, setMySelectionId] = useState<string | null>(null);
   const [receipt, setReceipt] = useState<ExportReceipt | null>(null);
+  const slotStatus = useSlotStatus(projectName, slot.source_artifact_key, slot.cohort_id, slot.product_surface);
+  const server = slotStatus.status;
 
-  const resetAfter = (level: "revision" | "check" | "preview") => {
-    if (level === "revision") {
-      setObservation(null);
-      setChoices({});
-      setReasons({});
-    }
-    if (level !== "preview") setPreview(null);
-    setSelection(null);
-    setReceipt(null);
-  };
+  const draftInputs = JSON.stringify([
+    runId,
+    title,
+    description,
+    tags,
+    hashtags,
+    chaptersJson,
+    localizationsJson,
+    groupsJson,
+    assetsJson,
+    audience,
+    ageRestriction,
+    classificationDigest,
+    syntheticMedia,
+    paidPromotion,
+    disclosureDigest,
+  ]);
+  const draftUnsaved = revision !== null && savedDraft !== draftInputs;
+  const blocking = observation?.findings.filter((finding) => finding.severity === "BLOCKING") ?? [];
+  const waivers = blocking
+    .filter((finding) => (reasons[finding.finding_id] ?? "").trim())
+    .map((finding) => ({ rule_id: finding.rule_id, finding_id: finding.finding_id, reason: reasons[finding.finding_id].trim() }));
+  const previewInputs = JSON.stringify([slot, revision?.payload_digest, observation?.observation_id, choices, waivers]);
+  // A preview stands only for the exact inputs it was made from; any later edit makes it unselectable.
+  const currentPreview = preview && preview.inputs === previewInputs && !draftUnsaved ? preview.value : null;
 
   const saveRevision = async () => {
-    let assets: PackagingDraft["assets"];
+    const invalid = (field: string) => t("packaging_json_invalid", { field });
+    let draft: PackagingDraft;
     try {
-      assets = JSON.parse(assetsJson) as PackagingDraft["assets"];
-    } catch {
-      return void step.run(() => Promise.reject(new Error(t("packaging_assets_invalid"))), t("packaging_assets_invalid"));
+      draft = {
+        title,
+        description,
+        tags: splitList(tags),
+        hashtags: splitList(hashtags),
+        chapters: parseList(chaptersJson, t("packaging_field_chapters"), invalid),
+        localization_variants: parseList(localizationsJson, t("packaging_field_localizations"), invalid),
+        audience_classification: {
+          audience_category: audience.trim(),
+          age_restriction: ageRestriction.trim() || null,
+          classification_policy_digest: classificationDigest.trim(),
+        },
+        disclosure: {
+          synthetic_media: syntheticMedia,
+          paid_promotion: paidPromotion,
+          disclosure_policy_digest: disclosureDigest.trim(),
+        },
+        variant_groups: parseList(groupsJson, t("packaging_field_variant_groups"), invalid),
+        assets: parseList(assetsJson, t("packaging_field_assets"), invalid),
+      };
+    } catch (failure: unknown) {
+      if (failure instanceof DraftFieldError) return void step.fail(failure.message);
+      throw failure;
     }
-    const draft: PackagingDraft = {
-      title,
-      description,
-      tags: splitList(tags),
-      hashtags: splitList(hashtags),
-      chapters: [],
-      localization_variants: [],
-      audience_classification: { audience_category: "general", age_restriction: null, classification_policy_digest: ZERO_DIGEST },
-      disclosure: { synthetic_media: true, paid_promotion: false, disclosure_policy_digest: ZERO_DIGEST },
-      variant_groups: [],
-      assets,
-    };
+    const inputs = draftInputs;
     const saved = await step.run(
       (signal) =>
         appendRevision(
@@ -138,8 +221,12 @@ export default function PackagingPage({ projectName }: PackagingPageProps) {
     );
     if (saved) {
       setRevision(saved.revision);
+      setSavedDraft(inputs);
       setHeadVersion(saved.head.head_version);
-      resetAfter("revision");
+      setObservation(null);
+      setChoices({});
+      setReasons({});
+      setPreview(null);
     }
   };
 
@@ -163,14 +250,13 @@ export default function PackagingPage({ projectName }: PackagingPageProps) {
     );
     if (checked) {
       setObservation(checked);
-      resetAfter("check");
+      setPreview(null);
     }
   };
 
-  const blocking = observation?.findings.filter((finding) => finding.severity === "BLOCKING") ?? [];
-
   const makePreview = async () => {
     if (!revision || !observation) return;
+    const inputs = previewInputs;
     const shown = await step.run(
       (signal) =>
         previewPackage(
@@ -183,66 +269,73 @@ export default function PackagingPage({ projectName }: PackagingPageProps) {
             candidate_payload_digest: revision.payload_digest,
             packaging_observation_id: observation.observation_id,
             selected_variant_ids: Object.values(choices),
-            waivers: blocking.map((finding) => ({
-              rule_id: finding.rule_id,
-              finding_id: finding.finding_id,
-              reason: reasons[finding.finding_id] ?? "",
-            })),
+            waivers,
           },
           { signal },
         ),
       t("packaging_preview_failed"),
     );
-    if (shown) {
-      setPreview(shown);
-      resetAfter("preview");
-    }
+    if (shown) setPreview({ inputs, value: shown });
   };
 
   const select = async () => {
-    if (!preview) return;
+    if (!currentPreview) return;
     const chosen = await step.run(
       (signal) =>
         selectPackage(
           projectName,
           {
             command_id: newCommandId("select"),
-            preview_id: preview.preview.preview_id,
-            preview_digest: preview.preview_digest,
-            expected_head_version: preview.preview.expected_head_version,
+            preview_id: currentPreview.preview.preview_id,
+            preview_digest: currentPreview.preview_digest,
+            expected_head_version: currentPreview.preview.expected_head_version,
           },
           { signal },
         ),
       t("packaging_select_failed"),
     );
-    if (chosen) setSelection(chosen);
+    if (chosen) {
+      setMySelectionId(chosen.selection_id);
+      setPreview(null);
+    }
+    await slotStatus.refresh();
   };
 
   const exportSelected = async () => {
-    if (!selection) return;
+    const selected = server?.selection;
+    if (!selected) return;
     const exported = await step.run(
       (signal) =>
         exportPackage(
           projectName,
-          { command_id: newCommandId("export"), ...slot, selection_id: selection.selection_id, selection_digest: selection.selection_digest },
+          { command_id: newCommandId("export"), ...slot, selection_id: selected.selection_id, selection_digest: selected.selection_digest },
           { signal },
         ),
       t("packaging_export_failed"),
     );
-    if (exported) setReceipt(exported);
+    setReceipt(exported);
+    await slotStatus.refresh();
   };
 
+  const checkState: StepState = observation
+    ? observation.status === "PASS" || blocking.length === 0
+      ? "done"
+      : "blocked"
+    : "todo";
   const ladder: { key: string; label: string; state: StepState }[] = [
-    { key: "draft", label: t("packaging_step_draft"), state: revision ? "done" : "todo" },
+    { key: "draft", label: t("packaging_step_draft"), state: revision && !draftUnsaved ? "done" : "todo" },
+    { key: "check", label: t("packaging_step_check"), state: checkState },
+    { key: "select", label: t("packaging_step_select"), state: server?.selection ? "done" : "todo" },
     {
-      key: "check",
-      label: t("packaging_step_check"),
-      state: observation ? (observation.status === "PASS" || blocking.length === 0 ? "done" : "blocked") : "todo",
+      key: "export",
+      label: t("packaging_step_export"),
+      state: server?.exportable && server.exports.length > 0 ? "done" : "todo",
     },
-    { key: "select", label: t("packaging_step_select"), state: selection ? "done" : "todo" },
-    { key: "export", label: t("packaging_step_export"), state: receipt ? "done" : "todo" },
   ];
+  const currentRung = ladder.findIndex((item) => item.state === "todo");
   const groups = revision?.payload.variant_groups ?? [];
+  const superseded = mySelectionId !== null && server !== null && server.selection?.selection_id !== mySelectionId;
+  const lockedByDraft = step.busy || draftUnsaved;
 
   return (
     <div className="flex h-full min-h-0 flex-col overflow-y-auto bg-bg">
@@ -254,7 +347,7 @@ export default function PackagingPage({ projectName }: PackagingPageProps) {
 
       <ol className="pk-ladder mx-auto w-full max-w-6xl px-4 pt-5" aria-label={t("packaging_progress")}>
         {ladder.map((item, index) => (
-          <li key={item.key} className="pk-rung" data-state={item.state} aria-current={item.state === "todo" ? undefined : "step"}>
+          <li key={item.key} className="pk-rung" data-state={item.state} aria-current={index === currentRung ? "step" : undefined}>
             <span className="pk-rung-index font-mono">{index + 1}</span>
             <span className="pk-rung-label">{item.label}</span>
             <span className="sr-only">{t(`packaging_state_${item.state}`)}</span>
@@ -297,8 +390,53 @@ export default function PackagingPage({ projectName }: PackagingPageProps) {
               <input className="fm-input" value={hashtags} onChange={(event) => setHashtags(event.target.value)} />
             </label>
             <label className="text-xs text-text-2">
+              {t("packaging_field_chapters")}
+              <textarea className="fm-input font-mono" rows={3} value={chaptersJson} onChange={(event) => setChaptersJson(event.target.value)} />
+            </label>
+            <label className="text-xs text-text-2">
+              {t("packaging_field_variant_groups")}
+              <textarea className="fm-input font-mono" rows={3} value={groupsJson} onChange={(event) => setGroupsJson(event.target.value)} />
+            </label>
+            <label className="text-xs text-text-2">
+              {t("packaging_field_localizations")}
+              <textarea
+                className="fm-input font-mono"
+                rows={3}
+                value={localizationsJson}
+                onChange={(event) => setLocalizationsJson(event.target.value)}
+              />
+            </label>
+            <label className="text-xs text-text-2 pk-wide">
               {t("packaging_field_assets")}
               <textarea className="fm-input font-mono" rows={3} value={assetsJson} onChange={(event) => setAssetsJson(event.target.value)} />
+            </label>
+            <label className="text-xs text-text-2">
+              {t("packaging_field_audience")}
+              <input className="fm-input" value={audience} onChange={(event) => setAudience(event.target.value)} />
+            </label>
+            <label className="text-xs text-text-2">
+              {t("packaging_field_age_restriction")}
+              <input className="fm-input" value={ageRestriction} onChange={(event) => setAgeRestriction(event.target.value)} />
+            </label>
+            <label className="text-xs text-text-2">
+              {t("packaging_field_classification_digest")}
+              <input
+                className="fm-input font-mono"
+                value={classificationDigest}
+                onChange={(event) => setClassificationDigest(event.target.value)}
+              />
+            </label>
+            <label className="text-xs text-text-2">
+              {t("packaging_field_disclosure_digest")}
+              <input className="fm-input font-mono" value={disclosureDigest} onChange={(event) => setDisclosureDigest(event.target.value)} />
+            </label>
+            <label className="text-xs text-text-2">
+              <input type="checkbox" checked={syntheticMedia} onChange={(event) => setSyntheticMedia(event.target.checked)} />{" "}
+              {t("packaging_field_synthetic")}
+            </label>
+            <label className="text-xs text-text-2">
+              <input type="checkbox" checked={paidPromotion} onChange={(event) => setPaidPromotion(event.target.checked)} />{" "}
+              {t("packaging_field_paid")}
             </label>
           </div>
           <div className="pk-actions">
@@ -307,7 +445,7 @@ export default function PackagingPage({ projectName }: PackagingPageProps) {
             </button>
             {revision ? (
               <p className="text-xs text-text-3" role="status">
-                {t("packaging_revision_saved", { revision: revision.revision })}
+                {draftUnsaved ? t("packaging_draft_unsaved") : t("packaging_revision_saved", { revision: revision.revision })}
               </p>
             ) : null}
           </div>
@@ -316,7 +454,7 @@ export default function PackagingPage({ projectName }: PackagingPageProps) {
         <section aria-labelledby="pk-check" className="pk-card">
           <h2 id="pk-check" className="pk-kicker font-mono">CHECK</h2>
           {!revision ? <p className="text-sm text-text-3">{t("packaging_check_empty")}</p> : null}
-          <button type="button" className="fm-btn" disabled={step.busy || !revision || !runDigest} onClick={() => void runCheck()}>
+          <button type="button" className="fm-btn" disabled={lockedByDraft || !revision || !runDigest} onClick={() => void runCheck()}>
             {t("packaging_run_check")}
           </button>
           {observation ? (
@@ -384,30 +522,54 @@ export default function PackagingPage({ projectName }: PackagingPageProps) {
             </fieldset>
           ))}
           <div className="pk-actions">
-            <button type="button" className="fm-btn" disabled={step.busy || !observation} onClick={() => void makePreview()}>
+            <button type="button" className="fm-btn" disabled={lockedByDraft || !observation} onClick={() => void makePreview()}>
               {t("packaging_preview")}
             </button>
-            <button type="button" className="fm-btn fm-btn-accent" disabled={step.busy || !preview} onClick={() => void select()}>
+            <button type="button" className="fm-btn fm-btn-accent" disabled={step.busy || !currentPreview} onClick={() => void select()}>
               {t("packaging_select")}
             </button>
           </div>
-          {preview ? (
-            <p className="text-xs text-text-3" role="status">
-              {t("packaging_preview_ready", { expires: new Date(preview.preview.expires_at).toLocaleString() })}
-            </p>
+          {currentPreview ? (
+            <div className="mt-2 grid gap-0.5 text-xs text-text-3" role="status">
+              <p>{t("packaging_preview_ready", { expires: new Date(currentPreview.preview.expires_at).toLocaleString() })}</p>
+              <p>
+                {t("packaging_preview_choices", {
+                  choices: currentPreview.preview.selected_variant_ids.join(", ") || t("packaging_none"),
+                })}
+              </p>
+              <p>
+                {t("packaging_preview_waivers", {
+                  rules: currentPreview.preview.waivers.map((waiver) => waiver.rule_id).join(", ") || t("packaging_none"),
+                })}
+              </p>
+            </div>
           ) : null}
-          {selection ? (
-            <p className="text-xs text-text-3" role="status">
-              {t("packaging_selected", { version: selection.head_version })}
-            </p>
-          ) : null}
+          <div className="mt-2 text-xs text-text-3" role="status">
+            {slotStatus.state === "loading" ? <p>{t("packaging_slot_loading")}</p> : null}
+            {slotStatus.state === "failed" ? <p>{t("packaging_slot_failed")}</p> : null}
+            {superseded ? <p>{t("packaging_slot_superseded")}</p> : null}
+            {server && !server.selection ? <p>{t("packaging_slot_empty")}</p> : null}
+            {server?.selection ? (
+              <p>
+                {t("packaging_slot_current", {
+                  revision: server.selection.preview.candidate_revision,
+                  version: server.selection.head_version,
+                })}
+              </p>
+            ) : null}
+          </div>
         </section>
 
         <section aria-labelledby="pk-export" className="pk-card">
           <h2 id="pk-export" className="pk-kicker font-mono">EXPORT</h2>
-          <button type="button" className="fm-btn fm-btn-accent" disabled={step.busy || !selection} onClick={() => void exportSelected()}>
+          <button type="button" className="fm-btn fm-btn-accent" disabled={step.busy || !server?.exportable || !server.selection} onClick={() => void exportSelected()}>
             {t("packaging_export")}
           </button>
+          {server?.selection && !server.exportable ? (
+            <p className="mt-2 text-xs text-text-2" role="status">
+              {t("packaging_not_exportable", { code: server.refusal_code ?? "" })}
+            </p>
+          ) : null}
           {receipt ? (
             <div className="mt-3">
               <p className="text-sm text-text">{t("packaging_exported", { count: receipt.manifest.entries.length })}</p>
@@ -416,13 +578,29 @@ export default function PackagingPage({ projectName }: PackagingPageProps) {
                   <li key={entry.path}>{entry.path}</li>
                 ))}
               </ul>
-              <a className="fm-btn mt-2 inline-block" href={downloadUrl(projectName, receipt)}>
-                {t("packaging_download")}
-              </a>
             </div>
           ) : (
             <p className="mt-2 text-xs text-text-3">{t("packaging_export_note")}</p>
           )}
+          {server && server.exports.length > 0 ? (
+            <div className="mt-3">
+              <h3 className="text-xs text-text-2">{t("packaging_exports_history")}</h3>
+              <ul className="pk-entries text-xs text-text-2">
+                {server.exports.map((item) => (
+                  <li key={item.archive_digest}>
+                    <span className="font-mono text-[11px]">{item.archive_digest.slice(7, 19)}</span>{" "}
+                    {item.download_token ? (
+                      <a className="fm-btn inline-block" href={downloadUrl(projectName, { ...item, download_token: item.download_token })}>
+                        {t("packaging_download")}
+                      </a>
+                    ) : (
+                      <span className="text-text-3">{t("packaging_download_unavailable")}</span>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
         </section>
       </div>
     </div>
