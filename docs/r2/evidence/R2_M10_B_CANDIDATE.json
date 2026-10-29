@@ -1,11 +1,11 @@
 {
   "schema_id": "m10.b-seal-candidate.v1",
-  "status": "SEAL_CANDIDATE_PILOTS_RUN_FINDINGS_OPEN",
+  "status": "SEAL_CANDIDATE_PENDING_REVIEW_OF_B7_FIXES",
   "branch": "design/r2-m10-b",
   "worktree": ".worktrees/r2-m10-b",
   "base": "0af66db9e",
   "candidate_head": "10c9a1dc8c3892f0559d53efdd02f8719632b783",
-  "code_head_for_evidence": "975584c87c774d1ef1f2610ee11069759dbd76eb",
+  "code_head_for_evidence": "7609bceac",
   "design": "docs/superpowers/specs/2026-10-28-r2-m10-b-packaging-export-design.md",
   "packets": {
     "B0": {
@@ -52,18 +52,22 @@
       "verdict": "PASS (Kalinga, OpenMontage)",
       "report": "docs/r2/evidence/R2_M10_B6_DONOR_PARITY.json",
       "baseline": "docs/r2/evidence/R2_M10_B6_DONOR_BASELINE.json",
-      "bound_code_head": "975584c87c774d1ef1f2610ee11069759dbd76eb"
+      "bound_code_head": "7609bceac"
     },
     "B7": {
-      "verdict": "RUN_NOT_PASSED_AS_PREREGISTERED",
+      "verdict": "PASSED_WITH_DEVIATIONS",
       "summary": "docs/r2/evidence/R2_M10_B7_PILOT_SUMMARY.json",
       "dossiers": [
         "docs/r2/evidence/R2_M10_B7_PILOT_WESTERN_EXPLAINER.json",
         "docs/r2/evidence/R2_M10_B7_PILOT_VERTICAL_FACTUAL_SHORT.json",
         "docs/r2/evidence/R2_M10_B7_PILOT_ZH_SHUANG.json"
       ],
-      "result": "seeded recall 7/7 in all three cohorts, 0 findings on clean finals, export <= 1.9 s, worker peak <= 23 MB, socket EPERM; cross-root determinism fails (manifest provenance); Human gates performed by the agent under sponsor chat delegation, not by the sponsor",
-      "findings": "F1 (High) V2 finals yuvj420p refused by CONTAINER_STREAM probe; F2 determinism criterion vs manifest provenance; F3 packaging grant reader expected_uid=0; F4 stale attestor socket"
+      "result": "run 2 on the original V2 finals at 7609bceac: recall 7/7 x3, 0 FP, export <= 1.9 s, worker peak <= 23 MB, EPERM, amended determinism met; frozen whole-archive wording fails (recorded); Human gates performed by the agent under sponsor delegation",
+      "fixes": {
+        "F1": "0299b0a11",
+        "F2": "7609bceac",
+        "F3": "55edfa11c"
+      }
     },
     "preseal": {
       "verdict": "ACCEPTED_WITH_CONDITIONS",
@@ -120,8 +124,7 @@
     "M10-A-F1 carried items as recorded in the handoff."
   ],
   "open_items": [
-    "Sponsor decisions on B7 findings F1 (V2 pixel format vs probe) and F2 (determinism criterion)",
-    "Optional sponsor-performed rerun of the Human gates if sponsor-reviewed evidence is required",
+    "Codex review of the B7 fixes (0299b0a11, 55edfa11c, 7609bceac)",
     "B8 seal / M10-B acceptance",
     "M10 integrated acceptance"
   ],

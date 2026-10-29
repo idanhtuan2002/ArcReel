@@ -37,7 +37,7 @@ async def main(pilot: Path, cohort: str, max_ms: int, min_ms: int):
         probe = await (await probe_service(env, probe_req)).observe(probe_req)
         review = await human(env, human_request(env, command_id="human-2", profile=profile, status="PASS"))
         run = await seal(env, completion(env, [probe, review], command_id="seal-2", profile=profile))
-        app.dependency_overrides[packaging.packaging_deps] = lambda: packaging.PackagingDeps(sessions=async_session_factory, project_root=lambda n: env["project"], grant_reader=env["reader"], read_directory=tree / "read", socket_directory=sock)
+        app.dependency_overrides[packaging.packaging_deps] = lambda: packaging.PackagingDeps(sessions=async_session_factory, project_root=lambda n: env["project"], grant_reader=env["reader"], read_directory=tree / "read", socket_directory=sock, custody_uid=os.getuid(), custody_gid=os.getgid())
         zero = "sha256:" + "0" * 64
         draft = b.clean_draft(pilot, cohort) | {"audience_classification": {"audience_category": "general", "age_restriction": None, "classification_policy_digest": zero}, "disclosure": {"synthetic_media": True, "paid_promotion": False, "disclosure_policy_digest": zero}}
         headers = {"Authorization": f"Bearer {token}"}

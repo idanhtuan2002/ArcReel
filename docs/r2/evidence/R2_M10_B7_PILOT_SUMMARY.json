@@ -1,58 +1,63 @@
 {
-  "schema_id": "m10.b7-pilot-summary.v1",
-  "code_head": "affa7c322571e002dc9c54a6097868d41211eafb",
+  "schema_id": "m10.b7-pilot-summary.v2",
+  "code_head": "7609bceac",
   "run_at": "2026-10-29",
-  "verdict": "NOT_PASSED_AS_PREREGISTERED",
-  "verdict_reason": [
-    "determinism threshold (byte-identical archives from two clean roots) fails in every cohort: only manifest.json differs, because it binds selection, disposition and candidate payload identities that are unique per root",
-    "the preregistered reviewer (sponsor as HUMAN_SHOWRUNNER) did not perform the Human gates; the agent did under the sponsor's chat delegation"
+  "verdict": "PASSED_WITH_DEVIATIONS",
+  "verdict_detail": [
+    "run 2 (original V2 finals, code 7609bceac): every metric meets its threshold in all three cohorts under the amended determinism definition; the frozen whole-archive wording still fails and is recorded as such",
+    "deviation kept: the agent, under the sponsor's chat delegation, performed the Human gates and the reviewer verdicts; the sponsor-as-reviewer independence is not met",
+    "zh_shuang used the English 9:16 master (no zh-Hans V2 final exists); Chinese-language suitability not assessed"
   ],
-  "all_other_thresholds": "met in every cohort: seeded recall 7/7, 0 findings on clean finals, export <= 1.9 s, worker peak <= 23 MB, network socket EPERM, downloaded archive matches its receipt",
-  "cohorts": {
-    "western_explainer": {
-      "dossier": "docs/r2/evidence/R2_M10_B7_PILOT_WESTERN_EXPLAINER.json",
-      "seeded_recall": "7/7",
-      "false_positives_on_clean": 0,
-      "export_ui_ms": 1870,
-      "peak_rss_bytes": 23060480,
-      "storage_ratio": 1.0225,
-      "determinism_cross_root": false,
-      "determinism_same_root": true,
-      "differing_members": [
-        "manifest.json"
-      ],
-      "network_eperm": true,
-      "download_verified": true
+  "runs": {
+    "run1": {
+      "commit": "6b94dfd33",
+      "corpus": "yuv420p-normalized derivatives (F1 blocked the originals)",
+      "verdict": "NOT_PASSED_AS_PREREGISTERED"
     },
-    "vertical_factual_short": {
-      "dossier": "docs/r2/evidence/R2_M10_B7_PILOT_VERTICAL_FACTUAL_SHORT.json",
-      "seeded_recall": "7/7",
-      "false_positives_on_clean": 0,
-      "export_ui_ms": 1376,
-      "peak_rss_bytes": 15417344,
-      "storage_ratio": 1.046,
-      "determinism_cross_root": false,
-      "determinism_same_root": true,
-      "differing_members": [
-        "manifest.json"
-      ],
-      "network_eperm": true,
-      "download_verified": true
-    },
-    "zh_shuang": {
-      "dossier": "docs/r2/evidence/R2_M10_B7_PILOT_ZH_SHUANG.json",
-      "seeded_recall": "7/7",
-      "false_positives_on_clean": 0,
-      "export_ui_ms": 1370,
-      "peak_rss_bytes": 15413248,
-      "storage_ratio": 1.046,
-      "determinism_cross_root": false,
-      "determinism_same_root": true,
-      "differing_members": [
-        "manifest.json"
-      ],
-      "network_eperm": true,
-      "download_verified": true
+    "run2": {
+      "commit": "7609bceac",
+      "corpus": "original V2 finals byte for byte",
+      "cohorts": {
+        "western_explainer": {
+          "dossier": "docs/r2/evidence/R2_M10_B7_PILOT_WESTERN_EXPLAINER.json",
+          "seeded_recall": "7/7",
+          "false_positives_on_clean": 0,
+          "export_ui_ms": 1872,
+          "peak_rss_bytes": 23597056,
+          "storage_ratio": 1.0086,
+          "determinism_frozen_wording": false,
+          "determinism_amended": true,
+          "network_eperm": true,
+          "download_verified": true,
+          "master_is_source_final": true
+        },
+        "vertical_factual_short": {
+          "dossier": "docs/r2/evidence/R2_M10_B7_PILOT_VERTICAL_FACTUAL_SHORT.json",
+          "seeded_recall": "7/7",
+          "false_positives_on_clean": 0,
+          "export_ui_ms": 1375,
+          "peak_rss_bytes": 15458304,
+          "storage_ratio": 1.0485,
+          "determinism_frozen_wording": false,
+          "determinism_amended": true,
+          "network_eperm": true,
+          "download_verified": true,
+          "master_is_source_final": true
+        },
+        "zh_shuang": {
+          "dossier": "docs/r2/evidence/R2_M10_B7_PILOT_ZH_SHUANG.json",
+          "seeded_recall": "7/7",
+          "false_positives_on_clean": 0,
+          "export_ui_ms": 1374,
+          "peak_rss_bytes": 15462400,
+          "storage_ratio": 1.0485,
+          "determinism_frozen_wording": false,
+          "determinism_amended": true,
+          "network_eperm": true,
+          "download_verified": true,
+          "master_is_source_final": true
+        }
+      }
     }
   },
   "findings": [
@@ -61,28 +66,32 @@
       "severity": "High",
       "title": "Approved V2 finals are refused by the M10 CONTAINER_STREAM probe",
       "detail": "Both V2 finals use pix_fmt yuvj420p (full range); the probe worker accepts only yuv420p and fails the technical probe (M10_PROBE_FAILED, recorded with ResourceEvidence). M10 quality cannot assess real V2 output until the renderer emits yuv420p or the probe admits yuvj420p with a range fact. The pilot continued on a yuv420p-normalized derivative.",
-      "owner": "design decision for B8/M10 acceptance"
+      "owner": "design decision for B8/M10 acceptance",
+      "status": "RESOLVED 0299b0a11: probe admits yuvj420p, route requalified (180 tests); run 2 used the original finals"
     },
     {
       "id": "F2",
       "severity": "Medium",
       "title": "Cross-root determinism criterion conflicts with the manifest's provenance binding",
       "detail": "Members (video, thumbnail, metadata) are byte-identical across clean roots; manifest.json differs in selection_id/digest, disposition_id/digest and candidate_payload_digest. Same-root re-export is byte-identical. Either amend the criterion to member-level determinism or move provenance out of the archive.",
-      "owner": "sponsor decision"
+      "owner": "sponsor decision",
+      "status": "DECIDED 7609bceac: determinism defined by same-selection re-export and content members; provenance stays in the manifest"
     },
     {
       "id": "F3",
       "severity": "Medium",
       "title": "Packaging grant reader assumes root-owned governance",
       "detail": "packaging_deps verifies governance with expected_uid=0 while the selection custodian uses os.getuid(); consistent only when the app runs as root (as on V2 staging). A non-root host cannot export without an override.",
-      "owner": "B8"
+      "owner": "B8",
+      "status": "RESOLVED 55edfa11c: custody owner from PackagingDeps (root by default) for both grant reader and selection custodian"
     },
     {
       "id": "F4",
       "severity": "Low",
       "title": "Stale attestor socket after stopping the served app",
       "detail": "After SIGTERM of the pilot host the attestor socket remained and the next attestor refused to start until it was removed. Cause not isolated (wrapper vs graceful shutdown).",
-      "owner": "B8 observation"
+      "owner": "B8 observation",
+      "status": "CLOSED as pilot-harness artifact: uvicorn re-raises SIGTERM after shutdown (uvicorn/server.py capture_signals), so the in-process attestor context never unlinked its socket; production runs the attestor as its own systemd service"
     },
     {
       "id": "F5",

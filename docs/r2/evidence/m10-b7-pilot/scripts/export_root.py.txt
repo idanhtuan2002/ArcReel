@@ -20,7 +20,7 @@ async def main(pilot: Path, cohort: str) -> None:
     state = env["state"]; run = state["gates"]["run"]
     app.dependency_overrides[packaging.packaging_deps] = lambda: packaging.PackagingDeps(
         sessions=async_session_factory, project_root=lambda n: env["project"], grant_reader=env["reader"],
-        read_directory=tree / "read", socket_directory=socket_dir)
+        read_directory=tree / "read", socket_directory=socket_dir, custody_uid=os.getuid(), custody_gid=os.getgid())
     token = auth.create_token("actor"); headers = {"Authorization": f"Bearer {token}"}
     zero = "sha256:" + "0" * 64
     draft = b.clean_draft(pilot, cohort) | {

@@ -2,31 +2,31 @@
   "schema_id": "m10.b7-pilot-dossier.v1",
   "cohort": "western_explainer",
   "preregistration": "docs/r2/evidence/R2_M10_B7_PILOT_PREREGISTRATION.json (revision 2)",
-  "code_head": "affa7c322571e002dc9c54a6097868d41211eafb",
+  "code_head": "7609bceac923a8972bd5dffae6b96ad075d96507",
   "run_at": "2026-10-29",
   "deviations": [
     "Human gates (profile publication, narrative observation, disposition, package selection) were performed by the agent under the sponsor's explicit chat delegation on 2026-10-29 ('ban lam het tat ca cac buoc'), through the real custodians with an interactive token for principal 'actor'. The preregistered reviewer identity (sponsor as HUMAN_SHOWRUNNER) is therefore NOT met; reviewer verdicts below are the agent's.",
-    "Local pilot host: per-cohort PostgreSQL database at alembic head, user-owned governance tree built with the repository's qualified-custody fixtures (test signing keys), attestor served in-process; the app's packaging deps were overridden only to point the grant reader at the user-owned tree (expected_uid=os.getuid()).",
-    "Corpus master is a yuv420p-normalized derivative of the approved V2 final (finding F1); the dependency head is the repository fixture video_only.mp4 bound by the fixture subject binding.",
+    "Local pilot host: per-cohort PostgreSQL database at alembic head, user-owned governance tree built with the repository's qualified-custody fixtures (test signing keys), attestor served in-process; the app's packaging deps were overridden only to point the grant reader and custody owner (custody_uid/gid) at the pilot user's tree.",
+    "Corpus master is the approved V2 final byte for byte (full-range yuvj420p, admitted since 0299b0a11); the dependency head is the repository fixture video_only.mp4 bound by the fixture subject binding.",
     "Profile policy is the repository V2 policy fixture with this cohort's platform constraints, every packaging check rule declared, banned phrases ['click here','link in bio'] and freshness max_age 7 days."
   ],
   "corpus": {
     "source_final": "/home/anhtuan/arcreel-v2-staging/data/du-an-01-649c62c1/production/final/du-an-01-649c62c1.mp4",
     "source_sha256": "sha256:1bcd60c2ee2765e7b5a4aef886963abc1bbb2b23c42bf0f796364a1150431aa6",
     "source_pix_fmt": "yuvj420p",
-    "master_sha256": "sha256:ff309032198f82dfe38d3a56f7d0329a754d20e89c7d8d77e378c0ddd2137444",
-    "master_bytes": 7491356,
+    "master_sha256": "sha256:1bcd60c2ee2765e7b5a4aef886963abc1bbb2b23c42bf0f796364a1150431aa6",
+    "master_bytes": 8036130,
     "artifact_key": "artifact-key-v1:WyJlcGlzb2RlLXZpZGVvIiwxLCJGSU5BTCJd"
   },
   "gates": {
     "profile": {
       "profile_id": "0199f00d-0000-7000-8000-000000000001",
       "revision": 1,
-      "digest": "sha256:396e9fb408d40a5dead6783cf65bae9422959b73e310fd2fbf0bbad7f929eec0"
+      "digest": "sha256:fa5837d9af2433a39df6c7e5847851e56329801cde51a38b7f17ab063b73c48f"
     },
     "technical": {
       "status": "PASS",
-      "observation_id": "01a18651-56a3-705e-bc25-319001ce343a"
+      "observation_id": "01a18673-8209-7da7-b027-a0978d98133d"
     },
     "narrative": {
       "status": "PASS",
@@ -37,15 +37,15 @@
         "final frame is black",
         "explainer cards on H.264 frame types and macroblocks are legible"
       ],
-      "observation_id": "01a18651-5891-7f88-ab74-9294305b39bb"
+      "observation_id": "01a18673-83ec-72c3-8415-4f82fd538b44"
     },
     "run": {
-      "run_id": "01a18651-589d-7a1c-93db-c3cdeb8d337e",
-      "run_digest": "sha256:02b12db53238eef0e0301041b54812cd2aedd6fcdba87c15811517edc7123e1c",
-      "subject_digest": "sha256:f88b0b53e5939413fecfd089647d2f84b7ab03f443567ea432ba0d4d76679f23"
+      "run_id": "01a18673-83f9-74eb-8305-82bbeb2db92e",
+      "run_digest": "sha256:4c19c4e61dc0f5a1691dd99cf170b3bb565906afc800815abc31c1f52ae086b2",
+      "subject_digest": "sha256:8afd121bdf9d140e49991d61a876162a977689fd3078d586755ce72b94459761"
     },
     "disposition": {
-      "disposition_id": "01a18651-5a40-782c-a330-10a0fc0f1f97",
+      "disposition_id": "01a18673-8597-7bbd-ab33-f88be6b11993",
       "decision": "PASS"
     }
   },
@@ -129,7 +129,7 @@
             "duration"
           ],
           "caught": true,
-          "root": "root2"
+          "root": "main (after export)"
         }
       ]
     },
@@ -145,36 +145,38 @@
       "note": "no findings on the clean final; nothing to disagree on"
     },
     "runtime_per_bundle_ms": {
-      "ui_click_to_download_link_ms": 1870,
+      "ui_click_to_download_link_ms": 1872,
       "service_export_ms_root2": [
-        872,
-        928
+        869,
+        938
       ],
       "threshold": "<= 30000",
       "pass": true
     },
     "peak_rss_bytes": {
-      "value": 23060480,
+      "value": 23597056,
       "method": "cgroup memory.peak of the m10-export unit polled every 2 ms during a root2 export (same inputs)",
       "threshold": "<= 536870912",
       "pass": true
     },
     "storage_bytes": {
-      "archive_bytes": 7659993,
-      "master_bytes": 7491356,
-      "ratio": 1.0225
+      "archive_bytes": 8105635,
+      "master_bytes": 8036130,
+      "ratio": 1.0086
     },
     "determinism": {
-      "main_root_archive": "sha256:de0e644f617175c8f74c589c96c65a541cbca900e5ff8deeafe50903ac2577b0",
-      "root2_archive": "sha256:a9cf8e79d24c48e4e4237d7a90aa030b1c5fc3d16ae7199ec3a0dc629c9b017a",
-      "root2_reexport_archive": "sha256:a9cf8e79d24c48e4e4237d7a90aa030b1c5fc3d16ae7199ec3a0dc629c9b017a",
+      "main_root_archive": "sha256:118322e68ecd5fe730ccc7d3d98508a3e505ae278d1d04d862fa5c7c17b3244b",
+      "root2_archive": "sha256:2f49046e4afa0c340deceacd399e41e51f3c15feb4a0a7bdece82f891c3a3e6c",
+      "root2_reexport_archive": "sha256:2f49046e4afa0c340deceacd399e41e51f3c15feb4a0a7bdece82f891c3a3e6c",
       "byte_identical_across_roots": false,
       "byte_identical_same_root_reexport": true,
       "differing_members": [
         "manifest.json"
       ],
-      "threshold": "byte-identical archives from two clean roots",
-      "pass": false
+      "frozen_threshold": "byte-identical archives from two clean roots",
+      "frozen_pass": false,
+      "amended_threshold": "same-selection re-export byte-identical AND every content member identical across roots",
+      "pass": true
     },
     "runtime_network": {
       "launcher": "QualityProbeRuntime.launch (same as PackageExportService._build_and_publish), unit_prefix m10-export, tools={}",
@@ -216,13 +218,13 @@
     }
   },
   "export": {
-    "archive_digest": "sha256:de0e644f617175c8f74c589c96c65a541cbca900e5ff8deeafe50903ac2577b0",
-    "archive_bytes": 7659993,
+    "archive_digest": "sha256:118322e68ecd5fe730ccc7d3d98508a3e505ae278d1d04d862fa5c7c17b3244b",
+    "archive_bytes": 8105635,
     "members": [
       {
         "path": "manifest.json",
-        "bytes": 1462,
-        "sha256": "sha256:6b62741ff0338f4a05e4282ae7c3ba1597b742f21b93863ca573d95b98f0d1a0"
+        "bytes": 1461,
+        "sha256": "sha256:d69694a7512c2a325e45cb3fadd911fe4c935bcba99d6b52a7545000f552064b"
       },
       {
         "path": "metadata/en.json",
@@ -236,13 +238,13 @@
       },
       {
         "path": "thumbnails/thumbnail.png",
-        "bytes": 165618,
-        "sha256": "sha256:d7360e0a619624d249e8057df2802689335794bd0cb1236430a181cf5a938764"
+        "bytes": 66487,
+        "sha256": "sha256:acb2f8b3f60d8a0164513943a4c5b2aed66fdfb11f6304de64ac9e51344e7b9d"
       },
       {
         "path": "video/output.mp4",
-        "bytes": 7491356,
-        "sha256": "sha256:ff309032198f82dfe38d3a56f7d0329a754d20e89c7d8d77e378c0ddd2137444"
+        "bytes": 8036130,
+        "sha256": "sha256:1bcd60c2ee2765e7b5a4aef886963abc1bbb2b23c42bf0f796364a1150431aa6"
       }
     ],
     "downloaded_once_and_verified": true
@@ -260,10 +262,7 @@
     "20-preview.png",
     "21-selected.png",
     "22-exported.png",
-    "23-downloaded.png",
-    "nav-retry-0.png",
-    "nav-retry-1.png",
-    "nav-retry-2.png"
+    "23-downloaded.png"
   ],
   "smallest_useful_effect": {
     "seeded_recall_ok": true,

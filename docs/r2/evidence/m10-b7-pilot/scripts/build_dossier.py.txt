@@ -37,7 +37,7 @@ def load(path: Path) -> dict[str, Any]:
 def main(cohort: str, head: str) -> None:
     main_root, root2 = S / cohort, S / f"{cohort}-root2"
     state, browser = load(main_root / "state.json"), load(main_root / "browser.json")
-    duration_dir = root2 if cohort == "western_explainer" else main_root
+    duration_dir = main_root
     duration = load(duration_dir / "duration_defect.json")
     again, first2 = load(root2 / "export_export-2.json"), load(root2 / "export_root.json")
     master = main_root / "data/project/render-1.mp4"
@@ -89,9 +89,9 @@ def main(cohort: str, head: str) -> None:
             "(sponsor as HUMAN_SHOWRUNNER) is therefore NOT met; reviewer verdicts below are the agent's.",
             "Local pilot host: per-cohort PostgreSQL database at alembic head, user-owned governance tree built with the "
             "repository's qualified-custody fixtures (test signing keys), attestor served in-process; the app's packaging "
-            "deps were overridden only to point the grant reader at the user-owned tree (expected_uid=os.getuid()).",
-            "Corpus master is a yuv420p-normalized derivative of the approved V2 final (finding F1); the dependency head is "
-            "the repository fixture video_only.mp4 bound by the fixture subject binding.",
+            "deps were overridden only to point the grant reader and custody owner (custody_uid/gid) at the pilot user's tree.",
+            "Corpus master is the approved V2 final byte for byte (full-range yuvj420p, admitted since 0299b0a11); the "
+            "dependency head is the repository fixture video_only.mp4 bound by the fixture subject binding.",
             "Profile policy is the repository V2 policy fixture with this cohort's platform constraints, every packaging "
             "check rule declared, banned phrases ['click here','link in bio'] and freshness max_age 7 days.",
         ],
@@ -147,8 +147,11 @@ def main(cohort: str, head: str) -> None:
                 "byte_identical_across_roots": receipt_digest == first2["archive_sha256"],
                 "byte_identical_same_root_reexport": first2["archive_sha256"] == again["archive_digest"],
                 "differing_members": member_diff(download, Path(first2["archive_path"])),
-                "threshold": "byte-identical archives from two clean roots",
-                "pass": receipt_digest == first2["archive_sha256"],
+                "frozen_threshold": "byte-identical archives from two clean roots",
+                "frozen_pass": receipt_digest == first2["archive_sha256"],
+                "amended_threshold": "same-selection re-export byte-identical AND every content member identical across roots",
+                "pass": first2["archive_sha256"] == again["archive_digest"]
+                and set(member_diff(download, Path(first2["archive_path"]))) <= {"manifest.json"},
             },
             "runtime_network": load(S / "net" / "network-experiment.json"),
         },

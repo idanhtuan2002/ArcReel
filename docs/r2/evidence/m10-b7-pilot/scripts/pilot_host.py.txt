@@ -34,7 +34,7 @@ FINAL_9_16 = Path(__file__).resolve().parent / "corpus/final-9x16-yuv420p.mp4"
 
 COHORTS: dict[str, dict[str, Any]] = {
     "western_explainer": {
-        "master": FINAL_16_9,
+        "master": SOURCE_16_9,
         "width": 1920,
         "height": 1080,
         "min_duration_ms": 60000,
@@ -43,7 +43,7 @@ COHORTS: dict[str, dict[str, Any]] = {
         "platform_profile_id": "youtube-long",
     },
     "vertical_factual_short": {
-        "master": FINAL_9_16,
+        "master": SOURCE_9_16,
         "width": 1080,
         "height": 1920,
         "min_duration_ms": 5000,
@@ -52,7 +52,7 @@ COHORTS: dict[str, dict[str, Any]] = {
         "platform_profile_id": "youtube-shorts",
     },
     "zh_shuang": {
-        "master": FINAL_9_16,
+        "master": SOURCE_9_16,
         "width": 1080,
         "height": 1920,
         "min_duration_ms": 5000,
@@ -375,6 +375,8 @@ async def serve(pilot: Path, cohort: str) -> None:
         grant_reader=reader,
         read_directory=tree / "read",
         socket_directory=socket_dir,
+        custody_uid=os.getuid(),
+        custody_gid=os.getgid(),
     )
     async with _attestor(env):
         server = uvicorn.Server(uvicorn.Config(app, host="127.0.0.1", port=1241, log_level="info"))

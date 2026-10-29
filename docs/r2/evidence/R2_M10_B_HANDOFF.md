@@ -164,9 +164,15 @@ Rewrite in place; this is the resume entry for M10-B.
   cross-root determinism fails (manifest provenance), reviewer identity deviated. Findings F1 (High: V2 finals
   yuvj420p refused by the CONTAINER_STREAM probe), F2, F3, F4.
 
+- B7 findings decided by the agent after research (sponsor rule: decide, don't ask): F1 probe admits full-range
+  `yuvj420p` + A4 route requalified (`0299b0a11`, 180 tests); F3 custody owner from `PackagingDeps` (`55edfa11c`);
+  F2 determinism defined by same-selection re-export + content members, provenance stays in the manifest
+  (`7609bceac`, post-run amendment recorded); F4 was a pilot-harness artifact (uvicorn re-raises SIGTERM). Run 2 on
+  the original finals: all thresholds met under the amended definition (`R2_M10_B7_PILOT_SUMMARY.json` v2).
+  B6 parity rebound to `7609bceac`.
+
 ## Next step
 
-**Stop for the sponsor.** Decide F1 (renderer emits yuv420p vs probe admits yuvj420p) and F2 (member-level
-determinism vs provenance outside the archive); optionally rerun the Human gates yourself if sponsor-reviewed evidence
-is required. Then B8 seal (M10-B acceptance with the carried conditions in `R2_M10_B_CANDIDATE.json`) and M10
-integrated acceptance. Nothing pushed; merge/tag/deploy are Human gates.
+Codex review of `0299b0a11`, `55edfa11c`, `7609bceac` and the run-2 evidence; then B8 seal (M10-B acceptance with
+the carried conditions in `R2_M10_B_CANDIDATE.json`) and M10 integrated acceptance. Nothing pushed; merge/tag/deploy
+are Human gates.
