@@ -122,6 +122,45 @@
         "ffmpeg": "8.0.1",
         "vmaf": "3.2.1 f85a853"
       }
+    },
+    {
+      "date": "2026-10-29",
+      "reason": "M10-C enables the embedded host-v1 catalog (container and decode configs pinned to this host's ffmpeg 8.0.1 tools and the probe worker) behind ARCREEL_QUALITY_PROBE_CATALOG=host-v1 for the quality operator routes",
+      "catalog": {
+        "host-v1-container-stream": "sha256:b78079e1cbda42c011e048c7802772405c6220d0e3f0e9bace5855dde6be5483",
+        "host-v1-decode": "sha256:45b6aad2bd24cc3637cb91a48e31c20123d23bf5ef5f1a111572792842960d07"
+      },
+      "source_sha256": {
+        "r2/quality/host_catalog.py": "404a78d2d1d386794078ea43c0715f7afbe607325437d89bc2dda4ab78bde180",
+        "server/services/quality_probe_worker.py": "934ec55210e4aa1f76f1862cc6802ce67f279743576253bcc51e29b560892036",
+        "r2/quality/probes.py": "454430c14a938b6de36d9adebdc1a797130d7d672754e13c339f2214c1ac8a82",
+        "server/services/quality_probe_runtime.py": "e29ee0acd2255ffe6295a4a3d5a08cfe01e47b4597768359d01d7063d32b2ca9",
+        "server/services/quality_probes.py": "b21e206cb574311ea24fc9260d44cd9c812d4d2b56ee2988af8ce487e47f9ec7",
+        "server/routers/quality.py": "7d12c840acbc5a518c6e04bf03efd0c8c89adb88c6bc0d89791bb25a4101d6e4"
+      },
+      "suite": {
+        "selection": [
+          "A4 suite as before",
+          "tests/unit/r2/quality/test_probes.py",
+          "tests/integration/server/services/test_quality_host_catalog.py",
+          "tests/integration/server/services/test_quality_operator_chain.py",
+          "tests/integration/server/routers/test_quality_routes.py"
+        ],
+        "result": {
+          "tests": 195,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "junit_sha256": "7ba7b5cf4b352a86dbbe9819fc058c2b681d7eee8107d7364527e52471637e1d"
+      },
+      "environment": {
+        "postgresql": "16.15 disposable container",
+        "kernel": "7.0.0-38-generic",
+        "systemd": "259",
+        "ffmpeg": "8.0.1",
+        "vmaf": "3.2.1 f85a853"
+      }
     }
   ]
 }
