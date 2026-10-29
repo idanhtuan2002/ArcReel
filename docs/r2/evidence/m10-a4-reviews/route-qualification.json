@@ -161,6 +161,45 @@
         "ffmpeg": "8.0.1",
         "vmaf": "3.2.1 f85a853"
       }
+    },
+    {
+      "date": "2026-10-29",
+      "reason": "M10-C quality router changed after the host-v1 requalification (session actor read, newest-page observation reads with disclosure, probe/run cursor paging, run closure read, streaming body ceiling); same catalog, worker and probe services",
+      "catalog": {
+        "host-v1-container-stream": "sha256:b78079e1cbda42c011e048c7802772405c6220d0e3f0e9bace5855dde6be5483",
+        "host-v1-decode": "sha256:45b6aad2bd24cc3637cb91a48e31c20123d23bf5ef5f1a111572792842960d07"
+      },
+      "source_sha256": {
+        "r2/quality/host_catalog.py": "404a78d2d1d386794078ea43c0715f7afbe607325437d89bc2dda4ab78bde180",
+        "server/services/quality_probe_worker.py": "934ec55210e4aa1f76f1862cc6802ce67f279743576253bcc51e29b560892036",
+        "r2/quality/probes.py": "454430c14a938b6de36d9adebdc1a797130d7d672754e13c339f2214c1ac8a82",
+        "server/services/quality_probe_runtime.py": "e29ee0acd2255ffe6295a4a3d5a08cfe01e47b4597768359d01d7063d32b2ca9",
+        "server/services/quality_probes.py": "b21e206cb574311ea24fc9260d44cd9c812d4d2b56ee2988af8ce487e47f9ec7",
+        "server/routers/quality.py": "26b12386edf8ed35395495d035335ffba5bef4d4a620508df3fdd50b8cfd6377"
+      },
+      "suite": {
+        "selection": [
+          "A4 suite as before",
+          "tests/unit/r2/quality/test_probes.py",
+          "tests/integration/server/services/test_quality_host_catalog.py",
+          "tests/integration/server/services/test_quality_operator_chain.py",
+          "tests/integration/server/routers/test_quality_routes.py"
+        ],
+        "result": {
+          "tests": 206,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "junit_sha256": "7bbf67d708b2036588e2c45d865030de555a12f31298bb29eb18cc7bb1297d37"
+      },
+      "environment": {
+        "postgresql": "16.15 disposable container",
+        "kernel": "7.0.0-38-generic",
+        "systemd": "259",
+        "ffmpeg": "8.0.1",
+        "vmaf": "3.2.1 f85a853"
+      }
     }
   ]
 }
