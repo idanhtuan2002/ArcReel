@@ -835,7 +835,7 @@ class PackageExportService:
     async def _project_slot(
         self, session: AsyncSession, reader: CheckpointedShowrunnerGrantReader, slot: p.PackagingSlotKey, actor_id: str
     ) -> SlotStatus | None:
-        """One consistent projection, or None when the head moved after it was read."""
+        """One consistent projection, or None when the head moved after it was read and the check refused."""
         selections = PackageSelectionRepository(session)
         exports = ExportRepository(session)
         selection_id, version = await selections.current_head(slot)
@@ -864,13 +864,17 @@ class PackageExportService:
         refusal: M10Error | None = None
         try:
             await self._require_current(session, reader, subject, selection)
-        except StaleHeadError:
-            current, _ = await selections.current_head(slot)
-            if current != selection_id:
-                return None
-            refusal = StaleHeadError()
-        except (DispositionStaleError, ProfileStaleError, SubjectStaleError, WaiverForbiddenError) as error:
+        except (
+            DispositionStaleError,
+            ProfileStaleError,
+            StaleHeadError,
+            SubjectStaleError,
+            WaiverForbiddenError,
+        ) as error:
             refusal = error
+        if refusal is not None and await selections.current_head(slot) != (selection_id, version):
+            # An earlier refusal can mask a replacement of the selection itself; project the replacement instead.
+            return None
         run = await QualityRunRepository(session).run(
             user_id=slot.user_id, project_name=slot.project_name, run_id=selection.preview.quality_run_id
         )

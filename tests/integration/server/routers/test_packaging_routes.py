@@ -563,7 +563,10 @@ async def test_a_replaced_selection_keeps_its_exports_as_history_that_cannot_be_
     ]
 
 
-async def test_a_selection_replaced_during_the_slot_read_is_projected_from_the_replacement(http) -> None:
+@pytest.mark.parametrize("new_disposition", [False, True], ids=["same-disposition", "new-disposition"])
+async def test_a_selection_replaced_during_the_slot_read_is_projected_from_the_replacement(
+    http, new_disposition: bool
+) -> None:
     import asyncio
 
     from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
@@ -600,9 +603,13 @@ async def test_a_selection_replaced_during_the_slot_read_is_projected_from_the_r
     slot = p.PackagingSlotKey(user_id="default", project_name="project", **flow["slot"])
     reading = asyncio.create_task(service.slot_status(slot, ACTOR))
     await asyncio.wait_for(head_read.wait(), timeout=30)
+    if new_disposition:
+        await issue(env, disposition_request(env["run"], command_id="decide-2", version=1))
     replacement = await _replace_selection(env, flow)
     proceed.set()
     status = await asyncio.wait_for(reading, timeout=60)
     assert status.selection is not None
     assert (status.selection.selection_id, status.head_version) == (replacement.selection_id, 2)
-    assert (status.exportable, status.refusal_code) == (True, None)
+    assert (status.exportable, status.refusal_code, status.readiness_state) == (True, None, "READY")
+    if new_disposition:
+        assert replacement.preview.disposition_id != flow["selection"]["preview"]["disposition_id"]

@@ -1,0 +1,137 @@
+{
+  "verdict": "CHANGES_REQUESTED",
+  "head": "6f92db859c4cfd16dee767c1c871a70c9dad2f2d",
+  "prior_findings": [
+    {
+      "id": "M1",
+      "status": "RESOLVED",
+      "evidence": [
+        "lib/db/repositories/quality_packaging.py:221",
+        "server/services/package_export.py:841",
+        "server/services/package_export.py:879",
+        "server/routers/packaging.py:399",
+        "server/routers/packaging.py:413",
+        "frontend/src/features/packaging/ui/PackagingPage.tsx:581",
+        "frontend/src/features/packaging/ui/PackagingPage.tsx:589",
+        "frontend/src/features/packaging/ui/PackagingPage.tsx:597",
+        "frontend/src/features/packaging/ui/PackagingPage.tsx:629",
+        "tests/integration/server/routers/test_packaging_routes.py:540"
+      ],
+      "assessment": "Whole-slot selection history now supplies receipts with selection_id/current flags; historical entries persist after replacement and receive no new token. DTO includes readiness state/reasons and disposition decision. The UI displays readiness/decision, selected waiver rule IDs and replaced archive entries, and provides an explicit refresh button in addition to mutation refreshes. These address the prior missing lifecycle/history projection. The page remains a user-refreshed snapshot, not a subscription to external changes; server export/download checks remain authoritative. Runtime router/history acceptance could not execute here because PostgreSQL sockets are denied. The remaining concurrent projection defect is classified under N3 rather than duplicated here."
+    },
+    {
+      "id": "N1",
+      "status": "RESOLVED",
+      "evidence": [
+        "frontend/src/features/packaging/ui/PackagingPage.tsx:74",
+        "frontend/src/features/packaging/ui/PackagingPage.tsx:90",
+        "frontend/src/features/packaging/ui/PackagingPage.tsx:101",
+        "frontend/src/features/packaging/ui/PackagingPage.tsx:106",
+        "frontend/src/features/packaging/ui/PackagingPage.test.tsx:310",
+        "frontend/src/features/packaging/ui/PackagingPage.test.tsx:333"
+      ],
+      "assessment": "Refresh reads the currently committed scope through a ref instead of capturing the old action scope. Scope cleanup and explicit refresh clear settled authority; aborted results cannot settle. Both added deferred-response page tests passed in the fresh 10-test frontend run: an old selection completion refreshes the newly edited slot, and returning to a prior slot with a pending read leaves export disabled. This closes the two reported N1 scenarios. Coverage does not constitute a live-browser concurrency audit."
+    },
+    {
+      "id": "N2",
+      "status": "RESOLVED",
+      "evidence": [
+        "docs/r2/evidence/R2_M10_B6_DONOR_PARITY.json:19",
+        "docs/r2/evidence/R2_M10_B6_DONOR_PARITY.json:223",
+        "docs/r2/evidence/R2_M10_B6_DONOR_PARITY.json:257",
+        "docs/r2/evidence/R2_M10_B6_DONOR_PARITY.json:439"
+      ],
+      "assessment": "Both reports are rebound to concrete code HEAD 29168da353abbdc96b5123114fa22b01bcc2b490 and record a fresh 18-test rerun, result digest, timing and the three export-path files changed since 07e69875c. Git diff 29168da35..6f92db859 changes only the report itself, so all reviewed code/test inputs match the bound code snapshot. Fresh evaluation returns PASS for each report at 29168da35. Literal evaluation at the documentation commit 6f92db859 still returns BLOCKED by the exact-string HEAD contract; this review explicitly accepts the source-identical code-snapshot binding, not a claim that the pure fold passes at 6f92db859. The recorded rerun is historical evidence, not an independently reproduced confined-runtime pass in this sandbox. Any subsequent source fix requires affected evidence to be refreshed/rebound before B8 acceptance."
+    },
+    {
+      "id": "N3",
+      "status": "PARTIAL",
+      "severity": "Medium",
+      "confirmation": "CONFIRMED_SOURCE_AND_CONTROLLED_BRANCH_PROBE",
+      "title": "Moved-head retry is skipped when an earlier disposition/run refusal masks the selection replacement",
+      "evidence": [
+        "server/services/package_export.py:841",
+        "server/services/package_export.py:867",
+        "server/services/package_export.py:872",
+        "server/services/package_export.py:888",
+        "server/services/package_export.py:1012",
+        "server/services/package_export.py:1014",
+        "tests/integration/server/routers/test_packaging_routes.py:566",
+        "tests/integration/server/routers/test_packaging_routes.py:603"
+      ],
+      "assessment": "Column-select current_head removes identity-map reuse, and StaleHeadError caused by a simple same-disposition replacement correctly requests a fresh transaction, bounded to three attempts. The deterministic PG test has the right shape for that case: it pauses after the unlocked head read, replaces the title selection under the existing run/disposition, then expects version 2. However, head movement is checked only in the StaleHeadError handler. Other currentness refusals return the original selection/version without checking whether it still fills the slot.",
+      "scenario": "Reader captures S1/version1 bound to disposition D1, then pauses before _require_current locks the heads. Another session issues D2 (for example a renewed ACCEPT disposition), creates a preview bound to D2, and selects S2/version2 into the same slot. On resume, _require_current sees D2 != S1.preview.disposition_id and raises DispositionStaleError at line 1013 before it reaches the packaging-head check at line 1014. _project_slot catches that at 872 and returns S1/version1/exportable=false at 888, potentially alongside READY/D2 from its later readiness read. The UI labels S1 Current selection and withholds a valid S2 export until another refresh. A run/profile replacement can similarly mask the moved selection. This is a current-state projection defect; it does not grant stale export/download authority.",
+      "verification": "A fresh controlled Python branch probe executed the actual _project_slot code object in an isolated globals namespace with minimal repository stand-ins and a real PackageSelection fixture. The simulated currentness refusal moved the head to S2 and raised DispositionStaleError. The result retained S1/exportable=false and performed only one current_head read, proving that branch never rechecks/retries. This is not a real database interleaving. The authorized PG interleaving test could not execute because socket creation is denied.",
+      "fix": "Check the slot head after every caught currentness refusal, and retry the complete projection in a new transaction whenever selection/version changed, not only after StaleHeadError. Preserve the existing global lock order. Add a deterministic PG test that advances disposition and selects a package bound to that disposition while the first head read is paused; expect S2/version2 with its own readiness/history. A compatible retry for early profile/run refusals should receive equivalent coverage."
+    },
+    {
+      "id": "L2",
+      "status": "PARTIAL",
+      "evidence": [
+        "frontend/src/features/packaging/ui/PackagingPage.test.tsx:193",
+        "frontend/src/features/packaging/ui/PackagingPage.test.tsx:258",
+        "frontend/src/features/packaging/ui/PackagingPage.test.tsx:360"
+      ],
+      "assessment": "The focused frontend suite still includes passing populated-success and empty-state axe checks with color-contrast disabled. The populated refusal/history state has behavioral assertions but no axe invocation. Real keyboard traversal, focus recovery and contrast verification were not performed. This is a nonblocking accessibility verification note; remaining integrated UX acceptance belongs to B8 conditions, not a new finding."
+    }
+  ],
+  "new_findings": [],
+  "conditions": {
+    "critical_status": "No confirmed Critical or High issue identified in this bounded delta. Prior Medium N3 remains partial and is the source defect determining CHANGES_REQUESTED. L2 does not determine the verdict. No additional new finding is asserted.",
+    "scope": "Independent single-agent delta2 review using git diff 52f44a9f0..HEAD. Entry HEAD exactly matched the requested SHA and the worktree was clean. No repository source/test edits, formatting, staging, commits, push, merge or tag; only this review JSON is authored.",
+    "locks_and_tokens": "The new retry exits the transaction before restarting and does not acquire the packaging lock ahead of masters/profile/run/disposition. Existing advisory, shared-head and grant-row locks still make status reads capable of blocking writers; no new lock-order inversion was identified in the inspected delta. Tokens are issued only for interactive users when the selected package is exportable, and only on history entries whose selection_id equals the returned current selection. Historical entries have null tokens. Download continues to independently revalidate currentness. No fresh PostgreSQL contention, deadlock or token-route acceptance is claimed.",
+    "verification": [
+      {
+        "command": "docker exec m10b-test-pg psql -U postgres -d arcreel_test -tAc \"SELECT count(pg_terminate_backend(pid)) FROM pg_stat_activity WHERE datname=current_database() AND pid<>pg_backend_pid()\"",
+        "result": "Exit 1: permission denied connecting to /var/run/docker.sock. The requested backend cleanup could not be performed; no backend was terminated by this review."
+      },
+      {
+        "command": "DATABASE_URL=postgresql+asyncpg://postgres:postgres@127.0.0.1:55491/arcreel_test .venv/bin/python -m pytest -q --tb=short tests/integration/server/routers/test_packaging_routes.py tests/integration/server/services/test_package_export.py tests/integration/server/services/test_packaging_donor_parity.py",
+        "result": "Exit 1: 24 passed, 42 setup errors, 1 failed in 18.02s. PostgreSQL setup fails with PermissionError EPERM creating the socket. Confined parity performance fails with AmbiguousSubmitError because worker group cleanup is unverified. Environment limitations, not product pass/fail evidence for those paths. Full captured log: /tmp/m10-delta2-pytest.log."
+      },
+      {
+        "command": "cd frontend && pnpm vitest run src/features/packaging",
+        "result": "PASS: 1 file, 10 tests in 5.17s, including both new deferred-response N1 regressions."
+      },
+      {
+        "command": "Isolated Python branch probe using PackageExportService._project_slot.__code__, stand-in repositories and a real PackageSelection fixture",
+        "result": "Confirms remaining N3 branch: concurrent head replacement plus DispositionStaleError returns S1/exportable=false with current_head read count 1. No production object or repository source was patched."
+      },
+      {
+        "command": "Python evaluate_quality_parity at report-bound HEAD and review HEAD; git diff --name-status 29168da35..6f92db859",
+        "result": "Both reports PASS at 29168da35 and BLOCKED at literal 6f92db859; only R2_M10_B6_DONOR_PARITY.json differs, verifying identical code/test snapshot. Reported historical timing rerun was not substituted for a fresh successful runtime execution."
+      }
+    ],
+    "graph_limit": "list_projects succeeds but the indexed main-repository project is not this worktree. Structural search and check_index_coverage requests were denied with MCP tool call requires approval, but approval policy is never. No current graph generation/completeness claim; direct diff and numbered source verification used.",
+    "before_preseal_acceptance": [
+      "Close the remaining N3 early-refusal/head-replacement branch and verify it with a deterministic PostgreSQL interleaving.",
+      "Rerun the affected authorized backend tests where PostgreSQL sockets and confined worker execution are available; current sandbox errors do not establish product behavior.",
+      "Refresh affected source-bound parity evidence after any further source fix. Keep the concrete code snapshot distinct from later report/review-only commits."
+    ],
+    "B7_sponsor_conditions": [
+      "Sponsor-as-Human cohort pilots, utility/recall evidence, Human publication/disposition/selection and the preregistered clean-root/network experiments remain pending execution gates, not defects found by this delta review.",
+      "Preserve interactive authorization requirements for export; runbook agent wording does not permit borrowing Human authority."
+    ],
+    "B8_integrated_acceptance_conditions": [
+      "Perform the planned integrated acceptance against a frozen reviewed source snapshot, including real keyboard/focus/contrast and populated refusal-state accessibility verification.",
+      "No B7 completion, B8 acceptance, final seal or production-readiness claim follows from this review."
+    ],
+    "files_read": [
+      "docs/r2/evidence/m10-b-reviews/preseal-delta1-codex-review.json",
+      "server/services/package_export.py (delta and projection/currentness sections)",
+      "server/routers/packaging.py (delta)",
+      "lib/db/repositories/quality_packaging.py (delta and head access)",
+      "frontend/src/features/packaging/api/packagingClient.ts (delta)",
+      "frontend/src/features/packaging/ui/PackagingPage.tsx (delta, hook and projection sections)",
+      "frontend/src/features/packaging/ui/PackagingPage.test.tsx (delta and test execution)",
+      "tests/integration/server/routers/test_packaging_routes.py (delta and interleaving test)",
+      "tests/integration/server/services/test_package_export.py (execution only)",
+      "tests/integration/server/services/test_packaging_donor_parity.py (execution only)",
+      "frontend/src/i18n/en/dashboard.ts (delta)",
+      "frontend/src/i18n/vi/dashboard.ts (delta)",
+      "frontend/src/i18n/zh/dashboard.ts (delta)",
+      "docs/r2/evidence/R2_M10_B6_DONOR_PARITY.json",
+      "r2/quality/parity.py and r2/advanced_creative/parity.py (fresh fold execution; source read in delta1)"
+    ]
+  }
+}
