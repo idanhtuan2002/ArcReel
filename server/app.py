@@ -76,6 +76,7 @@ from server.routers import (
     projects,
     props,
     providers,
+    quality,
     r2_shots,
     reference_videos,
     scenes,
@@ -712,6 +713,12 @@ app.include_router(
     prefix="/api/v1",
     dependencies=[Depends(get_current_user), Depends(require_project_migration_ok)],
     tags=["M10 packaging"],
+)
+app.include_router(
+    quality.router,
+    prefix="/api/v1",
+    dependencies=[Depends(get_current_user), Depends(require_project_migration_ok)],
+    tags=["M10 quality"],
 )
 # The scoped export token authenticates downloads; no Bearer dependency.
 app.include_router(packaging.download_router, prefix="/api/v1", tags=["M10 packaging"])
