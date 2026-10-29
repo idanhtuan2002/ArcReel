@@ -1,0 +1,123 @@
+{
+  "schema_id": "m10.b-seal-candidate.v1",
+  "status": "SEAL_CANDIDATE_PENDING_HUMAN_PILOTS",
+  "branch": "design/r2-m10-b",
+  "worktree": ".worktrees/r2-m10-b",
+  "base": "0af66db9e",
+  "candidate_head": "10c9a1dc8c3892f0559d53efdd02f8719632b783",
+  "code_head_for_evidence": "975584c87c774d1ef1f2610ee11069759dbd76eb",
+  "design": "docs/superpowers/specs/2026-10-28-r2-m10-b-packaging-export-design.md",
+  "packets": {
+    "B0": {
+      "verdict": "ACCEPTED",
+      "review": "docs/r2/evidence/m10-b-reviews/design-b0-review.json"
+    },
+    "B1": {
+      "verdict": "ACCEPTED_WITH_CONDITIONS",
+      "reviews": [
+        "docs/r2/evidence/m10-b-reviews/b1-codex-review.json",
+        "docs/r2/evidence/m10-b-reviews/b1-codex-delta-review.json"
+      ],
+      "migration": "5d2a7c3e8b11"
+    },
+    "B2": {
+      "verdict": "ACCEPTED_WITH_CONDITIONS",
+      "reviews": [
+        "docs/r2/evidence/m10-b-reviews/b2-codex-delta3-review.json"
+      ],
+      "migration": "6e3b8d4f9c22"
+    },
+    "B3": {
+      "verdict": "ACCEPTED_WITH_CONDITIONS",
+      "reviews": [
+        "docs/r2/evidence/m10-b-reviews/b3-codex-delta2-review.json"
+      ],
+      "migration": "7f4c9e5a0d33"
+    },
+    "B4": {
+      "verdict": "ACCEPTED_WITH_CONDITIONS",
+      "reviews": [
+        "docs/r2/evidence/m10-b-reviews/b4-codex-delta3-review.json"
+      ],
+      "migration": "8a5d0f6b1e44",
+      "route_qualification": "docs/r2/evidence/m10-b-reviews/export-route-qualification.json"
+    },
+    "B5": {
+      "verdict": "ACCEPTED_WITH_VERIFICATION_LIMITS",
+      "reviews": [
+        "docs/r2/evidence/m10-b-reviews/b5-codex-delta2-review.json"
+      ]
+    },
+    "B6": {
+      "verdict": "PASS (Kalinga, OpenMontage)",
+      "report": "docs/r2/evidence/R2_M10_B6_DONOR_PARITY.json",
+      "baseline": "docs/r2/evidence/R2_M10_B6_DONOR_BASELINE.json",
+      "bound_code_head": "975584c87c774d1ef1f2610ee11069759dbd76eb"
+    },
+    "B7": {
+      "verdict": "PREREGISTERED_NOT_RUN",
+      "preregistration": "docs/r2/evidence/R2_M10_B7_PILOT_PREREGISTRATION.json (revision 2)",
+      "runbook": "docs/r2/evidence/R2_M10_B7_PILOT_RUNBOOK.md",
+      "requires": "sponsor as Human: profile publication, disposition, package selection in an interactive session"
+    },
+    "preseal": {
+      "verdict": "ACCEPTED_WITH_CONDITIONS",
+      "reviews": [
+        "docs/r2/evidence/m10-b-reviews/preseal-codex-review.json",
+        "docs/r2/evidence/m10-b-reviews/preseal-delta1-codex-review.json",
+        "docs/r2/evidence/m10-b-reviews/preseal-delta2-codex-review.json",
+        "docs/r2/evidence/m10-b-reviews/preseal-delta3-codex-review.json"
+      ]
+    }
+  },
+  "gates_run_by_main_agent": [
+    {
+      "head": "975584c87",
+      "command": "pytest tests/integration/server/routers/test_packaging_routes.py tests/integration/server/services/test_packaging_donor_parity.py (PG16 :55491)",
+      "result": "37 passed"
+    },
+    {
+      "head": "29168da35 (pre-fix of slot refusal branch)",
+      "command": "pytest test_packaging_routes.py test_package_export.py test_quality_package_selection.py (PG16)",
+      "result": "89 passed"
+    },
+    {
+      "head": "975584c87",
+      "command": "N3 regression: new-disposition interleaving case with fix reverted",
+      "result": "1 failed, 1 passed (fails without fix)"
+    },
+    {
+      "head": "29168da35",
+      "command": "(cd frontend && pnpm check)",
+      "result": "exit 0; 235 files, 2643 passed, 4 skipped"
+    },
+    {
+      "head": "29168da35",
+      "command": "ruff check, ruff format --check, basedpyright --warnings, lint-imports, deptry, audit_tests --check, i18n consistency",
+      "result": "all clean; 23 contracts kept; 18 i18n passed"
+    },
+    {
+      "head": "975584c87",
+      "command": "ruff, basedpyright (touched files), audit_tests --check",
+      "result": "clean"
+    }
+  ],
+  "verification_limits": [
+    "Full suite not run (sponsor rule: related tests only).",
+    "Codex reviewer sandbox could not reach docker/PostgreSQL in delta2/delta3; PG results are the main agent's runs.",
+    "Contention/deadlock freedom of the slot read is reasoned from lock order, not load-tested."
+  ],
+  "carried_conditions": [
+    "B4 → B8: disk-full/write/fsync/rename crash cuts; before/after-publication interruption; unknown recovery against an already-published object; LOCAL_REGULAR_FILE_IO / trusted project root (finalize × run-seal pair covered at 8df2456ac).",
+    "Pre-seal L2 → B8: live keyboard/focus/contrast and populated refusal-state accessibility checks.",
+    "Slot status reads take shared/advisory locks in global order and can briefly block writers; measure under B8.",
+    "Any later source change must refresh and rebind B6 parity evidence.",
+    "M10-A-F1 carried items as recorded in the handoff."
+  ],
+  "open_items": [
+    "B7 pilots (sponsor as Human) per runbook",
+    "B8 seal / M10-B acceptance",
+    "M10 integrated acceptance"
+  ],
+  "human_gates": "push, merge, tag, deploy, profile publication, disposition, package selection — never performed by the agent"
+}

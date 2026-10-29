@@ -153,8 +153,13 @@ Rewrite in place; this is the resume entry for M10-B.
   exit 0, 2641 tests). Static gates clean at `9c385bf94`. Codex delta1 running (`preseal-delta1-codex-review.json`).
   Parity `integrated_head` predates the `package_export.py` signature refactor in `2e3997b74`; rebuild at the seal HEAD.
 
+- Pre-seal delta1 CHANGES_REQUESTED (N1 UI refresh scope, N2 parity head binding, N3 slot race, M1 partial) →
+  `29168da35`, parity rebound `6f92db859`; delta2 CHANGES_REQUESTED (N3 partial: earlier refusal masked a moved head)
+  → `975584c87` (verified failing without the fix), parity rebound `19f0842de`; **delta3 ACCEPTED_WITH_CONDITIONS**
+  (`preseal-delta3-codex-review.json`). Seal candidate: `R2_M10_B_CANDIDATE.json`.
+
 ## Next step
 
-Triage the pre-seal delta1 review; rebuild the B6 parity report at the final HEAD. Then write `R2_M10_B_CANDIDATE.json` (seal candidate: HEAD, packets, reviews, gates run,
-carried conditions, the Human-gated B7 pilots as the only open item) and stop for the sponsor: pilots per the runbook,
-then B8 seal (M10-B acceptance) and M10 integrated acceptance. Nothing pushed; merge/tag/deploy are Human gates.
+**Stop for the sponsor.** Run the B7 pilots as Human per `R2_M10_B7_PILOT_RUNBOOK.md` (profile publication,
+disposition, package selection in an interactive session). Then B8 seal (M10-B acceptance with the carried
+conditions in `R2_M10_B_CANDIDATE.json`) and M10 integrated acceptance. Nothing pushed; merge/tag/deploy are Human gates.
