@@ -14,6 +14,8 @@ from typing import Any
 
 BASELINE = "docs/r2/evidence/R2_M10_B6_DONOR_BASELINE.json"
 TESTS = "tests/integration/server/services/test_packaging_donor_parity.py"
+# OpenMontage's `schemas.artifacts` validator and publish_log schema, pinned at the donor commit and run in-test.
+SCHEMA_FIXTURE = "tests/fixtures/r2/m10_b6_donors/openmontage_schema.json"
 P, IM = "PARITY", "IMPROVED"
 DIMENSIONS = (
     "functionality",
@@ -25,7 +27,8 @@ DIMENSIONS = (
     "performance",
     "resources",
 )
-_SEO = (P, P, P, P, IM, IM, P, P)
+# Pure text rules over identical inputs: data_integrity PARITY by the frozen criterion; typed codes improve observability.
+_SEO = (P, P, P, P, P, IM, P, P)
 _SEO_TESTS = (
     "test_every_donor_seo_finding_is_detected_by_its_m10_rule[{}]",
     "test_the_m10_check_stays_within_the_frozen_performance_rule",
@@ -47,8 +50,9 @@ ASSESSMENT: dict[str, tuple[tuple[str, ...], tuple[str, ...]]] = {
             "kalinga_tag_min",
         )
     },
+    # Both refuse a package without metadata (failure_safety PARITY); M10 refuses it structurally with a typed error.
     "kalinga_metadata_missing": (
-        (P, P, P, IM, IM, IM, P, P),
+        (P, P, P, P, P, IM, P, P),
         ("test_missing_metadata_is_a_donor_issue_and_cannot_even_be_constructed_in_m10",),
     ),
     "openmontage_missing_video": (
@@ -62,7 +66,8 @@ ASSESSMENT: dict[str, tuple[tuple[str, ...], tuple[str, ...]]] = {
     "openmontage_layout": (
         (P, P, IM, P, IM, P, P, IM),
         (
-            "test_the_bundle_layout_matches_the_donor_for_video_metadata_and_thumbnail",
+            "test_one_case_exports_the_same_member_bytes_and_metadata_values",
+            "test_a_publish_log_rejected_by_the_donor_schema_writes_a_partial_bundle",
             "test_the_confined_export_stays_within_the_frozen_performance_rule",
         ),
     ),
@@ -82,7 +87,10 @@ ASSESSMENT: dict[str, tuple[tuple[str, ...], tuple[str, ...]]] = {
     ),
     "openmontage_metadata_document": (
         (P, P, IM, P, IM, P, P, P),
-        ("test_the_metadata_document_covers_every_donor_metadata_field",),
+        (
+            "test_one_case_exports_the_same_member_bytes_and_metadata_values",
+            "test_a_corrupted_metadata_value_would_be_detected_by_this_comparison",
+        ),
     ),
 }
 
@@ -90,6 +98,10 @@ ASSESSMENT: dict[str, tuple[tuple[str, ...], tuple[str, ...]]] = {
 def _digest(value: object) -> str:
     raw = json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
     return "sha256:" + hashlib.sha256(raw).hexdigest()
+
+
+def _file_digest(path: Path) -> str:
+    return "sha256:" + hashlib.sha256(path.read_bytes()).hexdigest()
 
 
 def build(root: Path, integrated_head: str, results: dict[str, Any]) -> dict[str, Any]:
@@ -101,6 +113,7 @@ def build(root: Path, integrated_head: str, results: dict[str, Any]) -> dict[str
     reports: dict[str, Any] = {}
     for key, donor in baseline["donors"].items():
         frozen_rows = [row for row in baseline["rows"] if row["donor"] == key]
+        extra_fixtures = [] if key != "openmontage" else [f"{SCHEMA_FIXTURE}@{_file_digest(root / SCHEMA_FIXTURE)}"]
         rows = []
         for frozen in frozen_rows:
             excluded = not frozen["measured"]
@@ -109,7 +122,7 @@ def build(root: Path, integrated_head: str, results: dict[str, Any]) -> dict[str
                 {
                     "behavior_id": frozen["behavior_id"],
                     "donor_test_refs": frozen["donor_test_refs"],
-                    "fixture_refs": [baseline["fixtures"]],
+                    "fixture_refs": [baseline["fixtures"], *extra_fixtures],
                     "intentional_difference": frozen.get("intentional_difference"),
                     **dict(zip(DIMENSIONS, values, strict=True)),
                     "evidence_refs": [f"{TESTS}::{name}" for name in tests],

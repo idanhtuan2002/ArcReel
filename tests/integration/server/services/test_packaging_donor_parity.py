@@ -21,7 +21,6 @@ import pytest
 
 from r2.contracts import quality as q
 from r2.quality.packaging_check import check_package
-from server.services.package_export import member_path, metadata_document
 from server.services.package_export_worker import BundleMember, build_archive
 from tests.unit.r2.quality.test_packaging_check import all_rules_constraints, clean_body, facts, sealed
 
@@ -46,15 +45,31 @@ class _Config:
         return _Channel()
 
 
+SCHEMA_FIXTURE = ROOT / "tests" / "fixtures" / "r2" / "m10_b6_donors" / "openmontage_schema.json"
+
+
 @pytest.fixture(scope="module")
-def donors() -> Iterator[dict[str, Any]]:
-    # OpenMontage validates its publish_log against its own schema package, which is outside the measured rows.
+def donors(tmp_path_factory: pytest.TempPathFactory) -> Iterator[dict[str, Any]]:
+    """The pinned donors, with OpenMontage's own pinned publish_log schema validator installed as `schemas.artifacts`."""
     import sys
     import types
 
+    import jsonschema
+
+    pinned = json.loads(SCHEMA_FIXTURE.read_text("utf-8"))
+    assert pinned["commit_sha"] == BASELINE["donors"]["openmontage"]["commit_sha"]
+    schema_bytes = pinned["publish_log_schema"].encode("utf-8")
+    assert hashlib.sha256(schema_bytes).hexdigest() == pinned["files"]["schemas/artifacts/publish_log.schema.json"]
+    schema_dir = tmp_path_factory.mktemp("openmontage-schemas")
+    (schema_dir / "publish_log.schema.json").write_bytes(schema_bytes)
     schemas = types.ModuleType("schemas")
     artifacts = types.ModuleType("schemas.artifacts")
-    artifacts.validate_artifact = lambda _kind, _value: None
+    artifacts.__dict__.update(
+        {"json": json, "Path": Path, "Any": Any, "jsonschema": jsonschema, "SCHEMA_DIR": schema_dir}
+    )
+    for function in pinned["functions"]:
+        assert hashlib.sha256(function["source"].encode("utf-8")).hexdigest() == function["sha256"]
+        exec(compile(function["source"], "schemas/artifacts/__init__.py", "exec"), artifacts.__dict__)
     previous = {name: sys.modules.get(name) for name in ("schemas", "schemas.artifacts")}
     sys.modules["schemas"], sys.modules["schemas.artifacts"] = schemas, artifacts
     try:
@@ -278,29 +293,134 @@ def _checked(body: dict[str, Any]):
     return candidate, q.PlatformConstraintSnapshot.model_validate(constraints), facts(candidate)
 
 
-def test_the_bundle_layout_matches_the_donor_for_video_metadata_and_thumbnail(donors, tmp_path: Path) -> None:
-    result = _Bundle(donors["openmontage"]).execute(_inputs(tmp_path))
-    assert result.success is True
-    export_root = Path(_inputs(tmp_path)["export_dir"])
-    donor_paths = {Path(path).relative_to(export_root).as_posix() for path in result.data["files_written"]}
-    m10_paths = {
-        member_path("video", None, "video/mp4"),
-        member_path("thumbnail", None, "image/png"),
-        "metadata/metadata.json",
+CASE = {
+    "title": "A history of the river valley",
+    "description": "How the river shaped the valley.",
+    "tags": ["river", "history"],
+    "hashtags": ["#river"],
+    "chapters": [{"start_seconds": 0, "title": "Source"}, {"start_seconds": 60, "title": "Delta"}],
+}
+VIDEO = b"\x00\x00\x00\x18ftypisom" + b"v" * 4096
+THUMBNAIL = b"\x89PNG\r\n\x1a\n" + b"t" * 512
+
+
+def _donor_case(tmp_path: Path) -> dict[str, Any]:
+    render = tmp_path / "render"
+    render.mkdir(parents=True, exist_ok=True)
+    (render / "final.mp4").write_bytes(VIDEO)
+    (render / "thumb.png").write_bytes(THUMBNAIL)
+    return {
+        **CASE,
+        "video_path": str(render / "final.mp4"),
+        "thumbnail_path": str(render / "thumb.png"),
+        "export_dir": str(tmp_path / "donor-export"),
+        "project_name": "demo",
+        "timestamp": "2026-10-29T00:00:00+00:00",
     }
-    assert m10_paths <= donor_paths
 
 
-def test_the_metadata_document_covers_every_donor_metadata_field(donors, tmp_path: Path) -> None:
+def _m10_case() -> tuple[Any, list[tuple[str, bytes]]]:
+    """The same case as an M10 package: identical bytes, metadata and chapters (seconds -> milliseconds)."""
     from r2.contracts.advanced_creative import PackagingCandidate
 
-    result = _Bundle(donors["openmontage"]).execute(_inputs(tmp_path))
-    donor_metadata = json.loads(
-        (Path(_inputs(tmp_path)["export_dir"]) / "metadata" / "metadata.json").read_text("utf-8")
+    def asset(role: str, data: bytes, media: str, rule: str) -> dict[str, Any]:
+        return {
+            "role": role,
+            "variant_id": None,
+            "source_ref": f"{role}.bin",
+            "content_digest": "sha256:" + hashlib.sha256(data).hexdigest(),
+            "media_type": media,
+            "byte_size": len(data),
+            "constraint_rule_id": rule,
+        }
+
+    body = clean_body() | {
+        "title": CASE["title"],
+        "description": CASE["description"],
+        "tags": CASE["tags"],
+        "hashtags": CASE["hashtags"],
+        "chapters": [{"start_ms": c["start_seconds"] * 1000, "title": c["title"]} for c in CASE["chapters"]],
+        "localization_variants": [],
+        "variant_groups": [],
+        "assets": [
+            asset("video", VIDEO, "video/mp4", "asset-video"),
+            asset("thumbnail", THUMBNAIL, "image/png", "asset-thumbnail"),
+        ],
+    }
+    return PackagingCandidate.model_validate(body), [("video.bin", VIDEO), ("thumbnail.bin", THUMBNAIL)]
+
+
+def _m10_archive(tmp_path: Path) -> dict[str, bytes]:
+    """Plan, snapshot and build the M10 archive for the case; returns member bytes by path."""
+    import io
+    import os
+    import zipfile
+
+    from r2.contracts import packaging as p
+    from server.services.package_export import (
+        PackageEvidence,
+        WorkDirectory,
+        builder_identity_digest,
+        open_export_store,
+        plan_export,
+        snapshot_assets,
     )
-    ours = metadata_document(PackagingCandidate.model_validate(_checked(clean_body())[0].model_dump(mode="python")), {})
+    from tests.unit.r2.contracts.test_packaging import selection_data
+
+    candidate, files = _m10_case()
+    root = tmp_path / "m10"
+    root.mkdir(parents=True)
+    for name, data in files:
+        (root / name).write_bytes(data)
+    selection = p.PackageSelection.model_validate(selection_data())
+    plan = plan_export(selection, PackageEvidence(candidate, None, None, None), builder_identity_digest())
+    store = open_export_store(root)
+    work = WorkDirectory(store, root)
+    try:
+        members = [m.member for m in snapshot_assets(root, work, plan)]
+        build_archive(work.path / "out.zip", members, plan.manifest_bytes)
+        data = (work.path / "out.zip").read_bytes()
+    finally:
+        work.close()
+        os.close(store)
+    with zipfile.ZipFile(io.BytesIO(data)) as bundle:
+        return {name: bundle.read(name) for name in bundle.namelist()}
+
+
+def test_one_case_exports_the_same_member_bytes_and_metadata_values(donors, tmp_path: Path) -> None:
+    result = _Bundle(donors["openmontage"]).execute(_donor_case(tmp_path))
+    assert result.success is True, result.error
+    root = Path(_donor_case(tmp_path)["export_dir"])
+    ours = _m10_archive(tmp_path)
+    assert (root / "video" / "output.mp4").read_bytes() == ours["video/output.mp4"] == VIDEO
+    assert (root / "thumbnails" / "thumbnail.png").read_bytes() == ours["thumbnails/thumbnail.png"] == THUMBNAIL
+    donor_metadata = json.loads((root / "metadata" / "metadata.json").read_text("utf-8"))
+    m10_metadata = json.loads(ours["metadata/metadata.json"])
+    for field in ("title", "description", "tags", "hashtags"):
+        assert donor_metadata[field] == m10_metadata[field] == CASE[field], field
+    assert [{"start_seconds": c["start_ms"] // 1000, "title": c["title"]} for c in m10_metadata["chapters"]] == (
+        donor_metadata["chapters"]
+    )
+    # Frozen exclusions: pasteable text files and video/subtitles.* exist only in the donor bundle.
+    donor_only = {Path(p).relative_to(root).as_posix() for p in result.data["files_written"]} - set(ours)
+    assert donor_only <= {"metadata/description.txt", "metadata/tags.txt", "metadata/chapters.txt"}
+
+
+def test_a_corrupted_metadata_value_would_be_detected_by_this_comparison(donors, tmp_path: Path) -> None:
+    case = _donor_case(tmp_path) | {"title": "A different title"}
+    result = _Bundle(donors["openmontage"]).execute(case)
+    donor_metadata = json.loads((Path(case["export_dir"]) / "metadata" / "metadata.json").read_text("utf-8"))
+    ours = json.loads(_m10_archive(tmp_path)["metadata/metadata.json"])
     assert result.success is True
-    assert set(donor_metadata) <= set(ours)
+    assert donor_metadata["title"] != ours["title"]
+
+
+def test_a_publish_log_rejected_by_the_donor_schema_writes_a_partial_bundle(donors, tmp_path: Path) -> None:
+    case = _donor_case(tmp_path) | {"visibility": "secret"}
+    result = _Bundle(donors["openmontage"]).execute(case)
+    assert result.success is False
+    assert "schema validation" in (result.error or "")
+    assert (Path(case["export_dir"]) / "video" / "output.mp4").is_file()
 
 
 def test_the_donor_bundle_is_not_byte_stable_and_the_m10_archive_is(donors, tmp_path: Path) -> None:
@@ -326,10 +446,10 @@ def test_both_export_locally_without_uploading(donors, tmp_path: Path) -> None:
 
 
 async def test_the_confined_export_stays_within_the_frozen_performance_rule(donors, tmp_path: Path) -> None:
+    """Both sides export the same case (same video and thumbnail bytes, same metadata), timed from source files to a written bundle."""
     import os
 
     from r2.contracts import packaging as p
-    from r2.contracts.advanced_creative import PackagingCandidate
     from server.services.package_export import (
         PackageEvidence,
         PackageExportService,
@@ -339,34 +459,32 @@ async def test_the_confined_export_stays_within_the_frozen_performance_rule(dono
         plan_export,
         snapshot_assets,
     )
-    from tests.unit.r2.contracts.test_packaging import candidate_data, selection_data
+    from tests.unit.r2.contracts.test_packaging import selection_data
 
+    candidate, files = _m10_case()
     root = tmp_path / "project"
-    (root / "masters").mkdir(parents=True)
-    payload = b"\x00\x00\x00\x18ftypisom" + b"v" * 4096
-    (root / "masters" / "final.mp4").write_bytes(payload)
-    asset = candidate_data()["assets"][0] | {
-        "content_digest": "sha256:" + hashlib.sha256(payload).hexdigest(),
-        "byte_size": len(payload),
-    }
-    candidate = PackagingCandidate.model_validate(candidate_data() | {"assets": [asset]})
+    root.mkdir()
+    for name, data in files:
+        (root / name).write_bytes(data)
     selection = p.PackageSelection.model_validate(selection_data())
     service = PackageExportService(sessions=None, grant_reader=None, project_root=root, interactive_token=None)
     m10_ms, donor_ms = [], []
-    for attempt in range(3):
+    for attempt in range(5):
+        started = time.perf_counter()
         plan = plan_export(selection, PackageEvidence(candidate, None, None, None), builder_identity_digest())
         store = open_export_store(root)
         work = WorkDirectory(store, root)
         try:
             members = snapshot_assets(root, work, plan)
-            started = time.perf_counter()
             digest = await service._build_and_publish(f"perf-{attempt}", plan, members, store, work)
-            assert (root / "exports" / f"{digest.removeprefix('sha256:')}.zip").is_file()
             m10_ms.append((time.perf_counter() - started) * 1000)
+            assert (root / "exports" / f"{digest.removeprefix('sha256:')}.zip").is_file()
         finally:
             work.close()
             os.close(store)
+        case = _donor_case(tmp_path / f"donor-{attempt}")
         started = time.perf_counter()
-        _Bundle(donors["openmontage"]).execute(_inputs(tmp_path / f"donor-{attempt}"))
+        result = _Bundle(donors["openmontage"]).execute(case)
         donor_ms.append((time.perf_counter() - started) * 1000)
+        assert result.success is True, result.error
     assert statistics.median(m10_ms) <= statistics.median(donor_ms) + OVERHEAD_MS, (m10_ms, donor_ms)

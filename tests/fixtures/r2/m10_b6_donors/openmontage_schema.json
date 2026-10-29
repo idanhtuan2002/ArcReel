@@ -1,0 +1,26 @@
+{
+  "schema_id": "m10.b6-openmontage-schema.v1",
+  "repository_url": "https://github.com/calesthio/OpenMontage",
+  "commit_sha": "08e2151fa02de28a5d6a312b3d575692bf147ad7",
+  "files": {
+    "schemas/artifacts/__init__.py": "b298af5bb8b73ceeb193220b3b722bfea842a7bf4cfbbf6fcbbdee9532595599",
+    "schemas/artifacts/publish_log.schema.json": "bab332eefac416b8b572d7fcc4eaaa2bb71dd12f27c62042f139aa38d6bb6282"
+  },
+  "functions": [
+    {
+      "name": "load_schema",
+      "lineno": 37,
+      "end_lineno": 43,
+      "sha256": "631a79d72e5d1d0140a7bac9bd6888d6af465f02741a2c627188dd608763fb70",
+      "source": "def load_schema(name: str) -> dict:\n    \"\"\"Load a JSON schema by artifact name.\"\"\"\n    path = SCHEMA_DIR / f\"{name}.schema.json\"\n    if not path.exists():\n        raise FileNotFoundError(f\"Schema not found: {path}\")\n    with open(path, encoding=\"utf-8\") as f:\n        return json.load(f)\n"
+    },
+    {
+      "name": "validate_artifact",
+      "lineno": 46,
+      "end_lineno": 49,
+      "sha256": "d7d81ebfd669732c288b9baa29a752385937f1d9dd77b2a3d9227ab8be5c447e",
+      "source": "def validate_artifact(name: str, data: dict[str, Any]) -> None:\n    \"\"\"Validate artifact data against its schema. Raises on failure.\"\"\"\n    schema = load_schema(name)\n    jsonschema.validate(instance=data, schema=schema)\n"
+    }
+  ],
+  "publish_log_schema": "{\n  \"$schema\": \"https://json-schema.org/draft/2020-12/schema\",\n  \"$id\": \"openmontage/artifacts/publish_log\",\n  \"title\": \"Publish Log\",\n  \"description\": \"Per-platform publish/export results produced by the Publisher agent.\",\n  \"type\": \"object\",\n  \"required\": [\"version\", \"entries\"],\n  \"properties\": {\n    \"version\": { \"type\": \"string\", \"const\": \"1.0\" },\n    \"entries\": {\n      \"type\": \"array\",\n      \"items\": {\n        \"type\": \"object\",\n        \"required\": [\"platform\", \"status\", \"timestamp\"],\n        \"properties\": {\n          \"platform\": { \"type\": \"string\" },\n          \"status\": { \"type\": \"string\", \"enum\": [\"published\", \"exported\", \"failed\", \"draft\", \"pending_review\"] },\n          \"url\": { \"type\": \"string\" },\n          \"video_id\": { \"type\": \"string\" },\n          \"visibility\": { \"type\": \"string\", \"enum\": [\"public\", \"private\", \"unlisted\"] },\n          \"export_path\": { \"type\": \"string\" },\n          \"timestamp\": { \"type\": \"string\", \"format\": \"date-time\" },\n          \"metadata_used\": {\n            \"type\": \"object\",\n            \"properties\": {\n              \"title\": { \"type\": \"string\" },\n              \"description\": { \"type\": \"string\" },\n              \"hashtags\": { \"type\": \"array\", \"items\": { \"type\": \"string\" } },\n              \"chapters\": { \"type\": \"array\", \"items\": { \"type\": \"object\" } }\n            }\n          },\n          \"error\": { \"type\": \"string\" }\n        },\n        \"additionalProperties\": false\n      }\n    },\n    \"metadata\": { \"type\": \"object\" }\n  },\n  \"additionalProperties\": false\n}\n"
+}
