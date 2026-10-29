@@ -41,3 +41,20 @@ activated-host qualification + deploy (sudo), then M9-B.
   disagreement policies are private schema-tagged digests (`m10-c.qualification.host-deterministic-probe.v1`,
   `m10-c.disagreement.single-slot.v1`), not test placeholders.
 
+## C3 router plan (checkpoint)
+- Seal module done `7767bba08` (`server/services/quality_prepare.py`, 9 tests).
+- `server/routers/quality.py`, prefix `/projects/{p}/quality`; `QualityDeps` like `PackagingDeps` + catalog
+  (`HOST_CATALOG` iff `ARCREEL_QUALITY_PROBE_CATALOG=host-v1`), probe runtime, `AUTH_TOKEN_SECRET`.
+- Prepare/submit pairs, request builders mirror the accepted test helpers:
+  publish (`publication_request`: draft user/project/profile_id/revision/parent/cohort/surface/policy/policy_digest/
+  supersession_effect/created_by/created_at → subject with draft digest + expected revision → command PUBLISH_PROFILE);
+  probe (`ProbeRequest`: execution_ref = command id, requirement/slot from template, rule from slot rule ids);
+  review (`HumanObservationRequest`, D7 digests); seal (`completion`: bindings from stored observations);
+  dispose (`request_for` in test_quality_dispositions, bounded expiry).
+- Services: `InteractiveProfilePublicationCustodian.for_request` + `ProfilePublicationService.publish`;
+  `QualityProbeService.for_request(request, sessions, interactive_token, project_root, catalog, runtime).observe`;
+  `HumanObservationService.for_request(..., grant_reader, project_root).record`;
+  `QualityRunService.for_request(...).complete`; `DispositionCustodian.for_request` + `DispositionService.issue`.
+- Reads needing additive read-only repository methods: profile heads/revisions list, observations per
+  profile/subject, runs per root.
+
