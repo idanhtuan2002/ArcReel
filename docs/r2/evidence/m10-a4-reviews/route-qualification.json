@@ -78,5 +78,50 @@
     "receipt-first replay precedes catalog resolution",
     "cancellation kills, reaps and verifies the owned unit",
     "DECODE refuses media missing a required stream"
+  ],
+  "requalifications": [
+    {
+      "date": "2026-10-29",
+      "reason": "B7 finding F1: approved V2 finals are full-range H.264 4:2:0 (ffprobe pix_fmt yuvj420p) and were refused; CONTAINER_STREAM now admits yuv420p and yuvj420p and reports the declared value as StreamFacts.pixel_format",
+      "source_sha256": {
+        "server/services/quality_probe_worker.py": "934ec55210e4aa1f76f1862cc6802ce67f279743576253bcc51e29b560892036",
+        "r2/quality/probes.py": "454430c14a938b6de36d9adebdc1a797130d7d672754e13c339f2214c1ac8a82",
+        "server/services/quality_probe_runtime.py": "e29ee0acd2255ffe6295a4a3d5a08cfe01e47b4597768359d01d7063d32b2ca9",
+        "server/services/quality_probe_inputs.py": "7f5282d6a8ced58726e0cb6a77833333f094276bb6bdf4dd53743bc3c1e1ff33",
+        "server/services/quality_probes.py": "b21e206cb574311ea24fc9260d44cd9c812d4d2b56ee2988af8ce487e47f9ec7",
+        "lib/db/repositories/quality_probes.py": "4c1f9dc8ef8e755a6b50d73dd3d2589d36f920ffea88cc5ba3b2ef3e71ff9ea9",
+        "lib/db/models/quality_probes.py": "286e734fb32cfaa789668bf58d87067d83da0c92d16415b81ef66c0ce126a37c",
+        "alembic/versions/07fd34535384_quality_probe_evidence.py": "f8b1b2a74a601197f6488b1c9e2143764665dcb431127c0ad7c8baa089c047f8"
+      },
+      "fixtures": {
+        "tests/fixtures/r2/quality_probes/av_fullrange.mp4": "26127b8fccc69ac07c0a8ef34562efaa3288bcb070c922ac258c9a2be4b2362a"
+      },
+      "suite": {
+        "selection": [
+          "tests/unit/server/services/test_quality_probe_inputs.py",
+          "tests/integration/server/services/test_quality_probes.py",
+          "tests/integration/server/services/test_quality_probe_runtime.py",
+          "tests/integration/server/services/test_quality_probe_recipes.py",
+          "tests/integration/lib/db/repositories/test_quality_probes.py",
+          "tests/integration/lib/db/migrations/test_07fd34535384_quality_probe_evidence.py",
+          "tests/unit/r2/quality/test_probes.py"
+        ],
+        "result": {
+          "tests": 180,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "junit_sha256": "305a32383fb8c2d258d54a77a660a73e8bc2457282326068493e31c27a05bf98"
+      },
+      "real_media_check": "both approved V2 finals (16:9 sha256 1bcd60c2…, 9:16 sha256 c9f5d429…) measure PASS for CONTAINER_STREAM and DECODE",
+      "environment": {
+        "postgresql": "16.15 disposable container",
+        "kernel": "7.0.0-38-generic",
+        "systemd": "259",
+        "ffmpeg": "8.0.1",
+        "vmaf": "3.2.1 f85a853"
+      }
+    }
   ]
 }

@@ -119,6 +119,17 @@ async def test_container_reports_typed_mp4_streams_and_policy_requires_audio(pro
     assert missing.measurement.status == "FAIL"
 
 
+async def test_a_full_range_h264_master_is_measured_and_reported_as_full_range(project: Path) -> None:
+    result = await measure(
+        project, config_for("CONTAINER_STREAM", parameters={"require_audio": True}), "av_fullrange.mp4"
+    )
+    assert result.measurement.status == "PASS"
+    video = result.measurement.facts.streams[0]
+    assert (video.codec, video.pixel_format, video.width, video.height) == ("h264", "yuvj420p", 64, 64)
+    decoded = await measure(project, config_for("DECODE"), "av_fullrange.mp4")
+    assert decoded.measurement.status == "PASS"
+
+
 @pytest.mark.parametrize("media", ["truncated.mp4", "mpeg4.mp4"])
 async def test_truncated_or_unqualified_container_is_a_probe_failure(project: Path, media: str) -> None:
     with pytest.raises(ProbeFailedError):

@@ -143,6 +143,18 @@ def test_stream_shape_is_strict_and_kind_specific(change) -> None:
         probes().StreamFacts.model_validate(video_stream() | change)
 
 
+@pytest.mark.parametrize("pixel_format", ["yuv420p", "yuvj420p"])
+def test_video_facts_keep_the_4_2_0_range_the_stream_declares(pixel_format: str) -> None:
+    stream = probes().StreamFacts.model_validate(video_stream() | {"pixel_format": pixel_format})
+    assert stream.pixel_format == pixel_format
+
+
+@pytest.mark.parametrize("pixel_format", ["yuv444p", "yuv420p10le", "nv12"])
+def test_video_facts_refuse_other_pixel_formats(pixel_format: str) -> None:
+    with pytest.raises(ValidationError):
+        probes().StreamFacts.model_validate(video_stream() | {"pixel_format": pixel_format})
+
+
 def test_audio_has_no_invented_video_dimensions_or_frame_rate() -> None:
     data = video_stream() | {
         "index": 1,

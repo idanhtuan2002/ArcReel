@@ -325,11 +325,11 @@
       "supports_webhook": false,
       "supports_lookup": false,
       "provider_sequence_is_monotonic": false,
-      "evidence_digest": "sha256:e85344912856562a1399cbb75a2a637d42ad23f50b49847e149f9c76c80dd1b5",
+      "evidence_digest": "sha256:43d6b4a1ea25682ad0eb48b55fa3e26706b5906f87945967bd0208351c51fb25",
       "qualification_status": "OFFLINE_VERIFIED",
       "evidence_recorded_at": "2026-10-28T00:00:00+00:00",
       "evidence_expires_at": null,
-      "entry_digest": "sha256:fa67672c8bf0b741e1d8434b21d6875319a4ccb995ba1ee43142277f1829c963"
+      "entry_digest": "sha256:4abe56c4b792d628373c512380c61006723032704817cfbd38fbfcd221ac40eb"
     },
     {
       "ref": "local-zip-package-export@host-export-v1",

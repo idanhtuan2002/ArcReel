@@ -406,6 +406,8 @@ def verify_tools(config: dict[str, object], *, deadline: float) -> None:
 
 
 _MP4_FORMAT = "mov,mp4,m4a,3gp,3g2,mj2"
+# H.264 4:2:0 in limited or full range; ffprobe names full-range 4:2:0 `yuvj420p`.
+_PIXEL_FORMATS = frozenset({"yuv420p", "yuvj420p"})
 _PROBE_ENTRIES = (
     "format=format_name,duration:stream=index,codec_type,codec_name,width,height,pix_fmt,sample_rate,channels,"
     "avg_frame_rate,time_base,duration_ts,start_time"
@@ -575,7 +577,8 @@ def probe_media(config: dict[str, object], path: str, *, deadline: float, failur
         stream_duration = _time(length * time_base) if type(length) is int and length >= 0 else "UNKNOWN"
         kind = stream.get("codec_type")
         if kind == "video" and video is None:
-            if stream.get("codec_name") != "h264" or stream.get("pix_fmt") != "yuv420p":
+            pixel_format = stream.get("pix_fmt")
+            if stream.get("codec_name") != "h264" or pixel_format not in _PIXEL_FORMATS:
                 raise WorkerError(unsupported)
             width, height = stream.get("width"), stream.get("height")
             rate = _rational(stream.get("avg_frame_rate"), unsupported)
@@ -590,7 +593,7 @@ def probe_media(config: dict[str, object], path: str, *, deadline: float, failur
                     "codec": "h264",
                     "width": width,
                     "height": height,
-                    "pixel_format": "yuv420p",
+                    "pixel_format": pixel_format,
                     "frame_rate": _time(rate),
                     "time_base": _time(time_base),
                     "duration": stream_duration,

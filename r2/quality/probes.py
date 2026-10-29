@@ -128,7 +128,8 @@ class StreamFacts(M10ContractModel):
     codec: Literal["h264", "aac"]
     width: StrictInt | None = Field(default=None, gt=0, le=32768)
     height: StrictInt | None = Field(default=None, gt=0, le=32768)
-    pixel_format: Literal["yuv420p"] | None = None
+    # H.264 4:2:0 in limited (yuv420p) or full (yuvj420p) range, as the stream declares it.
+    pixel_format: Literal["yuv420p", "yuvj420p"] | None = None
     sample_rate: StrictInt | None = Field(default=None, gt=0, le=384000)
     channels: StrictInt | None = Field(default=None, gt=0, le=32)
     frame_rate: MediaTime | None = None
