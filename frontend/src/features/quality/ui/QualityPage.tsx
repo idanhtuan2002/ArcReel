@@ -10,7 +10,6 @@ import "../../packaging/ui/packaging.css";
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
-import { useAuthStore } from "@/stores/auth-store";
 
 import {
   commandOf,
@@ -26,6 +25,7 @@ import {
   profileTemplate,
   readRevision,
   readRun,
+  readSession,
   submit,
   type Master,
   type Observation,
@@ -265,11 +265,26 @@ interface QualityPageProps {
   projectName: string;
 }
 
-/** The page binds every kept request to the signed-in actor; a change of actor remounts the workspace. */
+/** The page binds every kept request to the actor the server seals for; a change of actor remounts the workspace. */
 export default function QualityPage({ projectName }: QualityPageProps) {
   const { t } = useTranslation("dashboard");
-  const actor = useAuthStore((state) => state.username);
-  if (!actor) return <p className="p-4 text-sm text-text-3">{t("quality_signin_required")}</p>;
+  const [actor, setActor] = useState<string | null>(null);
+  const [failed, setFailed] = useState<string | null>(null);
+  useEffect(() => {
+    const controller = new AbortController();
+    readSession(projectName, { signal: controller.signal }).then(
+      (found) => !controller.signal.aborted && setActor(found.actor_id),
+      (failure: unknown) => !controller.signal.aborted && setFailed(errorMessage(failure) ?? t("quality_load_failed")),
+    );
+    return () => controller.abort();
+  }, [projectName, t]);
+  if (failed)
+    return (
+      <p role="alert" className="p-4 text-sm text-text-2">
+        {failed}
+      </p>
+    );
+  if (!actor) return <p className="p-4 text-sm text-text-3">{t("quality_loading")}</p>;
   return <QualityWorkspace key={actor} projectName={projectName} actor={actor} />;
 }
 
@@ -279,10 +294,14 @@ function QualityWorkspace({ projectName, actor }: QualityPageProps & { actor: st
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [revisions, setRevisions] = useState<number[]>([]);
   const [selected, setSelected] = useState<Profile | null>(null);
+  // What the operator chose; `selected` follows once that exact revision has been read.
+  const [choice, setChoice] = useState<{ profileId: string; revision: number | null } | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [root, setRoot] = useState("");
   const [observations, setObservations] = useState<Observation[]>([]);
   const [probes, setProbes] = useState<ProbeAttempt[]>([]);
+  const [moreProbes, setMoreProbes] = useState<string | null>(null);
+  const [moreObservations, setMoreObservations] = useState<string[]>([]);
   const [runs, setRuns] = useState<RunEntry[]>([]);
   const [olderRuns, setOlderRuns] = useState<string | null>(null);
   const [runDetail, setRunDetail] = useState<(RunEntry & { observations: Observation[] }) | null>(null);
@@ -353,8 +372,16 @@ function QualityWorkspace({ projectName, actor }: QualityPageProps & { actor: st
         if (live()) setLoadError(errorMessage(failure) ?? t("quality_load_failed"));
       };
       return Promise.all([
-        listObservations(projectName, scope, { signal }).then((found) => live() && setObservations(found.observations), failed),
-        listProbes(projectName, scope, { signal }).then((found) => live() && setProbes(found.probes), failed),
+        listObservations(projectName, scope, { signal }).then((found) => {
+          if (!live()) return;
+          setObservations(found.observations);
+          setMoreObservations(found.more);
+        }, failed),
+        listProbes(projectName, scope, null, { signal }).then((found) => {
+          if (!live()) return;
+          setProbes(found.probes);
+          setMoreProbes(found.next_after);
+        }, failed),
         listRuns(projectName, root, null, { signal }).then((found) => {
           if (!live()) return;
           setRuns(found.runs);
@@ -371,13 +398,34 @@ function QualityWorkspace({ projectName, actor }: QualityPageProps & { actor: st
     return () => controller.abort();
   }, [refreshSubject]);
 
+  // One controller per data lifetime: the chosen profile revision, and the chosen run's detail.
+  const revisionRead = useRef<AbortController | null>(null);
+  const runRead = useRef<AbortController | null>(null);
+  const currentRun = useRef("");
+
+  const readChosenRun = async (id: string) => {
+    runRead.current?.abort();
+    const controller = new AbortController();
+    runRead.current = controller;
+    try {
+      const detail = await readRun(projectName, id, { signal: controller.signal });
+      if (!controller.signal.aborted && currentRun.current === id) setRunDetail(detail);
+    } catch (failure: unknown) {
+      if (!controller.signal.aborted) setLoadError(errorMessage(failure) ?? t("quality_load_failed"));
+    }
+  };
+
   const clearScope = () => {
     activeScope.current = "";
     setObservations([]);
     setProbes([]);
+    setMoreProbes(null);
+    setMoreObservations([]);
     setRuns([]);
     setOlderRuns(null);
     setRunDetail(null);
+    runRead.current?.abort();
+    currentRun.current = "";
     setChosen({});
     setRunId("");
     setWaived({});
@@ -389,49 +437,68 @@ function QualityWorkspace({ projectName, actor }: QualityPageProps & { actor: st
     await reload(controller.signal);
     await refreshSubject(controller.signal);
     // A decision moves the run's disposition version; the next decision must carry the new one.
-    if (!runId) return;
-    const key = activeScope.current;
-    try {
-      const detail = await readRun(projectName, runId);
-      if (activeScope.current === key) setRunDetail(detail);
-    } catch (failure: unknown) {
-      setLoadError(errorMessage(failure) ?? t("quality_load_failed"));
-    }
+    if (currentRun.current) await readChosenRun(currentRun.current);
+  };
+
+  const rotateRevisionRead = () => {
+    revisionRead.current?.abort();
+    const controller = new AbortController();
+    revisionRead.current = controller;
+    return controller.signal;
   };
 
   const chooseProfile = async (profileId: string) => {
+    const signal = rotateRevisionRead();
     clearScope();
     setSelected(null);
     setRevisions([]);
+    setChoice(profileId ? { profileId, revision: null } : null);
     if (!profileId) return;
     try {
-      const found = await listRevisions(projectName, profileId);
+      const found = await listRevisions(projectName, profileId, { signal });
+      if (signal.aborted) return;
       setRevisions(found.revisions.map((item) => item.revision));
       const latest = found.revisions.at(-1)?.revision;
-      if (latest !== undefined) setSelected((await readRevision(projectName, profileId, latest)).profile);
+      if (latest === undefined) return;
+      setChoice({ profileId, revision: latest });
+      const read = await readRevision(projectName, profileId, latest, { signal });
+      if (!signal.aborted) setSelected(read.profile);
     } catch (failure: unknown) {
-      setLoadError(errorMessage(failure) ?? t("quality_load_failed"));
+      if (!signal.aborted) setLoadError(errorMessage(failure) ?? t("quality_load_failed"));
     }
   };
 
   const chooseRevision = async (revision: number) => {
-    if (!selected) return;
+    if (!choice) return;
+    const profileId = choice.profileId;
+    setChoice({ profileId, revision });
+    const signal = rotateRevisionRead();
     clearScope();
+    setSelected(null);
     try {
-      setSelected((await readRevision(projectName, selected.profile_id, revision)).profile);
+      const read = await readRevision(projectName, profileId, revision, { signal });
+      if (!signal.aborted) setSelected(read.profile);
     } catch (failure: unknown) {
-      setLoadError(errorMessage(failure) ?? t("quality_load_failed"));
+      if (!signal.aborted) setLoadError(errorMessage(failure) ?? t("quality_load_failed"));
     }
   };
 
   const chooseRun = async (id: string) => {
+    currentRun.current = id;
     setRunId(id);
     setRunDetail(null);
     setWaived({});
+    await readChosenRun(id);
+  };
+
+  const loadMoreProbes = async () => {
+    if (!moreProbes || !selected) return;
     const key = activeScope.current;
     try {
-      const detail = await readRun(projectName, id);
-      if (activeScope.current === key) setRunDetail(detail);
+      const found = await listProbes(projectName, { profile_id: selected.profile_id, revision: selected.revision, root }, moreProbes);
+      if (activeScope.current !== key) return;
+      setProbes((current) => [...current, ...found.probes]);
+      setMoreProbes(found.next_after);
     } catch (failure: unknown) {
       setLoadError(errorMessage(failure) ?? t("quality_load_failed"));
     }
@@ -518,7 +585,7 @@ function QualityWorkspace({ projectName, actor }: QualityPageProps & { actor: st
               <div className="fm-grid">
                 <label className="text-xs text-text-2">
                   {t("quality_profile")}
-                  <select className="fm-input" value={selected?.profile_id ?? ""} onChange={(event) => void chooseProfile(event.target.value)}>
+                  <select className="fm-input" value={choice?.profileId ?? ""} onChange={(event) => void chooseProfile(event.target.value)}>
                     <option value="">{t("quality_choose")}</option>
                     {profiles.map((profile) => (
                       <option key={profile.profile_id} value={profile.profile_id}>
@@ -527,10 +594,10 @@ function QualityWorkspace({ projectName, actor }: QualityPageProps & { actor: st
                     ))}
                   </select>
                 </label>
-                {selected ? (
+                {choice?.revision != null ? (
                   <label className="text-xs text-text-2">
                     {t("quality_revision")}
-                    <select className="fm-input" value={selected.revision} onChange={(event) => void chooseRevision(Number(event.target.value))}>
+                    <select className="fm-input" value={choice.revision} onChange={(event) => void chooseRevision(Number(event.target.value))}>
                       {revisions.map((revision) => (
                         <option key={revision} value={revision}>
                           r{revision}
@@ -667,6 +734,15 @@ function QualityWorkspace({ projectName, actor }: QualityPageProps & { actor: st
                     {attempt.requirement_id} · {attempt.execution_ref} · {attempt.actor_id} · {attempt.attempt_state ?? "—"} ·{" "}
                     {attempt.status ?? t("quality_probe_no_result")}
                     {attempt.failure ? ` · ${t("quality_probe_failed", { code: attempt.failure.error_code })}` : ""}
+                    <span className="block text-text-3">
+                      {t("quality_probe_identity", { execution: attempt.execution_id, binding: attempt.master_binding_digest })}
+                    </span>
+                    {attempt.failure?.resources ? (
+                      <details className="text-text-3">
+                        <summary>{t("quality_probe_resources")}</summary>
+                        <pre className="qa-pre">{JSON.stringify(attempt.failure.resources, null, 2)}</pre>
+                      </details>
+                    ) : null}
                     {attempt.attempt_state === "SUBMIT_OUTCOME_UNKNOWN" || attempt.attempt_state === "NEEDS_OPERATOR"
                       ? ` · ${t("quality_probe_needs_review")}`
                       : ""}
@@ -680,6 +756,13 @@ function QualityWorkspace({ projectName, actor }: QualityPageProps & { actor: st
                 );
               })}
             </ul>
+          ) : null}
+          {moreProbes ? (
+            <div className="pk-actions">
+              <button type="button" className="fm-btn" onClick={() => void loadMoreProbes()}>
+                {t("quality_more_probes")}
+              </button>
+            </div>
           ) : null}
         </section>
 
@@ -775,6 +858,9 @@ function QualityWorkspace({ projectName, actor }: QualityPageProps & { actor: st
                 <fieldset key={requirement} className="pk-group">
                   <legend className="text-xs text-text-2">{t("quality_choose_observation", { requirement })}</legend>
                   {options.length === 0 ? <span className="text-xs text-text-3">{t("quality_no_observation")}</span> : null}
+                  {moreObservations.includes(requirement) ? (
+                    <span className="block text-xs text-text-3">{t("quality_older_observations_hidden")}</span>
+                  ) : null}
                   {options.map((option) => (
                     <label key={option.observation_id} className="mr-3 text-xs text-text-2">
                       <input

@@ -463,3 +463,51 @@ async def test_a_probe_prepared_before_the_catalog_was_disabled_is_unavailable_o
         f"{BASE}/probes", json={"request": body["request"], "seal": body["seal"]}, headers=_headers()
     )
     assert refused.status_code == 503
+
+
+async def test_observations_list_the_newest_page_per_requirement_and_name_what_was_left_out(http) -> None:
+    env = http
+    chain = await _chain(env)
+    scope = {"profile_id": chain["profile"]["profile_id"], "revision": 1, "root_artifact_key": chain["root"]}
+    latest = ""
+    for index in range(quality.OBSERVATION_PAGE):
+        review = await _do(
+            env,
+            "reviews",
+            {
+                "command_id": f"review-more-{index}",
+                **scope,
+                "status": "PASS",
+                "criteria_verdicts": dict.fromkeys(RUBRIC_CRITERIA, "PASS"),
+                "findings": [],
+                "notes": "Watched again.",
+            },
+        )
+        latest = review["observation"]["observation_id"]
+    listed = (
+        await env["client"].get(
+            f"{BASE}/observations",
+            params={"profile_id": scope["profile_id"], "revision": 1, "root": chain["root"]},
+            headers=_headers(),
+        )
+    ).json()
+    reviews = [o["observation_id"] for o in listed["observations"] if o["requirement_id"] == "review"]
+    assert len(reviews) == quality.OBSERVATION_PAGE
+    assert latest in reviews
+    first_review = next(
+        item["observation_id"]
+        for item in env["sealed"]["runs"]["request"]["subject"]["observations"]
+        if item["observation_id"] not in {o["observation_id"] for o in listed["observations"]}
+    )
+    assert first_review not in reviews
+    assert listed["more"] == ["review"]
+    assert sorted(o["requirement_id"] for o in listed["observations"] if o["requirement_id"] != "review") == [
+        "technical-container",
+        "technical-decode",
+    ]
+
+
+async def test_the_session_names_the_actor_requests_are_sealed_for(http) -> None:
+    response = await http["client"].get(f"{BASE}/session", headers=_headers())
+    assert response.status_code == 200, response.text
+    assert response.json() == {"actor_id": ACTOR}

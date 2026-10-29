@@ -95,7 +95,7 @@ export function listObservations(
   projectName: string,
   values: { profile_id: string; revision: number; root: string },
   options: CallOptions = {},
-): Promise<{ subject_digest: string; observations: Observation[] }> {
+): Promise<{ subject_digest: string; observations: Observation[]; more: string[] }> {
   return API.request(`${base(projectName)}/observations?${query(values)}`, { signal: options.signal });
 }
 
@@ -158,9 +158,15 @@ export interface ProbeAttempt {
 export function listProbes(
   projectName: string,
   values: { profile_id: string; revision: number; root: string },
+  after: string | null,
   options: CallOptions = {},
 ): Promise<{ probes: ProbeAttempt[]; next_after: string | null }> {
-  return API.request(`${base(projectName)}/probes?${query(values)}`, { signal: options.signal });
+  return API.request(`${base(projectName)}/probes?${query(after ? { ...values, after } : values)}`, { signal: options.signal });
+}
+
+/** The actor the server seals this principal's requests for. */
+export function readSession(projectName: string, options: CallOptions = {}): Promise<{ actor_id: string }> {
+  return API.request(`${base(projectName)}/session`, { signal: options.signal });
 }
 
 export function listRevisions(

@@ -2,8 +2,6 @@ import { fireEvent, render, screen, waitFor, within } from "@testing-library/rea
 import axe from "axe-core";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { useAuthStore } from "@/stores/auth-store";
-
 import QualityPage from "./QualityPage";
 
 function json(body: unknown, status = 200): Response {
@@ -48,8 +46,8 @@ const sent: { path: string; body: Record<string, unknown> }[] = [];
 beforeEach(() => {
   sent.length = 0;
   window.localStorage.clear();
-  useAuthStore.setState({ username: "showrunner" });
   gets = {
+    "/quality/session": () => json({ actor_id: "showrunner" }),
     "/quality/masters": () => json({ masters: [MASTER] }),
     "/quality/profiles": () => json({ profiles: [PROFILE] }),
     "/quality/profiles/prof-1/revisions": () => json({ revisions: [{ revision: 1, profile_digest: "a" }, { revision: 2, profile_digest: "b" }] }),
@@ -65,8 +63,9 @@ beforeEach(() => {
           OBS("o-r1", "review", "FAIL", [FINDING]),
           OBS("o-r2", "review", "PASS"),
         ],
+        more: [],
       }),
-    "/quality/probes": () => json({ probes: [] }),
+    "/quality/probes": () => json({ probes: [], next_after: null }),
     "/quality/runs": () => json({ runs: [RUN("READY")], next_before: null }),
     "/quality/runs/01a1run000000000": () => json({ ...RUN("READY"), observations: [OBS("o-r1", "review", "FAIL", [FINDING])] }),
   };
@@ -133,7 +132,7 @@ describe("Quality page", () => {
     fireEvent.click(await screen.findByRole("button", { name: /^Publish profile$|^发布配置$/ }));
     await screen.findByRole("alert");
     expect(window.localStorage.getItem("arcreel.m10c.pending/demo/showrunner/profiles/publish-x")).not.toBeNull();
-    useAuthStore.setState({ username: "someone-else" });
+    gets["/quality/session"] = () => json({ actor_id: "someone-else" });
     const { unmount } = render(<QualityPage projectName="demo" />);
     await screen.findAllByLabelText(/Approved video|Video đã duyệt|已批准的视频/);
     expect(screen.queryByRole("button", { name: /^Resend$|^Gửi lại$|^重新发送$/ })).not.toBeInTheDocument();
@@ -215,11 +214,103 @@ describe("Quality page", () => {
     await waitFor(() => expect(screen.getByLabelText(/^Revision$|^修订$/)).toHaveValue("1"));
   });
 
-  it("asks for sign-in instead of binding requests to an unknown actor", async () => {
-    useAuthStore.setState({ username: null });
+  it("binds kept requests to the actor the server seals for, without the sign-in username", async () => {
+    const kept = { action: "publish_profile", request: { command: { command_id: "publish-k" } }, seal: "s" };
+    window.localStorage.setItem("arcreel.m10c.pending/demo/showrunner/profiles/publish-k", JSON.stringify(kept));
     render(<QualityPage projectName="demo" />);
-    expect(await screen.findByText(/Sign in to review quality|Hãy đăng nhập|请登录/)).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: /^Resend$|^Gửi lại$|^重新发送$/ })).toBeInTheDocument();
+  });
+
+  it("does not open the workspace when the actor cannot be read", async () => {
+    gets["/quality/session"] = () => json({ detail: "unavailable" }, 503);
+    render(<QualityPage projectName="demo" />);
+    expect(await screen.findByRole("alert")).toBeInTheDocument();
     expect(screen.queryByLabelText(/Approved video|Video đã duyệt|已批准的视频/)).not.toBeInTheDocument();
+  });
+
+  it("keeps the latest chosen run's detail when an earlier choice answers late", async () => {
+    let releaseA: () => void = () => undefined;
+    const detail = (id: string) => ({ ...RUN("READY", id), observations: [] });
+    gets["/quality/runs"] = () => json({ runs: [RUN("READY", "01a1runA00000000"), RUN("READY", "01a1runB00000000")], next_before: null });
+    const original = vi.mocked(globalThis.fetch).getMockImplementation();
+    vi.mocked(globalThis.fetch).mockImplementation((input, init) => {
+      const path = new URL(String(input), "http://test").pathname;
+      if (path.endsWith("/quality/runs/01a1runA00000000"))
+        return new Promise((resolve) => {
+          releaseA = () => resolve(json(detail("01a1runA00000000")));
+        });
+      if (path.endsWith("/quality/runs/01a1runB00000000")) return Promise.resolve(json(detail("01a1runB00000000")));
+      return original!(input, init);
+    });
+    await choose();
+    fireEvent.click(await screen.findByRole("radio", { name: /01a1runA/ }));
+    fireEvent.click(screen.getByRole("radio", { name: /01a1runB/ }));
+    fireEvent.change(screen.getByLabelText(/^Reason$|^Lý do$|^理由$/), { target: { value: "fine" } });
+    const button = screen.getByRole("button", { name: /Prepare decision|Chuẩn bị quyết định|准备决定/ });
+    await waitFor(() => expect(button).toBeEnabled());
+    releaseA();
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(button).toBeEnabled();
+  });
+
+  it("keeps the latest chosen revision when an earlier choice answers late", async () => {
+    let releaseOne: () => void = () => undefined;
+    const original = vi.mocked(globalThis.fetch).getMockImplementation();
+    await choose();
+    vi.mocked(globalThis.fetch).mockImplementation((input, init) => {
+      const path = new URL(String(input), "http://test").pathname;
+      if (path.endsWith("/revisions/1"))
+        return new Promise((resolve) => {
+          releaseOne = () => resolve(json({ profile: { ...PROFILE, revision: 1 } }));
+        });
+      return original!(input, init);
+    });
+    const select = screen.getByLabelText(/^Revision$|^修订$/);
+    fireEvent.change(select, { target: { value: "1" } });
+    await waitFor(() => expect(screen.queryByLabelText(/^Revision$|^修订$/)).toBeInTheDocument());
+    fireEvent.change(screen.getByLabelText(/^Revision$|^修订$/), { target: { value: "2" } });
+    await waitFor(() => expect(screen.getByLabelText(/^Revision$|^修订$/)).toHaveValue("2"));
+    releaseOne();
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(screen.getByLabelText(/^Revision$|^修订$/)).toHaveValue("2");
+  });
+
+  it("pages further probe checks and shows each attempt's identity and failure resources", async () => {
+    const attempt = (ref: string) => ({
+      execution_ref: ref,
+      execution_id: `exec-${ref}`,
+      master_binding_digest: "sha256:bind",
+      actor_id: "showrunner",
+      requirement_id: "technical-decode",
+      attempt_state: "FAILED_BEFORE_ACCEPTANCE",
+      observation_id: null,
+      status: null,
+      failure: { error_code: "M10_PROBE_FAILED", resources: { wall_ms: 1234 } },
+    });
+    const original = vi.mocked(globalThis.fetch).getMockImplementation();
+    vi.mocked(globalThis.fetch).mockImplementation((input, init) => {
+      const url = new URL(String(input), "http://test");
+      if (url.pathname.endsWith("/quality/probes"))
+        return Promise.resolve(
+          json(url.searchParams.get("after") === "p-1" ? { probes: [attempt("p-2")], next_after: null } : { probes: [attempt("p-1")], next_after: "p-1" }),
+        );
+      return original!(input, init);
+    });
+    await choose();
+    expect(await screen.findByText(/exec-p-1/)).toBeInTheDocument();
+    expect(screen.getAllByText(/sha256:bind/).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/"wall_ms": 1234/).length).toBe(1);
+    fireEvent.click(screen.getByRole("button", { name: /Show more checks|Xem thêm các lần kiểm tra|显示更多检查/ }));
+    expect(await screen.findByText(/exec-p-2/)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Show more checks/ })).not.toBeInTheDocument();
+  });
+
+  it("says when older observations of a requirement are left out", async () => {
+    const listed = gets["/quality/observations"]();
+    const body = (await listed.json()) as Record<string, unknown>;
+    gets["/quality/observations"] = () => json({ ...body, more: ["review"] });
+    await choose();
+    expect(await screen.findByText(/newest 20 are listed|20 bản mới nhất|最新的 20 条/)).toBeInTheDocument();
   });
 
   it("offers only the BLOCKING findings of the chosen run's failed review for a waiver", async () => {

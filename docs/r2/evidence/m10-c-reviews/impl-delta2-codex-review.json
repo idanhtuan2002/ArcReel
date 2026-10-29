@@ -1,0 +1,150 @@
+{
+  "reviewed_head": "39ed7b28056fa47ed7a39c601fe2024fac0ed8ce",
+  "verdict": "CHANGES_REQUESTED",
+  "prior_findings": {
+    "H1": {
+      "state": "PARTIAL",
+      "evidence": [
+        "server/routers/quality.py:383-435 returns scoped attempts, execution identity, binding digest, state and failure resources in bounded pages.",
+        "frontend/src/features/quality/ui/QualityPage.tsx:663-678 now shows execution_ref/actor, NEEDS_OPERATOR review warning and exact-envelope finish/lost-envelope paths.",
+        "frontend/src/features/quality/ui/QualityPage.tsx:667-669 still renders only failure.error_code; execution_id, master_binding_digest and failure.resources are never displayed. Two attempts across master versions cannot be reconciled with their subjects/resources from the screen. Medium residual; original High authority impact not established.",
+        "frontend/src/features/quality/ui/QualityPage.test.tsx:263-280 covers ACCEPTED kept-envelope and PLANNED lost-envelope; no failure resource presentation. Probe continuation regression is N3 below."
+      ]
+    },
+    "H2": {
+      "state": "RESOLVED",
+      "evidence": [
+        "frontend/src/features/quality/ui/QualityPage.tsx:138-185 renders targets from the sealed request, including candidate/media digest for probe/review and media digest for seal.",
+        "frontend/src/features/quality/ui/QualityPage.tsx:190-211 exposes the sealed publication policy and each review finding locator/severity, including restored requests through Confirm at lines 226-241. D7 encodes the criterion in subject_locator, so it is visible.",
+        "frontend/src/features/quality/ui/QualityPage.tsx:256-260,516,688,768,852 locks action drafts while prepared. This closes the delta1 missing confirmation details; no live browser acceptance claimed."
+      ]
+    },
+    "M1": {
+      "state": "PARTIAL",
+      "evidence": [
+        "frontend/src/features/quality/api/qualityClient.ts:185-187 uses escaped project/actor/action segments; QualityPage.tsx:269-273 remounts workspace on actor change and refuses the anonymous namespace.",
+        "frontend/src/stores/auth-store.ts:15-25 still restores only token/isAuthenticated on reload, leaving username null. frontend/src/main.tsx:29 invokes this initialization.",
+        "frontend/src/features/quality/ui/QualityPage.tsx:271-273 now renders only a sign-in message for that already authenticated session. Every token-backed full reload blocks the entire Quality workspace and pending-envelope recovery until an explicit logout/login restores username. The message has no sign-in action. Medium residual.",
+        "Fresh /tmp Vitest probe called the real auth-store initialize with a saved token, confirmed isAuthenticated=true and username=null, then confirmed Quality renders only the sign-in message. Checked-in test at QualityPage.test.tsx:218-223 asserts the null-actor message without testing token-backed initialization."
+      ]
+    },
+    "M3": {
+      "state": "RESOLVED",
+      "evidence": [
+        "server/routers/quality.py:549-576 reads the chosen run and its exact stored observation_refs through verifying repositories, independently of the current profile selector.",
+        "frontend/src/features/quality/ui/QualityPage.tsx:427-438,464-468,898-905 derives waiver candidates/bindings from that run detail and filters to BLOCKING findings on failed reviews; selection clears waived bindings.",
+        "frontend/src/features/quality/ui/QualityPage.test.tsx:154-167,225-239 passed. Normal selected-run closure is fixed; new response-order regression is N4 below. PostgreSQL detail route execution remains unverified in this sandbox."
+      ]
+    },
+    "M6": {
+      "state": "PARTIAL",
+      "evidence": [
+        "frontend/src/features/quality/ui/QualityPage.tsx:339-375 adds a scope-key guard for subject refreshes, including post-action refresh; clearScope invalidates prior scope immediately.",
+        "frontend/src/features/quality/ui/QualityPage.tsx:402-424 still commits every listRevisions/readRevision response without cancellation or a selection generation. Selecting A then B and completing B before A reverts the selector/data to A. chooseRevision also leaves the previous revision active while fetching. Medium residual.",
+        "frontend/src/features/quality/ui/QualityPage.tsx:386-398 captures the active key only after awaits while retaining an older runId closure; a scope/run change during the refresh can also let a stale run detail overwrite current detail. New chooseRun-specific manifestation is N4."
+      ]
+    },
+    "M7": {
+      "state": "PARTIAL",
+      "evidence": [
+        "server/routers/quality.py:399-407,523-546 bounds probe/run pages; lines 450-452 narrow technical observations by master binding, and lines 465-475 narrow Human observations by subject before verification. Unrelated Human histories are no longer replayed.",
+        "server/routers/quality.py:454-462,475-480 still materializes all matching observations and verifies each chain without a page or work bound. Repeated reviews/probes of the same current subject/profile revision grow one read and response indefinitely; the page reloads it after each action (QualityPage.tsx:355-363,386-390). Medium residual.",
+        "No query/work-budget fixture for many same-subject observations was executed; no performance completeness claim is made."
+      ]
+    },
+    "M8": {
+      "state": "RESOLVED",
+      "evidence": [
+        "server/routers/quality.py:719-751 checks attempt state: absent invocation/attempt or PLANNED needs a catalog and returns 503 when disabled.",
+        "server/services/quality_probes.py:261-283 keeps receipt replay, ACCEPTED finalization and terminal refusal ahead of catalog resolution. Accepted service semantics are unchanged.",
+        "tests/integration/server/routers/test_quality_routes.py:443-465 adds prepared-before-disable first-submit coverage. PG setup was blocked; PLANNED/ACCEPTED transition cases were assessed by source, not independently executed."
+      ]
+    },
+    "M9": {
+      "state": "RESOLVED",
+      "evidence": [
+        "server/routers/quality.py:69-111 enforces the limit while receiving chunks before calling the downstream app, ignoring untrusted Content-Length; server/app.py:717 installs it.",
+        "Fresh direct ASGI probes with malformed chunks and absent/false Content-Length both returned 413 exactly on threshold crossing, after three receives, without invoking the downstream parser/app.",
+        "tests/integration/server/routers/test_quality_routes.py:245-269 adds streaming oversized and malformed-under-limit cases, but their PG fixture setup was unavailable. Resolution concerns the source and direct ASGI behavior, not deployed proxy qualification."
+      ]
+    },
+    "N1": {
+      "state": "RESOLVED",
+      "evidence": [
+        "server/routers/quality.py:498-546 replaces the silent cap with stable (sealed_at,run_id) cursor pages and next_before.",
+        "frontend/src/features/quality/api/qualityClient.ts:102-110 passes the cursor; QualityPage.tsx:440-447,840-845 appends older runs via explicit navigation.",
+        "Fresh checked-in UI pagination test QualityPage.test.tsx:242-260 passed. Backend 21-run route fixture exists at test_quality_routes.py:405-427 but could not execute because sockets are denied."
+      ]
+    },
+    "N2": {
+      "state": "RESOLVED",
+      "evidence": [
+        "frontend/src/features/quality/ui/QualityPage.tsx:635-639 reselects result.profile.profile_id after successful publication.",
+        "frontend/src/features/quality/ui/QualityPage.tsx:402-411 clears selection/revisions and fetches the revision list/latest exact revision, so the next existing-profile publication uses the refreshed maximum at line 616.",
+        "The stale cached-CAS defect is source-closed; this does not close the independent M6 out-of-order selection problem."
+      ]
+    }
+  },
+  "new_findings": [
+    {
+      "id": "N3",
+      "severity": "Medium",
+      "summary": "Probe pagination is implemented on the server but inaccessible from the operator page.",
+      "failure_scenario": "Once a root/profile revision has more than 20 attempts, the server returns only the first 20 in execution_ref order. listProbes cannot accept an after cursor and refreshSubject discards next_after; the page has no continuation control. A later ACCEPTED, failed or unknown attempt disappears from the recovery/history surface, including its envelope-lost warning when storage is gone. With random probe command IDs, a newly created attempt can be outside the visible page immediately. Add cursor input/state/navigation and verify a later pending attempt remains reachable.",
+      "location": "frontend/src/features/quality/api/qualityClient.ts:158-163; frontend/src/features/quality/ui/QualityPage.tsx:357,660-683; server/routers/quality.py:399-435"
+    },
+    {
+      "id": "N4",
+      "severity": "Medium",
+      "summary": "Out-of-order chosen-run detail responses disable disposition for the currently selected run.",
+      "failure_scenario": "Choose run A, then B under the same root/profile. B detail finishes first and enables its disposition; A arrives later. chooseRun guards only the root/profile scope, so A replaces runDetail while runId remains B. The runId equality check then makes run null and disables the disposition form indefinitely. Selecting the already checked B radio does not fire a change; the operator must switch away and back. Guard detail reads with the selected run ID plus a request generation/cancellation; apply the same guard to after(). Fresh source-importing Vitest probe reproduced B remaining checked while its previously enabled decision button became disabled after late A.",
+      "location": "frontend/src/features/quality/ui/QualityPage.tsx:427-434,464,852,887; related post-action overwrite at lines 391-396"
+    }
+  ],
+  "conditions": [
+    "Blocking: close the Medium residuals under H1, M1, M6, M7 and new Medium N3/N4. No Critical or High security/authority bypass was established by this bounded review. Original H1/H2 IDs retain their historical severity labels; remaining H1 scope is Medium. Low findings would not block.",
+    "Review scope: git diff 9b7ac64d4..39ed7b280 plus requested delta1 findings against the router, quality services and frontend. No source files changed, no subagents, no providers or external network calls. Graph tools were not exposed in this session; structural evidence used direct source fallback, with no graph completeness claim.",
+    "Concurrent HEAD drift: initial HEAD was 39ed7b28056fa47ed7a39c601fe2024fac0ed8ce; later HEAD was 41e7ff4fb127eaf41b47f07d9cc0eb3de96f0518. git diff 39ed7b280..41e7ff4fb changed only docs/r2/evidence/R2_M10_C_HANDOFF.md. git show 39ed7b280:<path> byte comparisons confirmed all inspected implementation/test evidence paths unchanged. Verdict remains pinned to reviewed_head and preserves the concurrent documentation commit.",
+    "Runtime limits: PostgreSQL route/resolver suite had 21 fixture-setup errors from PermissionError [Errno 1] at socket creation. This is execution unavailable, not a product pass/fail. No independent PG full-chain, PLANNED/ACCEPTED transition, or backend pagination runtime acceptance is claimed.",
+    "Carry forward design/acceptance gates: route requalification after router changes, live Chrome/axe and operator acceptance without scripts, then sponsor activated-host qualification/deployment and acceptance record. Existing focused tests and direct probes do not establish these gates.",
+    "Fresh successful checks: 14 checked-in Quality UI tests; 16 quality template/prepare unit tests; two temporary source-importing Vitest reproductions; two direct ASGI receive-order/body-limit probes. Temporary probes were created only under /tmp. Static gates were not independently rerun in this read-only source review."
+  ],
+  "commands_run": [
+    {
+      "command": "git rev-parse HEAD; git status --short; git diff --stat 9b7ac64d4..HEAD; git diff 9b7ac64d4..HEAD; git log --oneline 9b7ac64d4..HEAD",
+      "result": "Pinned initial HEAD and clean checkout; inspected delta and affected source/tests/spec/delta1 review via numbered source reads. Later repeated HEAD/status and compared frozen blobs after drift."
+    },
+    {
+      "command": "cd frontend && pnpm exec vitest run src/features/quality",
+      "result": "PASS: 1 file, 14 tests."
+    },
+    {
+      "command": "uv run python -m pytest tests/unit/server/services/test_quality_template.py tests/unit/server/services/test_quality_prepare.py -q",
+      "result": "Could not start: uv default cache lock is read-only."
+    },
+    {
+      "command": "UV_CACHE_DIR=/tmp/arcreel-review-uv-cache uv run --no-sync python -m pytest tests/unit/server/services/test_quality_template.py tests/unit/server/services/test_quality_prepare.py -q [also retried with --tb=short]",
+      "result": "Two attempts interrupted with Ctrl-C, exit 130, without test output; default conftest performs an owned SQLite schema migration. No test result claimed from these attempts."
+    },
+    {
+      "command": "DATABASE_URL=postgresql+asyncpg://postgres:postgres@127.0.0.1:55491/arcreel_test UV_CACHE_DIR=/tmp/arcreel-review-uv-cache uv run --no-sync python -m pytest tests/unit/server/services/test_quality_template.py tests/unit/server/services/test_quality_prepare.py -q",
+      "result": "PASS: 16 tests in 1.29s. External DATABASE_URL bypasses the default owned-schema migration; these unit tests do not require a DB connection."
+    },
+    {
+      "command": "DATABASE_URL=postgresql+asyncpg://postgres:postgres@127.0.0.1:55491/arcreel_test UV_CACHE_DIR=/tmp/arcreel-review-uv-cache uv run --no-sync python -m pytest tests/integration/server/routers/test_quality_routes.py tests/integration/server/services/test_quality_subjects.py -q",
+      "result": "UNAVAILABLE: 21 fixture-setup errors; sandbox PermissionError [Errno 1] on AF_INET socket creation."
+    },
+    {
+      "command": "cd frontend && pnpm exec vitest run --config /tmp/m10c-vitest.config.mts -t 'delta2 independent probes'",
+      "result": "First temporary setup could not resolve @testing-library/react from /tmp; moved the temporary test into /tmp/m10c-review with a node_modules symlink. Rerun PASS: 2 bug-reproduction tests, 14 copied existing cases skipped. Confirmed reload blockage and stale run-detail response disabling selected B."
+    },
+    {
+      "command": "DATABASE_URL=postgresql+asyncpg://postgres:postgres@127.0.0.1:55491/arcreel_test UV_CACHE_DIR=/tmp/arcreel-review-uv-cache uv run --no-sync python - [inline direct ASGI QualityBodyLimit receive-order probe]",
+      "result": "PASS: 2 malformed-stream probes, missing and false Content-Length; threshold crossing returns 413 after 3 receives and before downstream invocation."
+    },
+    {
+      "command": "git diff --stat 39ed7b280..HEAD; git log --oneline 39ed7b280..HEAD; Python git show 39ed7b280:<path> byte comparisons",
+      "result": "Only concurrent handoff documentation changed; all 17 compared implementation/test evidence files match the reviewed frozen commit."
+    }
+  ]
+}

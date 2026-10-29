@@ -435,44 +435,91 @@ async def list_probes(
     return {"probes": probes, "next_after": next_after}
 
 
+@router.get("/projects/{project_name}/quality/session")
+async def quality_session(project_name: str, user: CurrentUser, deps: Deps) -> dict[str, Any]:
+    """The actor every prepared request of this principal is sealed for."""
+    _available(deps)
+    return {"actor_id": user.sub}
+
+
+OBSERVATION_PAGE = 20
+
+
+def _newest(statement: Any, requirement: Any, recorded: Any) -> Any:
+    """`statement`'s rows ranked newest first within each requirement, at most one past the page per requirement."""
+    ranked = statement.add_columns(
+        requirement.label("requirement"),
+        sa.func.row_number().over(partition_by=requirement, order_by=(recorded.desc(),)).label("rank"),
+    ).subquery()
+    return sa.select(ranked.c.observation_id, ranked.c.requirement, ranked.c.rank).where(
+        ranked.c.rank <= OBSERVATION_PAGE + 1
+    )
+
+
 @router.get("/projects/{project_name}/quality/observations")
 async def list_observations(
     project_name: str, profile_id: str, revision: int, root: str, user: CurrentUser, deps: Deps
 ) -> dict[str, Any]:
-    """Technical and Human observations of the root's current subject under one profile revision; candidates are
-    narrowed in SQL (binding digest, subject digest) before each one's full verification."""
+    """Technical and Human observations of the root's current subject under one profile revision: the newest
+    `OBSERVATION_PAGE` per requirement, narrowed in SQL (binding digest, subject digest) before each one's full
+    verification; `more` names the requirements with older observations left out."""
     _available(deps)
     subject = await _subject(deps, user.id, project_name, root)
     subject_digest = compute_digest("m10.assessed-subject.v1", subject)
     found: list[dict[str, Any]] = []
+    more: set[str] = set()
+    invocation = QualityProbeInvocationModel
+    observed = QualityProbeObservationModel
+    human = QualityHumanObservationModel
     async with deps.sessions() as session:
         repository = QualityRunRepository(session)
-        statement = _probe_invocations(user.id, project_name, profile_id, revision, root).where(
-            _json_text(QualityProbeInvocationModel.request_json, "subject", "master_binding_digest")
-            == subject.master_binding_digest
+        technical = _newest(
+            sa.select(observed.observation_id)
+            .join(
+                invocation,
+                sa.and_(
+                    invocation.user_id == observed.user_id,
+                    invocation.project_name == observed.project_name,
+                    invocation.observation_id == observed.observation_id,
+                ),
+            )
+            .where(
+                invocation.user_id == user.id,
+                invocation.project_name == project_name,
+                _json_text(invocation.request_json, "profile", "profile_id") == profile_id,
+                _json_text(invocation.request_json, "profile", "revision") == str(revision),
+                _json_text(invocation.request_json, "subject", "master_binding_digest")
+                == subject.master_binding_digest,
+            ),
+            _json_text(invocation.request_json, "requirement_id"),
+            observed.finalized_at,
         )
-        for row in (await session.execute(statement)).scalars().all():
-            if await session.get(QualityProbeObservationModel, (user.id, project_name, row.observation_id)) is None:
+        for observation_id, requirement, rank in (await session.execute(technical)).all():
+            if rank > OBSERVATION_PAGE:
+                more.add(requirement)
                 continue
             stored = await _run(
-                lambda oid=row.observation_id: repository.technical_observation(
+                lambda oid=observation_id: repository.technical_observation(
                     user_id=user.id, project_name=project_name, observation_id=oid
                 )
             )
             if stored is not None and compute_digest("m10.assessed-subject.v1", stored[1].subject) == subject_digest:
                 found.append(_summary(stored[0]))
-        human_ids = (
-            await session.execute(
-                sa.select(QualityHumanObservationModel.observation_id).where(
-                    QualityHumanObservationModel.user_id == user.id,
-                    QualityHumanObservationModel.project_name == project_name,
-                    QualityHumanObservationModel.profile_id == profile_id,
-                    QualityHumanObservationModel.profile_revision == revision,
-                    _json_text(QualityHumanObservationModel.observation_json, "subject_digest") == subject_digest,
-                )
-            )
-        ).scalars()
-        for observation_id in human_ids.all():
+        narrative = _newest(
+            sa.select(human.observation_id).where(
+                human.user_id == user.id,
+                human.project_name == project_name,
+                human.profile_id == profile_id,
+                human.profile_revision == revision,
+                _json_text(human.observation_json, "subject_digest") == subject_digest,
+            ),
+            _json_text(human.observation_json, "requirement_id"),
+            human.recorded_at,
+        )
+        for observation_id, requirement, rank in (await session.execute(narrative)).all():
+            if rank > OBSERVATION_PAGE:
+                more.add(requirement)
+                continue
             stored = await _run(
                 lambda oid=observation_id: repository.human_observation(
                     user_id=user.id, project_name=project_name, observation_id=oid
@@ -480,7 +527,7 @@ async def list_observations(
             )
             if stored is not None and stored.observation.subject_digest == subject_digest:
                 found.append(_summary(stored.observation))
-    return {"subject_digest": subject_digest, "observations": found}
+    return {"subject_digest": subject_digest, "observations": found, "more": sorted(more)}
 
 
 def _summary(observation: q.TechnicalObservation | q.NarrativeObservation) -> dict[str, Any]:
