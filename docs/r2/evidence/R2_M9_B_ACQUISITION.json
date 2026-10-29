@@ -1,0 +1,1288 @@
+{
+  "schema_version": "1",
+  "status": "M9_B_CANDIDATE",
+  "packet": "M9-B",
+  "tested_head": "92081cbf83b3e07d4e062c83a5d211dcba27ed98",
+  "tested_parent": "3ab0d7112148896ac89d94cd7f93cbbcf4d0c01c",
+  "branch": "impl/r2-m9b-acquisition-observations",
+  "releases": {
+    "docs/r2/evidence/R2_M9_B_PACKET_RELEASE.json": "ba61ad5085fbfc4a786f4de9dae055b10a578afc0691ed9610f2b7ed00fd365e",
+    "docs/r2/evidence/R2_M9_B_RECOVERY_V2_RELEASE.json": "1a3fac2206e2d2abd095fb991adf07bfbf86ea40ad7bebc9e03b7ed034f999ea"
+  },
+  "sources": {
+    "alembic/versions/9b9c4a0e0001_add_m9_acquisition_observations.py": "52cc09968e780cc76898e52131a060bbb8717242279f7122ddce75c01caba352",
+    "alembic/versions/9b9c4a0e0002_add_m9_manual_admission.py": "13dbf0a27494f125000cd5a9c40b849dbf2dbdfbe5e82dd1887a85a738d6d48d",
+    "docs/r2/evidence/R2_M9_B_RECOVERY_V2_E_CLOSURE_HANDOFF.md": "f9e1467415db54a065facb31a7d7aa81d310a70bbe02080ad418a052bef7d9a3",
+    "docs/r2/evidence/R2_M9_B_RECOVERY_V2_RELEASE.json": "1a3fac2206e2d2abd095fb991adf07bfbf86ea40ad7bebc9e03b7ed034f999ea",
+    "docs/r2/evidence/schemas/R2_M9_B_ACQUISITION.schema.json": "47d4cf0f6ff1ef9e0c06ce8d9f92e333f33dc89cb89d7ab0affc7730574f5497",
+    "docs/r2/evidence/schemas/R2_M9_B_RECOVERY_V2.schema.json": "9d64177dd17d2d2a7798fbce5f06e6937a43ee4949fbe9e9492dbf4ce55e5463",
+    "docs/research/2026-10-20-r2-m9b-upload-custody.md": "da5d72a1b3dafbfed13ff42500273e409f33ad29a74f4fc55dcbc92facc50e07",
+    "docs/superpowers/plans/2026-10-20-r2-m9b-manual-recovery-v2.md": "486d13bc154849b1aa426120e136e5bc735e6d040428736ddb7cd3851fe3bf8f",
+    "docs/superpowers/specs/2026-10-20-r2-m9b-manual-recovery-v2-design.md": "9aaf6e65103a7e15be1c87f2f9d972b4fbc60eca0016eff0c6df71a3000ac520",
+    "lib/db/models/__init__.py": "91cae305f107ee9cc3abe8fc3c44236688c707e0aabfcbe2eb47526486f4ee09",
+    "lib/db/models/opportunity_acquisition.py": "0b1dd0bd91f4f79af65474f926d9e0cb60853ab7c2a420ef357c32c68cdc52fc",
+    "lib/db/models/opportunity_manual_admission.py": "98c3b883656e1364c42166818f53d86a840deb095d3cbf644c66b2b306402759",
+    "lib/db/repositories/__init__.py": "b2ddb73d24b0c23611757aa3bccefaaa9a61c1e2602181bbb294e0484ea94c6e",
+    "lib/db/repositories/opportunity_acquisition.py": "26b40ccea43194fbd4d88e422a64c311cf79e51db4b68b65120ce99ea9a54499",
+    "lib/db/repositories/opportunity_manual_admission.py": "ef979bdb5342ce84c4505447663bbf9892390f2142e85a4c4f127874b3cf858a",
+    "lib/i18n/en/errors.py": "63e65d8a5d4f979eba72f00af65282a8ce828eb14587ba2ba0b13df064cb5393",
+    "lib/i18n/vi/errors.py": "f8cdf3baf8e8762df402a0a589a6868bead2601e09fc8c77b383a2c7b1275995",
+    "lib/i18n/zh/errors.py": "ae53562cd2d6edb02527f7557a3fa498a62959d0d95692fe03350351defba3c2",
+    "r2/contracts/opportunity_acquisition_v2.py": "b225fefb1b4d498977cdfe4fd1ee43622944cd8e87c4d8cbf679a50f41c04e6e",
+    "r2/opportunity/acquisition.py": "2fec344550a67ed3f5a38c8841fc7824078e35795b5a33d31c04d38bcdf93df9",
+    "r2/opportunity/acquisition_v2.py": "1de1d42af862adb0e34bf7b516c5ec2907a9c14ae6395301e7776606282958a0",
+    "r2/opportunity/acquisition_v2_digests.py": "a57f4b79762c5db7ef62c17974967dfc2a316da19e878f83714731c8b78d84ec",
+    "r2/opportunity/capabilities.py": "4055f08115738e6170475bea0f5bedf8b3da5209d2dbcf25f868be64fe2fbe3b",
+    "r2/opportunity/manual_admission.py": "e6e15215f8003b11f21abe945e9eeaa888bc8922a140b841f71a44d6fbbf3428",
+    "r2/opportunity/manual_admission_ports.py": "93f6e92046bb47100cc867b5018d284aefe2e1df067718eca9f277051db02dc9",
+    "r2/opportunity/manual_import.py": "1d7f12cca61cb986af20d5a7ea51f410431843026d43cf7f6ad4d178abc25254",
+    "r2/opportunity/normalization.py": "d613354f237076541c1c4185f1de996c4404478c3466d3977a539be836428630",
+    "scripts/r2/run_m9b_recovery_gate.py": "d629eaeca363574d511e8aed15ce7929dd81a173da690052d85c1c0190f0cb52",
+    "scripts/r2/verify_m9b_evidence.py": "369bc99aa2c6f25b1e0ed166fd6d80305e0e402d5a6db43942081aca02e0ab51",
+    "scripts/r2/verify_m9b_recovery_evidence.py": "865884082320e1c5598a52da1999b547cdc5e51c2bc41c3376340fced4d88636",
+    "scripts/r2/verify_m9b_recovery_scope.py": "f78b2fc0a125713f3162b71aa7ce0e92a42900c108775277feac4c1210c7451d",
+    "scripts/r2/verify_m9b_scope.py": "1e904b6774994f1a690294a2111309212476f7b4937fa9d1fc6960402b4ba380",
+    "server/app.py": "c6b56dab688769e5fc7ae2a6c63485b0aed05b581cfd434adc964901ddf83c03",
+    "server/routers/opportunity_acquisition.py": "a8f1ec41bcb354b2c20c6388d9dccdb53d73e56baef42ab6c41cf274a3134b87",
+    "server/services/m9_evidence_store.py": "93a18d2296601531182528a1f556db72152fa087e426508c5367d73d083e3478",
+    "server/services/m9_manual_authenticity.py": "e0cc0beee6d1757c76903feaca4ffed35c2b209de160d7ea51f9f713da6df463",
+    "server/services/m9_manual_publication.py": "77159b3f20e2cc564bc5eb9a0309e89a7bdf6f3108a9726aff36941a2684ef0a",
+    "server/services/opportunity.py": "52e50c5a909ae3d6c5ea41d24f7a403104d445e2872dc912717c52d26bc47f6d",
+    "server/services/opportunity_acquisition_v2.py": "cb40a477ab32c8f925c1308dfa66e16424d587f95273de5910360c63fb2c3fe8",
+    "tests/fixtures/r2/opportunity/manual_admission_custodian.py": "a62daddda68f5812239e11b819b05d1397bcad1d38def4fb55a2914b06446a14",
+    "tests/fixtures/r2/opportunity/manual_import.json": "05e1b8a10574e0dd17879bc7504b92f9500b15dd708f66cb602b2a67296bd88b",
+    "tests/fixtures/r2/opportunity/manual_recovery_restarts.json": "eb250979a2ccffdfe0e744d2c77d6f49e0aba90a5dc4708ccd702d1d2c7aad7a",
+    "tests/fixtures/r2/opportunity/manual_recovery_worker.py": "d6edb7b15b2c42d21c1fac588c97c83a6671d18caf921c83fff038dd7f05b0ac",
+    "tests/fixtures/r2/opportunity/source_capabilities.json": "348a11818f06a2f2278b60018a4c54057a98158dafb5a71127f187e9ba953e99",
+    "tests/integration/lib/db/migrations/test_alembic_m8_exploration.py": "49769f286f873098d411258cc72201860767680a32248597c3a3d69bb9a18595",
+    "tests/integration/lib/db/migrations/test_alembic_m9_acquisition.py": "82a9f0ebe009402c20cd0b5361caa6722922abb54a7d4852d2252cf1ff561bf7",
+    "tests/integration/lib/db/migrations/test_alembic_m9_foundation.py": "615cffca1aa38c45bdc49ef38c54d63652b90e5f9b6f74fc995e9d79fe15a3d0",
+    "tests/integration/lib/db/migrations/test_alembic_m9_manual_admission.py": "1fecab367fc8703fd8e321024c38399472cefc92eea01a8966d1fa95b1e3434d",
+    "tests/integration/lib/db/migrations/test_format_projections.py": "e70a93c438c9ecf0c3369b288d73f37fe1c504260bbe3ecd31a8c180caa323e5",
+    "tests/integration/lib/db/migrations/test_learning_observations.py": "d048c75166f351c24778729156450c8c6dca043d4324df0281028bc1a52d8907",
+    "tests/integration/lib/db/migrations/test_production_binding_authority.py": "c6e7d85dec6c20b52cd6a3513e002360dda68c58322f6f7cabc79d94505d376f",
+    "tests/integration/lib/db/migrations/test_production_target_registry.py": "c4680ea61d8ce645c2de2133b8e79f0dd6877fdf7606e69de23e6aa65c0a62fa",
+    "tests/integration/lib/db/migrations/test_spatial_constraint_sets.py": "38f706887f0b65ca4649ed585bb7ed6f87789e02f9a9fbdca43c1dc6b455c7a1",
+    "tests/integration/lib/db/migrations/test_spatial_execution_evidence.py": "0f9975d3a80585c1a205114ab4492fb806d9a6c60a6bd979d1d54477f9bdaea5",
+    "tests/integration/lib/db/migrations/test_spatial_frame_receipts.py": "146b2f504eb0b7533e3d737ef3ea2d0578e83861f08923ab75f5d095abca139a",
+    "tests/integration/lib/db/migrations/test_spatial_pair_authority.py": "e0c1af48a4a2f2ef3af75c06a198e70d3ffba681bde81a69b2b493bb4929549b",
+    "tests/integration/lib/db/migrations/test_spatial_pair_v2_custody.py": "e7897109b6517b885ab46b99f19bc5efbcecf684ca9fed7afa8c3db597085ea8",
+    "tests/integration/lib/db/migrations/test_spatial_promotion_sidecars.py": "c7a953e42106ed0ab806ca4eb69d4fd6034ea2d5a3f76c968ff7a70aaf421ca6",
+    "tests/integration/lib/db/migrations/test_spatial_review_custody.py": "98553cfeb32173bffb354496e3feac90ffd3b6d4e8d2b8b71e82317d2b221564",
+    "tests/integration/lib/db/repositories/test_opportunity_acquisition.py": "0d39c7f0719fbe02f8c9fbfe79966da2cdb9d9fdb388570bb52769a899f9ddb1",
+    "tests/integration/lib/db/repositories/test_opportunity_manual_admission.py": "f40bef3f0a7de9bd796876e6895e7acdce71f7cf0c4672ccecd979f39d6766b6",
+    "tests/integration/r2/opportunity/test_acquisition_concurrency.py": "2a99b42a20941305493c6be90125288c85c7b480ba8263025a449fb8b4c1c801",
+    "tests/integration/r2/opportunity/test_acquisition_v2.py": "3a8b24867c29230f98c81b70d25f8e6abe597e73b9b7ed01291197200ce82b70",
+    "tests/integration/r2/opportunity/test_acquisition_v2_restarts.py": "0d41f952a9558eec8222d3976bb40b59bffc41ab4a73a1a4dd1661f1a41f4b30",
+    "tests/integration/scripts/r2/test_verify_m9b_recovery_scope.py": "a095e7989b88659300e94b7317ba715a80888f7e37056f6d701f8f943a45d030",
+    "tests/integration/server/services/test_m9_evidence_store.py": "acd75066ac7db43bac72de947f0b55811545ed7befcaa3e963cc73c501b44658",
+    "tests/integration/server/services/test_m9_manual_custody_isolation.py": "e2cfb38d3522431bb6e433fc8c6838f1af33632ed55687c34904a7b3bb8c5754",
+    "tests/integration/server/services/test_m9_manual_publication.py": "82b4b7508a01c35b75a4c1e5c5899b39def55ff3303ed1f7ccd831360e3d656f",
+    "tests/unit/r2/contracts/test_opportunity_acquisition_v2.py": "ad796bd5ea6a44eda875a1db49cb929f1b0cdee7cee2d580b85abc0c3b0823a5",
+    "tests/unit/r2/opportunity/test_acquisition_v2_digests.py": "7b25cd31b8965d5a86644f425210479c51124d8b91684acca4a4662f560e2f6a",
+    "tests/unit/r2/opportunity/test_capabilities.py": "5e45ce649eb5dfdbb770bf8d7da739c0e56365d3dcc328ae543f439e4085f038",
+    "tests/unit/r2/opportunity/test_manual_admission.py": "ecc3bbef8c2b62cee8ef22a08ee6992a75585df72f34c737f65dbf767c5bb6b4",
+    "tests/unit/r2/opportunity/test_manual_import.py": "dcb6b2825559b1eb9435c0c245eeebe49f8064e68403f7d00dd2e4224a4d3043",
+    "tests/unit/r2/opportunity/test_normalization.py": "ad05e4ae2dd0028581aa0478ec433ab7068965f155a02636fdce7390cf46bf25",
+    "tests/unit/scripts/r2/test_run_m9b_recovery_gate.py": "da27a3abe304e2edb4ffc337eb3d9529640e0ab2315ae634866b77e84d8e8c07",
+    "tests/unit/scripts/r2/test_verify_m9_scope.py": "428efe19550588b719b0f36fb833883fba04e31b5a6cf05244d55036431d9dd5",
+    "tests/unit/scripts/r2/test_verify_m9b_evidence.py": "c55d180e3d84fcaf9b7e70145461925cc2a25bad3fe6c320d9d7d853f1d41e4c",
+    "tests/unit/scripts/r2/test_verify_m9b_recovery_evidence.py": "2d4ba832d4e93882993dbb86a29fe83d65f033aa6d1cc21d9508f85f8c28b9d9",
+    "tests/unit/scripts/r2/test_verify_m9b_scope.py": "f77d66330b8652fcb83d4e4061c5d009f7ba0e0d45eafca091925c745ae5eb41",
+    "tests/unit/server/routers/test_opportunity_acquisition_router.py": "63123cc689f0fa5613df1446c9545877d15db11b2b983c40e0ab5125ee1711de",
+    "tests/unit/server/services/test_m9_manual_authenticity.py": "1b1df08d71a158c512293fa85b5ca0e018f2b7b71a5900260381f50ad3b6f974"
+  },
+  "commands": [
+    {
+      "gate": "audit",
+      "command": "/home/anhtuan/content-production-os/.worktrees/r2-v2-main/.venv/bin/python scripts/audit_tests.py --check",
+      "exit": 0,
+      "tested_head": "92081cbf83b3e07d4e062c83a5d211dcba27ed98",
+      "passed": 0,
+      "skipped": 0,
+      "log": {
+        "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/audit.log",
+        "sha256": "f591aeb7ae019180ab0411cbdc541672aecf0992e3a48f5a907291b55afe7a55"
+      },
+      "result": {
+        "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/audit.result.json",
+        "sha256": "f85360161a27b29763f364f1201b49f62f16cd5f9c3323252ed4952b01c6872d"
+      }
+    },
+    {
+      "gate": "dependencies",
+      "command": "/home/anhtuan/content-production-os/.worktrees/r2-v2-main/.venv/bin/deptry lib server alembic scripts tests r2",
+      "exit": 0,
+      "tested_head": "92081cbf83b3e07d4e062c83a5d211dcba27ed98",
+      "passed": 0,
+      "skipped": 0,
+      "log": {
+        "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/dependencies.log",
+        "sha256": "a3181052042f527dff485160320d821d40c4ca56a4bc4db05eefb55b411d10d2"
+      },
+      "result": {
+        "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/dependencies.result.json",
+        "sha256": "d1cdec926e14e4926550264c9a5db076832ccfd1e2c73e99a1935b9841064dfe"
+      }
+    },
+    {
+      "gate": "diff",
+      "command": "git diff --check",
+      "exit": 0,
+      "tested_head": "92081cbf83b3e07d4e062c83a5d211dcba27ed98",
+      "passed": 0,
+      "skipped": 0,
+      "log": {
+        "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/diff.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "result": {
+        "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/diff.result.json",
+        "sha256": "50e07d2c3c1260dab70c7031790a22cd3d0b09ff22417ba5a3c4a5151767ec9f"
+      }
+    },
+    {
+      "gate": "format",
+      "command": "/home/anhtuan/content-production-os/.worktrees/r2-v2-main/.venv/bin/ruff format --check .",
+      "exit": 0,
+      "tested_head": "92081cbf83b3e07d4e062c83a5d211dcba27ed98",
+      "passed": 0,
+      "skipped": 0,
+      "log": {
+        "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/format.log",
+        "sha256": "054e0d4491e9ee8ad5b5a75b347a7f0224d9c308b31b68789659a0bffefadedf"
+      },
+      "result": {
+        "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/format.result.json",
+        "sha256": "a8e55f841bfe5c5c0bcc697f31203d2caf2bce14e8acc7cbe686f1c2a4885dd3"
+      }
+    },
+    {
+      "gate": "imports",
+      "command": "/home/anhtuan/content-production-os/.worktrees/r2-v2-main/.venv/bin/lint-imports",
+      "exit": 0,
+      "tested_head": "92081cbf83b3e07d4e062c83a5d211dcba27ed98",
+      "passed": 0,
+      "skipped": 0,
+      "log": {
+        "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/imports.log",
+        "sha256": "add8e10fb73be2503802775c2aeee3267aabba81f0beff29d391f395c8cbe520"
+      },
+      "result": {
+        "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/imports.result.json",
+        "sha256": "7f0c60e2d90c12c37a6e5edadc45fb8f7349ec013978f69f54f4b4653402340a"
+      }
+    },
+    {
+      "gate": "migration",
+      "command": "/home/anhtuan/content-production-os/.worktrees/r2-v2-main/.venv/bin/python -m pytest tests/integration/lib/db/migrations -n 4 --dist loadfile -q --basetemp=/tmp/claude-1000/-home-anhtuan-content-production-os/d4870d56-34f2-481b-bd28-fb82e19f6306/scratchpad/m9b-t10/out3/migration-temp --junitxml=/tmp/claude-1000/-home-anhtuan-content-production-os/d4870d56-34f2-481b-bd28-fb82e19f6306/scratchpad/m9b-t10/out3/.superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/migration.junit.xml",
+      "exit": 0,
+      "tested_head": "92081cbf83b3e07d4e062c83a5d211dcba27ed98",
+      "passed": 166,
+      "skipped": 0,
+      "log": {
+        "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/migration.log",
+        "sha256": "641e1245e8d1daa3ee0d13a7180b518b36377d8573342f1cea04ce22662fdffc"
+      },
+      "result": {
+        "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/migration.result.json",
+        "sha256": "f6e9a2b43be3867be6f192270526d90e96daf306ed13892b21fec721cab8ac71"
+      }
+    },
+    {
+      "gate": "ruff",
+      "command": "/home/anhtuan/content-production-os/.worktrees/r2-v2-main/.venv/bin/ruff check .",
+      "exit": 0,
+      "tested_head": "92081cbf83b3e07d4e062c83a5d211dcba27ed98",
+      "passed": 0,
+      "skipped": 0,
+      "log": {
+        "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/ruff.log",
+        "sha256": "82b3e6a6c090a57601d22943bd23fca9218d1031dbe5a7b754092f9a156b4f18"
+      },
+      "result": {
+        "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/ruff.result.json",
+        "sha256": "fa4c2bd3bd2c4370e93f8364925fa584c7d5567b76ae82f9153a4a75cd74d0bb"
+      }
+    },
+    {
+      "gate": "scope",
+      "command": "/home/anhtuan/content-production-os/.worktrees/r2-v2-main/.venv/bin/python scripts/r2/verify_m9b_recovery_scope.py docs/r2/evidence/R2_M9_B_RECOVERY_V2_RELEASE.json",
+      "exit": 0,
+      "tested_head": "92081cbf83b3e07d4e062c83a5d211dcba27ed98",
+      "passed": 0,
+      "skipped": 0,
+      "log": {
+        "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/scope.log",
+        "sha256": "28061924ea2639d25d1b1e7763adf63250e00384c8dd701fae82c4575803ad21"
+      },
+      "result": {
+        "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/scope.result.json",
+        "sha256": "6b87a51f54814fdfbf23f41d58f49322f62b95ef92645c50556ca1d6a6ce33c2"
+      }
+    },
+    {
+      "gate": "tests",
+      "command": "/home/anhtuan/content-production-os/.worktrees/r2-v2-main/.venv/bin/python -m pytest tests/integration/lib/db/repositories/test_opportunity_acquisition.py tests/integration/lib/db/repositories/test_opportunity_manual_admission.py tests/integration/r2/opportunity/test_acquisition_concurrency.py tests/integration/r2/opportunity/test_acquisition_v2.py tests/integration/scripts/r2/test_verify_m9b_recovery_scope.py tests/integration/server/services/test_m9_evidence_store.py tests/integration/server/services/test_m9_manual_custody_isolation.py tests/integration/server/services/test_m9_manual_publication.py tests/unit/r2/contracts/test_opportunity_acquisition_v2.py tests/unit/r2/opportunity/test_acquisition_v2_digests.py tests/unit/r2/opportunity/test_capabilities.py tests/unit/r2/opportunity/test_manual_admission.py tests/unit/r2/opportunity/test_manual_import.py tests/unit/r2/opportunity/test_normalization.py tests/unit/scripts/r2/test_run_m9b_recovery_gate.py tests/unit/scripts/r2/test_verify_m9_scope.py tests/unit/scripts/r2/test_verify_m9b_evidence.py tests/unit/scripts/r2/test_verify_m9b_recovery_evidence.py tests/unit/scripts/r2/test_verify_m9b_scope.py tests/unit/server/routers/test_opportunity_acquisition_router.py tests/unit/server/services/test_m9_manual_authenticity.py tests/unit/server/routers/test_opportunity_router.py tests/unit/lib/i18n/test_i18n_consistency.py tests/unit/r2/contracts/test_opportunity.py tests/unit/r2/opportunity/test_digests.py tests/unit/r2/opportunity/test_profiles.py tests/unit/scripts/r2/test_verify_m9_parity.py tests/unit/scripts/r2/test_verify_m9_evidence.py tests/unit/r2/learning/test_adapters.py -n 4 --dist loadfile -q --basetemp=/tmp/claude-1000/-home-anhtuan-content-production-os/d4870d56-34f2-481b-bd28-fb82e19f6306/scratchpad/m9b-t10/out3/tests-temp --junitxml=/tmp/claude-1000/-home-anhtuan-content-production-os/d4870d56-34f2-481b-bd28-fb82e19f6306/scratchpad/m9b-t10/out3/.superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/tests.junit.xml",
+      "exit": 0,
+      "tested_head": "92081cbf83b3e07d4e062c83a5d211dcba27ed98",
+      "passed": 1246,
+      "skipped": 0,
+      "log": {
+        "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/tests.log",
+        "sha256": "55952182f22e9074292ae36e191fb3b4c000eb347af5321bbcf5b9da9bf3f893"
+      },
+      "result": {
+        "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/tests.result.json",
+        "sha256": "04c3fc99cddac5996c81c77a920949f3f31f9b5a9a7abf32851f394c7c86c4ab"
+      }
+    },
+    {
+      "gate": "types",
+      "command": "/home/anhtuan/content-production-os/.worktrees/r2-v2-main/.venv/bin/basedpyright --warnings",
+      "exit": 0,
+      "tested_head": "92081cbf83b3e07d4e062c83a5d211dcba27ed98",
+      "passed": 0,
+      "skipped": 0,
+      "log": {
+        "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/types.log",
+        "sha256": "56882e01cb80173ef053c4096e4ee43e3123a15f5c0a06715f96988d48fbd91c"
+      },
+      "result": {
+        "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/types.result.json",
+        "sha256": "c7ab8e6bd005d33d8298e1f386d1d2c24de7cee85d5eda8cdbc36ae7c5ede014"
+      }
+    }
+  ],
+  "test_report": {
+    "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/tests.junit.xml",
+    "sha256": "dfa381367eb71fb16adcae3275eaf64c028300721f3ce70179e6f83ff9642584"
+  },
+  "migration_report": {
+    "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/migration.junit.xml",
+    "sha256": "6182ef6aa1382bc04037e7f99423d8c6692ce32ded1456374142b4acab504bce"
+  },
+  "fault_matrix": {
+    "replay": {
+      "test_refs": [
+        "tests.integration.r2.opportunity.test_acquisition_v2::test_v2_acquire_uses_committed_custody_before_dispatch_and_replays_without_ports",
+        "tests.integration.r2.opportunity.test_acquisition_v2::test_v2_http_declares_acquires_replays_and_reads_through_the_scoped_service"
+      ]
+    },
+    "scope": {
+      "test_refs": [
+        "tests.integration.r2.opportunity.test_acquisition_v2::test_v2_snapshot_read_scope_and_missing_identity_never_open_material[identity]",
+        "tests.integration.r2.opportunity.test_acquisition_v2::test_v2_snapshot_read_scope_and_missing_identity_never_open_material[project_name]",
+        "tests.integration.r2.opportunity.test_acquisition_v2::test_v2_snapshot_read_scope_and_missing_identity_never_open_material[user_id]",
+        "tests.unit.server.routers.test_opportunity_acquisition_router::test_body_scope_injection_is_rejected_before_the_application[actor_id]",
+        "tests.unit.server.routers.test_opportunity_acquisition_router::test_body_scope_injection_is_rejected_before_the_application[context]",
+        "tests.unit.server.routers.test_opportunity_acquisition_router::test_body_scope_injection_is_rejected_before_the_application[project_name]",
+        "tests.unit.server.routers.test_opportunity_acquisition_router::test_body_scope_injection_is_rejected_before_the_application[user_id]"
+      ]
+    },
+    "interactive": {
+      "test_refs": [
+        "tests.integration.r2.opportunity.test_acquisition_v2::test_v2_http_on_an_unconfigured_host_refuses_before_source_or_custody_contact",
+        "tests.unit.server.routers.test_opportunity_acquisition_router::test_api_keys_and_disabled_auth_cannot_mutate[/acquisitions-acquisition-False]",
+        "tests.unit.server.routers.test_opportunity_acquisition_router::test_api_keys_and_disabled_auth_cannot_mutate[/acquisitions-acquisition-True]",
+        "tests.unit.server.routers.test_opportunity_acquisition_router::test_api_keys_and_disabled_auth_cannot_mutate[/queries-declaration-False]",
+        "tests.unit.server.routers.test_opportunity_acquisition_router::test_api_keys_and_disabled_auth_cannot_mutate[/queries-declaration-True]"
+      ]
+    },
+    "retention": {
+      "test_refs": [
+        "tests.integration.r2.opportunity.test_acquisition_v2::test_v2_expiry_uses_original_deadline_without_any_content_or_port_call[False]",
+        "tests.integration.r2.opportunity.test_acquisition_v2::test_v2_expiry_uses_original_deadline_without_any_content_or_port_call[True]",
+        "tests.integration.r2.opportunity.test_acquisition_v2::test_v2_snapshot_history_becomes_stale_then_unavailable_at_original_deadlines"
+      ]
+    },
+    "revocation": {
+      "test_refs": [
+        "tests.integration.r2.opportunity.test_acquisition_v2::test_v2_known_newer_source_revocation_prevents_admission_and_dispatch",
+        "tests.integration.r2.opportunity.test_acquisition_v2::test_v2_snapshot_reader_refuses_current_from_known_newer_source_revocation"
+      ]
+    },
+    "erasure": {
+      "test_refs": [
+        "tests.integration.r2.opportunity.test_acquisition_v2::test_v2_cleanup_commits_only_after_real_private_and_public_erasure[never-published]",
+        "tests.integration.r2.opportunity.test_acquisition_v2::test_v2_cleanup_commits_only_after_real_private_and_public_erasure[published-unattached]",
+        "tests.integration.r2.opportunity.test_acquisition_v2::test_v2_cleanup_commits_only_after_real_private_and_public_erasure[ready]",
+        "tests.integration.r2.opportunity.test_acquisition_v2::test_v2_cleanup_drains_admitted_reads_before_any_private_erasure",
+        "tests.integration.r2.opportunity.test_acquisition_v2::test_v2_cleanup_retry_reconciles_physical_erasure_with_sql_rollback[cleanup-authorization-before-commit-2-True-False]",
+        "tests.integration.r2.opportunity.test_acquisition_v2::test_v2_cleanup_retry_reconciles_physical_erasure_with_sql_rollback[cleanup-authorized-committed-3-True-False]",
+        "tests.integration.r2.opportunity.test_acquisition_v2::test_v2_cleanup_retry_reconciles_physical_erasure_with_sql_rollback[cleanup-completion-before-commit-3-True-True]",
+        "tests.integration.r2.opportunity.test_acquisition_v2::test_v2_cleanup_retry_reconciles_physical_erasure_with_sql_rollback[cleanup-drain-before-commit-1-False-False]",
+        "tests.integration.r2.opportunity.test_acquisition_v2::test_v2_cleanup_retry_reconciles_physical_erasure_with_sql_rollback[cleanup-drained-committed-2-False-False]",
+        "tests.integration.r2.opportunity.test_acquisition_v2::test_v2_cleanup_retry_reconciles_physical_erasure_with_sql_rollback[cleanup-erased-committed-4-True-True]",
+        "tests.integration.r2.opportunity.test_acquisition_v2::test_v2_cleanup_retry_reconciles_physical_erasure_with_sql_rollback[cleanup-fence-before-commit-None-False-False]",
+        "tests.integration.r2.opportunity.test_acquisition_v2::test_v2_cleanup_retry_reconciles_physical_erasure_with_sql_rollback[cleanup-fenced-committed-1-False-False]",
+        "tests.integration.r2.opportunity.test_acquisition_v2::test_v2_cleanup_retry_reconciles_physical_erasure_with_sql_rollback[cleanup-private-erasure-returned-2-True-False]",
+        "tests.integration.r2.opportunity.test_acquisition_v2::test_v2_cleanup_retry_reconciles_physical_erasure_with_sql_rollback[cleanup-public-erasure-returned-3-True-True]",
+        "tests.integration.r2.opportunity.test_acquisition_v2::test_v2_cleanup_retry_reconciles_physical_erasure_with_sql_rollback[cleanup-publication-fenced-1-False-False]"
+      ]
+    }
+  },
+  "full_backend": {
+    "executed": false,
+    "reason": "Sponsor rule 2026-10-14: pytest runs explicit related paths only; the full suite runs only on explicit request."
+  },
+  "runtime_signing_key_dependency": false,
+  "production_activation_authorized": false,
+  "provider_network_executed": false,
+  "independent_review": {
+    "budget": 1,
+    "used": 0
+  },
+  "graph_coverage": {
+    "method": "direct-read fallback (codebase-memory index does not cover this worktree)",
+    "paths": [
+      "alembic/versions/9b9c4a0e0001_add_m9_acquisition_observations.py",
+      "alembic/versions/9b9c4a0e0002_add_m9_manual_admission.py",
+      "docs/r2/evidence/R2_M9_B_RECOVERY_V2_E_CLOSURE_HANDOFF.md",
+      "docs/r2/evidence/R2_M9_B_RECOVERY_V2_RELEASE.json",
+      "docs/r2/evidence/schemas/R2_M9_B_ACQUISITION.schema.json",
+      "docs/r2/evidence/schemas/R2_M9_B_RECOVERY_V2.schema.json",
+      "docs/research/2026-10-20-r2-m9b-upload-custody.md",
+      "docs/superpowers/plans/2026-10-20-r2-m9b-manual-recovery-v2.md",
+      "docs/superpowers/specs/2026-10-20-r2-m9b-manual-recovery-v2-design.md",
+      "lib/db/models/__init__.py",
+      "lib/db/models/opportunity_acquisition.py",
+      "lib/db/models/opportunity_manual_admission.py",
+      "lib/db/repositories/__init__.py",
+      "lib/db/repositories/opportunity_acquisition.py",
+      "lib/db/repositories/opportunity_manual_admission.py",
+      "lib/i18n/en/errors.py",
+      "lib/i18n/vi/errors.py",
+      "lib/i18n/zh/errors.py",
+      "r2/contracts/opportunity_acquisition_v2.py",
+      "r2/opportunity/acquisition.py",
+      "r2/opportunity/acquisition_v2.py",
+      "r2/opportunity/acquisition_v2_digests.py",
+      "r2/opportunity/capabilities.py",
+      "r2/opportunity/manual_admission.py",
+      "r2/opportunity/manual_admission_ports.py",
+      "r2/opportunity/manual_import.py",
+      "r2/opportunity/normalization.py",
+      "scripts/r2/run_m9b_recovery_gate.py",
+      "scripts/r2/verify_m9b_evidence.py",
+      "scripts/r2/verify_m9b_recovery_evidence.py",
+      "scripts/r2/verify_m9b_recovery_scope.py",
+      "scripts/r2/verify_m9b_scope.py",
+      "server/app.py",
+      "server/routers/opportunity_acquisition.py",
+      "server/services/m9_evidence_store.py",
+      "server/services/m9_manual_authenticity.py",
+      "server/services/m9_manual_publication.py",
+      "server/services/opportunity.py",
+      "server/services/opportunity_acquisition_v2.py",
+      "tests/fixtures/r2/opportunity/manual_admission_custodian.py",
+      "tests/fixtures/r2/opportunity/manual_import.json",
+      "tests/fixtures/r2/opportunity/manual_recovery_restarts.json",
+      "tests/fixtures/r2/opportunity/manual_recovery_worker.py",
+      "tests/fixtures/r2/opportunity/source_capabilities.json",
+      "tests/integration/lib/db/migrations/test_alembic_m8_exploration.py",
+      "tests/integration/lib/db/migrations/test_alembic_m9_acquisition.py",
+      "tests/integration/lib/db/migrations/test_alembic_m9_foundation.py",
+      "tests/integration/lib/db/migrations/test_alembic_m9_manual_admission.py",
+      "tests/integration/lib/db/migrations/test_format_projections.py",
+      "tests/integration/lib/db/migrations/test_learning_observations.py",
+      "tests/integration/lib/db/migrations/test_production_binding_authority.py",
+      "tests/integration/lib/db/migrations/test_production_target_registry.py",
+      "tests/integration/lib/db/migrations/test_spatial_constraint_sets.py",
+      "tests/integration/lib/db/migrations/test_spatial_execution_evidence.py",
+      "tests/integration/lib/db/migrations/test_spatial_frame_receipts.py",
+      "tests/integration/lib/db/migrations/test_spatial_pair_authority.py",
+      "tests/integration/lib/db/migrations/test_spatial_pair_v2_custody.py",
+      "tests/integration/lib/db/migrations/test_spatial_promotion_sidecars.py",
+      "tests/integration/lib/db/migrations/test_spatial_review_custody.py",
+      "tests/integration/lib/db/repositories/test_opportunity_acquisition.py",
+      "tests/integration/lib/db/repositories/test_opportunity_manual_admission.py",
+      "tests/integration/r2/opportunity/test_acquisition_concurrency.py",
+      "tests/integration/r2/opportunity/test_acquisition_v2.py",
+      "tests/integration/r2/opportunity/test_acquisition_v2_restarts.py",
+      "tests/integration/scripts/r2/test_verify_m9b_recovery_scope.py",
+      "tests/integration/server/services/test_m9_evidence_store.py",
+      "tests/integration/server/services/test_m9_manual_custody_isolation.py",
+      "tests/integration/server/services/test_m9_manual_publication.py",
+      "tests/unit/r2/contracts/test_opportunity_acquisition_v2.py",
+      "tests/unit/r2/opportunity/test_acquisition_v2_digests.py",
+      "tests/unit/r2/opportunity/test_capabilities.py",
+      "tests/unit/r2/opportunity/test_manual_admission.py",
+      "tests/unit/r2/opportunity/test_manual_import.py",
+      "tests/unit/r2/opportunity/test_normalization.py",
+      "tests/unit/scripts/r2/test_run_m9b_recovery_gate.py",
+      "tests/unit/scripts/r2/test_verify_m9_scope.py",
+      "tests/unit/scripts/r2/test_verify_m9b_evidence.py",
+      "tests/unit/scripts/r2/test_verify_m9b_recovery_evidence.py",
+      "tests/unit/scripts/r2/test_verify_m9b_scope.py",
+      "tests/unit/server/routers/test_opportunity_acquisition_router.py",
+      "tests/unit/server/services/test_m9_manual_authenticity.py"
+    ]
+  },
+  "required_skips": [],
+  "material_unknowns": [],
+  "artifacts": [
+    {
+      "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/audit.log",
+      "sha256": "f591aeb7ae019180ab0411cbdc541672aecf0992e3a48f5a907291b55afe7a55"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/audit.result.json",
+      "sha256": "f85360161a27b29763f364f1201b49f62f16cd5f9c3323252ed4952b01c6872d"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/dependencies.log",
+      "sha256": "a3181052042f527dff485160320d821d40c4ca56a4bc4db05eefb55b411d10d2"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/dependencies.result.json",
+      "sha256": "d1cdec926e14e4926550264c9a5db076832ccfd1e2c73e99a1935b9841064dfe"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/diff.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/diff.result.json",
+      "sha256": "50e07d2c3c1260dab70c7031790a22cd3d0b09ff22417ba5a3c4a5151767ec9f"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/format.log",
+      "sha256": "054e0d4491e9ee8ad5b5a75b347a7f0224d9c308b31b68789659a0bffefadedf"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/format.result.json",
+      "sha256": "a8e55f841bfe5c5c0bcc697f31203d2caf2bce14e8acc7cbe686f1c2a4885dd3"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/imports.log",
+      "sha256": "add8e10fb73be2503802775c2aeee3267aabba81f0beff29d391f395c8cbe520"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/imports.result.json",
+      "sha256": "7f0c60e2d90c12c37a6e5edadc45fb8f7349ec013978f69f54f4b4653402340a"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/migration.junit.xml",
+      "sha256": "6182ef6aa1382bc04037e7f99423d8c6692ce32ded1456374142b4acab504bce"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/migration.log",
+      "sha256": "641e1245e8d1daa3ee0d13a7180b518b36377d8573342f1cea04ce22662fdffc"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/migration.result.json",
+      "sha256": "f6e9a2b43be3867be6f192270526d90e96daf306ed13892b21fec721cab8ac71"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts.log",
+      "sha256": "18d9278f2d821087ec64692f35b4f3c237ced4a641014c1d84217ad5a5b9c546"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts.result.json",
+      "sha256": "58b6313b359141d30e94cd65c761fc9ffe862107c2819c11156e22dd8701d9e2"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/junit.xml",
+      "sha256": "67afa60912fab1c56ee5f3fc48430353679039f9ae102efec674e3d7874f225a"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/manifest.json",
+      "sha256": "2e644d36f073fd2786cd87f7519c01f1e37c6d23c4bd0437b8ece9bb95184103"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/pytest.log",
+      "sha256": "accdc89dcedd4491ea78d66fb58a50fe901fb73d1047a4b9369b7bd6d953a367"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-acquire-before-source-dispatch.armed.json",
+      "sha256": "afa5738451c9728a695a99a2f43794221de40750145d56deb27ea3a7165f4a4a"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-acquire-before-source-dispatch.arrival.json",
+      "sha256": "ecad3646afd6dbe360765dcfbe1d24f82314e3591e75eb97a894fd71517ceef7"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-acquire-before-source-dispatch.json",
+      "sha256": "6965e7f11023b0c900042d27b9a076c0e6efe87b8c32ae15233463707bd21d93"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-acquire-checkpoint-before-commit.armed.json",
+      "sha256": "2a57c70a7fa30b51ac23a75257529b7e45ab6d2c0e5d550c4894c074de860209"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-acquire-checkpoint-before-commit.arrival.json",
+      "sha256": "a3a5370896e9cead98bc11490b9986ac98e042eda81731d5b710ff0e03af8287"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-acquire-checkpoint-before-commit.json",
+      "sha256": "a1f6fd44872173ad0265e9fa0f384769de7857e72c0dbb5e26687176d55f4369"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-acquire-checkpoint-committed.armed.json",
+      "sha256": "bf675d23329512a7ad9875e3ee3e7e43c6948b33fffa2ef73ceb592a1b752639"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-acquire-checkpoint-committed.arrival.json",
+      "sha256": "ddfef537ef39d489072686b9bbdeb6cb8de139d81b83a00ce910d9535defe840"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-acquire-checkpoint-committed.json",
+      "sha256": "f9bd5734de0af5e63411f7a42e5185fd0d4a397cc212e10a1b9cd06d238be86c"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-acquire-claim-before-commit.armed.json",
+      "sha256": "2329dfe8cc74e49c23e3e8459c88fad2d041993e2d376ee7f595e97fdce66796"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-acquire-claim-before-commit.arrival.json",
+      "sha256": "6a6a02a9e8d2ee8147d4b943f8ed522fc1e6b527a25d5187af871f168834a6ce"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-acquire-claim-before-commit.json",
+      "sha256": "518c75725bd5b7e5b596f169736f6f83677b94d0ac41a0cada015355f8f4a23b"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-acquire-claim-committed.armed.json",
+      "sha256": "0799025c114e57b7fca42a023ca8836b687b0e3369a306f03edfed43c76fe313"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-acquire-claim-committed.arrival.json",
+      "sha256": "7202d3cbf2935a9481933695d9bf93291749c6ea0bacdeb4b5840d107c0aca7c"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-acquire-claim-committed.json",
+      "sha256": "ff9757f975b50c4876ff1982b612621a49c8d5222651e5119362da1b5e300e12"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-acquire-finalization-before-commit.armed.json",
+      "sha256": "c00a5c8688c1d91f8e208daf2286f4ca8f1b6858c015399b91aafec50dc3040e"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-acquire-finalization-before-commit.arrival.json",
+      "sha256": "a5b14ba42854da9e9f98b713670c1acbfc3f8e5cbcca173de793c3da529d5082"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-acquire-finalization-before-commit.json",
+      "sha256": "32bfc97a1494ed75b15fcf09330707636cf9591c09ac919f0d66e7b9835da4fc"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-acquire-finalization-committed.armed.json",
+      "sha256": "615cdf869efba7e7d894f2ffa7777718cabb81934824063aa020fd4ccb3b0df5"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-acquire-finalization-committed.arrival.json",
+      "sha256": "cee88908ae0c89044e014d4aa3c72815572664d5e05d9eec10db1c20e88ef599"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-acquire-finalization-committed.json",
+      "sha256": "3f53355808488d690575936c5d4583f52bce8c1bbcd649e3cc269c2966d64173"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-acquire-planned-committed.armed.json",
+      "sha256": "d4b684ac85c66b630a54077d11aac043ad08de6032d7940ccc4f64b3ff0ccc7a"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-acquire-planned-committed.arrival.json",
+      "sha256": "200a372596d394b8af5881ac9716c11e53b0e900f2ecf93175db983db5c12eef"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-acquire-planned-committed.json",
+      "sha256": "857191f6e357d0df36b8b5c3e12224320ba768c564915037cc30af1fe31c3b0e"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-acquire-publication-returned.armed.json",
+      "sha256": "46d685182e4d19018aaf1a15f507da14635fccc7cd9a584e85d5f3d7f3b856a8"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-acquire-publication-returned.arrival.json",
+      "sha256": "bd944d1cc19887613f93520d8793e8b2a2ed1de89fec381ce8231a9d73279d53"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-acquire-publication-returned.json",
+      "sha256": "fa791f8da84dcd40a5f0f5bb1218f3d824efd7b83b552b565d739983c7576cca"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-acquire-ready-before-commit.armed.json",
+      "sha256": "5e3cbb31bc93729cf637b4e20579c54d15e6e5437aefd6335aab0217f89c1663"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-acquire-ready-before-commit.arrival.json",
+      "sha256": "7af0c8d03e83421ef67e603ecf0369e4a07d92cbec8baa5af901587b13670865"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-acquire-ready-before-commit.json",
+      "sha256": "b4d4123ac7929389cb56fbe8a855adca2cd7e6945670eadecc2f4f102c402f5e"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-acquire-ready-committed.armed.json",
+      "sha256": "d29aacb6e0f23f4fe55fc49fa3749f836d3deba8285059a507456b6e0dcc8aa4"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-acquire-ready-committed.arrival.json",
+      "sha256": "eec4b51b47b475fc60b9723dc63b4743071992797a6f51815b9b4bc51c71606f"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-acquire-ready-committed.json",
+      "sha256": "a0eca87d7617d95e07491c9247ed82236f17d0441100f21f1ff6a126542ba25d"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-acquire-reserved-committed.armed.json",
+      "sha256": "2885cca2124f4a4fdafcdaa8e7159ffdb74e4d52af653e32739f9d7463e5f656"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-acquire-reserved-committed.arrival.json",
+      "sha256": "f36c70821c0d1fec9a68093950e315f1eb23afef10b35cb61233ccfef9385ace"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-acquire-reserved-committed.json",
+      "sha256": "2f9bb5f54f9f2d7c1554c6286137725318d0c7d7ab519a25dd13f1000e5454b9"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-acquire-source-response-returned.armed.json",
+      "sha256": "c6ea8b970c7c79ff1510256d4543d6f6afda5370c133a4def1df0f016d681dc0"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-acquire-source-response-returned.arrival.json",
+      "sha256": "1c8681f3a4f2188704cb63231fc026a2555007cdb621b3e9e08e667a4b247a72"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-acquire-source-response-returned.json",
+      "sha256": "15d4f883a50cd0d718b5950d2934b7dbd2d6dd8726c025937be97cc1a99ccdc9"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-cleanup-cleanup-authorization-before-commit.armed.json",
+      "sha256": "50723f32e5fdc08c504b07f7b2af1a8dccb0bdfde32dba61b2da1ed5d76f9f5c"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-cleanup-cleanup-authorization-before-commit.arrival.json",
+      "sha256": "ac7f5772111a9a8318edb78c861a5080f07c55ca9210c1b7b1a18522c022ce2c"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-cleanup-cleanup-authorization-before-commit.json",
+      "sha256": "978470bb144d2386712c078a03e1519cd5c423f0f1da71070be3121fc47c6919"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-cleanup-cleanup-authorized-committed.armed.json",
+      "sha256": "7d7023c7e6cba1c1ebda4739467ef3a10a6515b2465e0dd810b406844f83a976"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-cleanup-cleanup-authorized-committed.arrival.json",
+      "sha256": "02e8eed6968fd5927d79142b650c2728f293855452192fbea1b922eac58f0bb4"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-cleanup-cleanup-authorized-committed.json",
+      "sha256": "eaac11c03452013bc248de2227b2369379a8f918fb3072a9d3f389576787ac14"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-cleanup-cleanup-completion-before-commit.armed.json",
+      "sha256": "c38b86d9a4a2c145bf4493cb3e977a5d385b4683d9f5ffc24ae2f0e3621237de"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-cleanup-cleanup-completion-before-commit.arrival.json",
+      "sha256": "ae7e44571ab952effe72349f5dab4660ff79d5c047a9e23bed04b89af92b7118"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-cleanup-cleanup-completion-before-commit.json",
+      "sha256": "d13b0b612ebdcb5d05183bc4011a1f72def7b5a3dcf5945f90603989757d4704"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-cleanup-cleanup-drain-before-commit.armed.json",
+      "sha256": "8156f6ebae34ed4d4804e76cccce225b557941a9c79bb77cabd084f7d8e4f1d7"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-cleanup-cleanup-drain-before-commit.arrival.json",
+      "sha256": "ba6fa36d43f5abf7e48c5b363cfbe2bb2073282a7f906c358d5c19b676de15a3"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-cleanup-cleanup-drain-before-commit.json",
+      "sha256": "dcae9c20459a7e704a5e35e4a51718ff54e7ace49d5a8d0dff47a47af1ae99c1"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-cleanup-cleanup-drained-committed.armed.json",
+      "sha256": "df008841d4b7d847c795a907cf003c1dd552b919e3823e657d5a70a052198aa8"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-cleanup-cleanup-drained-committed.arrival.json",
+      "sha256": "df6c8d7fcf97b4c3f559777f9c477ca709be86bc5160b9fff228bed6ec467207"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-cleanup-cleanup-drained-committed.json",
+      "sha256": "8eebbb8fc189f9f4cbedef9265c654d7f9f7e45afa5a367e3a2901cc2b4bf4f3"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-cleanup-cleanup-erased-committed.armed.json",
+      "sha256": "2d9190c42d3f332db2bfe4f40c4b5750151b29ddf732d89fbb1343425e478db0"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-cleanup-cleanup-erased-committed.arrival.json",
+      "sha256": "092746e0bf1697d76e284df67dca05e78ce5cccdfdf0af6eb32701b1308ebee6"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-cleanup-cleanup-erased-committed.json",
+      "sha256": "41025c3ed0599295fde6fe2eb8f47a9ef756257bdef9620cbaadc43986a6c271"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-cleanup-cleanup-fence-before-commit.armed.json",
+      "sha256": "f3b90339fcb6fb93387de52a0ca4804136f4223d7ce5fa1cae790bce7d30f28a"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-cleanup-cleanup-fence-before-commit.arrival.json",
+      "sha256": "bdf3d756c9484ac0e23eac629c8a76d84a2be87b595f16168441343dfc362b97"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-cleanup-cleanup-fence-before-commit.json",
+      "sha256": "93572c63c186f0c2e5de218574dfe214d887263dc76a8ee16f621ff6e2256421"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-cleanup-cleanup-fenced-committed.armed.json",
+      "sha256": "39fc5d551d4f300c57eadd8fff3fc263a568f1e8eed540c25b1a22ba243d2c40"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-cleanup-cleanup-fenced-committed.arrival.json",
+      "sha256": "3d596301fcff519e2ca300d664e59f484a55594075ef0dbc1274f0d8f523f52a"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-cleanup-cleanup-fenced-committed.json",
+      "sha256": "565a7b2f9b45796db0a5f177fd4d4af7971eb106cf58867e1170cc0683668269"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-cleanup-cleanup-private-erasure-returned.armed.json",
+      "sha256": "ba822da789fce73bb24bd75ca62f0dcedb9958d45b5a8c9a7798330237a71ffd"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-cleanup-cleanup-private-erasure-returned.arrival.json",
+      "sha256": "323dfa19afce794fad5a5f1cbade355f28f3c682849845d8dd65a8e53ab279f6"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-cleanup-cleanup-private-erasure-returned.json",
+      "sha256": "89dece3cd046fa4d93ce05e3a23d009946711d09fa1162c3d71fc0a07ac5218e"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-cleanup-cleanup-public-erasure-returned.armed.json",
+      "sha256": "2f7a56cc112a8b3af96ffbc40464b79be8102ccd5381483c2e4188f33e95fe72"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-cleanup-cleanup-public-erasure-returned.arrival.json",
+      "sha256": "c81f19a7692cb4665f8cf4fbf5f51b9e3901f450ad0e1f2a00d3f123a831cfe6"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-cleanup-cleanup-public-erasure-returned.json",
+      "sha256": "ed30c56f0e652dce291978aa839c6669664ceea171b9767729efc520b9f6f7f5"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-cleanup-cleanup-publication-fenced.armed.json",
+      "sha256": "04f30b7b36f0f339273005e33e062b917f714ebad0eb7ca44cfd8547a42f4813"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-cleanup-cleanup-publication-fenced.arrival.json",
+      "sha256": "fb62d4fa1c24e4bcc326c325e3d298ad96c627d38f16339a2b870bf52bbe71e1"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-cleanup-cleanup-publication-fenced.json",
+      "sha256": "8d39e54cb743b774149d8a3a4b2c0eca25beeef708d8f3f69d4b455d844ecaa9"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-cleanup-recovery-publication-fence-durable.armed.json",
+      "sha256": "f69509c47ec1b86faaf2edb16f89db8470afcda9cf4ee6e4943bb5ab4f9a27c0"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-cleanup-recovery-publication-fence-durable.arrival.json",
+      "sha256": "f8567281aee3f9c2388ca3aee16183db3e94d2976287413f0edd43d318dc0c3d"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-cleanup-recovery-publication-fence-durable.json",
+      "sha256": "5ce84d3b795ca978116949df9debe548e96bf9cabe8ddf0fbe5884c563e14a86"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-delete-recovery-deletion-attestations-durable.armed.json",
+      "sha256": "ad04bfbb15f1ad658846a953ea2d03f7f37d8f6faa1ec9cebe8c1ec76a20330b"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-delete-recovery-deletion-attestations-durable.arrival.json",
+      "sha256": "20c20d93ab01adc8175733892c452c6548bfdf145003fdc90a0624c666b78154"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-delete-recovery-deletion-attestations-durable.json",
+      "sha256": "3d98681d544a4a12ecda69412e704daf45ba33b958c3ebb6728a4ce0b7fb0c37"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-delete-recovery-deletion-fence-durable.armed.json",
+      "sha256": "5a464eefc40dc67ff8084e001ad1838043fce487eaeca162e48ba6ba03ae5383"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-delete-recovery-deletion-fence-durable.arrival.json",
+      "sha256": "8fe69c531561f51179392a53f2878541f69ce43d2c1f596d530c14eaf262a4fc"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-delete-recovery-deletion-fence-durable.json",
+      "sha256": "e6b7e11da5f33a0fbc293191feb986bc20cbb92de355fe4d83eac51c6b584449"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-delete-recovery-deletion-headers-durable.armed.json",
+      "sha256": "681b7a7232faf789374b721c71b556e90fcee835f80e591808ef63152d6a05c5"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-delete-recovery-deletion-headers-durable.arrival.json",
+      "sha256": "b30c571d23c2aa530e693279783984d3d9de43dadc713529a155111e0cbd70d3"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-delete-recovery-deletion-headers-durable.json",
+      "sha256": "4690c46c607b64f1402d6363a05d8148ac06c56d6b5b161c91d5c537e291a9eb"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-delete-recovery-deletion-integrities-durable.armed.json",
+      "sha256": "dd15558b17b8c413de11ea8b457c08173333046834c41155c4463efffccaebb3"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-delete-recovery-deletion-integrities-durable.arrival.json",
+      "sha256": "9498b9b9bae97c9e81f0ee528e8863e32afb06c6ee8d38bddefe69dc06b607ef"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-delete-recovery-deletion-integrities-durable.json",
+      "sha256": "e96d1126c220f15a8070228a3972c8cf2069787feda6224eff4af6d2642226ff"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-delete-recovery-deletion-payloads-durable.armed.json",
+      "sha256": "adb0bfdc0a8312b1cdb9d737408ad58cb5d86615a71b22f48ef727bf142ad70a"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-delete-recovery-deletion-payloads-durable.arrival.json",
+      "sha256": "3655ac005a4a6a2e191436727f30cf2118d265b67b9f2f20aac78031a80bb114"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-delete-recovery-deletion-payloads-durable.json",
+      "sha256": "b3e8ee7bbef572d2b8b42a2c961c11036e7674d2d19c3e97bacdfb2c9dea8ac7"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-delete-recovery-deletion-plan-durable.armed.json",
+      "sha256": "6df978f52d56cee4f5ac4898433b770dd26a7372d641ca511ff051bab7bf3133"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-delete-recovery-deletion-plan-durable.arrival.json",
+      "sha256": "ecb91a96195f75c595016a7bdb2fc3627b5099f85429b23e614512f37efc9e9c"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-delete-recovery-deletion-plan-durable.json",
+      "sha256": "51b0c07f0dc59741aa04bb4042ad6e4dfb51af73ca38951b3a154ac0cf43ea8f"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-delete-recovery-deletion-receipt-durable.armed.json",
+      "sha256": "7e3e28133bf4124006512c9be28bda42ab1d8f89ceeb07be88abe24b5a3dc1aa"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-delete-recovery-deletion-receipt-durable.arrival.json",
+      "sha256": "8ac0e3036bc1235ee7ed26fa26c4e1b643eb3515f025c791301c058c741d0f17"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-delete-recovery-deletion-receipt-durable.json",
+      "sha256": "792728f47fa910143a93ebeea7d7526d1827740709dd94cecca7457db6dc35f3"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-expire-expiry-committed.armed.json",
+      "sha256": "330d9093ee8ad02a8d99c338537e8c92f5bd25e05abe6531fefcb88be7f4c830"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-expire-expiry-committed.arrival.json",
+      "sha256": "35707c03e499caaae30cbfca8914c5e3d5f84eccb3d69cf39b41091790e1a4e1"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-expire-expiry-committed.json",
+      "sha256": "4d8cc605ac049db5cf0aadf1d787ed024f09ecf149ecce551ca7384311e75b39"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-reconstruct-reconstruction-checkpoint-committed.armed.json",
+      "sha256": "2fde92cb5e17020d75e03ed7a4123a90a3fef7b6c137b9a492ec808d74a3cf99"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-reconstruct-reconstruction-checkpoint-committed.arrival.json",
+      "sha256": "2b6930b07f8c9c9a85779a5e04af2d17ce20295e36450159513b2016f80a592c"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-reconstruct-reconstruction-checkpoint-committed.json",
+      "sha256": "0dde7b76ee9bf924f556aeb24c0a00b7f513c87432a3ac9713b4d27f26efba7f"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-reconstruct-reconstruction-fenced.armed.json",
+      "sha256": "9b5fb1debfa808af52c51b365ca2bc39090d608cc10725f16d2ba686e0170afc"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-reconstruct-reconstruction-fenced.arrival.json",
+      "sha256": "d92fdd72c79a361fa4c3354f4c42ada8b4316e1112e25fec31f9c8b253668e5c"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-reconstruct-reconstruction-fenced.json",
+      "sha256": "07b1adfe887c99087e094eb286c1170fa9e3b439502cdc2b5f09456fa547ab85"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-admit-custodian-claim-custody-durable.armed.json",
+      "sha256": "dcb1c8cbf494fa5f4b489956117249f2e8cbcda7953c888be274202e9fa2fbe8"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-admit-custodian-claim-custody-durable.arrival.json",
+      "sha256": "e9b94d40ac7796d472093e7d6c74af6ca9d043db49e28ccfb43cf86d45ff3fd6"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-admit-custodian-claim-custody-durable.json",
+      "sha256": "ef2d3bb51591668c9f37e32997c04f39a24138490adeccbf705361c15d584e8a"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-admit-custodian-command-index-durable.armed.json",
+      "sha256": "f71665aadcad734cea001c1486e0468561a4070e4e9c4bcde1af5ce7d472e4c6"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-admit-custodian-command-index-durable.arrival.json",
+      "sha256": "9c4a14aeb4e2a8d7b15e12bd85be6ade039576b883b7cc90b2b66ce538f4946c"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-admit-custodian-command-index-durable.json",
+      "sha256": "19ea8b3cc6fabd29ea2dc06cb8973849e8085d38fce9d3fb0e69039523fbdd2e"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-admit-custodian-comparison-durable.armed.json",
+      "sha256": "55e9143b9c525349393c17b8713ad4aac9a1f068b8ef67c280d24d7857c2951d"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-admit-custodian-comparison-durable.arrival.json",
+      "sha256": "0492df2e9acb80618f24488c37622a3b76091248b5dac3c29b69e1370898ca25"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-admit-custodian-comparison-durable.json",
+      "sha256": "6e86221e9a8b8ab3ae009b4b5e386912d7ce82af4c88c91080e529caf7f33f3b"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-admit-custodian-original-header-durable.armed.json",
+      "sha256": "6a37683f711d46c6e2f8133750c186ecf193b4e2f42abebaff2a12f88f277acd"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-admit-custodian-original-header-durable.arrival.json",
+      "sha256": "a66883cf25862e9cc9477478ef3b3b34377a2fc34d674ef2d3f128d695433023"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-admit-custodian-original-header-durable.json",
+      "sha256": "440451c2144ba679a8d83b2e7aab83a861b071ba1b3d788e949ec959da31a23d"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-admit-custodian-upload-index-durable.armed.json",
+      "sha256": "b1a17c5073c597774da26885a3ce2ccbb19e5f5befc4743a733a15138c835b8d"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-admit-custodian-upload-index-durable.arrival.json",
+      "sha256": "61ed0de051f4e81d3e5b9cb76dfeaa24f490c8cef0b9085acdb8773697c86b32"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-admit-custodian-upload-index-durable.json",
+      "sha256": "a69dd2a0657fef2bfd5b3951bdc1877f0c996e2bd990baf4f15e4e01e0dcbd61"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-admit-issuer-header-seal-durable.armed.json",
+      "sha256": "7b3e3846acdd7a4a5a9931598a6e9c8262e9e5559afd69babf79d8acdbdecd29"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-admit-issuer-header-seal-durable.arrival.json",
+      "sha256": "f3fd0da63930bbc8313eeef4acf58d2b06b053a92b825de4eee08846b81109dc"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-admit-issuer-header-seal-durable.json",
+      "sha256": "1127c912a73bfcc7646feadbea20fbcfeb36d87570f50388444d846f1dc62023"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-admit-issuer-material-manual-native-index-seal-durable.armed.json",
+      "sha256": "5216c2f44f43fef144654717faa6d2bb90c52f7aa7b862f0813d8aa1c09f4f21"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-admit-issuer-material-manual-native-index-seal-durable.arrival.json",
+      "sha256": "30ff7fb5588e1f59a56afccf7d68502f8dbab27a0f70aee16a5b6796b5334400"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-admit-issuer-material-manual-native-index-seal-durable.json",
+      "sha256": "643e7e2d43066320cd2323710e771014470a23cde9fd00799330a9673e92b79c"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-admit-issuer-material-native-field-1-seal-durable.armed.json",
+      "sha256": "804de3dc6433e50a15a2f15ec4066b7db647b84b62adf20074c73cfb2e8f762e"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-admit-issuer-material-native-field-1-seal-durable.arrival.json",
+      "sha256": "3d066a956295e1b4aa8fb3af2c15828dc4b1ce1804c6346a76abba8e4e6d2525"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-admit-issuer-material-native-field-1-seal-durable.json",
+      "sha256": "eb10446c8aaf8672e11a41561d36731581252ef5da5cc280be678454220a8f56"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-admit-issuer-material-native-field-2-seal-durable.armed.json",
+      "sha256": "6e9fe1f2dd770768e1dff2e9d9cf0b1e808c1c34f4a666153b01ebaff1e42df4"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-admit-issuer-material-native-field-2-seal-durable.arrival.json",
+      "sha256": "2e6d93b21e0eeddfaf69530e2ec5e2f1ffccb685a3f219d59eee4c2e27590e79"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-admit-issuer-material-native-field-2-seal-durable.json",
+      "sha256": "5dd0624cfbcf5bef9bdc43c5f9e06f9ae405f1a94b9dd591e08ba1474e8fa6b7"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-admit-issuer-material-raw-page-seal-durable.armed.json",
+      "sha256": "df3aea14329d17e868d8ea0ae642e168579033c3b293bada38463b0a607ea79d"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-admit-issuer-material-raw-page-seal-durable.arrival.json",
+      "sha256": "f701e9608df0f245cd0fa661ba1d9fd6a873c5b3ae82188be17375c4510ca606"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-admit-issuer-material-raw-page-seal-durable.json",
+      "sha256": "e8d0f6db3068dc123ca632b3f740982290648249697433827fcc777552d7334c"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-admit-issuer-material-source-identity-1-seal-durable.armed.json",
+      "sha256": "c5ee46568060772e28d45d132659c7a95cecd57074240cf2a02f03dcb61a1c3d"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-admit-issuer-material-source-identity-1-seal-durable.arrival.json",
+      "sha256": "bf5059e09dd2d1c48b791eff86bef084b5580912f973126fc6ca4105f8cfe482"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-admit-issuer-material-source-identity-1-seal-durable.json",
+      "sha256": "9d5fd8e3cce2701d2f74099792689bf4255eb7d07e29c08cebdb31efb927ad7b"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-admit-issuer-material-source-identity-2-seal-durable.armed.json",
+      "sha256": "c171f38df5870fd20327bf8a710d02710d9416e64391e80bd417c4c9ced4058e"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-admit-issuer-material-source-identity-2-seal-durable.arrival.json",
+      "sha256": "fbcfa97656e01f41edae7c363aa67bdf3bfaeed34def0ecc0c054e1537234c6c"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-admit-issuer-material-source-identity-2-seal-durable.json",
+      "sha256": "814da3313ad303c03654a293cd49b414176b90b49ee77f9a23e277fbeb5981ac"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-admit-publication-attestations-durable.armed.json",
+      "sha256": "629263c49d16a383fdd065dc0da174f424f3600f0d8ee1b218a5d0130cc04cb1"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-admit-publication-attestations-durable.arrival.json",
+      "sha256": "092054680733959e78bafe0ebf09840ccef29f65dbb567ef8360cb14b3bc2fbf"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-admit-publication-attestations-durable.json",
+      "sha256": "ee4a05ae7209f1530fcb2bf3c0a24fdd2671b7af0be3e78bd4775ff6969021c7"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-admit-publication-complete.armed.json",
+      "sha256": "653f323d4b31dc9169543ce25072732a7d6a423e87a289ba641235f47230ea96"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-admit-publication-complete.arrival.json",
+      "sha256": "9e66f684186450d9c9ef0ab302b1f6c6d15eab6c44f64bfb60080fccfe1b23af"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-admit-publication-complete.json",
+      "sha256": "2c6602d9860e3053c0a2120d4ea7338d79b83c18a88218537176d3515dcdf2ea"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-admit-publication-header-durable.armed.json",
+      "sha256": "c5d0d93cf58c7f5a48861fc6a52b7691d628626da0a01ec3b915bcc91ee6c308"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-admit-publication-header-durable.arrival.json",
+      "sha256": "9083e7de423a81a9af78373abcff8259b40e0a3ac186f43e38b2ca3598e5bd14"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-admit-publication-header-durable.json",
+      "sha256": "5aa16d59a73ff9014a91304dc31f52c726e0858b6bf1d022c039fe87b56f3329"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-admit-publication-integrities-durable.armed.json",
+      "sha256": "4eaca7ff1db53304073cdb78efe719fa69ebfb54685438a2cbfaa8ac96aa4d85"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-admit-publication-integrities-durable.arrival.json",
+      "sha256": "6938eb3b0136826cc8d76137980f28183dc0f3bba5f73f9a3fc8dc1b55a6e585"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-admit-publication-integrities-durable.json",
+      "sha256": "3d2f2f90ed45b6b3171fbb455b066887214578d8d134338b0689c4bb79cd75b0"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-admit-publication-payloads-durable.armed.json",
+      "sha256": "1f9e9b5f4bcb8d205ae1914a603f6be9864bbd433af572c7e90aab54d45393b6"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-admit-publication-payloads-durable.arrival.json",
+      "sha256": "57c34a74ddc47cefb87ba22ba2b06da6000ff07b18f03a66a6560f1b8da5e211"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-admit-publication-payloads-durable.json",
+      "sha256": "2bc5a48d50f576e49425fc99f7bdfaf4d4f692104445afd30871326be6d46ad6"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-close-custodian-comparison-unlinked.armed.json",
+      "sha256": "6c0d8582640977da6d361df19cafa6e9cefb6ad80dc3b8db39c4477b7afd604c"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-close-custodian-comparison-unlinked.arrival.json",
+      "sha256": "bcea711cf6940bdfa0aef2a5ca99493e5699c832daa827339f26f82281e73aa4"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-close-custodian-comparison-unlinked.json",
+      "sha256": "3af08ae15720a9295ea70c37df9dfaea7f4901efdc1c0191031e41473e8351c2"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-close-custodian-header-unlinked.armed.json",
+      "sha256": "6ae9943acff36ee3f26da97ca0a81260ff97a90dcb20a5c35a64eed1e4aac87c"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-close-custodian-header-unlinked.arrival.json",
+      "sha256": "1bd35c53c941498d658366efa75ca50155c76c869ba9a0784b3e441d421134a3"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-close-custodian-header-unlinked.json",
+      "sha256": "2f20f8497bfcb1f289bddb3a2ded5f5f775a96d3984c89944431d51a69557eb9"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-close-custodian-material-seal-unlinked.armed.json",
+      "sha256": "46bf933a7582c7e2b7a551e91c003122de78838efe6ced332155a214e5b2166e"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-close-custodian-material-seal-unlinked.arrival.json",
+      "sha256": "c1f1774dee6e8a6957a85a0ed2bd437e45b196bc5a6a1f6a6847684575afe903"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-close-custodian-material-seal-unlinked.json",
+      "sha256": "640e6ed6944ed53411112897cd904217d60de44996314709b84bd1074a8b2336"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-close-custodian-original-unlinked.armed.json",
+      "sha256": "cccfe9688e6bdaf0ccfc494e61d2da6ff978c8738fca79b3a853ed6c23b6307a"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-close-custodian-original-unlinked.arrival.json",
+      "sha256": "2ba65170c38ba87590edf77bba0755c90205820d87d06ca69de5d402151e1b84"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-close-custodian-original-unlinked.json",
+      "sha256": "f668ed2bb22bc5961808a11f188a3eb205cc1b9092567c1a65ef17fcbe3efa46"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-close-custodian-private-object-unlinked.armed.json",
+      "sha256": "1f7d447098638c26074ce33de6c78821057b73c9bf425bd1053409cb80e09513"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-close-custodian-private-object-unlinked.arrival.json",
+      "sha256": "3972023ae61656d4cdd3f5ebd94a4fffa63719ce5ef5a10f5c7fae40d1bdb0b7"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-close-custodian-private-object-unlinked.json",
+      "sha256": "e8eeb73157ad18814f633f5431d141f6a54158e8a7982c8aa5fd86584c4a13ab"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-close-custodian-spend-plan-durable.armed.json",
+      "sha256": "c9dfef8e355d93f83baa7a68d116c8014c702ba3cfd3e3b8a3f21013cfdc19fa"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-close-custodian-spend-plan-durable.arrival.json",
+      "sha256": "e970145ea9f1018d9cad1a31ceb453bf851f95e3fb34be996eb03da78d4ea2fa"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-close-custodian-spend-plan-durable.json",
+      "sha256": "edf46f42b0228743250aae6d12366977c4fb50177fa6d191543058bb351c858c"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-close-custodian-spend-receipt-durable.armed.json",
+      "sha256": "242fc85096be8a3852af44937804e2a5a13d3d6f23650913777a845de1734093"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-close-custodian-spend-receipt-durable.arrival.json",
+      "sha256": "f3299de98680b618d8a5632c1a9d759bd09d71c8942f8936dbabcf91e135004f"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-close-custodian-spend-receipt-durable.json",
+      "sha256": "8ee2ea1c195d8e529ec889c5a34dad383b9ab2b2f83c62145899640b4892d49a"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-close-custodian-spent-fence-durable.armed.json",
+      "sha256": "9320fc7b5c5f7c8f826e6f38402b0a04689a46518fb419967f3c93fd2c8fe78d"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-close-custodian-spent-fence-durable.arrival.json",
+      "sha256": "b953d00b15ee0ddc69cf56efb39849d2d47a33981145f21db8176dda01ff9258"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-close-custodian-spent-fence-durable.json",
+      "sha256": "69da9dd44e51d7ed7f0ca18e4c21ab65a98446563b09be2b0649173a6424be84"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-close-custodian-spent-state-durable.armed.json",
+      "sha256": "42ca1441eeedb226ab84d4700272172dd6f7cc931294932b15b5c7a2eb19d1e3"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-close-custodian-spent-state-durable.arrival.json",
+      "sha256": "10e3a9a2eadc9dac5a4b866032ea246429f9f9203e34284017ceabb627d1bccd"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-close-custodian-spent-state-durable.json",
+      "sha256": "3d05fadc11e6f1bdf0bf7d7727f9a0195ed601d5d93273807b863be55a70c915"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-close-custodian-temporary-unlinked.armed.json",
+      "sha256": "3a9039304b26e02a8b77ad1ea39215469a8eff91cc05c98947a243525edf1a71"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-close-custodian-temporary-unlinked.arrival.json",
+      "sha256": "a6903e357354bb5261d1e03cdf15d2d994d851b8cb3e3297e0465ce53711a20e"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-close-custodian-temporary-unlinked.json",
+      "sha256": "ed925a05bf4be4c7d8a8ba825579442335eb6d0bab248323fb86575ce6fddcc2"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/ruff.log",
+      "sha256": "82b3e6a6c090a57601d22943bd23fca9218d1031dbe5a7b754092f9a156b4f18"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/ruff.result.json",
+      "sha256": "fa4c2bd3bd2c4370e93f8364925fa584c7d5567b76ae82f9153a4a75cd74d0bb"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/scope.log",
+      "sha256": "28061924ea2639d25d1b1e7763adf63250e00384c8dd701fae82c4575803ad21"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/scope.result.json",
+      "sha256": "6b87a51f54814fdfbf23f41d58f49322f62b95ef92645c50556ca1d6a6ce33c2"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/tests.junit.xml",
+      "sha256": "dfa381367eb71fb16adcae3275eaf64c028300721f3ce70179e6f83ff9642584"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/tests.log",
+      "sha256": "55952182f22e9074292ae36e191fb3b4c000eb347af5321bbcf5b9da9bf3f893"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/tests.result.json",
+      "sha256": "04c3fc99cddac5996c81c77a920949f3f31f9b5a9a7abf32851f394c7c86c4ab"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/types.log",
+      "sha256": "56882e01cb80173ef053c4096e4ee43e3123a15f5c0a06715f96988d48fbd91c"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/types.result.json",
+      "sha256": "c7ab8e6bd005d33d8298e1f386d1d2c24de7cee85d5eda8cdbc36ae7c5ede014"
+    }
+  ],
+  "limits": [
+    "Selected-domain gates only: the complete backend suite was not run (sponsor rule 2026-10-14: explicit related tests; full suite only on explicit request).",
+    "Disposable PostgreSQL 18.6 container arcreel-m9b-disposable-20261019; restart cases run worker UIDs 31001/31002 in Docker; no real provider, credential or network call.",
+    "Graph coverage: the codebase-memory index does not cover this worktree; changed paths were read directly.",
+    "No independent acceptance, E global closure, production activation, push or merge is claimed.",
+    "The original B owned path tests/unit/r2/opportunity/test_acquisition.py was never created; the acquisition service is exercised by tests/integration/lib/db/repositories/test_opportunity_acquisition.py and tests/integration/r2/opportunity/test_acquisition_concurrency.py in the tests gate.",
+    "Tests gate first attempt at this HEAD: 1244 passed, 2 failed on load-sensitive test budgets (a 6 s refresh window exceeded under -n 4 in test_v2_expiry_uses_original_deadline_without_any_content_or_port_call[False]; an asyncio.timeout(10) observer in test_v2_closure_native_fence_and_lease_interleavings_preserve_one_authority[attach]); runtime code was unchanged from the run where all 1246 passed. The same command was rerun once; the failed log is retained in the execution workspace (failed-attempt-92081cbf8).",
+    "Repair after the single independent acceptance pass (CHANGES_REQUESTED H1/H2/M1): restart source seals, boundary markers and kernel proof re-derived; executed cases must equal the pytest-collected inventory; original B6 regressions required by name."
+  ],
+  "created_at": "2026-10-29T18:55:41Z"
+}
