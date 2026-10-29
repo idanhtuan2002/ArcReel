@@ -1,0 +1,112 @@
+{
+  "schema_id": "m10.b7-pilot-summary.v1",
+  "code_head": "affa7c322571e002dc9c54a6097868d41211eafb",
+  "run_at": "2026-10-29",
+  "verdict": "NOT_PASSED_AS_PREREGISTERED",
+  "verdict_reason": [
+    "determinism threshold (byte-identical archives from two clean roots) fails in every cohort: only manifest.json differs, because it binds selection, disposition and candidate payload identities that are unique per root",
+    "the preregistered reviewer (sponsor as HUMAN_SHOWRUNNER) did not perform the Human gates; the agent did under the sponsor's chat delegation"
+  ],
+  "all_other_thresholds": "met in every cohort: seeded recall 7/7, 0 findings on clean finals, export <= 1.9 s, worker peak <= 23 MB, network socket EPERM, downloaded archive matches its receipt",
+  "cohorts": {
+    "western_explainer": {
+      "dossier": "docs/r2/evidence/R2_M10_B7_PILOT_WESTERN_EXPLAINER.json",
+      "seeded_recall": "7/7",
+      "false_positives_on_clean": 0,
+      "export_ui_ms": 1870,
+      "peak_rss_bytes": 23060480,
+      "storage_ratio": 1.0225,
+      "determinism_cross_root": false,
+      "determinism_same_root": true,
+      "differing_members": [
+        "manifest.json"
+      ],
+      "network_eperm": true,
+      "download_verified": true
+    },
+    "vertical_factual_short": {
+      "dossier": "docs/r2/evidence/R2_M10_B7_PILOT_VERTICAL_FACTUAL_SHORT.json",
+      "seeded_recall": "7/7",
+      "false_positives_on_clean": 0,
+      "export_ui_ms": 1376,
+      "peak_rss_bytes": 15417344,
+      "storage_ratio": 1.046,
+      "determinism_cross_root": false,
+      "determinism_same_root": true,
+      "differing_members": [
+        "manifest.json"
+      ],
+      "network_eperm": true,
+      "download_verified": true
+    },
+    "zh_shuang": {
+      "dossier": "docs/r2/evidence/R2_M10_B7_PILOT_ZH_SHUANG.json",
+      "seeded_recall": "7/7",
+      "false_positives_on_clean": 0,
+      "export_ui_ms": 1370,
+      "peak_rss_bytes": 15413248,
+      "storage_ratio": 1.046,
+      "determinism_cross_root": false,
+      "determinism_same_root": true,
+      "differing_members": [
+        "manifest.json"
+      ],
+      "network_eperm": true,
+      "download_verified": true
+    }
+  },
+  "findings": [
+    {
+      "id": "F1",
+      "severity": "High",
+      "title": "Approved V2 finals are refused by the M10 CONTAINER_STREAM probe",
+      "detail": "Both V2 finals use pix_fmt yuvj420p (full range); the probe worker accepts only yuv420p and fails the technical probe (M10_PROBE_FAILED, recorded with ResourceEvidence). M10 quality cannot assess real V2 output until the renderer emits yuv420p or the probe admits yuvj420p with a range fact. The pilot continued on a yuv420p-normalized derivative.",
+      "owner": "design decision for B8/M10 acceptance"
+    },
+    {
+      "id": "F2",
+      "severity": "Medium",
+      "title": "Cross-root determinism criterion conflicts with the manifest's provenance binding",
+      "detail": "Members (video, thumbnail, metadata) are byte-identical across clean roots; manifest.json differs in selection_id/digest, disposition_id/digest and candidate_payload_digest. Same-root re-export is byte-identical. Either amend the criterion to member-level determinism or move provenance out of the archive.",
+      "owner": "sponsor decision"
+    },
+    {
+      "id": "F3",
+      "severity": "Medium",
+      "title": "Packaging grant reader assumes root-owned governance",
+      "detail": "packaging_deps verifies governance with expected_uid=0 while the selection custodian uses os.getuid(); consistent only when the app runs as root (as on V2 staging). A non-root host cannot export without an override.",
+      "owner": "B8"
+    },
+    {
+      "id": "F4",
+      "severity": "Low",
+      "title": "Stale attestor socket after stopping the served app",
+      "detail": "After SIGTERM of the pilot host the attestor socket remained and the next attestor refused to start until it was removed. Cause not isolated (wrapper vs graceful shutdown).",
+      "owner": "B8 observation"
+    },
+    {
+      "id": "F5",
+      "severity": "Note",
+      "title": "Fixture policy freshness of 60 s expires runs almost immediately",
+      "detail": "Pilot profile used 7 days; real profiles need an explicit freshness choice.",
+      "owner": "profile authoring"
+    },
+    {
+      "id": "F6",
+      "severity": "Note",
+      "title": "Content observations from frame review",
+      "detail": "16:9 final shows placeholder-like text 'Golden A reusable local asset' and ends on a black frame; 9:16 projection letterboxes a 16:9 card with small text. No zh-Hans V2 final exists; the zh cohort used the English 9:16 master."
+    }
+  ],
+  "evidence": {
+    "dossiers": [
+      "docs/r2/evidence/R2_M10_B7_PILOT_WESTERN_EXPLAINER.json",
+      "docs/r2/evidence/R2_M10_B7_PILOT_VERTICAL_FACTUAL_SHORT.json",
+      "docs/r2/evidence/R2_M10_B7_PILOT_ZH_SHUANG.json"
+    ],
+    "scripts": "docs/r2/evidence/m10-b7-pilot/scripts (+scripts.sha256)",
+    "network": "docs/r2/evidence/m10-b7-pilot/network-experiment.json",
+    "screenshots": "docs/r2/evidence/m10-b7-pilot/shots/<cohort>/"
+  },
+  "environment": "local, non-production: PG16 container m10b-test-pg (databases m10b7_<cohort>[_root2]), user-owned governance tree with repository test keys, app on 127.0.0.1:1241 + Vite 5173, Chrome via Playwright (headed). Production was not touched."
+}

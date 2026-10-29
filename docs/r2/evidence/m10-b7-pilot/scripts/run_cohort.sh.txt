@@ -1,0 +1,19 @@
+#!/bin/bash
+# Full B7 pilot for one cohort: main root (setup, gates, served app, Chrome steps 4-7, duration defect after export)
+# and a second clean root (same inputs) for determinism and worker memory.
+set -uo pipefail
+S=$(cd "$(dirname "$0")" && pwd); C=$1; MAXD=$2; MIND=$3
+W=/home/anhtuan/content-production-os/.worktrees/r2-m10-b; cd "$W"
+thumb() { mkdir -p "$1/data/project/thumbnails"; ffmpeg -v error -y -ss 10 -i "$1/data/project/render-1.mp4" -frames:v 1 -vf "scale='if(gt(iw,ih),1280,720)':-2" "$1/data/project/thumbnails/thumb.png"; }
+P=$S/$C; mkdir -m 700 -p "$P"; cp "$S/narratives/$C.json" "$P/narrative.json"
+uv run python "$S/pilot_host.py" "$P" "$C" setup | tail -1; thumb "$P"
+uv run python "$S/pilot_host.py" "$P" "$C" gates > "$P/gates.log" 2>&1; grep -E '"status"|"decision"' "$P/gates.log"
+pkill -f "pilot_host.py .* serve" || true; sleep 3
+nohup uv run python "$S/pilot_host.py" "$P" "$C" serve > "$P/serve.log" 2>&1 &
+for i in $(seq 60); do ss -ltn | grep -q 127.0.0.1:1241 && break; sleep 1; done; sleep 3
+uv run python "$S/pilot_browser.py" "$P" "$C" > "$P/browser.log" 2>&1 || { tail -20 "$P/browser.log"; exit 1; }
+pkill -f "pilot_host.py .* serve" || true; sleep 3
+rm -f "$P/governance/run/attestor.sock"
+uv run python "$S/duration_defect.py" "$P" "$C" "$MAXD" "$MIND" > "$P/duration.log" 2>&1; grep -E '"rule_id"|"status"|refused' "$P/duration.log" || true
+bash "$S/run_root2.sh" "$C"
+echo "cohort $C done"

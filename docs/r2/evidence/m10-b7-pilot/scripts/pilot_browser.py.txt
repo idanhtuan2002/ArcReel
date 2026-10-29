@@ -1,0 +1,270 @@
+"""M10-B7 browser steps 4-7 on the Packaging page of the local pilot host, in a visible Chrome window.
+
+Usage: uv run python pilot_browser.py <pilot_dir> <cohort>
+Writes <pilot_dir>/browser.json and screenshots under <pilot_dir>/shots/.
+"""
+
+from __future__ import annotations
+
+import asyncio
+import copy
+import hashlib
+import json
+import re
+import sys
+import time
+from pathlib import Path
+from typing import Any
+
+from playwright.async_api import Page, async_playwright
+
+BASE = "http://127.0.0.1:5173"
+TEXT = {
+    "western_explainer": {
+        "title": "How H.264 shrinks video: frames and macroblocks",
+        "alt_title": "Inside H.264: I, P and B frames explained",
+        "description": "A short explainer on how H.264 compresses video with I, P and B frames and 16x16 macroblocks.",
+        "tags": ["video", "h264", "compression"],
+        "hashtags": ["#h264"],
+        "chapters": [{"start_ms": 0, "title": "Intro"}, {"start_ms": 30000, "title": "Frame types"}],
+    },
+    "vertical_factual_short": {
+        "title": "Git in 20 seconds: working tree to commit",
+        "alt_title": "What git status really shows",
+        "description": "A twenty second look at how changes move from the working tree to the index and into a commit.",
+        "tags": ["git", "developer", "short"],
+        "hashtags": ["#git"],
+        "chapters": [],
+    },
+    "zh_shuang": {
+        "title": "二十秒看懂 Git：从工作区到提交",
+        "alt_title": "git status 到底在说什么",
+        "description": "用二十秒讲清楚改动如何从工作区进入暂存区，再进入一次提交。",
+        "tags": ["Git", "开发", "短视频"],
+        "hashtags": ["#Git"],
+        "chapters": [],
+    },
+}
+LOCALE = {"western_explainer": "en", "vertical_factual_short": "en", "zh_shuang": "zh-Hans"}
+# Seeded defect id -> the profile rule id whose finding catches it.
+EXPECTED = {
+    "missing_required_asset": "asset-video",
+    "byte_drift": "asset-thumbnail",
+    "over_long_title": "title-length",
+    "banned_phrase": "tone",
+    "chapter_not_at_zero": "r-chapters.rules",
+    "missing_locale": "r-locales.coverage",
+}
+
+
+def sha(path: Path) -> str:
+    return "sha256:" + hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def clean_draft(pilot: Path, cohort: str) -> dict[str, Any]:
+    text = TEXT[cohort]
+    project = pilot / "data" / "project"
+    video, thumb = project / "render-1.mp4", project / "thumbnails" / "thumb.png"
+    localized = {k: text[k] for k in ("title", "description", "tags", "hashtags", "chapters")}
+    return {
+        "title": text["title"],
+        "description": text["description"],
+        "tags": text["tags"],
+        "hashtags": text["hashtags"],
+        "chapters": text["chapters"],
+        "localization_variants": [{"locale": LOCALE[cohort], **localized}],
+        "variant_groups": [
+            {
+                "group_id": "titles",
+                "field": "title",
+                "variants": [
+                    {"variant_id": "t1", "value": {"text": text["title"]}, "asset_role": None},
+                    {"variant_id": "t2", "value": {"text": text["alt_title"]}, "asset_role": None},
+                ],
+            }
+        ],
+        "assets": [
+            {
+                "role": "video",
+                "variant_id": None,
+                "source_ref": "render-1.mp4",
+                "content_digest": sha(video),
+                "media_type": "video/mp4",
+                "byte_size": video.stat().st_size,
+                "constraint_rule_id": "asset-video",
+            },
+            {
+                "role": "thumbnail",
+                "variant_id": None,
+                "source_ref": "thumbnails/thumb.png",
+                "content_digest": sha(thumb),
+                "media_type": "image/png",
+                "byte_size": thumb.stat().st_size,
+                "constraint_rule_id": "asset-thumbnail",
+            },
+        ],
+    }
+
+
+def seeded(clean: dict[str, Any]) -> list[tuple[str, dict[str, Any]]]:
+    out: list[tuple[str, dict[str, Any]]] = []
+    d = copy.deepcopy(clean)
+    d["assets"] = [a for a in d["assets"] if a["role"] != "video"]
+    out.append(("missing_required_asset", d))
+    d = copy.deepcopy(clean)
+    d["assets"][1]["byte_size"] += 1
+    out.append(("byte_drift", d))
+    d = copy.deepcopy(clean)
+    d["title"] = "T" * 101
+    out.append(("over_long_title", d))
+    d = copy.deepcopy(clean)
+    d["description"] = clean["description"] + " Click here for more."
+    out.append(("banned_phrase", d))
+    d = copy.deepcopy(clean)
+    d["chapters"] = [{"start_ms": 5000, "title": "Intro"}, {"start_ms": 30000, "title": "Frame types"}]
+    out.append(("chapter_not_at_zero", d))
+    d = copy.deepcopy(clean)
+    d["localization_variants"] = []
+    out.append(("missing_locale", d))
+    return out
+
+
+async def set_field(page: Page, label: str, value: str) -> None:
+    await page.get_by_label(re.compile("^" + re.escape(label))).first.fill(value)
+
+
+async def set_draft(page: Page, draft: dict[str, Any]) -> None:
+    await set_field(page, "Title", draft["title"])
+    await set_field(page, "Description", draft["description"])
+    await set_field(page, "Tags (comma separated)", ", ".join(draft["tags"]))
+    await set_field(page, "Hashtags (comma separated)", ", ".join(draft["hashtags"]))
+    await set_field(
+        page, "Chapters (JSON list of start_ms and title)", json.dumps(draft["chapters"], ensure_ascii=False)
+    )
+    await set_field(page, "Alternative groups (JSON list)", json.dumps(draft["variant_groups"], ensure_ascii=False))
+    await set_field(
+        page, "Localized metadata (JSON list)", json.dumps(draft["localization_variants"], ensure_ascii=False)
+    )
+    await set_field(page, "Assets (JSON list)", json.dumps(draft["assets"], ensure_ascii=False))
+
+
+async def save_and_check(page: Page, revision: int, shots: Path, name: str) -> dict[str, Any]:
+    await (
+        page.get_by_role("button", name="Save package")
+        .or_(page.get_by_role("button", name="Save as new revision"))
+        .click()
+    )
+    await page.get_by_text(f"Revision {revision} saved").wait_for(timeout=30000)
+    await page.get_by_role("button", name="Run check").click()
+    verdict = page.locator("p[data-verdict]")
+    await verdict.wait_for(timeout=60000)
+    await page.wait_for_function(
+        "() => !document.querySelector('[role=alert]') || document.querySelector('p[data-verdict]')"
+    )
+    status = await verdict.get_attribute("data-verdict")
+    findings = []
+    for item in await page.locator(".pk-findings li").all():
+        spans = item.locator("span")
+        findings.append(
+            {
+                "rule_id": (await spans.nth(0).inner_text()).strip(),
+                "locator": (await spans.nth(1).inner_text()).strip(),
+                "severity": (await spans.nth(2).inner_text()).strip(),
+            }
+        )
+    await page.screenshot(path=str(shots / f"{revision:02d}-{name}.png"), full_page=True)
+    return {"name": name, "revision": revision, "status": status, "findings": findings}
+
+
+async def main(pilot: Path, cohort: str) -> None:
+    state = json.loads((pilot / "state.json").read_text("utf-8"))
+    run = state["gates"]["run"]
+    password = (pilot / "auth-password").read_text("utf-8").strip()
+    shots = pilot / "shots"
+    shots.mkdir(exist_ok=True)
+    clean = clean_draft(pilot, cohort)
+    record: dict[str, Any] = {"cohort": cohort, "checks": [], "alerts": []}
+    async with async_playwright() as p:
+        browser = await p.chromium.launch(channel="chrome", headless=False, slow_mo=60)
+        context = await browser.new_context(
+            locale="en-US", viewport={"width": 1440, "height": 1000}, accept_downloads=True
+        )
+        page = await context.new_page()
+        page.on("dialog", lambda dialog: asyncio.ensure_future(dialog.dismiss()))
+        await page.goto(f"{BASE}/login")
+        await page.locator("input").nth(0).fill("actor")
+        await page.locator("input[type=password]").fill(password)
+        await page.locator("button[type=submit]").click()
+        await page.wait_for_url(lambda url: "/login" not in url, timeout=30000)
+        await page.wait_for_url(re.compile(r"/app/projects"), timeout=30000)
+        await page.wait_for_timeout(4000)
+        skip = page.get_by_role("button", name="Skip")
+        if await skip.count():
+            await skip.first.click()
+            await page.wait_for_timeout(1000)
+        for attempt in range(3):
+            await page.goto(f"{BASE}/app/projects/project/packaging")
+            try:
+                await page.get_by_label(re.compile("^Quality run ID")).wait_for(timeout=20000)
+                break
+            except Exception:
+                await page.screenshot(path=str(shots / f"nav-retry-{attempt}.png"))
+        else:
+            raise RuntimeError("packaging page did not load")
+        await page.screenshot(path=str(shots / "00-empty.png"), full_page=True)
+        await set_field(page, "Quality run ID", run["run_id"])
+        await set_field(page, "Quality run digest", run["run_digest"])
+        revision = 0
+        plan = [("clean", clean), *seeded(clean), ("clean-final", clean)]
+        for name, draft in plan:
+            revision += 1
+            await set_draft(page, draft)
+            try:
+                record["checks"].append(await save_and_check(page, revision, shots, name))
+            except Exception as error:  # a refusal instead of findings is recorded as such
+                alert = page.locator("[role=alert]")
+                text = await alert.inner_text() if await alert.count() else repr(error)
+                record["alerts"].append({"name": name, "revision": revision, "alert": text})
+                await page.screenshot(path=str(shots / f"{revision:02d}-{name}-refused.png"), full_page=True)
+                if await page.get_by_text(f"Revision {revision} saved").count() == 0:
+                    revision -= 1
+        # Step 5-6: preview and select the clean final (title variant t1).
+        await set_field(page, "Video artifact key", state["root_key"])
+        await set_field(page, "Cohort", "cohort")
+        await set_field(page, "Product surface", "video")
+        await page.get_by_role("radio", name="t1").check()
+        await page.get_by_role("button", name="Preview selection").click()
+        await page.get_by_text("Preview ready").wait_for(timeout=60000)
+        await page.screenshot(path=str(shots / "20-preview.png"), full_page=True)
+        await page.get_by_role("button", name="Select as showrunner").click()
+        await page.get_by_text("Current selection:").wait_for(timeout=60000)
+        await page.screenshot(path=str(shots / "21-selected.png"), full_page=True)
+        # Step 7: export and download once.
+        export = page.get_by_role("button", name="Export archive")
+        await export.wait_for(state="visible")
+        await page.wait_for_function(
+            "() => [...document.querySelectorAll('button')].some(b => b.textContent.includes('Export archive') && !b.disabled)",
+            timeout=60000,
+        )
+        started = time.perf_counter()
+        await export.click()
+        link = page.get_by_role("link", name="Download archive").first
+        await link.wait_for(timeout=120000)
+        record["export_ui_wall_ms"] = round((time.perf_counter() - started) * 1000)
+        await page.screenshot(path=str(shots / "22-exported.png"), full_page=True)
+        async with page.expect_download() as info:
+            await link.click()
+        download = await info.value
+        target = pilot / "download.zip"
+        await download.save_as(target)
+        record["download"] = {"bytes": target.stat().st_size, "sha256": sha(target)}
+        record["export_href"] = await link.get_attribute("href")
+        await page.screenshot(path=str(shots / "23-downloaded.png"), full_page=True)
+        await page.wait_for_timeout(1500)
+        await browser.close()
+    (pilot / "browser.json").write_text(json.dumps(record, indent=2, ensure_ascii=False), encoding="utf-8")
+    print(json.dumps(record, indent=2, ensure_ascii=False)[:6000])
+
+
+if __name__ == "__main__":
+    asyncio.run(main(Path(sys.argv[1]).resolve(), sys.argv[2]))

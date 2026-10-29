@@ -1,0 +1,38 @@
+{
+  "launcher": "QualityProbeRuntime.launch (same as PackageExportService._build_and_publish), unit_prefix m10-export, tools={}",
+  "unit_properties": [
+    "MemoryMax=536870912",
+    "MemorySwapMax=0",
+    "TasksMax=32",
+    "CPUQuota=100%",
+    "RuntimeMaxSec=15000ms",
+    "TimeoutStopSec=1s",
+    "KillMode=control-group",
+    "NoNewPrivileges=yes",
+    "LimitCORE=0",
+    "LimitFSIZE=67108864",
+    "UMask=0077",
+    "SystemCallErrorNumber=EPERM",
+    "SystemCallFilter=~@network-io @debug ptrace process_vm_readv process_vm_writev kcmp io_uring_setup io_uring_enter io_uring_register"
+  ],
+  "manager_result": "EXIT_CODE",
+  "exit_code": 1,
+  "group_cleanup_verified": true,
+  "report": {
+    "socket_af_inet_stream": {
+      "errno": 1,
+      "name": "EPERM"
+    },
+    "status": [
+      "NoNewPrivs:\t1",
+      "Seccomp:\t2",
+      "Seccomp_filters:\t3"
+    ],
+    "cgroup": "0::/user.slice/user-1000.slice/user@1000.service/app.slice/m10-export-0d839317a49f4712a0ae7d0654f2a108.service",
+    "memory.max": "536870912",
+    "memory.swap.max": "0",
+    "pids.max": "32",
+    "cpu.max": "100000 100000"
+  },
+  "stderr_tail": null
+}

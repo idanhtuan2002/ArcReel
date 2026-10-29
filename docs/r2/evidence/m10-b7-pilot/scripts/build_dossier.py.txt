@@ -1,0 +1,202 @@
+"""Assemble R2_M10_B7_PILOT_<cohort>.json from one cohort's pilot directories (main root and root2)."""
+
+from __future__ import annotations
+
+import hashlib
+import json
+import subprocess
+import sys
+from pathlib import Path
+from typing import Any
+
+S = Path(__file__).resolve().parent
+OUT = Path("/home/anhtuan/content-production-os/.worktrees/r2-m10-b/docs/r2/evidence")
+EXPECTED = {
+    "missing_required_asset": "asset-video",
+    "byte_drift": "asset-thumbnail",
+    "over_long_title": "title-length",
+    "banned_phrase": "tone",
+    "chapter_not_at_zero": "r-chapters.rules",
+    "missing_locale": "r-locales.coverage",
+}
+SOURCES = {
+    "western_explainer": "production/final/du-an-01-649c62c1.mp4",
+    "vertical_factual_short": "formats/c9f5d429e8900516dd22b445a60d388b8e42b5826778ff95bdc055d3d127a2b3.mp4",
+    "zh_shuang": "formats/c9f5d429e8900516dd22b445a60d388b8e42b5826778ff95bdc055d3d127a2b3.mp4",
+}
+
+
+def sha(path: Path) -> str:
+    return "sha256:" + hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def load(path: Path) -> dict[str, Any]:
+    return json.loads(path.read_text("utf-8"))
+
+
+def main(cohort: str, head: str) -> None:
+    main_root, root2 = S / cohort, S / f"{cohort}-root2"
+    state, browser = load(main_root / "state.json"), load(main_root / "browser.json")
+    duration_dir = root2 if cohort == "western_explainer" else main_root
+    duration = load(duration_dir / "duration_defect.json")
+    again, first2 = load(root2 / "export_export-2.json"), load(root2 / "export_root.json")
+    master = main_root / "data/project/render-1.mp4"
+    source = Path("/home/anhtuan/arcreel-v2-staging/data/du-an-01-649c62c1") / SOURCES[cohort]
+    checks = {c["name"]: c for c in browser["checks"]}
+    clean = checks["clean"]
+    defects = []
+    for name, rule in EXPECTED.items():
+        found = [f["rule_id"] for f in checks[name]["findings"]] if name in checks else []
+        defects.append(
+            {
+                "id": name,
+                "expected_rule_id": rule,
+                "revision": checks.get(name, {}).get("revision"),
+                "check_status": checks.get(name, {}).get("status"),
+                "finding_rule_ids": found,
+                "caught": rule in found,
+            }
+        )
+    duration_found = [f["rule_id"] for f in duration["check"].get("findings", [])]
+    defects.append(
+        {
+            "id": "duration_out_of_window",
+            "expected_rule_id": "duration",
+            "profile_revision": duration["profile_revision"],
+            "window_ms": duration["window_ms"],
+            "check_status": duration["check"].get("status"),
+            "finding_rule_ids": duration_found,
+            "caught": "duration" in duration_found,
+            "root": "root2" if duration_dir == root2 else "main (after export)",
+        }
+    )
+    caught = sum(d["caught"] for d in defects)
+    download = main_root / "download.zip"
+    receipt_digest = browser["download"]["sha256"]
+    rss = (
+        max(again["worker_memory_peak_bytes_observed"].values()) if again["worker_memory_peak_bytes_observed"] else None
+    )
+    dossier: dict[str, Any] = {
+        "schema_id": "m10.b7-pilot-dossier.v1",
+        "cohort": cohort,
+        "preregistration": "docs/r2/evidence/R2_M10_B7_PILOT_PREREGISTRATION.json (revision 2)",
+        "code_head": head,
+        "run_at": "2026-10-29",
+        "deviations": [
+            "Human gates (profile publication, narrative observation, disposition, package selection) were performed by the "
+            "agent under the sponsor's explicit chat delegation on 2026-10-29 ('ban lam het tat ca cac buoc'), through the "
+            "real custodians with an interactive token for principal 'actor'. The preregistered reviewer identity "
+            "(sponsor as HUMAN_SHOWRUNNER) is therefore NOT met; reviewer verdicts below are the agent's.",
+            "Local pilot host: per-cohort PostgreSQL database at alembic head, user-owned governance tree built with the "
+            "repository's qualified-custody fixtures (test signing keys), attestor served in-process; the app's packaging "
+            "deps were overridden only to point the grant reader at the user-owned tree (expected_uid=os.getuid()).",
+            "Corpus master is a yuv420p-normalized derivative of the approved V2 final (finding F1); the dependency head is "
+            "the repository fixture video_only.mp4 bound by the fixture subject binding.",
+            "Profile policy is the repository V2 policy fixture with this cohort's platform constraints, every packaging "
+            "check rule declared, banned phrases ['click here','link in bio'] and freshness max_age 7 days.",
+        ],
+        "corpus": {
+            "source_final": str(source),
+            "source_sha256": sha(source),
+            "source_pix_fmt": "yuvj420p",
+            "master_sha256": sha(master),
+            "master_bytes": master.stat().st_size,
+            "artifact_key": state["root_key"],
+        },
+        "gates": state["gates"],
+        "metrics": {
+            "seeded_recall": {
+                "caught": caught,
+                "of": len(defects),
+                "threshold": ">= 6 of 7",
+                "pass": caught >= 6,
+                "defects": defects,
+            },
+            "false_positives_on_clean": {
+                "findings_on_clean": clean["findings"],
+                "reviewer_verdicts": "no findings to judge (agent reviewer)",
+                "count": len(clean["findings"]),
+                "threshold": "<= 1",
+                "pass": len(clean["findings"]) <= 1,
+            },
+            "reviewer_disagreement": {"rows": [], "note": "no findings on the clean final; nothing to disagree on"},
+            "runtime_per_bundle_ms": {
+                "ui_click_to_download_link_ms": browser["export_ui_wall_ms"],
+                "service_export_ms_root2": [first2["service_export_wall_ms"], again["service_export_wall_ms"]],
+                "threshold": "<= 30000",
+                "pass": max(
+                    browser["export_ui_wall_ms"], first2["service_export_wall_ms"], again["service_export_wall_ms"]
+                )
+                <= 30000,
+            },
+            "peak_rss_bytes": {
+                "value": rss,
+                "method": "cgroup memory.peak of the m10-export unit polled every 2 ms during a root2 export (same inputs)",
+                "threshold": "<= 536870912",
+                "pass": rss is not None and rss <= 536870912,
+            },
+            "storage_bytes": {
+                "archive_bytes": browser["download"]["bytes"],
+                "master_bytes": master.stat().st_size,
+                "ratio": round(browser["download"]["bytes"] / master.stat().st_size, 4),
+            },
+            "determinism": {
+                "main_root_archive": receipt_digest,
+                "root2_archive": first2["archive_sha256"],
+                "root2_reexport_archive": again["archive_digest"],
+                "byte_identical_across_roots": receipt_digest == first2["archive_sha256"],
+                "byte_identical_same_root_reexport": first2["archive_sha256"] == again["archive_digest"],
+                "differing_members": member_diff(download, Path(first2["archive_path"])),
+                "threshold": "byte-identical archives from two clean roots",
+                "pass": receipt_digest == first2["archive_sha256"],
+            },
+            "runtime_network": load(S / "net" / "network-experiment.json"),
+        },
+        "export": {
+            "archive_digest": receipt_digest,
+            "archive_bytes": browser["download"]["bytes"],
+            "members": zip_members(download),
+            "downloaded_once_and_verified": sha(download) == receipt_digest,
+        },
+        "screenshots": sorted(p.name for p in (main_root / "shots").glob("*.png")),
+    }
+    effect = caught >= 6
+    dossier["smallest_useful_effect"] = {
+        "seeded_recall_ok": effect,
+        "real_defect_on_clean_final": "F1: the approved V2 final (yuvj420p) is refused by the CONTAINER_STREAM probe",
+        "met": effect,
+    }
+    target = OUT / f"R2_M10_B7_PILOT_{cohort.upper()}.json"
+    target.write_text(json.dumps(dossier, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    print(target, "recall", caught, "/", len(defects), "determinism", dossier["metrics"]["determinism"]["pass"])
+
+
+def zip_members(path: Path) -> list[dict[str, Any]]:
+    import zipfile
+
+    with zipfile.ZipFile(path) as bundle:
+        return [
+            {
+                "path": i.filename,
+                "bytes": i.file_size,
+                "sha256": "sha256:" + hashlib.sha256(bundle.read(i.filename)).hexdigest(),
+            }
+            for i in bundle.infolist()
+        ]
+
+
+def member_diff(a: Path, b: Path) -> list[str]:
+    import zipfile
+
+    with zipfile.ZipFile(a) as x, zipfile.ZipFile(b) as y:
+        return [n for n in x.namelist() if x.read(n) != y.read(n)]
+
+
+if __name__ == "__main__":
+    head = subprocess.run(
+        ["git", "-C", "/home/anhtuan/content-production-os/.worktrees/r2-m10-b", "rev-parse", "HEAD"],
+        capture_output=True,
+        text=True,
+        check=True,
+    ).stdout.strip()
+    main(sys.argv[1], head)

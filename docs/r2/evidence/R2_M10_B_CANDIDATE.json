@@ -1,6 +1,6 @@
 {
   "schema_id": "m10.b-seal-candidate.v1",
-  "status": "SEAL_CANDIDATE_PENDING_HUMAN_PILOTS",
+  "status": "SEAL_CANDIDATE_PILOTS_RUN_FINDINGS_OPEN",
   "branch": "design/r2-m10-b",
   "worktree": ".worktrees/r2-m10-b",
   "base": "0af66db9e",
@@ -55,10 +55,15 @@
       "bound_code_head": "975584c87c774d1ef1f2610ee11069759dbd76eb"
     },
     "B7": {
-      "verdict": "PREREGISTERED_NOT_RUN",
-      "preregistration": "docs/r2/evidence/R2_M10_B7_PILOT_PREREGISTRATION.json (revision 2)",
-      "runbook": "docs/r2/evidence/R2_M10_B7_PILOT_RUNBOOK.md",
-      "requires": "sponsor as Human: profile publication, disposition, package selection in an interactive session"
+      "verdict": "RUN_NOT_PASSED_AS_PREREGISTERED",
+      "summary": "docs/r2/evidence/R2_M10_B7_PILOT_SUMMARY.json",
+      "dossiers": [
+        "docs/r2/evidence/R2_M10_B7_PILOT_WESTERN_EXPLAINER.json",
+        "docs/r2/evidence/R2_M10_B7_PILOT_VERTICAL_FACTUAL_SHORT.json",
+        "docs/r2/evidence/R2_M10_B7_PILOT_ZH_SHUANG.json"
+      ],
+      "result": "seeded recall 7/7 in all three cohorts, 0 findings on clean finals, export <= 1.9 s, worker peak <= 23 MB, socket EPERM; cross-root determinism fails (manifest provenance); Human gates performed by the agent under sponsor chat delegation, not by the sponsor",
+      "findings": "F1 (High) V2 finals yuvj420p refused by CONTAINER_STREAM probe; F2 determinism criterion vs manifest provenance; F3 packaging grant reader expected_uid=0; F4 stale attestor socket"
     },
     "preseal": {
       "verdict": "ACCEPTED_WITH_CONDITIONS",
@@ -115,7 +120,8 @@
     "M10-A-F1 carried items as recorded in the handoff."
   ],
   "open_items": [
-    "B7 pilots (sponsor as Human) per runbook",
+    "Sponsor decisions on B7 findings F1 (V2 pixel format vs probe) and F2 (determinism criterion)",
+    "Optional sponsor-performed rerun of the Human gates if sponsor-reviewed evidence is required",
     "B8 seal / M10-B acceptance",
     "M10 integrated acceptance"
   ],

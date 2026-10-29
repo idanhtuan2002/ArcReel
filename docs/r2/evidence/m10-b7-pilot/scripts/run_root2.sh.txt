@@ -1,0 +1,12 @@
+#!/bin/bash
+set -uo pipefail
+S=$(cd "$(dirname "$0")" && pwd); C=$1
+cd /home/anhtuan/content-production-os/.worktrees/r2-m10-b
+P=$S/$C; R=$S/$C-root2; mkdir -m 700 -p "$R"; cp "$S/narratives/$C.json" "$R/narrative.json"
+export PILOT_DB=m10b7_${C}_root2
+uv run python "$S/pilot_host.py" "$R" "$C" setup | tail -1
+mkdir -p "$R/data/project/thumbnails"; cp "$P/data/project/thumbnails/thumb.png" "$R/data/project/thumbnails/thumb.png"
+cmp "$R/data/project/render-1.mp4" "$P/data/project/render-1.mp4" && echo same-master
+uv run python "$S/pilot_host.py" "$R" "$C" gates > "$R/gates.log" 2>&1; grep -E '"decision"' "$R/gates.log"
+uv run python "$S/export_root.py" "$R" "$C" > "$R/export_root.log" 2>&1; grep -E '"archive_sha256"|"check_status"' "$R/export_root.log"
+uv run python "$S/export_again.py" "$R" "$C" export-2 > "$R/export_again.log" 2>&1; grep -E 'archive_digest|m10-export' "$R/export_again.log"

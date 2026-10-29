@@ -1,0 +1,37 @@
+import asyncio, glob, json, sys, threading, time, hashlib
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).parent))
+import pilot_host as h
+async def main(pilot, cohort, command):
+    h._apply_env(pilot, cohort)
+    from server import auth
+    from server.routers import packaging
+    from server.services.package_export import PackageExportService
+    from lib.db import async_session_factory
+    from lib.db.repositories.quality_packaging import PackageSelectionRepository
+    from r2.contracts import packaging as p
+    from r2.quality.digests import compute_digest
+    f = h._factory(); env = await h._env_dict(pilot, f); state = env["state"]
+    slot = {"source_artifact_key": state["root_key"], "cohort_id": "cohort", "product_surface": "video"}
+    key = p.PackagingSlotKey(user_id="default", project_name="project", **slot)
+    async with async_session_factory() as s:
+        sid, _ = await PackageSelectionRepository(s).current_head(key)
+        sel = await PackageSelectionRepository(s).selection(user_id="default", project_name="project", selection_id=sid)
+    request = packaging._export_request("default", "actor", "project", packaging.ExportBody(command_id=command, **slot, selection_id=sid, selection_digest=compute_digest("m10.package-selection.v1", sel)))
+    peaks, stop = {}, threading.Event()
+    def poll():
+        while not stop.is_set():
+            for d in glob.glob("/sys/fs/cgroup/user.slice/user-1000.slice/user@1000.service/app.slice/m10-export-*.service"):
+                try: peaks[d] = max(peaks.get(d, 0), int(open(d + "/memory.peak").read()))
+                except OSError: pass
+            time.sleep(0.002)
+    t = threading.Thread(target=poll); t.start()
+    async with h._attestor(env):
+        started = time.perf_counter()
+        receipt = await PackageExportService(sessions=async_session_factory, grant_reader=env["reader"], project_root=env["project"], interactive_token=auth.create_token("actor")).export(request)
+        wall = round((time.perf_counter() - started) * 1000)
+    stop.set(); t.join()
+    out = {"command": command, "archive_digest": receipt.archive_digest, "archive_byte_size": receipt.archive_byte_size, "service_export_wall_ms": wall, "worker_memory_peak_bytes_observed": peaks}
+    print(json.dumps(out, indent=2))
+    (pilot / f"export_{command}.json").write_text(json.dumps(out, indent=2))
+asyncio.run(main(Path(sys.argv[1]).resolve(), sys.argv[2], sys.argv[3]))

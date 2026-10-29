@@ -1,0 +1,12 @@
+import asyncio, json, sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).parent))
+import pilot_host as h
+async def main(pilot, cohort):
+    h._apply_env(pilot, cohort)
+    f = h._factory(); env = await h._env_dict(pilot, f)
+    from server.services.quality_dispositions import quality_readiness
+    st = env["state"]["gates"]["run"]
+    r = await quality_readiness(f, env["reader"], project_root=env["project"], user_id="default", project_name="project", subject_digest=st["subject_digest"], profile_id=env["state"]["gates"]["profile"]["profile_id"])
+    print(r)
+asyncio.run(main(Path(sys.argv[1]).resolve(), sys.argv[2]))

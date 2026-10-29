@@ -1,0 +1,271 @@
+{
+  "schema_id": "m10.b7-pilot-dossier.v1",
+  "cohort": "vertical_factual_short",
+  "preregistration": "docs/r2/evidence/R2_M10_B7_PILOT_PREREGISTRATION.json (revision 2)",
+  "code_head": "affa7c322571e002dc9c54a6097868d41211eafb",
+  "run_at": "2026-10-29",
+  "deviations": [
+    "Human gates (profile publication, narrative observation, disposition, package selection) were performed by the agent under the sponsor's explicit chat delegation on 2026-10-29 ('ban lam het tat ca cac buoc'), through the real custodians with an interactive token for principal 'actor'. The preregistered reviewer identity (sponsor as HUMAN_SHOWRUNNER) is therefore NOT met; reviewer verdicts below are the agent's.",
+    "Local pilot host: per-cohort PostgreSQL database at alembic head, user-owned governance tree built with the repository's qualified-custody fixtures (test signing keys), attestor served in-process; the app's packaging deps were overridden only to point the grant reader at the user-owned tree (expected_uid=os.getuid()).",
+    "Corpus master is a yuv420p-normalized derivative of the approved V2 final (finding F1); the dependency head is the repository fixture video_only.mp4 bound by the fixture subject binding.",
+    "Profile policy is the repository V2 policy fixture with this cohort's platform constraints, every packaging check rule declared, banned phrases ['click here','link in bio'] and freshness max_age 7 days."
+  ],
+  "corpus": {
+    "source_final": "/home/anhtuan/arcreel-v2-staging/data/du-an-01-649c62c1/formats/c9f5d429e8900516dd22b445a60d388b8e42b5826778ff95bdc055d3d127a2b3.mp4",
+    "source_sha256": "sha256:c9f5d429e8900516dd22b445a60d388b8e42b5826778ff95bdc055d3d127a2b3",
+    "source_pix_fmt": "yuvj420p",
+    "master_sha256": "sha256:696eb187c8518c00a4a356cc89cf05cca2b01e4b0d08fdef4fdf1e27877b6412",
+    "master_bytes": 975494,
+    "artifact_key": "artifact-key-v1:WyJlcGlzb2RlLXZpZGVvIiwxLCJGSU5BTCJd"
+  },
+  "gates": {
+    "profile": {
+      "profile_id": "0199f00d-0000-7000-8000-000000000001",
+      "revision": 1,
+      "digest": "sha256:c298e66f2c8357db55c772ee8741af8fe8bc0f419d48628b041e53c94296d248"
+    },
+    "technical": {
+      "status": "PASS",
+      "observation_id": "01a18658-f664-7783-a7cc-b930fbf54dbb"
+    },
+    "narrative": {
+      "status": "PASS",
+      "reviewer": "agent (Claude) by sponsor delegation 2026-10-29; not the sponsor",
+      "method": "5 frames at 1/5 fps plus container/stream probe",
+      "notes": [
+        "9:16 frame letterboxes the 16:9 terminal card: content occupies about a third of the height",
+        "card text is small on a phone-size frame",
+        "last frame cuts to an abstract blurred background"
+      ],
+      "observation_id": "01a18658-f848-7340-b456-de6693f83177"
+    },
+    "run": {
+      "run_id": "01a18658-f855-7f60-b3d6-adfa0d449c01",
+      "run_digest": "sha256:a3e899e4558a9364f120e172242f39f3c6f5e7a6b7090b54195e4cd591446f92",
+      "subject_digest": "sha256:b68fc54bf2cd5e3926ee3be66e2ea1581bb7a3544d219a49dde8f6daaf56f612"
+    },
+    "disposition": {
+      "disposition_id": "01a18658-f9f9-7670-8230-f542e5baccff",
+      "decision": "PASS"
+    }
+  },
+  "metrics": {
+    "seeded_recall": {
+      "caught": 7,
+      "of": 7,
+      "threshold": ">= 6 of 7",
+      "pass": true,
+      "defects": [
+        {
+          "id": "missing_required_asset",
+          "expected_rule_id": "asset-video",
+          "revision": 2,
+          "check_status": "FAIL",
+          "finding_rule_ids": [
+            "asset-video"
+          ],
+          "caught": true
+        },
+        {
+          "id": "byte_drift",
+          "expected_rule_id": "asset-thumbnail",
+          "revision": 3,
+          "check_status": "FAIL",
+          "finding_rule_ids": [
+            "asset-thumbnail"
+          ],
+          "caught": true
+        },
+        {
+          "id": "over_long_title",
+          "expected_rule_id": "title-length",
+          "revision": 4,
+          "check_status": "FAIL",
+          "finding_rule_ids": [
+            "title-length"
+          ],
+          "caught": true
+        },
+        {
+          "id": "banned_phrase",
+          "expected_rule_id": "tone",
+          "revision": 5,
+          "check_status": "PASS",
+          "finding_rule_ids": [
+            "tone"
+          ],
+          "caught": true
+        },
+        {
+          "id": "chapter_not_at_zero",
+          "expected_rule_id": "r-chapters.rules",
+          "revision": 6,
+          "check_status": "FAIL",
+          "finding_rule_ids": [
+            "r-chapters.rules",
+            "r-chapters.rules"
+          ],
+          "caught": true
+        },
+        {
+          "id": "missing_locale",
+          "expected_rule_id": "r-locales.coverage",
+          "revision": 7,
+          "check_status": "FAIL",
+          "finding_rule_ids": [
+            "r-locales.coverage"
+          ],
+          "caught": true
+        },
+        {
+          "id": "duration_out_of_window",
+          "expected_rule_id": "duration",
+          "profile_revision": 2,
+          "window_ms": [
+            30000,
+            60000
+          ],
+          "check_status": "FAIL",
+          "finding_rule_ids": [
+            "duration"
+          ],
+          "caught": true,
+          "root": "main (after export)"
+        }
+      ]
+    },
+    "false_positives_on_clean": {
+      "findings_on_clean": [],
+      "reviewer_verdicts": "no findings to judge (agent reviewer)",
+      "count": 0,
+      "threshold": "<= 1",
+      "pass": true
+    },
+    "reviewer_disagreement": {
+      "rows": [],
+      "note": "no findings on the clean final; nothing to disagree on"
+    },
+    "runtime_per_bundle_ms": {
+      "ui_click_to_download_link_ms": 1376,
+      "service_export_ms_root2": [
+        790,
+        836
+      ],
+      "threshold": "<= 30000",
+      "pass": true
+    },
+    "peak_rss_bytes": {
+      "value": 15417344,
+      "method": "cgroup memory.peak of the m10-export unit polled every 2 ms during a root2 export (same inputs)",
+      "threshold": "<= 536870912",
+      "pass": true
+    },
+    "storage_bytes": {
+      "archive_bytes": 1020350,
+      "master_bytes": 975494,
+      "ratio": 1.046
+    },
+    "determinism": {
+      "main_root_archive": "sha256:ebe5cf668a5d19f711e976ef4f96c21dee71a7d95302223c1ec2f71934d119e0",
+      "root2_archive": "sha256:331c45eb8a37e4d0ba477d16c4178f3101bce51ca4857522d53707178c3e8878",
+      "root2_reexport_archive": "sha256:331c45eb8a37e4d0ba477d16c4178f3101bce51ca4857522d53707178c3e8878",
+      "byte_identical_across_roots": false,
+      "byte_identical_same_root_reexport": true,
+      "differing_members": [
+        "manifest.json"
+      ],
+      "threshold": "byte-identical archives from two clean roots",
+      "pass": false
+    },
+    "runtime_network": {
+      "launcher": "QualityProbeRuntime.launch (same as PackageExportService._build_and_publish), unit_prefix m10-export, tools={}",
+      "unit_properties": [
+        "MemoryMax=536870912",
+        "MemorySwapMax=0",
+        "TasksMax=32",
+        "CPUQuota=100%",
+        "RuntimeMaxSec=15000ms",
+        "TimeoutStopSec=1s",
+        "KillMode=control-group",
+        "NoNewPrivileges=yes",
+        "LimitCORE=0",
+        "LimitFSIZE=67108864",
+        "UMask=0077",
+        "SystemCallErrorNumber=EPERM",
+        "SystemCallFilter=~@network-io @debug ptrace process_vm_readv process_vm_writev kcmp io_uring_setup io_uring_enter io_uring_register"
+      ],
+      "manager_result": "EXIT_CODE",
+      "exit_code": 1,
+      "group_cleanup_verified": true,
+      "report": {
+        "socket_af_inet_stream": {
+          "errno": 1,
+          "name": "EPERM"
+        },
+        "status": [
+          "NoNewPrivs:\t1",
+          "Seccomp:\t2",
+          "Seccomp_filters:\t3"
+        ],
+        "cgroup": "0::/user.slice/user-1000.slice/user@1000.service/app.slice/m10-export-0d839317a49f4712a0ae7d0654f2a108.service",
+        "memory.max": "536870912",
+        "memory.swap.max": "0",
+        "pids.max": "32",
+        "cpu.max": "100000 100000"
+      },
+      "stderr_tail": null
+    }
+  },
+  "export": {
+    "archive_digest": "sha256:ebe5cf668a5d19f711e976ef4f96c21dee71a7d95302223c1ec2f71934d119e0",
+    "archive_bytes": 1020350,
+    "members": [
+      {
+        "path": "manifest.json",
+        "bytes": 1460,
+        "sha256": "sha256:845c28fce49e0ed39c8fa9d86593981595deef9bf3fb2d32f5b20aa8c91a8544"
+      },
+      {
+        "path": "metadata/en.json",
+        "bytes": 247,
+        "sha256": "sha256:913fac9c0c731a74ec0042f08e59c29b4b57b4335c64b84636df200fb3817843"
+      },
+      {
+        "path": "metadata/metadata.json",
+        "bytes": 566,
+        "sha256": "sha256:89a048feceaae414d0d8a0826ead0e904ba16c1bbcc1e86a7ee8e0b90fc6ac84"
+      },
+      {
+        "path": "thumbnails/thumbnail.png",
+        "bytes": 41999,
+        "sha256": "sha256:4004067ae71c429250ece6af218d4941ded92ece0c53ae7fb99e71ff782b2808"
+      },
+      {
+        "path": "video/output.mp4",
+        "bytes": 975494,
+        "sha256": "sha256:696eb187c8518c00a4a356cc89cf05cca2b01e4b0d08fdef4fdf1e27877b6412"
+      }
+    ],
+    "downloaded_once_and_verified": true
+  },
+  "screenshots": [
+    "00-empty.png",
+    "01-clean.png",
+    "02-missing_required_asset.png",
+    "03-byte_drift.png",
+    "04-over_long_title.png",
+    "05-banned_phrase.png",
+    "06-chapter_not_at_zero.png",
+    "07-missing_locale.png",
+    "08-clean-final.png",
+    "20-preview.png",
+    "21-selected.png",
+    "22-exported.png",
+    "23-downloaded.png"
+  ],
+  "smallest_useful_effect": {
+    "seeded_recall_ok": true,
+    "real_defect_on_clean_final": "F1: the approved V2 final (yuvj420p) is refused by the CONTAINER_STREAM probe",
+    "met": true
+  }
+}

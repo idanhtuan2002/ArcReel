@@ -1,0 +1,52 @@
+"""Drive steps 4-7 for one pilot root over HTTP against the real app (no browser), exporting through the service
+with a measuring runtime so the confined worker's outcome (peak memory) is recorded. Used for the second clean root."""
+import asyncio, json, os, sys, time, hashlib
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).parent))
+import pilot_host as h
+import pilot_browser as b
+
+async def main(pilot: Path, cohort: str) -> None:
+    h._apply_env(pilot, cohort)
+    import httpx
+    from server import auth
+    from server.app import app
+    from server.routers import packaging
+    from server.services import quality_probe_runtime as rt
+    from server.services.package_export import PackageExportService, package_export_worker
+    from lib.db import async_session_factory
+    factory = h._factory(); env = await h._env_dict(pilot, factory)
+    tree, socket_dir = env["governance"]
+    state = env["state"]; run = state["gates"]["run"]
+    app.dependency_overrides[packaging.packaging_deps] = lambda: packaging.PackagingDeps(
+        sessions=async_session_factory, project_root=lambda n: env["project"], grant_reader=env["reader"],
+        read_directory=tree / "read", socket_directory=socket_dir)
+    token = auth.create_token("actor"); headers = {"Authorization": f"Bearer {token}"}
+    zero = "sha256:" + "0" * 64
+    draft = b.clean_draft(pilot, cohort) | {
+        "audience_classification": {"audience_category": "general", "age_restriction": None, "classification_policy_digest": zero},
+        "disclosure": {"synthetic_media": True, "paid_promotion": False, "disclosure_policy_digest": zero},
+    }
+    slot = {"source_artifact_key": state["root_key"], "cohort_id": "cohort", "product_surface": "video"}
+    outcomes = []
+    class Measuring(rt.QualityProbeRuntime):
+        async def launch(self, *a, **k):
+            o = await super().launch(*a, **k); outcomes.append(o); return o
+    async with h._attestor(env):
+        async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://pilot") as c:
+            r = await c.post("/api/v1/projects/project/packaging/revisions", headers=headers, json={"command_id": "rev-1", "quality_run_id": run["run_id"], "draft": draft}); r.raise_for_status(); rev = r.json()["revision"]
+            r = await c.post("/api/v1/projects/project/packaging/checks", headers=headers, json={"command_id": "check-1", "candidate_id": rev["candidate_id"], "candidate_revision": rev["revision"], "candidate_payload_digest": rev["payload_digest"], "quality_run_id": run["run_id"], "quality_run_digest": run["run_digest"]}); r.raise_for_status(); obs = r.json()
+            r = await c.post("/api/v1/projects/project/packaging/previews", headers=headers, json={"command_id": "preview-1", **slot, "candidate_id": rev["candidate_id"], "candidate_revision": rev["revision"], "candidate_payload_digest": rev["payload_digest"], "packaging_observation_id": obs["observation_id"], "selected_variant_ids": ["t1"], "waivers": []}); r.raise_for_status(); pv = r.json()
+            r = await c.post("/api/v1/projects/project/packaging/selections", headers=headers, json={"command_id": "select-1", "preview_id": pv["preview"]["preview_id"], "preview_digest": pv["preview_digest"], "expected_head_version": pv["preview"]["expected_head_version"]}); r.raise_for_status(); sel = r.json()
+        from r2.contracts import packaging as p
+        request = packaging._export_request("default", "actor", "project", packaging.ExportBody(command_id="export-1", **slot, selection_id=sel["selection_id"], selection_digest=sel["selection_digest"]))
+        service = PackageExportService(sessions=async_session_factory, grant_reader=env["reader"], project_root=env["project"], interactive_token=token,
+                                       runtime=Measuring(rt.ProbeHost(tools={}, worker=Path(package_export_worker.__file__))))
+        started = time.perf_counter(); receipt = await service.export(request); wall = round((time.perf_counter() - started) * 1000)
+    archive = env["project"] / "exports" / (receipt.archive_digest.removeprefix("sha256:") + ".zip")
+    o = outcomes[-1]
+    out = {"check_status": obs["status"], "findings": obs["findings"], "receipt": {"archive_digest": receipt.archive_digest, "archive_byte_size": receipt.archive_byte_size},
+           "service_export_wall_ms": wall, "worker": {"accounting": json.loads(o.stdout.splitlines()[-1]).get("accounting"), "wall_elapsed_ms": o.wall_elapsed_ms, "manager_result": o.manager_result, "exit_code": o.exit_code},
+           "archive_path": str(archive), "archive_sha256": "sha256:" + hashlib.sha256(archive.read_bytes()).hexdigest()}
+    (pilot / "export_root.json").write_text(json.dumps(out, indent=2, default=str)); print(json.dumps(out, indent=2, default=str))
+asyncio.run(main(Path(sys.argv[1]).resolve(), sys.argv[2]))

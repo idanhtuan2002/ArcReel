@@ -1,0 +1,15 @@
+import asyncio, json, sys
+from pathlib import Path
+sys.path.insert(0, "/home/anhtuan/content-production-os/.worktrees/r2-m10-b")
+from server.services import quality_probe_runtime as rt
+async def main(out):
+    runtime = rt.QualityProbeRuntime(rt.ProbeHost(tools={}, worker=Path(__file__).with_name("socket_worker.py")))
+    with rt.scratch_files() as scratch:
+        outcome = await runtime.launch(b"{}", budget_ms=10000, output_cap=65536, scratch=(scratch[0],), unit_prefix="m10-export")
+    result = {"launcher": "QualityProbeRuntime.launch (same as PackageExportService._build_and_publish), unit_prefix m10-export, tools={}",
+              "unit_properties": list(rt.service_properties(10000 + rt.STARTUP_ALLOWANCE_MS)[1::2]),
+              "manager_result": outcome.manager_result, "exit_code": outcome.exit_code, "group_cleanup_verified": outcome.group_cleanup_verified,
+              "report": json.loads(outcome.stdout.splitlines()[-1]) if outcome.stdout else None,
+              "stderr_tail": outcome.stderr.decode(errors="replace")[-600:] if hasattr(outcome, "stderr") else None}
+    Path(out).write_text(json.dumps(result, indent=2)); print(json.dumps(result, indent=2)[:3000])
+asyncio.run(main(sys.argv[1]))

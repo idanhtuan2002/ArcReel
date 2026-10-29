@@ -1,0 +1,393 @@
+"""M10-B7 local pilot host (one cohort per run).
+
+setup  : fresh PostgreSQL database at alembic head, user-owned qualified governance tree, grant ISSUE for
+         principal `actor`, real approved master promoted into data/project, dependency head from the fixture.
+gates  : with the attestor served -> A3 profile publication, real confined technical probe, narrative observation,
+         run seal, A6 PASS disposition (all through the product services with an interactive token for `actor`).
+serve  : attestor + the real FastAPI app on 127.0.0.1:1241 (packaging deps overridden only to point the grant reader
+         at the user-owned governance tree), until interrupted.
+
+Usage (from the M10-B worktree):
+  uv run python <this file> <pilot_dir> <cohort> setup|gates|serve
+"""
+
+from __future__ import annotations
+
+import asyncio
+import json
+import os
+import secrets
+import shutil
+import subprocess
+import sys
+from pathlib import Path
+from typing import Any
+
+WORKTREE = Path("/home/anhtuan/content-production-os/.worktrees/r2-m10-b")
+sys.path.insert(0, str(WORKTREE))
+PG = "postgresql+asyncpg://postgres:postgres@127.0.0.1:55491"
+V2 = Path("/home/anhtuan/arcreel-v2-staging/data/du-an-01-649c62c1")
+SOURCE_16_9 = V2 / "production/final/du-an-01-649c62c1.mp4"
+FINAL_16_9 = Path(__file__).resolve().parent / "corpus/final-16x9-yuv420p.mp4"
+SOURCE_9_16 = V2 / "formats/c9f5d429e8900516dd22b445a60d388b8e42b5826778ff95bdc055d3d127a2b3.mp4"
+FINAL_9_16 = Path(__file__).resolve().parent / "corpus/final-9x16-yuv420p.mp4"
+
+COHORTS: dict[str, dict[str, Any]] = {
+    "western_explainer": {
+        "master": FINAL_16_9,
+        "width": 1920,
+        "height": 1080,
+        "min_duration_ms": 60000,
+        "max_duration_ms": 900000,
+        "locale": "en",
+        "platform_profile_id": "youtube-long",
+    },
+    "vertical_factual_short": {
+        "master": FINAL_9_16,
+        "width": 1080,
+        "height": 1920,
+        "min_duration_ms": 5000,
+        "max_duration_ms": 60000,
+        "locale": "en",
+        "platform_profile_id": "youtube-shorts",
+    },
+    "zh_shuang": {
+        "master": FINAL_9_16,
+        "width": 1080,
+        "height": 1920,
+        "min_duration_ms": 5000,
+        "max_duration_ms": 180000,
+        "locale": "zh-Hans",
+        "platform_profile_id": "douyin-short",
+    },
+}
+SECRET_NAME = "auth-secret"
+
+
+def _db_name(cohort: str) -> str:
+    return os.environ.get("PILOT_DB") or f"m10b7_{cohort}"
+
+
+def _env(pilot: Path, cohort: str) -> dict[str, str]:
+    secret_file = pilot / SECRET_NAME
+    if not secret_file.exists():
+        secret_file.write_text(secrets.token_urlsafe(48), encoding="utf-8")
+        secret_file.chmod(0o600)
+    password_file = pilot / "auth-password"
+    if not password_file.exists():
+        password_file.write_text(secrets.token_urlsafe(18), encoding="utf-8")
+        password_file.chmod(0o600)
+    return {
+        "DATABASE_URL": f"{PG}/{_db_name(cohort)}",
+        "AUTH_ENABLED": "true",
+        "AUTH_USERNAME": "actor",
+        "AUTH_PASSWORD": password_file.read_text("utf-8").strip(),
+        "AUTH_TOKEN_SECRET": secret_file.read_text("utf-8").strip(),
+        "ARCREEL_DATA_DIR": str(pilot / "data"),
+    }
+
+
+def _apply_env(pilot: Path, cohort: str) -> None:
+    os.environ.update(_env(pilot, cohort))
+
+
+def _factory():
+    from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
+
+    return async_sessionmaker(create_async_engine(os.environ["DATABASE_URL"]), expire_on_commit=False)
+
+
+async def _custody(factory, root: Path):
+    """prepare_qualified_custody without the test-schema shims (alembic already installed the schema)."""
+    import hashlib
+
+    from cryptography.hazmat.primitives import serialization
+    from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+
+    from lib.content_digest import canonical_json_bytes
+    from r2.governance.grant_transition import GrantScopeV1
+    from server.services.governance_grants import GovernanceGrantImporter
+    from tests.integration.r2.governance.test_grant_importer import _event, _signed
+    from tests.unit.r2.governance.test_operator_archive_reader import _put, _tree
+
+    event_key = Ed25519PrivateKey.from_private_bytes(bytes(range(32, 64)))
+    public = event_key.public_key().public_bytes(serialization.Encoding.Raw, serialization.PublicFormat.Raw)
+    importer = GovernanceGrantImporter(factory, key_id="grant-key-a", public_key=public)
+    body = _event("ISSUE", 1, None, "2026-01-01T00:00:00Z", project_name="project")
+    body.update(user_id="default", principal="actor", signer_key_id="grant-key-a")
+    event = await importer.import_event(_signed(body, event_key), scope=GrantScopeV1("default", "project", "actor"))
+    tree, paths = _tree(root)
+    runtime = root / "run"
+    runtime.mkdir(mode=0o700)
+    checkpoint_key = Ed25519PrivateKey.from_private_bytes(bytes(range(32)))
+    old_path = paths["checkpoint"]
+    checkpoint_body = json.loads(old_path.read_bytes())["body"]
+    checkpoint_body["heads"] = [
+        {
+            "user_id": "default",
+            "project_name": "project",
+            "principal": "actor",
+            "head_sequence": 1,
+            "head_event_digest": event.event_digest,
+        }
+    ]
+    checkpoint = _signed(checkpoint_body, checkpoint_key)
+
+    def digest(raw: bytes) -> str:
+        return "sha256:" + hashlib.sha256(raw).hexdigest()
+
+    destination = tree / "archive/checkpoints" / ("sha256-" + digest(checkpoint)[7:] + ".json")
+    _put(destination, checkpoint, 0o600)
+    old_path.unlink()
+    _put(paths["public_checkpoint"], checkpoint, 0o644)
+    high = json.loads(paths["high_water"].read_bytes())
+    high.update(
+        checkpoint_body_digest=digest(canonical_json_bytes(checkpoint_body, allow_nan=False)),
+        checkpoint_file_digest=digest(checkpoint),
+    )
+    raw = canonical_json_bytes(high, allow_nan=False)
+    _put(paths["high_water"], raw, 0o600)
+    _put(paths["public_high_water"], raw, 0o644)
+    return tree, runtime
+
+
+def _policy(cohort: str, config) -> dict[str, Any]:
+    from r2.contracts import quality as q
+    from tests.integration.server.services.test_quality_packaging import v2_policy
+    from tests.unit.r2.contracts.test_packaging import rule
+
+    spec = COHORTS[cohort]
+    policy = v2_policy(config)
+    constraints = policy["platform_constraints"]
+    declared = {item["check_id"] for item in constraints["rules"]}
+    for check_id, rule_class in q.PACKAGING_CHECK_CLASSES.items():
+        if check_id not in declared:
+            constraints["rules"].append(rule(f"r-{check_id}", check_id, rule_class.value))
+    constraints.update(
+        platform_profile_id=spec["platform_profile_id"],
+        width=spec["width"],
+        height=spec["height"],
+        min_duration_ms=spec["min_duration_ms"],
+        max_duration_ms=spec["max_duration_ms"],
+        required_locales=[spec["locale"]],
+        title_required_terms=[],
+        description_required_terms=[],
+        banned_phrases=["click here", "link in bio"],
+    )
+    for freshness in policy.get("freshness_rules", []):
+        freshness["max_age_seconds"] = 7 * 24 * 3600
+    return policy
+
+
+async def setup(pilot: Path, cohort: str) -> None:
+    db = _db_name(cohort)
+    subprocess.run(
+        [
+            "docker",
+            "exec",
+            "m10b-test-pg",
+            "psql",
+            "-U",
+            "postgres",
+            "-c",
+            f"DROP DATABASE IF EXISTS {db} WITH (FORCE)",
+        ],
+        check=True,
+    )
+    subprocess.run(
+        ["docker", "exec", "m10b-test-pg", "psql", "-U", "postgres", "-c", f"CREATE DATABASE {db}"], check=True
+    )
+    subprocess.run(["uv", "run", "alembic", "upgrade", "head"], cwd=WORKTREE, check=True, env=os.environ.copy())
+    factory = _factory()
+    import sqlalchemy as sa
+
+    async with factory() as session, session.begin():
+        await session.execute(
+            sa.text(
+                "INSERT INTO users (id, username, role, is_active, created_at, updated_at) "
+                "VALUES ('default', 'default', 'user', true, NOW(), NOW()) ON CONFLICT (id) DO NOTHING"
+            )
+        )
+    governance = pilot / "governance"
+    governance.mkdir(mode=0o700)
+    await _custody(factory, governance)
+    data = pilot / "data"
+    project = data / "project"
+    project.mkdir(parents=True, mode=0o700)
+    meta = json.loads((V2 / "project.json").read_text("utf-8"))
+    meta["title"] = f"M10-B7 pilot · {cohort}"
+    (project / "project.json").write_text(json.dumps(meta, ensure_ascii=False, indent=2), encoding="utf-8")
+    (pilot / "work").mkdir(mode=0o700)
+    from tests.integration.server.services.test_quality_probe_recipes import FIXTURES
+    from tests.integration.server.services.test_quality_probes import promote
+    from tests.unit.r2.contracts.test_quality import binding_data
+
+    master = shutil.copy2(COHORTS[cohort]["master"], pilot / "master.mp4")
+    root = await promote(factory, project, Path(master), "1")
+    dependency = await promote(
+        factory,
+        project,
+        FIXTURES / "video_only.mp4",
+        "dep-1",
+        key=binding_data()["dependency_heads"][0]["artifact_key"],
+    )
+    (pilot / "state.json").write_text(
+        json.dumps({"cohort": cohort, "root_key": root.artifact_key, "dependency_key": dependency.artifact_key}, indent=2),
+        encoding="utf-8",
+    )
+    print("setup done", db)
+
+
+async def _env_dict(pilot: Path, factory) -> dict[str, Any]:
+    from lib.db.repositories.host_hardening import MasterAuthorityRepository
+
+    from r2.quality.probes import ProbeCatalog
+    from server.services import quality_probe_runtime as runtime
+    from server.services.governance_startup import verify_governance_activated_startup
+    from tests.integration.server.services.test_quality_probe_recipes import config_for, host
+
+    state = json.loads((pilot / "state.json").read_text("utf-8"))
+    async with factory() as session:
+        repository = MasterAuthorityRepository(session)
+        root = await repository.get_current(user_id="default", project_name="project", artifact_key=state["root_key"])
+        dependency = await repository.get_current(
+            user_id="default", project_name="project", artifact_key=state["dependency_key"]
+        )
+    assert root is not None and dependency is not None
+    governance = pilot / "governance"
+    tree, socket_dir = governance / "custody", governance / "run"
+    config = config_for("CONTAINER_STREAM")
+
+    async def reader():
+        return await verify_governance_activated_startup(
+            tree / "read", socket_dir, session_factory=factory, expected_uid=os.getuid(), expected_gid=os.getgid()
+        )
+
+    return {
+        "factory": factory,
+        "project": pilot / "data" / "project",
+        "config": config,
+        "root": root,
+        "dependency": dependency,
+        "selected": {root.artifact_key: "candidate-1", dependency.artifact_key: "candidate-dep-1"},
+        "runtime": runtime.QualityProbeRuntime(
+            runtime.ProbeHost(tools=host().tools, vmaf_model=host().vmaf_model, work_root=pilot / "work")
+        ),
+        "catalog": ProbeCatalog(schema_id="m10.probe-catalog.v1", configs=(config,)),
+        "reader": reader,
+        "governance": (tree, socket_dir),
+        "state": state,
+    }
+
+
+def _attestor(env):
+    from server.services.governance_attestation import serve_governance_attestor
+
+    tree, socket_dir = env["governance"]
+    return serve_governance_attestor(
+        tree, socket_dir, session_factory=env["factory"], expected_uid=os.getuid(), expected_gid=os.getgid()
+    )
+
+
+async def gates(pilot: Path, cohort: str) -> None:
+    from r2.quality.runs import run_digest
+    from server import auth
+    from server.services.quality_profile_custodian import InteractiveProfilePublicationCustodian
+    from server.services.quality_profiles import ProfilePublicationService
+    from tests.integration.server.services.test_quality_dispositions import issue
+    from tests.integration.server.services.test_quality_dispositions import request_for as disposition_request
+    from tests.integration.server.services.test_quality_runs import (
+        completion,
+        human,
+        human_request,
+        seal,
+        subject_of,
+        technical,
+        write_manifest,
+    )
+    from tests.unit.r2.quality.test_quality_profiles import publication_request
+
+    factory = _factory()
+    env = await _env_dict(pilot, factory)
+    tree, socket_dir = env["governance"]
+    record: dict[str, Any] = {}
+    async with _attestor(env):
+        request = publication_request(
+            user_id="default", revision=1, parent_revision=None, policy=_policy(cohort, env["config"])
+        )
+        custodian = await InteractiveProfilePublicationCustodian.for_request(
+            request,
+            factory,
+            interactive_token=auth.create_token("actor"),
+            read_directory=tree / "read",
+            socket_directory=socket_dir,
+            expected_uid=os.getuid(),
+            expected_gid=os.getgid(),
+        )
+        profile = await ProfilePublicationService(factory, custodian=custodian).publish(request)
+        env["profile"] = profile
+        record["profile"] = {
+            "profile_id": profile.profile_id,
+            "revision": profile.revision,
+            "digest": profile.profile_digest,
+        }
+        write_manifest(env["project"], subject_of(env))
+        probe = await technical(env)
+        record["technical"] = {"status": str(probe.status), "observation_id": probe.observation_id}
+        narrative = json.loads((pilot / "narrative.json").read_text("utf-8"))
+        review = await human(env, human_request(env, status=narrative["status"]))
+        record["narrative"] = narrative | {"observation_id": review.observation_id}
+        run = await seal(env, completion(env, [probe, review]))
+        env["run"] = run
+        record["run"] = {"run_id": run.run_id, "run_digest": run_digest(run), "subject_digest": run.subject_digest}
+        disposition = await issue(env, disposition_request(run, "PASS"))
+        record["disposition"] = {"disposition_id": disposition.disposition_id, "decision": str(disposition.decision)}
+    state = env["state"] | {"gates": record}
+    (pilot / "state.json").write_text(json.dumps(state, indent=2, default=str), encoding="utf-8")
+    print(json.dumps(record, indent=2, default=str))
+
+
+async def serve(pilot: Path, cohort: str) -> None:
+    import uvicorn
+
+    from lib.db import async_session_factory
+    from lib.project_manager import get_project_manager
+    from server.app import app
+    from server.routers import packaging
+    from server.services.governance_startup import verify_governance_activated_startup
+
+    factory = _factory()
+    env = await _env_dict(pilot, factory)
+    tree, socket_dir = env["governance"]
+
+    async def reader():
+        return await verify_governance_activated_startup(
+            tree / "read",
+            socket_dir,
+            session_factory=async_session_factory,
+            expected_uid=os.getuid(),
+            expected_gid=os.getgid(),
+        )
+
+    app.dependency_overrides[packaging.packaging_deps] = lambda: packaging.PackagingDeps(
+        sessions=async_session_factory,
+        project_root=lambda name: Path(get_project_manager().get_project_path(name)),
+        grant_reader=reader,
+        read_directory=tree / "read",
+        socket_directory=socket_dir,
+    )
+    async with _attestor(env):
+        server = uvicorn.Server(uvicorn.Config(app, host="127.0.0.1", port=1241, log_level="info"))
+        await server.serve()
+
+
+def main() -> None:
+    pilot, cohort, action = Path(sys.argv[1]).resolve(), sys.argv[2], sys.argv[3]
+    assert cohort in COHORTS, cohort
+    pilot.mkdir(parents=True, exist_ok=True, mode=0o700)
+    _apply_env(pilot, cohort)
+    asyncio.run({"setup": setup, "gates": gates, "serve": serve}[action](pilot, cohort))
+
+
+if __name__ == "__main__":
+    main()

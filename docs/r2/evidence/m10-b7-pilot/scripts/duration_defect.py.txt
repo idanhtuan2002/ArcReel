@@ -1,0 +1,54 @@
+"""Seeded defect duration_out_of_window: publish profile revision 2 whose window excludes the master, seal a run under
+it, then check the clean draft bound to that run over HTTP."""
+import asyncio, json, os, sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).parent))
+import pilot_host as h
+import pilot_browser as b
+async def main(pilot: Path, cohort: str, max_ms: int, min_ms: int):
+    h._apply_env(pilot, cohort)
+    import httpx
+    from server import auth
+    from server.app import app
+    from server.routers import packaging
+    from lib.db import async_session_factory
+    from r2.contracts import quality as q
+    from r2.quality.digests import compute_digest
+    from r2.quality.runs import run_digest
+    from server.services.quality_profile_custodian import InteractiveProfilePublicationCustodian
+    from server.services.quality_profiles import ProfilePublicationService
+    from tests.integration.server.services.test_quality_runs import completion, human, human_request, seal, technical
+    from tests.unit.r2.quality.test_quality_profiles import publication_request
+    f = h._factory(); env = await h._env_dict(pilot, f); tree, sock = env["governance"]; state = env["state"]
+    policy = h._policy(cohort, env["config"])
+    policy["platform_constraints"].update(min_duration_ms=min_ms, max_duration_ms=max_ms)
+    base = publication_request(user_id="default", revision=2, parent_revision=1, policy=policy).model_dump(mode="json")
+    base["command"]["command_id"] = "publish-2"
+    base["command"]["request_digest"] = compute_digest("m10.profile-publication-request.v1", base)
+    request = q.ProfilePublicationAuthorizationRequest.model_validate(base)
+    token = auth.create_token("actor")
+    async with h._attestor(env):
+        custodian = await InteractiveProfilePublicationCustodian.for_request(request, f, interactive_token=token, read_directory=tree / "read", socket_directory=sock, expected_uid=os.getuid(), expected_gid=os.getgid())
+        profile = await ProfilePublicationService(f, custodian=custodian).publish(request)
+        env["profile"] = profile
+        from tests.integration.server.services.test_quality_probes import probe_request
+        from tests.integration.server.services.test_quality_probes import service as probe_service
+        probe_req = probe_request(profile, env["root"], requirement_id="technical-required", dependencies=(env["dependency"],), selected=env["selected"], execution_ref="probe-2")
+        probe = await (await probe_service(env, probe_req)).observe(probe_req)
+        review = await human(env, human_request(env, command_id="human-2", profile=profile, status="PASS"))
+        run = await seal(env, completion(env, [probe, review], command_id="seal-2", profile=profile))
+        app.dependency_overrides[packaging.packaging_deps] = lambda: packaging.PackagingDeps(sessions=async_session_factory, project_root=lambda n: env["project"], grant_reader=env["reader"], read_directory=tree / "read", socket_directory=sock)
+        zero = "sha256:" + "0" * 64
+        draft = b.clean_draft(pilot, cohort) | {"audience_classification": {"audience_category": "general", "age_restriction": None, "classification_policy_digest": zero}, "disclosure": {"synthetic_media": True, "paid_promotion": False, "disclosure_policy_digest": zero}}
+        headers = {"Authorization": f"Bearer {token}"}
+        async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://pilot") as c:
+            r = await c.post("/api/v1/projects/project/packaging/revisions", headers=headers, json={"command_id": "rev-duration", "quality_run_id": run.run_id, "draft": draft})
+            if r.status_code != 200:
+                print("revision refused", r.status_code, r.text); return
+            body = r.json()
+            rev = body["revision"]
+            r = await c.post("/api/v1/projects/project/packaging/revisions", headers=headers, json={"command_id": "rev-duration-next", "quality_run_id": run.run_id, "candidate_id": rev["candidate_id"], "expected_head_version": body["head"]["head_version"], "draft": draft}) if False else r
+            r = await c.post("/api/v1/projects/project/packaging/checks", headers=headers, json={"command_id": "check-duration", "candidate_id": rev["candidate_id"], "candidate_revision": rev["revision"], "candidate_payload_digest": rev["payload_digest"], "quality_run_id": run.run_id, "quality_run_digest": run_digest(run)})
+            out = {"profile_revision": profile.revision, "window_ms": [min_ms, max_ms], "run_id": run.run_id, "check_http": r.status_code, "check": r.json()}
+    (pilot / "duration_defect.json").write_text(json.dumps(out, indent=2)); print(json.dumps(out, indent=2)[:2500])
+asyncio.run(main(Path(sys.argv[1]).resolve(), sys.argv[2], int(sys.argv[3]), int(sys.argv[4])))

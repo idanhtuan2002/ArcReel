@@ -1,0 +1,15 @@
+import json, os, socket, sys
+r = {}
+try:
+    socket.socket(socket.AF_INET, socket.SOCK_STREAM).close(); r["socket_af_inet_stream"] = "allowed"
+except OSError as e:
+    r["socket_af_inet_stream"] = {"errno": e.errno, "name": __import__("errno").errorcode.get(e.errno)}
+status = open("/proc/self/status").read().splitlines()
+r["status"] = [l for l in status if l.split(":")[0] in ("NoNewPrivs", "Seccomp", "Seccomp_filters")]
+r["cgroup"] = open("/proc/self/cgroup").read().strip()
+for name in ("memory.max", "memory.swap.max", "pids.max", "cpu.max"):
+    try:
+        r[name] = open("/sys/fs/cgroup" + r["cgroup"].split("::")[-1] + "/" + name).read().strip()
+    except OSError as e:
+        r[name] = "unreadable:%d" % e.errno
+sys.stdout.write(json.dumps(r) + "\n")

@@ -158,8 +158,15 @@ Rewrite in place; this is the resume entry for M10-B.
   → `975584c87` (verified failing without the fix), parity rebound `19f0842de`; **delta3 ACCEPTED_WITH_CONDITIONS**
   (`preseal-delta3-codex-review.json`). Seal candidate: `R2_M10_B_CANDIDATE.json`.
 
+- B7 pilots run 2026-10-29 by the agent under the sponsor's chat delegation (all steps, Chrome via Playwright on a
+  local non-production host): `R2_M10_B7_PILOT_SUMMARY.json` + three dossiers + `m10-b7-pilot/` (scripts, shots,
+  network experiment). Recall 7/7 x3, 0 FP, export <= 1.9 s, peak <= 23 MB, EPERM; **not passed as preregistered**:
+  cross-root determinism fails (manifest provenance), reviewer identity deviated. Findings F1 (High: V2 finals
+  yuvj420p refused by the CONTAINER_STREAM probe), F2, F3, F4.
+
 ## Next step
 
-**Stop for the sponsor.** Run the B7 pilots as Human per `R2_M10_B7_PILOT_RUNBOOK.md` (profile publication,
-disposition, package selection in an interactive session). Then B8 seal (M10-B acceptance with the carried
-conditions in `R2_M10_B_CANDIDATE.json`) and M10 integrated acceptance. Nothing pushed; merge/tag/deploy are Human gates.
+**Stop for the sponsor.** Decide F1 (renderer emits yuv420p vs probe admits yuvj420p) and F2 (member-level
+determinism vs provenance outside the archive); optionally rerun the Human gates yourself if sponsor-reviewed evidence
+is required. Then B8 seal (M10-B acceptance with the carried conditions in `R2_M10_B_CANDIDATE.json`) and M10
+integrated acceptance. Nothing pushed; merge/tag/deploy are Human gates.
