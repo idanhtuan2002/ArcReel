@@ -79,3 +79,11 @@ activated-host qualification + deploy (sudo), then M9-B.
   new N1 (50-run cap hides history → cursor pagination) and N2 (stale publication CAS after publish). Next: fix all,
   add resolver mutation corpus (I1), delta2 review, then live Chrome acceptance + probe route requalification.
 
+- Delta1 fixes: backend `6724365eb` (streaming 1 MiB body limit, probes/runs cursor paging, `runs/{run_id}` closure
+  read, catalog 503 only for no invocation / PLANNED, resolver mutation corpus); frontend `25024fb28` + `39ed7b280`
+  (actor-keyed workspace + sign-in state, scope-key guard, publish selects published profile, older-runs paging,
+  waiver candidates = BLOCKING findings of FAIL review in the chosen run's closure, probe states + finish/lost
+  envelope, policy/findings/candidate in confirmation, reread run after decision). Gates at `39ed7b280`: `pnpm check`
+  236 files/2658 tests; ruff/format/basedpyright/lint-imports/deptry/audit/i18n green. Delta2 Codex review running
+  (`impl-delta2-codex-review.json`). Next: resolve delta2, requalify probe route (router changed), live Chrome
+  acceptance, M10-C acceptance record.
