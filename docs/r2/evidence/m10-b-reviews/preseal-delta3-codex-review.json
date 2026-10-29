@@ -1,0 +1,85 @@
+{
+  "verdict": "ACCEPTED_WITH_CONDITIONS",
+  "head": "19f0842de6a23ff0e245f07c57271f48659cc3e3",
+  "prior_findings": [
+    {
+      "id": "N3",
+      "status": "RESOLVED",
+      "confirmation": "SOURCE_VERIFIED_AND_CONTROLLED_BRANCH_PROBES_PASSED",
+      "evidence": [
+        "server/services/package_export.py:745",
+        "server/services/package_export.py:828",
+        "server/services/package_export.py:867",
+        "server/services/package_export.py:875",
+        "lib/db/repositories/quality_packaging.py:210",
+        "tests/integration/server/routers/test_packaging_routes.py:566",
+        "tests/integration/server/routers/test_packaging_routes.py:605",
+        "tests/integration/server/routers/test_packaging_routes.py:613"
+      ],
+      "assessment": "Every previously caught currentness refusal now reaches the same post-refusal column-select comparison of (selection_id, version). A changed pair returns None, so slot_status closes that transaction and starts another projection, bounded to three attempts. An unchanged head remains refused rather than becoming exportable. This closes the early DispositionStale/ProfileStale/SubjectStale/WaiverForbidden masking path as well as StaleHead. The change adds no earlier packaging lock and preserves the existing global lock order.",
+      "test_review": "The PostgreSQL test now runs same-disposition and new-disposition variants. Both pause immediately after the unlocked head read; the new case issues a new PASS disposition before selecting the replacement. Assertions require S2/version2/exportable/READY and explicitly require its disposition ID to differ from S1. The helper creates a fresh preview before selecting, so S2 binds to the new disposition. Run/profile replacement shares the same post-refusal branch, although those actual PostgreSQL interleavings are not separately exercised here.",
+      "fresh_verification": "Ten controlled probes executed the actual _project_slot code object in an isolated globals namespace with stand-in repositories and a real PackageSelection fixture: all five refusal types, each with moved and unchanged heads. Every case performed the second current_head read; moved heads returned None, unchanged heads returned the original non-exportable refusal. These are branch probes, not PostgreSQL interleaving tests. The two authorized PostgreSQL cases were attempted but failed at setup with sandbox PermissionError EPERM."
+    },
+    {
+      "id": "L2",
+      "status": "PARTIAL",
+      "severity": "Low",
+      "assessment": "Carried forward as a nonblocking verification note from delta2. No frontend source/test changes occur in this delta. Live keyboard/focus/contrast and populated refusal-state accessibility acceptance remain B8 conditions; no new accessibility defect is asserted."
+    }
+  ],
+  "new_findings": [],
+  "conditions": {
+    "critical_status": "No confirmed Critical, High or Medium finding remains in this bounded delta re-review. N3 is closed. Acceptance is for the reviewed pre-seal fix, not B7 completion, B8 integrated acceptance, final seal or production readiness.",
+    "scope": "Independent single-agent review of git diff 6f92db859..HEAD. Entry HEAD exactly matched the requested SHA and the worktree was clean. No source/test changes, formatting, staging, commits, push, merge, tag or full-suite run. Only this JSON review artifact is authored.",
+    "carried_resolutions": "M1, N1 and N2 were resolved in delta2. This delta changes only _project_slot refusal handling, its parametrized interleaving test, the parity report and the recorded delta2 review. No regression of those prior resolutions was identified within this delta.",
+    "parity_binding": {
+      "bound_code_head": "975584c87c774d1ef1f2610ee11069759dbd76eb",
+      "assessment": "Both reports record a fresh 18-passed parity rerun at the fix code snapshot, including updated timing and JUnit digest. Fresh evaluate_quality_parity calls return PASS at that bound SHA. Git diff from the bound SHA to requested HEAD changes only R2_M10_B6_DONOR_PARITY.json, establishing identical code/test inputs. Literal fold at requested documentation HEAD returns BLOCKED by the exact-HEAD string contract; this review accepts the explicitly identified source-identical code snapshot, not a claim that the pure fold passes at the documentation SHA. Further source changes require affected evidence to be refreshed/rebound.",
+      "evidence": [
+        "docs/r2/evidence/R2_M10_B6_DONOR_PARITY.json:19",
+        "docs/r2/evidence/R2_M10_B6_DONOR_PARITY.json:223",
+        "docs/r2/evidence/R2_M10_B6_DONOR_PARITY.json:257",
+        "docs/r2/evidence/R2_M10_B6_DONOR_PARITY.json:439"
+      ]
+    },
+    "fresh_verification": [
+      {
+        "command": "DATABASE_URL=postgresql+asyncpg://postgres:postgres@127.0.0.1:55491/arcreel_test .venv/bin/python -m pytest -q --tb=short tests/integration/server/routers/test_packaging_routes.py -k test_a_selection_replaced_during_the_slot_read_is_projected_from_the_replacement",
+        "result": "Exit 1: 17 deselected, 2 setup errors in 1.65s. Both same-disposition and new-disposition cases were selected, but socket creation is denied with PermissionError EPERM. No fresh PostgreSQL product pass/fail conclusion. Log: /tmp/m10-delta3-pg.log."
+      },
+      {
+        "command": "Isolated Python probes executing current PackageExportService._project_slot.__code__ with minimal repository stand-ins and a real selection fixture",
+        "result": "PASS: 10 cases, covering all five refusal types with moved and unchanged heads; second head read, retry signal and retained refusal verified. No source file or live production object patched."
+      },
+      {
+        "command": "Python evaluate_quality_parity for both report-bound and requested HEADs; git diff --name-only 975584c87..19f0842de",
+        "result": "Both bound-code folds PASS; literal documentation-HEAD folds BLOCKED; only parity report differs. No source/test changes after the report-bound code snapshot."
+      }
+    ],
+    "supplied_main_agent_verification": {
+      "provenance": "User-supplied execution results, not independently rerun successfully in this sandbox.",
+      "negative_control": "With the fix reverted, parametrized interleaving tests: 1 failed (new-disposition), 1 passed.",
+      "fixed_run": "With the fix, test_packaging_routes.py plus test_packaging_donor_parity.py: 37 passed.",
+      "parity_rerun": "18 passed at 975584c87; recorded report summary 18 passed, 1 warning in 2.32s, wall_ms 5841.",
+      "limit": "The negative-control and 37-pass outputs are supplied evidence. Their raw execution logs were not available in the reviewed delta; this reviewer does not represent them as fresh independent PostgreSQL results."
+    },
+    "graph_limit": "list_projects succeeded, but this project points to the main checkout rather than the reviewed worktree. search_graph and check_index_coverage returned MCP tool call requires approval, but approval policy is never. Direct numbered source/diff verification was used; no graph generation or completeness claim.",
+    "B7_sponsor_conditions": [
+      "Execute the preregistered sponsor-as-Human pilots and record cohort utility/recall, corrections, clean-root determinism and in-unit network-denial evidence. These are pending acceptance activities, not delta findings.",
+      "Keep publication, disposition, selection and interactive export authorization boundaries intact; agent preparation does not confer Human authority."
+    ],
+    "B8_integrated_acceptance_conditions": [
+      "Complete integrated acceptance against a frozen reviewed source snapshot, preserving provenance for the supplied successful runtime evidence. Independently reproduce the relevant PostgreSQL/confinement checks in an environment that permits them when required by that gate.",
+      "Complete live keyboard/focus/contrast and populated refusal-state accessibility verification. L2 alone does not block this code review.",
+      "Do not promote this bounded review to M10-B seal or production readiness without the remaining B7/B8 evidence."
+    ],
+    "files_read": [
+      "docs/r2/evidence/m10-b-reviews/preseal-delta2-codex-review.json (prior statuses)",
+      "server/services/package_export.py (full delta, slot_status and _project_slot)",
+      "lib/db/repositories/quality_packaging.py (current_head column select)",
+      "tests/integration/server/routers/test_packaging_routes.py (delta, replacement helper and full interleaving test)",
+      "tests/integration/server/services/test_quality_dispositions.py (disposition_request PASS default literal)",
+      "docs/r2/evidence/R2_M10_B6_DONOR_PARITY.json (delta and fresh contract/fold execution)"
+    ]
+  }
+}
