@@ -24,7 +24,7 @@ Rewrite in place; resume entry for the quality operator surface.
   (`design-delta2-codex-review.json`; implementation conditions I1 subject/template tests, I2 transport security, …).
 
 ## Next step
-C1 done (resolver; PG test: byte-equal to the accepted fixture subject, authoritative, stale cases). Next: C2
+C1 done `3bdb59b03` (resolver). C2 done `fc707e802` (embedded host-v1 catalog, 9 qualification tests). Template done (server/services/quality_template.py, 6 unit tests). Next: C3
 embedded host catalog (`r2/quality/host_catalog.py`) + requalification, C3 prepare/submit seal + quality router
 (`server/routers/quality.py`), C4 Quality page + Packaging prefill; then Codex review, local Chrome acceptance, sponsor
 activated-host qualification + deploy (sudo), then M9-B.
