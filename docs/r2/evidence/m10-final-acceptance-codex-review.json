@@ -1,0 +1,457 @@
+{
+  "schema_id": "m10.final-acceptance-codex-review.v1",
+  "verdict": "NOT_ACCEPTED",
+  "head": "70386a26a1a8a1275ead3b03d2843cd6040e0e21",
+  "branch": "design/r2-m10-b",
+  "review_date": "2026-10-29",
+  "reviewer": "Independent Codex final acceptance reviewer; single agent; no implementation edits",
+  "decision_scope": "Final M10 completion under Completion boundary and Task C, not a reopening of the accepted bounded M10-B implementation fixes.",
+  "rationale": "Three dossiers exist and support useful local export mechanism evidence, but three qualified passing pilot dossiers are not established: the native zh-shuang corpus is absent and the preregistered sponsor/Human reviewer was replaced by the implementing agent. PASSED_WITH_DEVIATIONS is not sufficient to discharge those explicit completion requirements. Conditional local implementation acceptance remains supportable. The verdict is driven by material acceptance gaps, not Low findings or sandbox unavailability.",
+  "completion_permitted": false,
+  "critical_high_status": {
+    "critical_product_defects_confirmed": 0,
+    "new_high_product_code_defects_confirmed": 0,
+    "high_acceptance_gaps": 1,
+    "medium_acceptance_gaps": 1,
+    "low_findings_determine_verdict": false,
+    "qualification": "This is a bounded evidence/acceptance review, not an exhaustive fresh source/security audit."
+  },
+  "findings": [
+    {
+      "id": "F1_NATIVE_PILOT",
+      "severity": "High",
+      "status": "CONFIRMED",
+      "kind": "UNMET_COMPLETION_REQUIREMENT",
+      "file:line": "docs/r2/evidence/R2_M10_B7_PILOT_ZH_SHUANG.json:36",
+      "related_locations": [
+        "docs/superpowers/plans/2026-09-16-r2-m10-quality-packaging.md:125",
+        "docs/superpowers/plans/2026-09-16-r2-m10-quality-packaging.md:140",
+        "docs/r2/evidence/R2_M10_B7_PILOT_SUMMARY.json:9",
+        "docs/r2/evidence/R2_M10_B_ACCEPTANCE.json:107"
+      ],
+      "scenario": "The zh_shuang dossier reuses the English 9:16 final used by the vertical factual Short. A zh-Hans metadata member and locale-rule checks exercise packaging, but do not assess a native Chinese final or Chinese-language suitability. The dossier expressly says no zh-Hans final exists. Counting this as the required native zh-shuang passing pilot would declare M10 complete without its specified third corpus.",
+      "fix": "Supply an approved native zh-Hans/zh-shuang final and complete the cohort dossier against a frozen source head with the required qualified Human judgments, metrics, correction evidence and export checks. Preserve the English surrogate run as partial mechanism evidence. A scope amendment must be explicit and independently accepted if the sponsor instead elects to change the completion requirement; no such amendment to the native-cohort requirement is established here.",
+      "blocks_final_m10_acceptance": true
+    },
+    {
+      "id": "F2_REVIEWER_QUALIFICATION",
+      "severity": "Medium",
+      "status": "CONFIRMED",
+      "kind": "UNMET_COMPLETION_REQUIREMENT",
+      "file:line": "docs/r2/evidence/R2_M10_B7_PILOT_SUMMARY.json:8",
+      "related_locations": [
+        "docs/r2/evidence/R2_M10_B7_PILOT_PREREGISTRATION.json:91",
+        "docs/r2/evidence/R2_M10_B7_PILOT_ZH_SHUANG.json:8",
+        "docs/r2/evidence/R2_M10_B_ACCEPTANCE.json:143"
+      ],
+      "scenario": "All three dossiers record agent-performed profile publication, narrative review, disposition and package selection under sponsor chat delegation. This is disclosed authorized local execution according to the supplied provenance, not an allegation of unauthorized actions. Authorization to execute does not turn the agent into the preregistered sponsor as HUMAN_SHOWRUNNER or independently validate its narrative/utility judgments. Even the originally allowed single-reviewer independence limit presupposed a Human reviewer. B8 accepts local fixes while explicitly leaving these reviewer/corpus dimensions open.",
+      "fix": "Obtain and record actual sponsor/Human review of the frozen cohort evidence and assets, including narrative suitability, finding judgments, correction usefulness and package choices; perform/reconfirm any necessary custodian decisions through the qualified Human. Retain the agent records and delegated provenance. Do not relabel historical agent actions as Human actions or infer reviewer acceptance from the general instruction to do every step.",
+      "blocks_final_m10_acceptance": true
+    }
+  ],
+  "completion_gate_assessment": {
+    "exact_parent_chain": {
+      "status": "VERIFIED",
+      "chain": {
+        "a_accepted_source": "b904bc000b79217cabc459b0029bf9fea1d6f773",
+        "a_acceptance_and_b_base": "0af66db9e892e634bec2809539c237dc8288c621",
+        "b_code": "00912922e29c9e991a1aadb695d87fba4426cc40",
+        "b_acceptance": "806b46b356927a1c942ba0a02435ea01f2232a27",
+        "review_head": "70386a26a1a8a1275ead3b03d2843cd6040e0e21"
+      },
+      "checks": "merge-base --is-ancestor b904bc000 HEAD; 0af66db9e HEAD; b904bc000 0af66db9e; 806b46b35 HEAD all exit 0. Initial branch and HEAD match; initial git status --short empty.",
+      "source_identity": "git diff --quiet 00912922e HEAD -- r2 server lib alembic tests frontend exits 0; complete diff since 00912922e contains only docs/r2/evidence paths."
+    },
+    "a_and_b_independent_acceptance": {
+      "status": "CONDITIONAL_RECORDS_PRESENT",
+      "a": "Separate Claude subagent acceptance at 8fd838db1 is explicitly sponsor-authorized; accepted source b904bc000 contains later lock-order/service-test fixes marked unreviewed in that historical record. Current quality_profiles.py:49-51 orders profile before grant admission. This review does not claim a new exhaustive A6/A7 concurrency audit. Same-family review alone is not treated as a blocker.",
+      "b": "Codex packet repair reviews culminate in B8 ACCEPTED_WITH_CONDITIONS at bcead9f4e. Historical REWORK/CHANGES_REQUESTED verdicts are superseded within their bounded repair scopes, not silently erased. The B8 verdict expressly excludes missing Human/corpus and integrated/production qualifications."
+    },
+    "conditional_c": {
+      "status": "SEPARATE_PACKET_NOT_REQUIRED",
+      "reason": "Task C first item allows direct binding of accepted A/B evidence. Exact ancestry and records support that convention. No new product surface is needed merely to create a C label."
+    },
+    "migrations": {
+      "status": "SINGLE_LINEAGE_VERIFIED_RUNTIME_QUALIFIED",
+      "head": "8a5d0f6b1e44",
+      "m10_chain": [
+        "65f53650f3a8",
+        "07fd34535384",
+        "57f67bae0cb4",
+        "bed415be3608",
+        "4c1f0e2a9b10",
+        "5d2a7c3e8b11",
+        "6e3b8d4f9c22",
+        "7f4c9e5a0d33",
+        "8a5d0f6b1e44"
+      ],
+      "independent": "Repository alembic heads and history both exit 0, showing one head and the expected chain from 918c4a0e0001. Source checks confirm guarded B downgrades; this is structural lineage verification.",
+      "supplied": "migration-lineage.log records empty PG16 upgrade head -> downgrade 918c4a0e0001 -> upgrade head. SHA256 c4e660b33ee61e442db12f97fa93a16e772b769c6350e1de9b7966dc1fb881a4 independently matches the integrated record.",
+      "limits": "No independent live PG round trip. Empty DB evidence does not prove preservation of populated predecessor/FK rows. B1 C3 witness/reproducibility remains partial. Some A downgrades drop their history; B history/failure-bearing downgrades intentionally refuse. Reversible lineage must not be described as a lossless downgrade of arbitrary populated data."
+    },
+    "selected_donor_surfaces": {
+      "status": "RECORDED_PASS_WITH_INDEPENDENT_FOLD_AND_SOURCE_BINDING",
+      "independent_folds": {
+        "m10_a_kalinga": {
+          "bound_head": "cf232e2c59a2f1c2b23b924e1a94f31554954603",
+          "rows": 10,
+          "fold": "PASS"
+        },
+        "m10_b_kalinga": {
+          "bound_head": "00912922e29c9e991a1aadb695d87fba4426cc40",
+          "rows": 9,
+          "fold": "PASS"
+        },
+        "m10_b_openmontage": {
+          "bound_head": "00912922e29c9e991a1aadb695d87fba4426cc40",
+          "rows": 8,
+          "fold": "PASS"
+        }
+      },
+      "literal_review_head_fold": "All three BLOCKED, as expected under the exact-head contract. No literal-HEAD PASS is claimed. B source identity is verified; A has changed since its A7 report and is covered by the supplied B8 selected regression, not by a fresh reviewer execution of its donor runtime.",
+      "supplied": "B6 records 18 passes at 00912922e; B8 2269-test selection includes both packaging donor parity and M10-A Kalinga parity. Pinned donor contracts/functions and explicit excluded rows define the scope; no full donor-product parity claim.",
+      "limit": "Fresh fold validates the report classifications/bindings; it does not independently authenticate execution, timings or missing raw JUnit bytes."
+    },
+    "three_pilot_dossiers": {
+      "status": "NOT_SATISFIED",
+      "files_exist": 3,
+      "qualified_native_zh_pilot": false,
+      "preregistered_human_reviewer_met": false,
+      "supported_claims": [
+        "Recorded local exports/download verification for three configurations using original V2 final bytes in run 2.",
+        "Seeded packaging recall 7/7 in each configuration, no emitted findings on the clean packages, and correction of a seeded missing-locale defect through the panel.",
+        "Reported export UI times 1872/1375/1374 ms, worker cgroup peaks 23597056/15458304/15462400 bytes, storage ratios 1.0086/1.0485/1.0485.",
+        "Same-selection re-export equality and cross-root content-member equality under the amended determinism rule."
+      ],
+      "unsupported_claims": [
+        "Three pilots passed their original preregistration in full.",
+        "Independent sponsor/Human narrative, disagreement or utility acceptance.",
+        "Native Chinese narrative/content suitability.",
+        "A naturally occurring packaging defect was corrected on a clean final; recorded correction is seeded.",
+        "Complete production dependency provenance; dossiers use a fixture dependency head.",
+        "Whole-archive cross-root byte equality."
+      ]
+    },
+    "no_network_no_production_write": {
+      "status": "SUPPORTED_WITH_BOUNDED_STATIC_AND_SUPPLIED_RUNTIME_EVIDENCE",
+      "independent_static": "AST/import/name scan of 36 current M10 quality/packaging contracts, modules, router, models and repositories found no listed network/provider imports or ProductionAuthority/upload/credential Name references. Targeted source reads verify export uses QualityProbeRuntime.launch with m10-export prefix. No confirmed new Production Authority mutation surface found in this bounded review.",
+      "runtime": "Supplied network-experiment.json records AF_INET socket EPERM, seccomp/cgroup properties and cleanup inside one m10-export unit using the shared launcher. Not rerun by this reviewer.",
+      "qualification": "Runtime assertion covers confined workers/probes only. Host code has static/source evidence, not runtime network isolation. This scan is direct, not transitive/dynamic proof of all possible imports or side effects. Router environment reads select governance directories; launcher allowlists manager environment; worker clears its environment. No credential-free assertion about the entire ArcReel host process."
+    }
+  },
+  "determinism_amendment": {
+    "status": "VALID_DISTINCT_AMENDED_CLAIM_NOT_RETROACTIVE_FROZEN_PASS",
+    "evidence": "Preregistration lines 151-158 and design section 7 explicitly retain the failed frozen archive comparison and replace it with same-selection archive equality plus cross-root content-member equality. Commit 7609bceac is the amendment; run 2 is recorded at that code head.",
+    "judgment": "Keeping per-root selection/disposition/candidate provenance in manifest.json is a coherent explanation of different whole ZIP digests, not evidence of nondeterminism for one immutable selection. The amended criterion can support local export implementation acceptance. It cannot retroactively establish the original frozen pass, and does not cure Human reviewer or native-corpus gaps. A later qualified pilot should explicitly freeze the amended rule before execution; no demand to remove provenance or rewrite source follows from this review."
+  },
+  "conditions": [
+    {
+      "id": "C1",
+      "gate": "Before final M10 completion",
+      "required": true,
+      "requirement": "Close F1 and F2 at a frozen exact source/parent chain. Reassess three qualified dossiers with an explicitly frozen applicable determinism rule. Preserve all prior failed/deviated runs."
+    },
+    {
+      "id": "C2",
+      "gate": "Integrated schema evidence closure",
+      "required": true,
+      "requirement": "Carry B1 C3: attach executable commands, executed source SHA and raw result with predecessor revision and referencing FK preservation across the permitted migration path. The empty-database integrated log narrows but does not close this condition. Reproduce applicable PG checks where execution is permitted; sandbox failure is not a product failure."
+    },
+    {
+      "id": "C3",
+      "gate": "Supported local operation and stronger recovery claims",
+      "required": true,
+      "requirement": "Retain LOCAL_REGULAR_FILE_IO/trusted-root limits, separate fsync fault-injection and abrupt process/power-loss gaps, observed-vs-reasoned serialization limits, and one-operator contention envelope. Do not label cancellation tests every crash cut or the one 20-read/one-export measurement general deadlock/scalability proof."
+    },
+    {
+      "id": "C4",
+      "gate": "Activated-host/production qualification inherited from B C2",
+      "required": true,
+      "requirement": "Retain intended-uid/root-owned governance archive, root attestor, pinned keys and stopped-app/worker restore prerequisites. Local test-key/user-owned pilot custody is not activated-host evidence. Do not perform production-host actions to close this review without separate authorization; local M10 completion grants no production activation."
+    },
+    {
+      "id": "C5",
+      "gate": "Historical A conditions and independent-review provenance",
+      "required": true,
+      "requirement": "F1 persistence has B0 migration/source and supplied regression evidence, so do not describe it as wholly unimplemented merely because the historical A record is stale. Retain the bounded A same-family/post-review-fix and live-PG limitations; this report is not a full replacement A6/A7 audit."
+    },
+    {
+      "id": "C6",
+      "gate": "Every downstream acceptance or source rebind",
+      "required": true,
+      "requirement": "Distinguish supplied runtime evidence from reviewer execution, source head from documentation head, amended determinism from frozen failure, seeded utility from real-defect utility, delegated agent execution from qualified Human review. Refresh affected parity/route/regression evidence after source changes."
+    },
+    {
+      "id": "C7",
+      "gate": "All use of this review",
+      "required": true,
+      "requirement": "Scope remains local export packages only. No M11, credentials, upload, publication, Production Authority mutation, production activation, push, merge, tag or deployment is authorized."
+    }
+  ],
+  "verification": {
+    "fresh_successful": [
+      {
+        "command": "git rev-parse HEAD; git branch --show-current; git status --short",
+        "result": "Exact requested head and branch; initial clean worktree."
+      },
+      {
+        "command": "git merge-base --is-ancestor b904bc000 HEAD; git merge-base --is-ancestor 0af66db9e HEAD; git merge-base --is-ancestor b904bc000 0af66db9e; git merge-base --is-ancestor 806b46b35 HEAD",
+        "result": "Each separately checked exit 0."
+      },
+      {
+        "command": "UV_OFFLINE=1 UV_CACHE_DIR=/tmp/m10-review-uv uv run --no-sync alembic heads; UV_OFFLINE=1 UV_CACHE_DIR=/tmp/m10-review-uv uv run --no-sync alembic history",
+        "result": "Both exit 0; single 8a5d0f6b1e44 head and expected linear M10 ancestry."
+      },
+      {
+        "command": "PYTHONDONTWRITEBYTECODE=1 DATABASE_URL=postgresql+asyncpg://postgres:postgres@127.0.0.1:55491/arcreel_test timeout 20s .venv/bin/python -m pytest -q -p no:cacheprovider tests/unit/r2/quality/test_quality_parity.py",
+        "result": "51 passed in 1.25s, exit 0; pure parity unit coverage, not PG execution."
+      },
+      {
+        "command": "Independent Python DonorParityReport validation and evaluate_quality_parity for all three recorded reports; AST scan; log SHA256; git source diff checks",
+        "result": "Recorded-head PASS/literal-review-head BLOCKED for all reports; 36-module bounded direct scan clean; migration log hash matches; source/test/frontend trees identical to B8 code head."
+      }
+    ],
+    "unavailable_or_incomplete": [
+      {
+        "command": "AF_INET TCP socket creation/connect probe to 127.0.0.1:55491",
+        "result": "PermissionError [Errno 1] Operation not permitted at socket creation. No independent live PostgreSQL result."
+      },
+      {
+        "command": "PYTHONDONTWRITEBYTECODE=1 DATABASE_URL=postgresql+asyncpg://postgres:postgres@127.0.0.1:55491/arcreel_test timeout 45s .venv/bin/python -m pytest -q -p no:cacheprovider tests/unit/r2/quality/test_quality_parity.py tests/integration/lib/db/migrations/test_5d2a7c3e8b11_m8_packaging_candidate_kind.py",
+        "result": "Exit 124 after progress dots; no completed summary. No completed migration-suite pass/fail conclusion. The parity file was then run alone with the successful result above. No source fix proposed or made for this unisolated timeout."
+      }
+    ],
+    "supplied_not_rerun": [
+      "B8 2269 passed, zero failures/errors/skips (raw JUnit bytes not supplied in the seal JSON).",
+      "PG16 migration round trip, donor performance/runtime runs, actual systemd/Landlock export/probe qualification.",
+      "Pilot browser/content/resource/download/network experiments, B8 live accessibility and contention measurements."
+    ],
+    "graph_limit": "list_projects succeeded but listed the main checkout, not this worktree. index_status/search_graph/check_index_coverage returned approval required with approval policy never; no project generation verified. Coverage requests included evidence scopes and material source/test paths; direct pinned-clean source, Git and AST fallback used. No graph completeness claim.",
+    "not_performed": [
+      "Full suite",
+      "Source edits, formatting, staging or commits",
+      "Push, merge, tag or deploy",
+      "Provider/network requests or production writes",
+      "Subagent delegation"
+    ]
+  },
+  "review_history": [
+    {
+      "file": "docs/r2/evidence/m10-a-reviews/acceptance-review.json",
+      "verdict": "ACCEPT_WITH_CONDITIONS",
+      "sha256": "95787098afc215638213a95db938417fe5942ba25f34dbd054a9f1c6124acadb"
+    },
+    {
+      "file": "docs/r2/evidence/m10-b-reviews/b1-codex-delta-review.json",
+      "verdict": "ACCEPT_WITH_CONDITIONS",
+      "sha256": "6969947955e464bf7e042545c5eb6b115bc0a17160d1b3ae0652326c62f85cce"
+    },
+    {
+      "file": "docs/r2/evidence/m10-b-reviews/b1-codex-review.json",
+      "verdict": "REWORK",
+      "sha256": "b409d1c462b42fdc325f4fd18ea54106620a780536989df3cf418a2a941e94d7"
+    },
+    {
+      "file": "docs/r2/evidence/m10-b-reviews/b1-pg-migration-roundtrip.json",
+      "verdict": "EVIDENCE_ONLY",
+      "sha256": "2762827a72a8fa9c977fa99b84039834f5b7dda6c057c895cd7c1a838b231ea6"
+    },
+    {
+      "file": "docs/r2/evidence/m10-b-reviews/b2-codex-delta-review.json",
+      "verdict": "REWORK",
+      "sha256": "4abccbdd46f24e3e45321333e1a3f741b457f31dde6bc966c1e13dc920c424ec"
+    },
+    {
+      "file": "docs/r2/evidence/m10-b-reviews/b2-codex-delta2-review.json",
+      "verdict": "REWORK",
+      "sha256": "decffb9bfd1ad7a4fee622f67ffbdbd1d7a591a1ae296f820b92fb9ed971a241"
+    },
+    {
+      "file": "docs/r2/evidence/m10-b-reviews/b2-codex-delta3-review.json",
+      "verdict": "ACCEPT_WITH_CONDITIONS",
+      "sha256": "eb3aea9c674f24b2a0df3e8300b881a2ce56920714b08ac84002ff3873e5fbc1"
+    },
+    {
+      "file": "docs/r2/evidence/m10-b-reviews/b2-codex-review.json",
+      "verdict": "REWORK",
+      "sha256": "7f5a11517156309d1a1ac1bc16252c69e8dcf2a07409ec93580f9e0e023452b1"
+    },
+    {
+      "file": "docs/r2/evidence/m10-b-reviews/b3-codex-delta-review.json",
+      "verdict": "REWORK",
+      "sha256": "235986c9a44673f079062a5cc06333c05b8d04a5000f8e64b4778c0ff472df25"
+    },
+    {
+      "file": "docs/r2/evidence/m10-b-reviews/b3-codex-delta2-review.json",
+      "verdict": "ACCEPT_WITH_CONDITIONS",
+      "sha256": "ba4936c5676f4895658cd5b42640294cc1b8033c524a8ad75e4d416d3c8fb7cc"
+    },
+    {
+      "file": "docs/r2/evidence/m10-b-reviews/b3-codex-review.json",
+      "verdict": "REWORK",
+      "sha256": "79ed4c66619e062a0f7291e3059560d62a5bdf40348d18056eefe89590975a4c"
+    },
+    {
+      "file": "docs/r2/evidence/m10-b-reviews/b4-codex-delta-review.json",
+      "verdict": "REWORK",
+      "sha256": "c01023bd1c5846a6e7ea29e181a830280de8348e1884948954602be8b15c394b"
+    },
+    {
+      "file": "docs/r2/evidence/m10-b-reviews/b4-codex-delta2-review.json",
+      "verdict": "REWORK",
+      "sha256": "2eab9869ee8eba516d1bc8a7b9efcac3d9862a6bc482a8eb8c5cf2f72a91fef1"
+    },
+    {
+      "file": "docs/r2/evidence/m10-b-reviews/b4-codex-delta3-review.json",
+      "verdict": "ACCEPT_WITH_CONDITIONS",
+      "sha256": "c8d90ba43c3ef59e293b716d5a2efbb31a5292d8b2f966d1a66263743dbf7b93"
+    },
+    {
+      "file": "docs/r2/evidence/m10-b-reviews/b4-codex-review.json",
+      "verdict": "REWORK",
+      "sha256": "16a49b05757c302be72c5756a2c7e4ca8f9dc08b2d1264dde9b372ea79b31217"
+    },
+    {
+      "file": "docs/r2/evidence/m10-b-reviews/b5-codex-delta-review.json",
+      "verdict": "NOT ACCEPTED",
+      "sha256": "ecb314dd8ad14e595c91ad42db1d11c2a9e809079c4b8f4413e327427be699f3"
+    },
+    {
+      "file": "docs/r2/evidence/m10-b-reviews/b5-codex-delta2-review.json",
+      "verdict": "ACCEPTED WITH VERIFICATION LIMITS",
+      "sha256": "c1430eafcd662ce7bc6e508dece2a07675de1bc60321a83157459b2e6e16c4c5"
+    },
+    {
+      "file": "docs/r2/evidence/m10-b-reviews/b5-codex-review.json",
+      "verdict": "NOT ACCEPTED",
+      "sha256": "0fae87da10b149fc1885a3cc9a3692efd8d7493a62fa24e83fc3dc7228412d06"
+    },
+    {
+      "file": "docs/r2/evidence/m10-b-reviews/b7-fixes-codex-review.json",
+      "verdict": "ACCEPTED_WITH_CONDITIONS",
+      "sha256": "bff888d5c01a07f5a9bab80162ab861bba9272713d4a3ff38965a6157bf5b126"
+    },
+    {
+      "file": "docs/r2/evidence/m10-b-reviews/b8-seal-codex-review.json",
+      "verdict": "ACCEPTED_WITH_CONDITIONS",
+      "sha256": "164b15c97273da462a0a023f41b8330716118f9df18fabfe200161779fa25c78"
+    },
+    {
+      "file": "docs/r2/evidence/m10-b-reviews/design-b0-review.json",
+      "verdict": "REWORK",
+      "sha256": "25e01c37d383ac0f02a7ca3c431b460bbc49f12aaf1b55010715ca6624049426"
+    },
+    {
+      "file": "docs/r2/evidence/m10-b-reviews/design-r2-delta-review.json",
+      "verdict": "ACCEPT_WITH_CONDITIONS",
+      "sha256": "ed10492c04e3bade1810e7170a21bb42231d0bc599774b6c02e94428978e39df"
+    },
+    {
+      "file": "docs/r2/evidence/m10-b-reviews/export-route-qualification.json",
+      "verdict": "LOCAL_PACKAGE_EXPORT_ROUTE_OFFLINE_VERIFIED",
+      "sha256": "23c40423f970239841e33c0559efede494042d839b16978dad7f15c408f61c44"
+    },
+    {
+      "file": "docs/r2/evidence/m10-b-reviews/preseal-codex-review.json",
+      "verdict": "CHANGES_REQUESTED",
+      "sha256": "e6bdf377ba35a4925c95d618d6be00b914a554e0742be6191006b3357abc9006"
+    },
+    {
+      "file": "docs/r2/evidence/m10-b-reviews/preseal-delta1-codex-review.json",
+      "verdict": "CHANGES_REQUESTED",
+      "sha256": "9166e087a2714ac563544797bcf7f15c97375107f79ba25de6c30c678676b613"
+    },
+    {
+      "file": "docs/r2/evidence/m10-b-reviews/preseal-delta2-codex-review.json",
+      "verdict": "CHANGES_REQUESTED",
+      "sha256": "0f0b0161df6a9f32c60a4b5793dedfa715905de700fd668ac5fc326c1835b6c6"
+    },
+    {
+      "file": "docs/r2/evidence/m10-b-reviews/preseal-delta3-codex-review.json",
+      "verdict": "ACCEPTED_WITH_CONDITIONS",
+      "sha256": "bfb02507686b22bccd7482eb3f1c42f37c0051f59d680c8a82ada1d78d037172"
+    }
+  ],
+  "primary_evidence": [
+    {
+      "file": "docs/superpowers/plans/2026-09-16-r2-m10-quality-packaging.md",
+      "sha256": "d0b9794e8f320c81f74df309fce7ec8b3eaeb8f1aafc1132ef0cf4a1b43f7379"
+    },
+    {
+      "file": "docs/superpowers/specs/2026-10-28-r2-m10-b-packaging-export-design.md",
+      "sha256": "66f6e9e8d14bc1326479cdb2e767d6a0d3336e3bc2d5aa9183ce395ae963cc87"
+    },
+    {
+      "file": "docs/r2/evidence/R2_M10_INTEGRATED_EVIDENCE.json",
+      "sha256": "910ce03ec4d1bd2d2d59903461bbbdaa110fb998bb9aa19cc630bcc445a729f3"
+    },
+    {
+      "file": "docs/r2/evidence/R2_M10_A_ACCEPTANCE.json",
+      "sha256": "2519da6998ef6b86b0dce3f93bb8f0057c8c63b38f1cb965f2ca0ab8bc208780"
+    },
+    {
+      "file": "docs/r2/evidence/R2_M10_B_ACCEPTANCE.json",
+      "sha256": "82eeedc158b7f9a87279b095f662ebfc42ed31c623bb96a652685bc6dbb6b0be"
+    },
+    {
+      "file": "docs/r2/evidence/R2_M10_B8_SEAL_EVIDENCE.json",
+      "sha256": "a8d1d5d667d772ea55713d4d36de7668c48d4f789bbc63a067573dadba4e36e6"
+    },
+    {
+      "file": "docs/r2/evidence/R2_M10_B7_PILOT_SUMMARY.json",
+      "sha256": "54b3ef9ca63f7d7b180619e2740e9bda0369b5b1d3690321f03681174c2efc79"
+    },
+    {
+      "file": "docs/r2/evidence/R2_M10_B6_DONOR_PARITY.json",
+      "sha256": "5345cd0e7834e3904d095554105a97ee5739a8a0a672028bfc9b489405816cbd"
+    },
+    {
+      "file": "docs/r2/evidence/R2_M10_A7_KALINGA_PARITY.json",
+      "sha256": "d655a07a966fde195091fd8eef768a74d90aef455153e6b2e21df574251acee4"
+    },
+    {
+      "file": "docs/r2/evidence/R2_M10_B7_PILOT_PREREGISTRATION.json",
+      "sha256": "47fe531407972a02c74b76f6b996a44e60d47022b69559cc68ce973c3993f606"
+    },
+    {
+      "file": "docs/r2/evidence/R2_M10_B7_PILOT_WESTERN_EXPLAINER.json",
+      "sha256": "6614518c7ee630f97e7429dceaf1b77932cfdfc15de5577e78151f51a92b7ccb"
+    },
+    {
+      "file": "docs/r2/evidence/R2_M10_B7_PILOT_VERTICAL_FACTUAL_SHORT.json",
+      "sha256": "998ac919bbb2f76ed5327e8a3a0bf2c0430d41d8eaaaca2e3981528450d3f15e"
+    },
+    {
+      "file": "docs/r2/evidence/R2_M10_B7_PILOT_ZH_SHUANG.json",
+      "sha256": "cbe7458dd7dd961db2d315d53910a244467d476f9c8e7d0486b2ac53be250b7c"
+    },
+    {
+      "file": "docs/r2/evidence/m10-integrated/migration-lineage.log",
+      "sha256": "c4e660b33ee61e442db12f97fa93a16e772b769c6350e1de9b7966dc1fb881a4"
+    },
+    {
+      "file": "docs/r2/evidence/m10-b7-pilot/network-experiment.json",
+      "sha256": "a7ef4b8a81e0fe6975ab76cce179e6f21c916fdd11ddc3b04a7fe0fdab075c6c"
+    }
+  ],
+  "source_read_scope": [
+    "r2/quality/parity.py",
+    "r2/quality/ports.py",
+    "server/services/quality_profiles.py",
+    "server/services/package_export.py (build/publish and classification)",
+    "server/routers/packaging.py (host dependencies)",
+    "server/services/quality_probe_runtime.py (network envelope/manager environment)",
+    "server/services/quality_probe_worker.py (environment/confinement)",
+    "alembic/versions (heads/history and relevant downgrade definitions)",
+    "alembic/versions/5d2a7c3e8b11_m8_packaging_candidate_kind.py",
+    "tests/integration/lib/db/migrations/test_5d2a7c3e8b11_m8_packaging_candidate_kind.py",
+    "scripts/r2/verify_m10_a_candidate.py (scope and limits)",
+    "tests/conftest.py and migrations/conftest.py (test execution setup)"
+  ],
+  "workspace": {
+    "initial_status": "clean",
+    "write_scope": "docs/r2/evidence/m10-final-acceptance-codex-review.json",
+    "reviewed_source_preserved": true,
+    "final_head_expected": "70386a26a1a8a1275ead3b03d2843cd6040e0e21"
+  }
+}

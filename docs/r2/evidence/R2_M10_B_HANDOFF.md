@@ -174,8 +174,17 @@ Rewrite in place; this is the resume entry for M10-B.
 - Codex review of the B7 fixes **ACCEPTED_WITH_CONDITIONS** (`b7-fixes-codex-review.json`, no H/M); L1-L3
   (utility-effect computation, member comparator, candidate wording) fixed; conditions C1-C3 carried in the candidate.
 
+- B8: crash cuts `f5f06b87c`, startup-verified grant reader `00912922e`, seal evidence `bcead9f4e` (2269 passed);
+  B8 seal **ACCEPTED_WITH_CONDITIONS** → `R2_M10_B_ACCEPTANCE.json` (`806b46b35`). Integrated evidence
+  `R2_M10_INTEGRATED_EVIDENCE.json` (`70386a26a`: exact parent chain, one reversible M10 migration lineage, no-network
+  scan). Final M10 review **NOT_ACCEPTED** (`m10-final-acceptance-codex-review.json`): F1 High no native zh-Hans final
+  for the zh_shuang pilot; F2 Medium pilots lack the preregistered Human reviewer (agent-performed gates).
+
 ## Next step
 
-B8 seal: assemble M10-B acceptance from `R2_M10_B_CANDIDATE.json` (packets, reviews, carried conditions) and run the
-B8 integrated checks the candidate lists (crash cuts, slot contention, accessibility). Then M10 integrated acceptance.
+**Stop for the sponsor (Human-only work).** (1) Provide an approved native zh-Hans/zh-shuang V2 final; (2) as the
+sponsor, perform the B7 Human gates (profile publication, narrative review, disposition, package selection) and
+review the findings for the three cohorts on an activated host, using `m10-b7-pilot/scripts` as the runbook driver
+for the agent-side steps. Then rerun the dossiers at a frozen head and request final M10 acceptance again. Carried:
+B1 C3 migration witness, storage/recovery limits, activated-host qualification (review conditions C2-C7).
 Nothing pushed; merge/tag/deploy are Human gates.
