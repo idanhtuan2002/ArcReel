@@ -491,16 +491,23 @@ function QualityWorkspace({ projectName, actor }: QualityPageProps & { actor: st
     await readChosenRun(id);
   };
 
+  const [loadingMore, setLoadingMore] = useState(false);
   const loadMoreProbes = async () => {
-    if (!moreProbes || !selected) return;
+    if (!moreProbes || !selected || loadingMore) return;
     const key = activeScope.current;
+    setLoadingMore(true);
     try {
       const found = await listProbes(projectName, { profile_id: selected.profile_id, revision: selected.revision, root }, moreProbes);
       if (activeScope.current !== key) return;
-      setProbes((current) => [...current, ...found.probes]);
+      setProbes((current) => {
+        const seen = new Set(current.map((attempt) => attempt.execution_ref));
+        return [...current, ...found.probes.filter((attempt) => !seen.has(attempt.execution_ref))];
+      });
       setMoreProbes(found.next_after);
     } catch (failure: unknown) {
       setLoadError(errorMessage(failure) ?? t("quality_load_failed"));
+    } finally {
+      setLoadingMore(false);
     }
   };
 
@@ -759,7 +766,7 @@ function QualityWorkspace({ projectName, actor }: QualityPageProps & { actor: st
           ) : null}
           {moreProbes ? (
             <div className="pk-actions">
-              <button type="button" className="fm-btn" onClick={() => void loadMoreProbes()}>
+              <button type="button" className="fm-btn" disabled={loadingMore} onClick={() => void loadMoreProbes()}>
                 {t("quality_more_probes")}
               </button>
             </div>

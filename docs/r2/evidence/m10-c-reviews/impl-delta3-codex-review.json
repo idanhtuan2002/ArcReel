@@ -1,0 +1,106 @@
+{
+  "reviewed_head": "82c1804f3e8a7b2c6944daa7808717fd3f8d9e06",
+  "verdict": "ACCEPTED_WITH_CONDITIONS",
+  "prior_findings": {
+    "H1": {
+      "state": "RESOLVED",
+      "evidence": [
+        "frontend/src/features/quality/ui/QualityPage.tsx:733-744 displays execution_ref, actor, attempt state, execution_id, master_binding_digest, error code and expandable failure.resources. Recovery controls and lost-envelope warnings remain at lines 746-754.",
+        "frontend/src/features/quality/ui/QualityPage.test.tsx:277-305 exercises identity, binding, recorded wall_ms and continuation; included in the fresh 19-test pass. This closes the historical H1 Medium residual; no new High authority defect confirmed."
+      ]
+    },
+    "M1": {
+      "state": "RESOLVED",
+      "evidence": [
+        "server/routers/quality.py:438-442 returns actor_id=user.sub after availability checking, matching the actor used to seal and verify requests at lines 205-223.",
+        "frontend/src/features/quality/ui/QualityPage.tsx:269-288 reads this session before opening the actor-keyed workspace, without consulting auth-store username. qualityClient.ts:168-169 uses the authenticated API request path; lines 191-193 retain escaped project/actor/action storage partitioning.",
+        "frontend/src/features/quality/ui/QualityPage.test.tsx:217-229 covers recovering a kept request without a sign-in username and refusing to open the workspace on session-read failure; fresh UI tests pass. Backend session test at tests/integration/server/routers/test_quality_routes.py:510-513 was collected but execution unavailable."
+      ]
+    },
+    "M6": {
+      "state": "RESOLVED",
+      "evidence": [
+        "frontend/src/features/quality/ui/QualityPage.tsx:443-483 rotates and aborts the revision controller for every profile/revision choice, clears selected immediately, and checks the signal after each await before committing revision state. choice keeps the selector usable while a revision is loading (lines 588-600).",
+        "frontend/src/features/quality/ui/QualityPage.tsx:406-412 guards run detail with both its controller and currentRun; clearScope aborts the read and clears currentRun at lines 418-431. after reads currentRun after its refresh awaits and uses the same guarded reader (lines 434-440).",
+        "frontend/src/features/quality/ui/QualityPage.test.tsx:232-275 tests late A run/revision responses after choosing B; fresh suite passes. Resolution is for the reported selection/detail races, not an exhaustive concurrency guarantee for every read."
+      ]
+    },
+    "M7": {
+      "state": "RESOLVED",
+      "evidence": [
+        "server/routers/quality.py:445-456 ranks matching rows by descending stored timestamp per requirement and returns only ranks 1 through 21. list_observations materializes/verifies at most 20 technical and 20 narrative candidates per requirement and uses the extra row to disclose more (lines 476-530). It no longer hydrates and verifies every matching historical observation.",
+        "frontend/src/features/quality/ui/QualityPage.tsx:375-378 stores more; lines 858-863 disclose omitted older observations for the affected requirement. The UI disclosure test at QualityPage.test.tsx:308-314 passes.",
+        "Applied the user-supplied design amendment: newest OBSERVATION_PAGE=20 per requirement, with older observations unavailable for page selection but still sealable through the API. No missing-older-observation navigation finding is raised. The PG 21-review fixture at tests/integration/server/routers/test_quality_routes.py:468-507 could not execute; SQL ranking still scans/sorts matching history and this review establishes no constant database work or latency bound."
+      ]
+    },
+    "N3": {
+      "state": "RESOLVED",
+      "evidence": [
+        "frontend/src/features/quality/api/qualityClient.ts:158-164 accepts and transmits after. QualityPage.tsx:380-383 retains next_after; lines 494-501 fetch and append the continuation under a scope check, with a visible control at lines 760-765.",
+        "frontend/src/features/quality/ui/QualityPage.test.tsx:277-305 confirms that the second attempt becomes visible and the control disappears at the final page; fresh suite passes. The new Low repeated-click defect below does not prevent ordinary continuation or recovery."
+      ]
+    },
+    "N4": {
+      "state": "RESOLVED",
+      "evidence": [
+        "frontend/src/features/quality/ui/QualityPage.tsx:406-412 aborts the previous run read and checks both the signal and currentRun before setting detail; chooseRun updates currentRun synchronously at lines 486-491.",
+        "frontend/src/features/quality/ui/QualityPage.tsx:434-440 uses the currently chosen run after refresh, rather than the previous render closure. clearScope also aborts detail reads at lines 426-430.",
+        "frontend/src/features/quality/ui/QualityPage.test.tsx:232-254 exercises B selected and enabled after late A; included in the fresh passing UI suite."
+      ]
+    }
+  },
+  "new_findings": [
+    {
+      "id": "N5",
+      "severity": "Low",
+      "summary": "Repeated continuation clicks append the same probe page multiple times.",
+      "failure_scenario": "While Show more checks is waiting on a slow response, click it twice. Both calls capture the same moreProbes cursor; each response appends its full page. Attempts then appear twice with duplicate execution_ref React keys and duplicated recovery controls. A late duplicate response can also restore an already-consumed cursor. This is display/navigation noise, not a demonstrated duplicate execution or authority bypass.",
+      "location": "frontend/src/features/quality/ui/QualityPage.tsx:494-501; frontend/src/features/quality/ui/QualityPage.tsx:733; frontend/src/features/quality/ui/QualityPage.tsx:760-764",
+      "evidence": "CONFIRMED at the handler level: a fresh Node probe evaluated the source loadMoreProbes body (only the TypeScript catch annotation removed), held two continuation responses, then released both; rows became p-1,p-2,p-2. The button has no loading/disabled guard. This was not a live-browser reproduction.",
+      "recommended_fix": "Allow only one continuation request per cursor, disable the control while loading, and/or deduplicate appended attempts by execution_ref. Do not let an obsolete response overwrite a newer cursor.",
+      "blocking": false
+    }
+  ],
+  "conditions": [
+    "All six requested prior findings are RESOLVED for this bounded delta review. No new Critical, High or Medium finding was confirmed. N5 is Low and does not block. ACCEPTED_WITH_CONDITIONS concerns the implementation delta, not production or operator acceptance.",
+    "Before runtime acceptance, execute the PostgreSQL route suite, especially newest-observation ranking/session identity, on a host permitting sockets. All 16 collected tests stopped during fixture setup with PermissionError [Errno 1] Operation not permitted at socket.socket; execution unavailable, not a product pass/fail.",
+    "Carry forward design section 4 gates: route requalification after router changes, live Chrome/axe and operator acceptance without scripts, then sponsor activated-host qualification/deployment and the acceptance record. Focused jsdom tests, including their axe assertion, do not establish those gates. Static verification here is TypeScript only; no claim that all repository static gates were rerun.",
+    "Scope: git diff 41e7ff4fb..82c1804f3 against impl-delta2-codex-review.json and the supplied design plus the two explicit user amendments (server session actor; newest-20 observation disclosure). Read changed router/client/page/tests/translations plus related auth, database model and integration wiring source. Existing accepted A/B service semantics were not re-audited in full. No providers, external network, subagents or source edits.",
+    "Graph limitation: list_projects succeeded but exposed no project rooted at this M10-C worktree; the supplied home-anhtuan-content-production-os project points at the main checkout. index_status, search_graph and check_index_coverage calls were rejected with MCP tool call requires approval, but approval policy is never. Used direct diff/numbered-source fallback, including complete changed handlers and their read/state paths; no graph freshness, generation or completeness claim.",
+    "HEAD and branch were verified initially and again before writing: 82c1804f3e8a7b2c6944daa7808717fd3f8d9e06, design/r2-m10-c-operator-surface. Initial worktree clean. Only the requested JSON review artifact is added in the repository."
+  ],
+  "commands_run": [
+    {
+      "command": "git rev-parse HEAD; git status --short; git branch --show-current; git log --oneline 41e7ff4fb..HEAD; git diff --stat 41e7ff4fb..HEAD; git diff --name-only 41e7ff4fb..HEAD; git diff 41e7ff4fb..HEAD -- <changed source/test/i18n paths>",
+      "result": "Pinned requested full SHA and branch, clean initial worktree; one implementation commit. Revalidated frozen HEAD before writing."
+    },
+    {
+      "command": "cat/sed/nl/rg on the prior review, supplied design, CONTRIBUTING.md, changed quality router/client/page/tests/translations, auth, observation models and StudioCanvasRouter",
+      "result": "Direct source/spec/standards review. StudioCanvasRouter.tsx:637 keys QualityPage by currentProjectName, so project switches remount the page."
+    },
+    {
+      "command": "MCP list_projects; index_status(project=home-anhtuan-content-production-os, verbose=true); search_graph(file_pattern=*quality*, name_pattern=.*(session|observations|QualityPage|chooseRun|chooseRevision).*); check_index_coverage(paths=[quality router, quality client, QualityPage, QualityPage tests, quality route tests], scopes=[frontend/src/features/quality, server/routers/quality.py])",
+      "result": "Project listing returned only other checkout roots; all subsequent graph calls rejected by approval policy. Direct source fallback used."
+    },
+    {
+      "command": "cd frontend && pnpm exec vitest run src/features/quality",
+      "result": "PASS: 1 file, 19 tests, exit 0. Nonfatal sandbox stream-fd and Vite config warnings."
+    },
+    {
+      "command": "cd frontend && pnpm typecheck",
+      "result": "PASS: tsc --noEmit, exit 0."
+    },
+    {
+      "command": "DATABASE_URL=postgresql+asyncpg://postgres:postgres@127.0.0.1:55491/arcreel_test UV_CACHE_DIR=/tmp/arcreel-delta3-uv-cache uv run --no-sync python -m pytest tests/integration/server/routers/test_quality_routes.py -q --tb=short",
+      "result": "EXECUTION UNAVAILABLE: 16 fixture-setup errors from socket creation PermissionError [Errno 1] Operation not permitted; exit 1. No backend test pass/fail inferred."
+    },
+    {
+      "command": "cd frontend && pnpm exec vitest run --config /tmp/arcreel-delta3-review/vitest.config.mjs -t 'delta3 probe' (two attempts)",
+      "result": "Temporary source-importing probe only under /tmp. First attempt failed config resolution; corrected vitest/config import for second attempt, which produced no test result and was interrupted with Ctrl-C, exit 130. No UI reproduction claimed from these attempts."
+    },
+    {
+      "command": "node --input-type=module: extract and evaluate the source loadMoreProbes body, issue two calls with one cursor, release both responses and assert execution_ref sequence",
+      "result": "First attempt could not parse the TypeScript catch annotation. After removing only that annotation, PASS: confirmed p-1,p-2,p-2 with two concurrent continuation reads. Handler-level confirmation only."
+    }
+  ]
+}
