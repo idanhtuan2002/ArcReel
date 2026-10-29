@@ -10,6 +10,7 @@ output inode, no network), then writes the archive into that output and reports 
 
 from __future__ import annotations
 
+import errno
 import hashlib
 import importlib.util
 import json
@@ -33,6 +34,8 @@ MANIFEST_PATH = "manifest.json"
 EXPORT_PATH = re.compile(r"^[a-z0-9._-]+(/[a-z0-9._-]+)*$")
 WORKER_CONFIG_SCHEMA = "m10.export-worker-config.v1"
 WORKER_OUTPUT_SCHEMA = "m10.export-worker-output.v1"
+# Writing the archive ran out of space (disk, quota or the unit's file-size limit): a known envelope refusal.
+_CAPACITY_ERRNOS = frozenset({errno.ENOSPC, errno.EDQUOT, errno.EFBIG})
 _CHUNK = 1 << 20
 _LOCAL_HEADER = 30
 _CENTRAL_HEADER = 46
@@ -227,10 +230,16 @@ def main() -> int:
         def opener(member: BundleMember) -> BinaryIO:
             return os.fdopen(sources.pop(member.path), "rb", buffering=0)
 
-        with os.fdopen(output, "w+b") as handle:
-            if os.fstat(handle.fileno()).st_size != 0:
-                raise ExportBuildError("OUTPUT_NOT_EMPTY")
-            body.update(status="OK", digest=write_archive(handle, members, manifest, opener))
+        try:
+            with os.fdopen(output, "w+b") as handle:
+                if os.fstat(handle.fileno()).st_size != 0:
+                    raise ExportBuildError("OUTPUT_NOT_EMPTY")
+                digest = write_archive(handle, members, manifest, opener)
+        except OSError as error:
+            if error.errno in _CAPACITY_ERRNOS:
+                raise ExportEnvelopeError("OUTPUT_CAPACITY") from None
+            raise
+        body.update(status="OK", digest=digest)
     except ExportEnvelopeError:
         body.update(status="ENVELOPE_EXCEEDED")
     except ExportBuildError:

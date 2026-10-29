@@ -392,7 +392,7 @@ waived/superseded/invalidated states; keyboard/focus/reduced-motion; axe-core; a
 | Contracts | golden vectors; RED: mutable payloads, tamper, malformed, undeclared/duplicate/missing roles, duplicate assets, client-supplied provenance, no circular subject binding, closure digest mismatch |
 | Packaging checks | ported lint + duration window + variants, seeded-defect fixtures, deterministic digests, packaging observation refused by run sealing |
 | Selection | RED: Human-only lease, stale master/profile/disposition, preview expiry, target confusion, head CAS, command conflict, unwaivable finding, waiver outside the lease; every writer-pair order test (§4); replay |
-| Export | golden archive; two clean roots byte-identical; RED: unsafe paths, case-colliding names, missing assets, byte drift, disk-full, interruption before/after rename, unknown outcome re-request with a new command; replay |
+| Export | golden archive; same-selection re-export byte-identical and content members identical across clean roots (§7); RED: unsafe paths, case-colliding names, missing assets, byte drift, disk-full, interruption before/after rename, unknown outcome re-request with a new command; replay |
 | Host regression | Gate C/D/export, M8 promotion, M10-A behavior unchanged |
 | Donor parity | frozen baseline, OpenMontage + Kalinga same-fixture, PASS recomputed |
 | UI | i18n consistency, states, axe-core |

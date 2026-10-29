@@ -40,5 +40,39 @@
       "tests/integration/lib/db/migrations/test_8a5d0f6b1e44_m10_export_custody.py"
     ],
     "result": "export 30 passed (PG16, real confined worker); worker 23 + plan 10 passed; unit/scripts/migrations recorded at the B4 seal"
-  }
+  },
+  "requalifications": [
+    {
+      "date": "2026-10-29",
+      "reason": "B8 crash cuts: a write that runs out of space (ENOSPC, EDQUOT, EFBIG) is a known ENVELOPE_EXCEEDED refusal instead of an unknown outcome; new real-worker tests for a full disk (unit file-size limit), a failed rename into the store, and an interruption after publication recovered by a new command",
+      "source_sha256": {
+        "server/services/package_export.py": "1ac495c5c68c68b0d158df397f4c9da2454257b122e902c39ff4827f2ec12225",
+        "server/services/package_export_worker.py": "029f2e2e35bc7f622d541f171f6b7de0b1d60686d9bfdf27580cc5227000164a",
+        "server/services/quality_probe_runtime.py": "e29ee0acd2255ffe6295a4a3d5a08cfe01e47b4597768359d01d7063d32b2ca9",
+        "server/services/quality_probe_worker.py": "934ec55210e4aa1f76f1862cc6802ce67f279743576253bcc51e29b560892036",
+        "lib/db/repositories/quality_packaging.py": "b0648eede41a82bd75619cf793d65f253689b59d5d7211e84cc1d7fa7fb9e9a8",
+        "lib/db/models/quality_packaging.py": "f38c36e9ef24eda3788c195f17da9c72058db75e68107b457ff0b44284a10521",
+        "alembic/versions/8a5d0f6b1e44_m10_export_custody.py": "18fac0a9ccba8b3810aaf724c07be49e2b16635244d74c4ededcae14f02fc762",
+        "r2/contracts/packaging.py": "60fdae42779f83cb806f7e3ee06de9dc9917f52837d6734771833aa8f9f65e9c"
+      },
+      "suite": {
+        "selection": [
+          "tests/integration/server/services/test_package_export.py",
+          "tests/unit/server/services/test_package_export_worker.py",
+          "tests/unit/server/services/test_package_export_plan.py",
+          "tests/integration/lib/db/migrations/test_8a5d0f6b1e44_m10_export_custody.py"
+        ],
+        "result": {
+          "tests": 71,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "junit_sha256": "27034d402e76262950aaea4c2ff9ef3ba27df5a39e559011c02a33e291387e47"
+      },
+      "limits": [
+        "fsync failure shares the rename OSError branch and is not separately injected"
+      ]
+    }
+  ]
 }

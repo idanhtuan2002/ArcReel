@@ -19,6 +19,7 @@ from r2.quality.digests import compute_digest
 from r2.quality.errors import (
     DispositionStaleError,
     ExportIntegrityFailedError,
+    OperationalEnvelopeExceededError,
     RequiredEvidenceMissingError,
     StaleHeadError,
 )
@@ -656,3 +657,107 @@ async def test_a_run_sealed_during_export_finalize_waits_for_it(selected_host, m
     receipt = await asyncio.wait_for(exporting, 120)
     assert receipt.status == "EXPORTED"
     assert (await asyncio.wait_for(sealing, 60)).run_id != env["run"].run_id
+
+
+class ConstrainedRuntime:
+    """Runs the real confined worker with a smaller file-size limit than the archive needs (a full disk)."""
+
+    def __init__(self, real, fsize: int) -> None:
+        self.real, self.fsize = real, fsize
+
+    async def launch(self, payload: bytes, **kwargs):
+        return await self.real.launch(payload, **kwargs | {"fsize": self.fsize})
+
+
+class OccupiedDestinationRuntime:
+    """Runs the real confined worker, then occupies the archive's published name so the rename into the store fails."""
+
+    def __init__(self, real, store: Path) -> None:
+        self.real, self.store = real, store
+
+    async def launch(self, payload: bytes, **kwargs):
+        import json
+
+        outcome = await self.real.launch(payload, **kwargs)
+        digest = json.loads(outcome.stdout)["digest"]
+        (self.store / archive_ref(digest).rsplit("/", 1)[-1]).mkdir()
+        return outcome
+
+
+def _real_runtime():
+    from server.services.package_export_worker import __file__ as worker_file
+    from server.services.quality_probe_runtime import ProbeHost, QualityProbeRuntime
+
+    return QualityProbeRuntime(ProbeHost(tools={}, worker=Path(worker_file)))
+
+
+def _service(env, **changes: Any) -> PackageExportService:
+    return PackageExportService(
+        sessions=env["factory"],
+        grant_reader=env["reader"],
+        project_root=env["project"],
+        interactive_token=auth.create_token(ACTOR),
+        **changes,
+    )
+
+
+async def test_a_full_disk_during_the_build_is_a_known_failure_with_no_partial_file(selected_host) -> None:
+    env = selected_host
+    service = _service(env, runtime=ConstrainedRuntime(_real_runtime(), fsize=4096))
+    with pytest.raises(OperationalEnvelopeExceededError):
+        await service.export(export_request(env))
+    assert await _attempt_states(env) == ["FAILED_BEFORE_ACCEPTANCE"]
+    assert list((env["project"] / "exports").iterdir()) == []
+    receipt = await exporter(env).export(export_request(env, command_id="export-2"))
+    assert receipt.status == "EXPORTED"
+
+
+async def test_a_failed_rename_into_the_store_is_a_known_failure_with_no_partial_file(selected_host) -> None:
+    env = selected_host
+    store = env["project"] / "exports"
+    service = _service(env, runtime=OccupiedDestinationRuntime(_real_runtime(), store))
+    with pytest.raises(ExportIntegrityFailedError):
+        await service.export(export_request(env))
+    assert await _attempt_states(env) == ["FAILED_BEFORE_ACCEPTANCE"]
+    (occupied,) = store.iterdir()
+    assert occupied.is_dir()
+    assert list(occupied.iterdir()) == []
+
+
+class CrashAfterPublication:
+    """The real M7 submitter whose process dies after the archive is published but before acceptance is recorded."""
+
+    def __init__(self, real) -> None:
+        self.real = real
+
+    async def submit(self, *, submit, **kwargs):
+        async def publish_then_die(attempt):
+            await submit(attempt)
+            raise asyncio.CancelledError
+
+        return await self.real.submit(submit=publish_then_die, **kwargs)
+
+
+async def test_an_interruption_after_publication_is_recovered_by_a_new_command_against_the_published_archive(
+    selected_host,
+) -> None:
+    from server.services.package_export import attempt_submitter
+
+    env = selected_host
+    store = env["project"] / "exports"
+
+    def crashing(session, user_id: str, project_name: str, execution_id: str):
+        return CrashAfterPublication(attempt_submitter(session, user_id, project_name, execution_id))
+
+    request = export_request(env)
+    with pytest.raises(asyncio.CancelledError):
+        await _service(env, submitter_for=crashing).export(request)
+    (published,) = store.glob("*.zip")
+    before = (published.stat().st_ino, _read(published))
+    assert await _attempt_states(env) != ["ACCEPTED"]
+    with pytest.raises(RequiredEvidenceMissingError):
+        await exporter(env).export(request)
+    receipt = await exporter(env).export(export_request(env, command_id="export-2"))
+    assert receipt.archive_digest == "sha256:" + hashlib.sha256(before[1]).hexdigest()
+    assert [path.name for path in store.glob("*.zip")] == [published.name]
+    assert _read(published) == before[1]
