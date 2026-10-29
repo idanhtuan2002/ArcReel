@@ -1,0 +1,385 @@
+{
+  "schema_id": "m10.c.implementation-delta1-review.v1",
+  "reviewer": "Codex",
+  "date": "2026-10-29",
+  "reviewed_head": "eda1a9a3cc7e64562048025e5ab6e5951c5775b1",
+  "base": "5b95b62b1",
+  "diff": "git diff 5b95b62b1..eda1a9a3cc7e64562048025e5ab6e5951c5775b1",
+  "branch": "design/r2-m10-c-operator-surface",
+  "worktree": "/home/anhtuan/content-production-os/.worktrees/r2-m10-c",
+  "fix_commits": [
+    "db453e096",
+    "6d1771d61",
+    "eda1a9a3c"
+  ],
+  "prior_review": "docs/r2/evidence/m10-c-reviews/impl-codex-review.json",
+  "prior_review_sha256": "06ee353ff5a3f3562343cfcc6fad61c1a1577e522b23648b2e6cd76428871d16",
+  "prior_review_head": "ce539d0ba83190a799bd2b9d363a42bd0022cc88",
+  "design": "docs/superpowers/specs/2026-10-29-r2-m10-c-operator-surface-design.md",
+  "design_sha256": "55205bac6179833120c4341f72a72d427460e9e1787cb6f69c78f02be1d74a60",
+  "design_conditions": "docs/r2/evidence/m10-c-reviews/design-delta2-codex-review.json",
+  "verdict": "CHANGES_REQUESTED",
+  "summary": "Four prior findings are resolved and eight are partial. The fixes close observation selection, run-owned handoff/targeting, historical revision selection and type-sensitive body equality. Remaining confirmed Medium defects include actual reload recovery, incomplete restored confirmations, chosen-run waiver projection, out-of-order reads and a post-parse body ceiling. Two new Medium regressions concern inaccessible history after 50 runs and stale publication CAS after success. No Critical or High authority/authentication bypass established in this bounded delta review; the former High findings have Medium residual scope. Live browser acceptance and route requalification remain conditions, not standalone reasons for this verdict.",
+  "counts": {
+    "prior_resolved": 4,
+    "prior_partial": 8,
+    "prior_open": 0,
+    "remaining_prior_medium": 8,
+    "new_critical": 0,
+    "new_high": 0,
+    "new_medium": 2,
+    "new_low": 0
+  },
+  "prior_findings": [
+    {
+      "id": "H1",
+      "prior_severity": "HIGH",
+      "status": "PARTIAL",
+      "evidence_level": "CONFIRMED_SOURCE",
+      "evidence": [
+        "server/routers/quality.py:333-382",
+        "frontend/src/features/quality/ui/QualityPage.tsx:555-564",
+        "tests/integration/server/routers/test_quality_routes.py:198-211"
+      ],
+      "assessment": "The new GET /probes starts at scoped invocations and includes M7 attempt state, execution_ref, actor, subject digest, finalized observation status and recorded failure resources. It no longer requires a current subject, so missing final observations and drift do not hide the backend history.",
+      "remaining_severity": "MEDIUM",
+      "remaining_scenario": "The operator list renders only requirement/state/status/error code and a warning for SUBMIT_OUTCOME_UNKNOWN. It does not render execution_ref, actor, subject identity or ResourceEvidence, and does not identify an ACCEPTED command as finishable using its retained envelope. Two attempts of the same requirement cannot be reliably reconciled from the screen; known failure resource evidence exists in the response but is inaccessible in the UI. NEEDS_OPERATOR is only an enum string. The added route test covers SUCCEEDED/PASS only.",
+      "fix": "Show scoped execution identity and available failure resources, distinguish pending/finish/known-failed/unknown/operator-review states, and correlate finish/resend with the exact stored envelope. If that envelope is lost, explicitly disclose the recovery limit and require deliberate reconciled new work; do not add a server draft store. Test every required attempt state and drifted history."
+    },
+    {
+      "id": "H2",
+      "prior_severity": "HIGH",
+      "status": "PARTIAL",
+      "evidence_level": "CONFIRMED_SOURCE",
+      "evidence": [
+        "frontend/src/features/quality/ui/QualityPage.tsx:136-182",
+        "frontend/src/features/quality/ui/QualityPage.tsx:193-219,422-536,569-649"
+      ],
+      "assessment": "Action-specific rows now use the sealed request: profile/revision, cohort/surface, supersession, root artifact key, observation IDs and disposition run/reason/waivers/expiry. Relevant draft fieldsets are disabled while a fresh request is prepared. This closes the original completely undisclosed target problem.",
+      "remaining_severity": "MEDIUM",
+      "remaining_scenario": "Restored publication confirmation still shows only policy_digest, not the policy or changed constraints; restored review confirmation shows only a finding count, not criterion/locator/severity. The original draft form context is absent after reload. These consequential values are already in the sealed request, but the operator cannot inspect what will be confirmed. Artifact key alone also omits the bound master candidate/digest. Master/profile/run selectors outside the particular Locked fieldset remain mutable; the immutable summary must fully identify the pending target.",
+      "fix": "Render the sealed policy/constraint details (expandable is sufficient), each finding and the bound candidate/media identity. Keep restored request context explicit and separate from current draft selectors. No raw notes persistence is required or authorized.",
+      "fresh_verification": "Temporary source-importing Vitest probe restored a FAIL review envelope: its root appeared, but its BLOCKING severity and visible-defects@whole locator did not. Existing publication-summary test passes while asserting only a digest."
+    },
+    {
+      "id": "M1",
+      "prior_severity": "MEDIUM",
+      "status": "PARTIAL",
+      "evidence_level": "CONFIRMED_SOURCE",
+      "evidence": [
+        "frontend/src/features/quality/api/qualityClient.ts:170-180",
+        "frontend/src/features/quality/ui/QualityPage.tsx:47-82,104-128,238",
+        "frontend/src/stores/auth-store.ts:15-25,57-64",
+        "frontend/src/main.tsx:29"
+      ],
+      "assessment": "Keys now include project, actor, action and command; sending removes only that command and pending envelopes can be listed/resubmitted. This fixes the former per-action overwrite for distinct commands.",
+      "remaining_severity": "MEDIUM",
+      "remaining_scenario": "Quality derives actor from auth-store username, falling back to anonymous. On a full-page reload initialize() restores the saved token but never restores username, so a request saved under showrunner is invisible under anonymous. Requests created after reload share the anonymous namespace across authenticated actors. Hook pending/prepared state is also initialized only once and is not reset when the prefix changes. user_id remains absent; the current backend single-user model narrows that part of the risk but does not fix the missing actor on reload.",
+      "fix": "Recover the authenticated user_id and actor_id before loading or writing pending envelopes; never use anonymous for authenticated mutation state. Reset/abort or remount the hooks when identity changes and use an unambiguous structured key. Test actual token-backed page initialization, actor changes and multiple pending commands, not just a second render with username preset.",
+      "fresh_verification": "Fresh temporary Vitest probe: saved showrunner envelope + token -> initialize() isAuthenticated=true, username=null -> mounted QualityPage offers no Resend although the saved envelope remains. The checked-in test never performs a real auth initialization/reload."
+    },
+    {
+      "id": "M2",
+      "prior_severity": "MEDIUM",
+      "status": "RESOLVED",
+      "evidence_level": "CONFIRMED_SOURCE",
+      "evidence": [
+        "frontend/src/features/quality/ui/QualityPage.tsx:652-689",
+        "frontend/src/features/quality/ui/QualityPage.test.tsx:143-155"
+      ],
+      "assessment": "Sealing now requires an explicitly chosen observation for each of the three requirements and sends those three IDs only. A corrected PASS can be selected without the earlier FAIL; the history no longer automatically exceeds the 16-binding limit.",
+      "fresh_verification": "Fresh checked-in UI test passed and asserted [o-c, o-d, o-r2], excluding the failed o-r1."
+    },
+    {
+      "id": "M3",
+      "prior_severity": "MEDIUM",
+      "status": "PARTIAL",
+      "evidence_level": "CONFIRMED_SOURCE",
+      "evidence": [
+        "frontend/src/features/quality/ui/QualityPage.tsx:588-639",
+        "frontend/src/features/quality/ui/QualityPage.tsx:373-374,747-781",
+        "r2/quality/dispositions.py:68-101"
+      ],
+      "assessment": "Findings can now be authored with criterion, severity and locator. Disposition sends explicit selected finding bindings with requirement:slot scope and justification. The formerly impossible basic same-profile waiver intent can be constructed.",
+      "remaining_severity": "MEDIUM",
+      "remaining_scenario": "reviewFindings is derived from all currently loaded observations for the selected profile revision/current subject, independently of the chosen run. Runs deliberately span profiles/revisions and can name a subset of observations. Select an otherwise current failed run from profile A while the profile selector is B: A's findings cannot be selected, so its valid WAIVE cannot be issued. Conversely findings from other reviews/runs, including advisory findings, are offered for the chosen run and lead to coverage refusal. The existing UI waiver mock does not tie the run observation closure to the offered finding.",
+      "fix": "Derive waiver candidates from the chosen run's immutable observation closure and exact profile, with only applicable failed-slot BLOCKING findings. Load verified run observations through existing storage as needed; clear/reconcile selected bindings when run changes. Keep final coverage authority in the unchanged service."
+    },
+    {
+      "id": "M4",
+      "prior_severity": "MEDIUM",
+      "status": "RESOLVED",
+      "evidence_level": "CONFIRMED_SOURCE",
+      "evidence": [
+        "server/routers/quality.py:463-478",
+        "frontend/src/features/quality/ui/QualityPage.tsx:373,696-709,765-784",
+        "frontend/src/features/quality/ui/QualityPage.test.tsx:157-182"
+      ],
+      "assessment": "Each run projection includes cohort/surface from its exact stored profile. Packaging reads those fields from the run row, and disposition names an explicit selected run rather than runs[0]. The former selected-profile prefill and implicit-target defects are closed; run-specific waiver candidates are separately tracked under M3.",
+      "fresh_verification": "Fresh checked-in UI tests passed for chosen run_id and run-owned cohort/surface handoff."
+    },
+    {
+      "id": "M5",
+      "prior_severity": "MEDIUM",
+      "status": "RESOLVED",
+      "evidence_level": "CONFIRMED_SOURCE",
+      "evidence": [
+        "server/routers/quality.py:267-295",
+        "frontend/src/features/quality/api/qualityClient.ts:151-168",
+        "frontend/src/features/quality/ui/QualityPage.tsx:337-360,425-445"
+      ],
+      "assessment": "The client now lists revisions and fetches a verified exact revision, and the selector permits deliberately working on an older immutable revision. The original absence of historical revision selection is closed. New post-publication cache staleness is N2; response ordering is tracked under M6.",
+      "fresh_verification": "Fresh checked-in UI test selected revision 1 successfully."
+    },
+    {
+      "id": "M6",
+      "prior_severity": "MEDIUM",
+      "status": "PARTIAL",
+      "evidence_level": "CONFIRMED_SOURCE",
+      "evidence": [
+        "frontend/src/features/quality/ui/QualityPage.tsx:298-360,400-406"
+      ],
+      "assessment": "Selection handlers clear observations/probes/runs/chosen IDs and independent reads preserve history when current-subject observations refuse. Effect-driven refresh requests are aborted on dependency changes.",
+      "remaining_severity": "MEDIUM",
+      "remaining_scenario": "chooseProfile and chooseRevision have no cancellation/generation check; a delayed earlier selection can replace a later selection. chooseRevision also leaves the previous selected profile active during the read. In addition, after() launches its own refresh with an untracked AbortController and an old captured root/profile, so a user scope change during post-submit reload can be followed by old observations/runs repopulating the newly cleared screen. Errors do not make this untracked data scope-safe.",
+      "fix": "Use a single current scope generation or tracked request controller for selection and all refreshes, including post-action refresh. Clear/invalidate the active scope during revision fetch and commit responses only when their scope matches the current one. Key read data by scope and test out-of-order profile/revision/root responses.",
+      "fresh_verification": "Fresh temporary Vitest probe selected A then B, completed B first, then delivered A; the selected profile reverted from B to A."
+    },
+    {
+      "id": "M7",
+      "prior_severity": "MEDIUM",
+      "status": "PARTIAL",
+      "evidence_level": "CONFIRMED_SOURCE",
+      "evidence": [
+        "server/routers/quality.py:297-341,352-365,394-421,444-456",
+        "server/services/quality_subjects.py:46-72"
+      ],
+      "assessment": "Technical candidate selection now filters profile/revision/root in SQL before full chain replay; run selection filters root in SQL and caps returned rows at 50. The explicit initial manifest snapshot is shared across root resolutions. The original whole-project technical replay loop is closed.",
+      "remaining_severity": "MEDIUM",
+      "remaining_scenario": "Probe and observation histories still call rows.all() without any page/limit, then perform per-row lookups/replay. Technical selection includes all historical subject versions for a root, and Human selection still includes every root under the profile revision before filtering by current subject. Thus relevant-history growth and unrelated Human-chain corruption can still make the read expensive or fail it. The new run cap avoids work by silently losing history instead of providing pages (N1). Sharing normalized bodies also does not prove file_master_projection performs no further reads.",
+      "fix": "Add bounded stable pagination and prefilter current-subject candidates before expensive verification; filter Human observations by subject/root using existing stored fields. Preserve historical recovery via separate paged history. Use a query/work budget assertion with many unrelated/historical rows; do not require a new authority, persistence model or speculative performance claim."
+    },
+    {
+      "id": "M8",
+      "prior_severity": "MEDIUM",
+      "status": "PARTIAL",
+      "evidence_level": "CONFIRMED_SOURCE",
+      "evidence": [
+        "server/routers/quality.py:597-624",
+        "server/services/quality_probes.py:258-283",
+        "tests/integration/server/routers/test_quality_routes.py:214-239"
+      ],
+      "assessment": "With no catalog, a verified saved request with no stored invocation now returns 503; committed replay and ACCEPTED finish can still enter the unchanged receipt-first service. Unrelated evidence failures are not guessed to be catalog unavailability.",
+      "remaining_severity": "MEDIUM",
+      "remaining_scenario": "The route checks only invocation existence. A crash after staging an invocation but before acceptance leaves PLANNED. Retrying it with the catalog disabled passes the route gate, reaches DEFAULT_PROBE_CATALOG.resolve and returns 409 required-evidence-missing although new catalog-dependent work is unavailable. The added test checks disabled prepare and committed replay, not prepared-first-submit or PLANNED retry.",
+      "fix": "Distinguish catalog-independent replay/finalization/terminal-history paths from PLANNED catalog-dependent work. Preserve unchanged service integrity checks and return 503 for unavailable new work without treating arbitrary evidence failures as catalog failures. Add prepared-before-disable first-submit, PLANNED, ACCEPTED and completed replay cases."
+    },
+    {
+      "id": "M9",
+      "prior_severity": "MEDIUM",
+      "status": "PARTIAL",
+      "evidence_level": "CONFIRMED_SOURCE",
+      "evidence": [
+        "server/routers/quality.py:63-75,507-514,635-644",
+        "tests/integration/server/routers/test_quality_routes.py:242-249"
+      ],
+      "assessment": "There is now an explicit 1 MiB threshold and 413 translation; policy/criteria dictionary cardinalities are bounded. Oversized valid JSON is refused before service side effects.",
+      "remaining_severity": "MEDIUM",
+      "remaining_scenario": "The ceiling is a router dependency. FastAPI reads and decodes JSON before solving dependencies on body-taking routes. It therefore does not bound allocation/JSON parsing, and malformed oversized JSON bypasses it. With missing Content-Length, request.body() also buffers the entire stream before comparing length. The new test asserts only status for valid JSON and cannot establish its before-parsing title.",
+      "fix": "Enforce the ceiling in a quality-scoped ASGI receive wrapper or route handler before invoking FastAPI body parsing. Count chunk bytes while receiving and stop at the threshold, regardless of Content-Length. Test malformed JSON, missing/false headers, chunked input and threshold+1 with explicit parser/dependency ordering and receive-count assertions.",
+      "fresh_verification": "Fresh in-process ASGI probe: valid oversized JSON -> 413 with events [json parse, limit dependency]; malformed oversized JSON -> 422 with [json parse] only. Direct headerless Request probe consumed three 1 MiB chunks before refusal."
+    },
+    {
+      "id": "L1",
+      "prior_severity": "LOW",
+      "status": "RESOLVED",
+      "evidence_level": "CONFIRMED_SOURCE",
+      "evidence": [
+        "server/services/quality_prepare.py:74-85",
+        "tests/unit/server/services/test_quality_prepare.py:35-45"
+      ],
+      "assessment": "The posted and normalized JSON spellings are compared as strings, preserving numeric and boolean distinctions before HMAC verification; malformed non-finite input is refused. HKDF/HMAC context and exact typed forwarding remain intact.",
+      "fresh_verification": "Fresh pure seal suite passed, including the added integral-float tampering case."
+    }
+  ],
+  "new_findings": [
+    {
+      "id": "N1",
+      "severity": "MEDIUM",
+      "status": "CONFIRMED",
+      "file": "server/routers/quality.py",
+      "line": 456,
+      "location": "server/routers/quality.py:456",
+      "title": "A hard 50-run cap silently removes history and can hide a current run for another profile",
+      "scenario": "D8 promises runs across subjects/profiles, including historical states. The query now returns at most 50 newest runs but has no cursor, offset, has_more or UI navigation. After 50 newer runs for profile B, an older still-current READY or failed run for profile A on the same root becomes inaccessible in Quality, so the operator cannot package it or select it for disposition. Selecting A does not change the all-profile query.",
+      "fix": "Return stable bounded pages (sealed_at plus run_id tie-breaker), a continuation token/has_more and UI history navigation or a scoped exact-run lookup. Retain all profiles/history while bounding one request. Test 51+ runs with an older independently current profile head.",
+      "evidence": [
+        "server/routers/quality.py:437-456,501",
+        "frontend/src/features/quality/api/qualityClient.ts:102-104",
+        "frontend/src/features/quality/ui/QualityPage.tsx:692-723"
+      ],
+      "conditions": [
+        "I3_REPLAY_AND_RECOVERY",
+        "I5_END_TO_END"
+      ]
+    },
+    {
+      "id": "N2",
+      "severity": "MEDIUM",
+      "status": "CONFIRMED",
+      "file": "frontend/src/features/quality/ui/QualityPage.tsx",
+      "line": 522,
+      "location": "frontend/src/features/quality/ui/QualityPage.tsx:522",
+      "title": "Publication succeeds but the next publication uses a stale cached revision CAS",
+      "scenario": "revisions is loaded only in chooseProfile. After publication, after() reloads profile heads but neither refreshes revisions nor incorporates result.profile into the current selection. Starting at r2 with revisions [1,2], publish r3; the next prepare still sends expected_profile_revision=Math.max(...revisions)=2. The service correctly refuses its attempt to publish r3 again. The newly published revision is also absent from the revision selector until the operator reselects the profile or reloads.",
+      "fix": "After publication, refresh that profile's revision list and head before permitting another publication; update/retain the assessment revision deliberately. Track publication head CAS separately from an intentionally selected historical assessment revision and handle concurrent head changes explicitly.",
+      "evidence": [
+        "frontend/src/features/quality/ui/QualityPage.tsx:276-283,330-346,518-526,536"
+      ],
+      "fresh_verification": "Temporary source-importing Vitest probe published r3 from selected r2, then prepared again; the second intent still had expected_profile_revision=2.",
+      "conditions": [
+        "I5_END_TO_END"
+      ]
+    }
+  ],
+  "conditions": [
+    {
+      "id": "I1_SUBJECT_AND_TEMPLATE",
+      "status": "PARTIAL",
+      "evidence": [
+        "server/services/quality_subjects.py:46-72",
+        "tests/integration/server/services/test_quality_subjects.py:25-50",
+        "tests/unit/server/services/test_quality_template.py"
+      ],
+      "assessment": "Shared normalized manifest snapshots are additive and authority verification remains service-owned. Six pure template tests pass at this HEAD. The resolver test file still contains only fixture equality/admission, approval mismatch and missing root; no new non-master/cyclic/divergence/order/version/fingerprint mutation corpus was added.",
+      "required": "Complete the actual resolver mutation coverage specified by design I1 and bind supplied/executed PostgreSQL resolver admission to the repaired frozen source. Do not label pure template tests as DB or resolver qualification."
+    },
+    {
+      "id": "I2_TRANSPORT",
+      "status": "PARTIAL",
+      "evidence": [
+        "server/services/quality_prepare.py:22-85",
+        "server/routers/quality.py:63-75",
+        "tests/unit/server/services/test_quality_prepare.py"
+      ],
+      "assessment": "Fixed actions/classes, authenticated user_id+actor_id context, HKDF/HMAC and unchanged typed forwarding are retained; L1 is closed by type-sensitive JSON comparison. Both prepare and submit still require InteractiveUser. M9's pre-parse resource bound and H2's full meaningful confirmation remain incomplete.",
+      "required": "Fix M9/H2 and add receive/parser-order tests. Retain cross-context tamper/current-session/agent/API-key/auth-off/key-rotation/TTL coverage from the design condition; distinguish configured-secret stability from process-local fallback. No caller-owned custody/runtime/catalog configuration."
+    },
+    {
+      "id": "I3_REPLAY_AND_RECOVERY",
+      "status": "NOT_CLOSED",
+      "evidence": [
+        "server/routers/quality.py:344-382,597-624",
+        "frontend/src/features/quality/ui/QualityPage.tsx:47-131,238,298-360,555-564"
+      ],
+      "assessment": "Backend history and per-command pending storage are materially improved; explicit observation selection is closed. Actual reload loses actor namespace, UI reconciliation lacks identity/resources, response ordering is unsafe and older run history is capped without continuation.",
+      "required": "Close H1/M1/M6/M7/M8/N1. Test real token-backed reload with lost-response pending envelopes, two actors/commands, every M7 attempt state including ACCEPTED and PLANNED, drifted history, old immutable revision, both supersession effects, expired disposition and deliberate new attempt after storage loss/rotation. Preserve exact stored request identity."
+    },
+    {
+      "id": "I4_EXACT_CATALOG",
+      "status": "PENDING_REQUALIFICATION",
+      "evidence": [
+        "docs/r2/evidence/m10-a4-reviews/route-qualification.json",
+        "server/routers/quality.py:597-624"
+      ],
+      "assessment": "Catalog/runtime bodies are unchanged by the delta, but the recorded router source hash 7d12c840acbc5a518c6e04bf03efd0c8c89adb88c6bc0d89791bb25a4101d6e4 no longer matches. Route requalification is explicitly still to come; this is a qualification condition, not an independent source defect.",
+      "required": "After the final repairs, rerun focused same-catalog recipe/isolation/M7 recovery/route qualification on the qualified host and append new source-bound evidence. Include M8 availability transitions and bind exact catalog/tool/parser/control-source identities. Do not count the previous 195-run record as a fresh run of this router."
+    },
+    {
+      "id": "I5_END_TO_END",
+      "status": "PARTIAL_PENDING_FIXES_AND_LIVE_ACCEPTANCE",
+      "evidence": [
+        "tests/integration/server/routers/test_quality_routes.py:281-381",
+        "frontend/src/features/quality/ui/QualityPage.test.tsx"
+      ],
+      "assessment": "The new test genuinely starts with the quality HTTP chain and uses its same run through Packaging revision/check/preview/selection/export, asserting EXPORTED. It is source evidence of the missing combined test, not an independent PostgreSQL pass here. Fresh existing UI tests passed, but mocks omit important state transitions. Four additional temporary probes reproduce remaining UI defects.",
+      "required": "Close residual Medium defects and N1/N2. Run the exact-head combined PG chain plus revision/CAS, TTL/waiver, drift/replay and scoped read mutations with real custodians/runtime; retain affected static/i18n gates. Live Chrome no-script acceptance and live axe remain explicitly pending and must cover reload recovery, all attempt states, cross-profile run/waiver selection and repeated publication. No activated-host deploy/release authority is granted."
+    },
+    {
+      "id": "I6_DIGEST_ONLY_EVIDENCE",
+      "status": "CARRIED_FORWARD_PARTIAL",
+      "assessment": "The delta does not change private evidence projections or introduce raw-notes persistence. Finding authoring exists; M3/H2/M9 still affect safe operator handling. Preserve digest-only notes and operator-owned source-note retention; deterministic projection mutation coverage remains required."
+    },
+    {
+      "id": "I7_INHERITED_LIMITS",
+      "status": "RETAIN",
+      "assessment": "Carry R2_M10_ACCEPTANCE C1-C6, trusted root, LOCAL_REGULAR_FILE_IO, single operator and root-owned activated custody limits. Accepted A/B service, contract and repository files are unchanged in the inspected delta. Live host qualification, deployment, release and production acceptance remain outside this review. The design still displays r2; update its stale label when next recording design evidence."
+    }
+  ],
+  "verification": {
+    "initial_head": "eda1a9a3cc7e64562048025e5ab6e5951c5775b1",
+    "initial_status": "Clean and expected branch matched before candidate artifacts were read.",
+    "review_tier": "Tier 2 task-directed source verification; no graph completeness claim.",
+    "graph": "list_projects succeeded; advertised main project root is the main checkout, not this worktree. index_status/search_graph and both coverage calls for relied-on code paths/scopes were denied by approval policy never. Direct current pinned-source/diff fallback used. No graph generation/freshness evidence available.",
+    "delegation": "None.",
+    "executed": [
+      {
+        "command": "PYTHONDONTWRITEBYTECODE=1 timeout 30s .venv/bin/python -B -m pytest --noconftest -p no:cacheprovider tests/unit/server/services/test_quality_prepare.py tests/unit/server/services/test_quality_template.py -q",
+        "result": "16 passed in 0.51s; explicitly excluded repository-wide conftest/autouse DB setup for these pure test bodies. This is not the normal fixture/DB/static gate."
+      },
+      {
+        "command": "cd frontend && pnpm exec vitest run src/features/quality/ui/QualityPage.test.tsx src/features/packaging/ui/PackagingPage.test.tsx",
+        "result": "2 files, 20 tests passed in 5.51s. Nonfatal stream-fd permission and Vite config-loader warnings. Includes mocked UI axe with contrast disabled, not live browser acceptance."
+      },
+      {
+        "command": "PYTHONDONTWRITEBYTECODE=1 timeout 35s .venv/bin/python -B (stdin in-process ASGI and streamed Request probes)",
+        "result": "Valid oversized JSON: 413, events json parse then limit dependency. Malformed oversized JSON: 422, json parse only. A headerless 3 MiB stream was fully consumed before refusal. No DB/provider/network side effects. AF_INET socket creation raised PermissionError errno 1."
+      },
+      {
+        "command": "cd frontend && pnpm exec vitest run --config /tmp/m10c-delta1-review/vitest.config.mts -t \"delta review counterexamples\"",
+        "result": "3 temporary source-importing probes passed, reproducing token-reload actor loss, concealed finding detail in restored confirmation, and A/B selection response race. Nine copied existing tests were filtered out, not rerun in this command. All temporary probe files are outside the repository."
+      },
+      {
+        "command": "cd frontend && pnpm exec vitest run --config /tmp/m10c-delta1-review/vitest.config.mts -t \"delta review publication cache\"",
+        "result": "1 temporary source-importing probe passed, reproducing stale expected_profile_revision=2 after successful r3 publication. Twelve unrelated temporary/copied tests filtered out."
+      },
+      {
+        "command": "git diff --check 5b95b62b1..HEAD",
+        "result": "Passed, exit 0."
+      },
+      {
+        "command": "git diff 5b95b62b1..HEAD -- accepted quality service/contract/core/run-repository paths",
+        "result": "Empty: no modifications to accepted authority/closure/custody services, quality contracts/core algorithms or run repository."
+      },
+      {
+        "command": "python3 (stdin compare qualification record router source_sha256 against current file)",
+        "result": "Existing route qualification router hash does not match current router, as expected pending requalification."
+      }
+    ],
+    "not_run": "No independent PostgreSQL service/router/resolver/export-chain execution, systemd/confined runtime, normal repo-wide pytest fixture gate, full static gates, live Chrome/no-script acceptance, activated-host/provider/production actions or full suite. AF_INET is denied. Previous review test counts are historical and are not reused as fresh passes. The added PG export test is inspected source, not a reviewer-executed pass.",
+    "write_scope": "Only docs/r2/evidence/m10-c-reviews/impl-delta1-codex-review.json in the repository; temporary probe files under /tmp/m10c-delta1-review. No source/test changes, format/stage/commit/push/merge/tag.",
+    "final_head": "eda1a9a3cc7e64562048025e5ab6e5951c5775b1"
+  },
+  "files_read": [
+    "docs/r2/evidence/m10-c-reviews/impl-codex-review.json",
+    "docs/superpowers/specs/2026-10-29-r2-m10-c-operator-surface-design.md",
+    "docs/r2/evidence/m10-c-reviews/design-delta2-codex-review.json",
+    "docs/r2/evidence/m10-a4-reviews/route-qualification.json",
+    "server/routers/quality.py",
+    "server/services/quality_prepare.py",
+    "server/services/quality_subjects.py",
+    "server/services/quality_requests.py (request/evidence builders)",
+    "server/services/quality_probes.py (receipt/attempt/catalog flow)",
+    "r2/quality/dispositions.py (waiver coverage)",
+    "frontend/src/features/quality/api/qualityClient.ts",
+    "frontend/src/features/quality/ui/QualityPage.tsx",
+    "frontend/src/features/quality/ui/QualityPage.test.tsx",
+    "frontend/src/stores/auth-store.ts",
+    "frontend/src/utils/auth.ts",
+    "frontend/src/main.tsx (auth initialization)",
+    "tests/integration/server/routers/test_quality_routes.py",
+    "tests/integration/server/services/test_quality_subjects.py",
+    "tests/unit/server/services/test_quality_prepare.py",
+    "tests/unit/server/services/test_quality_template.py (executed)",
+    "lib/db/models/host_hardening.py (attempt model)",
+    "CONTRIBUTING.md (test selection)",
+    "frontend/vitest.config.ts",
+    "frontend/src/i18n/en/dashboard.ts (delta)",
+    "frontend/src/i18n/vi/dashboard.ts (delta)",
+    "frontend/src/i18n/zh/dashboard.ts (delta)",
+    "lib/i18n/en/errors.py (delta)",
+    "lib/i18n/vi/errors.py (delta)",
+    "lib/i18n/zh/errors.py (delta)",
+    "frontend/src/features/packaging/ui/packaging.css (delta)"
+  ]
+}

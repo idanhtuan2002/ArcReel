@@ -74,4 +74,8 @@ activated-host qualification + deploy (sudo), then M9-B.
   independent reads; M7 SQL-filtered reads (no project-wide replays); M8 catalog-disabled first submit → 503 only when
   no stored invocation; M9 request byte ceilings and collection bounds; L1 canonical-bytes body equality.
   Conditions I1-I5 in the review (end-to-end PG chain through Packaging/export, live Chrome acceptance).
+- Impl fixes `db453e096` (backend), `6d1771d61` (frontend), `eda1a9a3c` (quality→packaging export PG chain). Delta1
+  **CHANGES_REQUESTED** (`impl-delta1-codex-review.json`): RESOLVED M2/M4/M5/L1; PARTIAL H1/H2/M1/M3/M6/M7/M8/M9;
+  new N1 (50-run cap hides history → cursor pagination) and N2 (stale publication CAS after publish). Next: fix all,
+  add resolver mutation corpus (I1), delta2 review, then live Chrome acceptance + probe route requalification.
 
