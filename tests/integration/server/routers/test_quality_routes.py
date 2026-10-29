@@ -24,6 +24,7 @@ BASE = "/api/v1/projects/project/quality"
 
 def _app(env) -> FastAPI:
     app = FastAPI()
+    app.add_middleware(quality.QualityBodyLimit)
     register_error_handlers(app)
     app.include_router(quality.router, prefix="/api/v1", dependencies=[Depends(get_current_user)])
     tree, sockets = env["governance"]
@@ -142,6 +143,7 @@ async def test_an_operator_drives_a_master_to_a_ready_pass_disposition_over_http
     runs = await env["client"].get(f"{BASE}/runs", params={"root": chain["root"]}, headers=_headers())
     assert runs.status_code == 200, runs.text
     [listed] = runs.json()["runs"]
+    assert runs.json()["next_before"] is None
     assert listed["run"]["run_id"] == chain["run"]["run"]["run_id"]
     assert (listed["readiness"]["state"], listed["disposition_version"]) == ("READY", 1)
     observations = await env["client"].get(
@@ -204,6 +206,7 @@ async def test_probe_history_lists_each_command_with_its_attempt_state(http) -> 
         headers=_headers(),
     )
     assert probes.status_code == 200, probes.text
+    assert probes.json()["next_after"] is None
     rows = sorted(probes.json()["probes"], key=lambda row: row["requirement_id"])
     assert [(row["requirement_id"], row["attempt_state"], row["status"]) for row in rows] == [
         ("technical-container", "SUCCEEDED", "PASS"),
@@ -239,14 +242,31 @@ async def test_with_new_probe_work_disabled_only_an_existing_command_continues(h
     assert fresh.status_code == 503
 
 
-async def test_an_oversized_body_is_refused_before_parsing(http) -> None:
+async def test_a_body_over_the_ceiling_is_refused_while_it_streams_whatever_its_headers_say(http) -> None:
+    env = http
+
+    async def chunks():
+        for _ in range(17):
+            yield b"a" * 65536
+
+    streamed = await env["client"].post(
+        f"{BASE}/runs", content=chunks(), headers=_headers() | {"Content-Type": "application/json"}
+    )
+    assert streamed.status_code == 413
+    lying = await env["client"].post(
+        f"{BASE}/runs",
+        content=b"a" * ((1 << 20) + 1),
+        headers=_headers() | {"Content-Type": "application/json", "Content-Length": "10"},
+    )
+    assert lying.status_code in {400, 413}
+
+
+async def test_a_malformed_body_under_the_ceiling_reaches_the_route_validation(http) -> None:
     env = http
     response = await env["client"].post(
-        f"{BASE}/runs",
-        content=b'{"request": {"x": "' + b"a" * (1 << 20) + b'"}, "seal": "s"}',
-        headers=_headers() | {"Content-Type": "application/json"},
+        f"{BASE}/runs", content=b"{not json", headers=_headers() | {"Content-Type": "application/json"}
     )
-    assert response.status_code == 413
+    assert response.status_code == 422
 
 
 async def test_an_exact_revision_and_the_runs_own_profile_are_readable(http) -> None:
@@ -380,3 +400,66 @@ async def test_a_run_made_on_the_quality_routes_exports_through_packaging(http) 
     )
     assert exported.status_code == 200, exported.text
     assert exported.json()["status"] == "EXPORTED"
+
+
+async def test_runs_page_stably_so_an_older_run_stays_reachable(http) -> None:
+    env = http
+    chain = await _chain(env)
+    sealed = env["sealed"]["runs"]["request"]["subject"]
+    scope = {"profile_id": chain["profile"]["profile_id"], "revision": 1, "root_artifact_key": chain["root"]}
+    ids = [item["observation_id"] for item in sealed["observations"]]
+    for index in range(20):
+        await _do(env, "runs", {"command_id": f"seal-more-{index}", **scope, "observation_ids": ids})
+    first = (await env["client"].get(f"{BASE}/runs", params={"root": chain["root"]}, headers=_headers())).json()
+    assert len(first["runs"]) == 20
+    assert first["next_before"] is not None
+    second = (
+        await env["client"].get(
+            f"{BASE}/runs", params={"root": chain["root"], "before": first["next_before"]}, headers=_headers()
+        )
+    ).json()
+    listed = [item["run"]["run_id"] for item in first["runs"] + second["runs"]]
+    assert chain["run"]["run"]["run_id"] in listed
+    assert len(set(listed)) == len(listed) == 21
+
+
+async def test_a_run_detail_carries_its_exact_observation_closure(http) -> None:
+    env = http
+    chain = await _chain(env)
+    detail = await env["client"].get(f"{BASE}/runs/{chain['run']['run']['run_id']}", headers=_headers())
+    assert detail.status_code == 200, detail.text
+    assert sorted(o["requirement_id"] for o in detail.json()["observations"]) == [
+        "review",
+        "technical-container",
+        "technical-decode",
+    ]
+
+
+async def test_a_probe_prepared_before_the_catalog_was_disabled_is_unavailable_on_first_submit(http) -> None:
+    env = http
+    chain = await _chain(env)
+    scope = {"profile_id": chain["profile"]["profile_id"], "revision": 1, "root_artifact_key": chain["root"]}
+    prepared = await env["client"].post(
+        f"{BASE}/probes/prepare",
+        json={"command_id": "probe-later", **scope, "requirement_id": "technical-decode"},
+        headers=_headers(),
+    )
+    assert prepared.status_code == 200, prepared.text
+    tree, sockets = env["governance"]
+    env["app"].dependency_overrides[quality.quality_deps] = lambda: quality.QualityDeps(
+        sessions=env["factory"],
+        project_root=lambda _name: env["project"],
+        grant_reader=env["reader"],
+        read_directory=tree / "read",
+        socket_directory=sockets,
+        catalog=None,
+        runtime=env["runtime"],
+        secret=SECRET,
+        custody_uid=os.getuid(),
+        custody_gid=os.getgid(),
+    )
+    body = prepared.json()
+    refused = await env["client"].post(
+        f"{BASE}/probes", json={"request": body["request"], "seal": body["seal"]}, headers=_headers()
+    )
+    assert refused.status_code == 503

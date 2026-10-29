@@ -9,6 +9,7 @@ unavailable when authentication is disabled.
 from __future__ import annotations
 
 import os
+import re
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -17,7 +18,9 @@ from typing import Annotated, Any, Literal
 
 import sqlalchemy as sa
 from fastapi import APIRouter, Depends, Query, Request
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, Field
+from starlette.requests import Request as StarletteRequest
 
 import r2.contracts.quality as q
 from lib.api_errors import ApiError, ConflictError, NotFoundError, ServiceUnavailableError, UnprocessableError
@@ -33,6 +36,7 @@ from lib.db.models.quality_probes import (
 from lib.db.models.quality_runs import QualityHumanObservationModel, QualityRunModel
 from lib.db.repositories.quality import QualityProfileRepository
 from lib.db.repositories.quality_runs import QualityRunRepository
+from lib.i18n import get_translator
 from lib.project_manager import get_project_manager
 from r2.contracts.artifact_metadata import R2ArtifactMetadata
 from r2.quality.digests import compute_digest
@@ -61,18 +65,50 @@ from server.services.quality_subjects import manifest_bodies, resolve_assessed_s
 from server.services.quality_template import default_platform_constraints, quality_policy
 
 MAX_BODY_BYTES = 1 << 20
+_QUALITY_PATH = re.compile(r"^/api/v1/projects/[^/]+/quality(?:/|$)")
 
 
-async def _bounded_body(request: Request) -> None:
-    """Refuse any quality request body above the operational ceiling before it is parsed."""
-    declared = request.headers.get("content-length")
-    if declared is not None and (not declared.isdigit() or int(declared) > MAX_BODY_BYTES):
-        raise ApiError(QUALITY_REQUEST_TOO_LARGE, status_code=413)
-    if len(await request.body()) > MAX_BODY_BYTES:
-        raise ApiError(QUALITY_REQUEST_TOO_LARGE, status_code=413)
+class QualityBodyLimit:
+    """ASGI middleware: a quality request body is counted chunk by chunk while it is received and refused with 413
+    as soon as it passes the ceiling, before any route parses it; the declared Content-Length is not trusted."""
+
+    def __init__(self, app: Any, limit: int = MAX_BODY_BYTES) -> None:
+        self.app, self.limit = app, limit
+
+    async def __call__(self, scope: Any, receive: Any, send: Any) -> None:
+        if scope["type"] != "http" or not _QUALITY_PATH.match(scope.get("path", "")):
+            await self.app(scope, receive, send)
+            return
+        chunks: list[bytes] = []
+        size = 0
+        while True:
+            message = await receive()
+            if message["type"] == "http.disconnect":
+                return
+            chunk = message.get("body", b"")
+            size += len(chunk)
+            if size > self.limit:
+                translate = get_translator(StarletteRequest(scope))
+                response = JSONResponse(status_code=413, content={"detail": translate(QUALITY_REQUEST_TOO_LARGE)})
+                await response(scope, receive, send)
+                return
+            chunks.append(chunk)
+            if not message.get("more_body", False):
+                break
+        body = b"".join(chunks)
+        delivered = False
+
+        async def replay() -> dict[str, Any]:
+            nonlocal delivered
+            if delivered:
+                return await receive()
+            delivered = True
+            return {"type": "http.request", "body": body, "more_body": False}
+
+        await self.app(scope, replay, send)
 
 
-router = APIRouter(dependencies=[Depends(_bounded_body)])
+router = APIRouter()
 
 QUALITY_UNAVAILABLE = "m10_quality_unavailable"
 QUALITY_REQUEST_INVALID = "m10_quality_request_invalid"
@@ -341,17 +377,34 @@ def _probe_invocations(user_id: str, project_name: str, profile_id: str, revisio
     )
 
 
+PAGE = 20
+
+
 @router.get("/projects/{project_name}/quality/probes")
 async def list_probes(
-    project_name: str, profile_id: str, revision: int, root: str, user: CurrentUser, deps: Deps
+    project_name: str,
+    profile_id: str,
+    revision: int,
+    root: str,
+    user: CurrentUser,
+    deps: Deps,
+    after: str | None = Query(default=None, max_length=255),
 ) -> dict[str, Any]:
-    """Every probe command of the root under one profile revision, across subjects, with its M7 attempt state,
-    its observation when finalized and its recorded failure resources when it failed before acceptance."""
+    """Probe commands of the root under one profile revision, across subjects, in execution-ref pages, each with its
+    M7 attempt state, its observation when finalized and its recorded failure resources when it failed before
+    acceptance."""
     _available(deps)
     probes = []
     async with deps.sessions() as session:
-        rows = (await session.execute(_probe_invocations(user.id, project_name, profile_id, revision, root))).scalars()
-        for row in rows.all():
+        statement = _probe_invocations(user.id, project_name, profile_id, revision, root)
+        if after is not None:
+            statement = statement.where(QualityProbeInvocationModel.execution_ref > after)
+        rows = (
+            (await session.execute(statement.order_by(QualityProbeInvocationModel.execution_ref).limit(PAGE + 1)))
+            .scalars()
+            .all()
+        )
+        for row in rows[:PAGE]:
             attempt = (
                 await session.execute(
                     sa.select(ExecutionAttemptModel.state).where(
@@ -366,12 +419,11 @@ async def list_probes(
             probes.append(
                 {
                     "execution_ref": row.execution_ref,
+                    "execution_id": row.execution_id,
                     "actor_id": row.actor_id,
                     "requirement_id": row.request_json.get("requirement_id"),
-                    "subject_digest": compute_digest(
-                        "m10.assessed-subject.v1", q.AssessedSubject.model_validate(row.request_json["subject"])
-                    ),
-                    "attempt_state": None if attempt is None else str(attempt),
+                    "master_binding_digest": row.request_json["subject"]["master_binding_digest"],
+                    "attempt_state": attempt,
                     "observation_id": None if observed is None else row.observation_id,
                     "status": None if observed is None else observed.observation_json.get("status"),
                     "failure": None
@@ -379,22 +431,27 @@ async def list_probes(
                     else {"error_code": failure.error_code, "resources": failure.resources_json},
                 }
             )
-    return {"probes": probes}
+    next_after = rows[PAGE - 1].execution_ref if len(rows) > PAGE else None
+    return {"probes": probes, "next_after": next_after}
 
 
 @router.get("/projects/{project_name}/quality/observations")
 async def list_observations(
     project_name: str, profile_id: str, revision: int, root: str, user: CurrentUser, deps: Deps
 ) -> dict[str, Any]:
-    """Technical and Human observations of the root's current subject under one profile revision."""
+    """Technical and Human observations of the root's current subject under one profile revision; candidates are
+    narrowed in SQL (binding digest, subject digest) before each one's full verification."""
     _available(deps)
     subject = await _subject(deps, user.id, project_name, root)
     subject_digest = compute_digest("m10.assessed-subject.v1", subject)
     found: list[dict[str, Any]] = []
     async with deps.sessions() as session:
         repository = QualityRunRepository(session)
-        rows = (await session.execute(_probe_invocations(user.id, project_name, profile_id, revision, root))).scalars()
-        for row in rows.all():
+        statement = _probe_invocations(user.id, project_name, profile_id, revision, root).where(
+            _json_text(QualityProbeInvocationModel.request_json, "subject", "master_binding_digest")
+            == subject.master_binding_digest
+        )
+        for row in (await session.execute(statement)).scalars().all():
             if await session.get(QualityProbeObservationModel, (user.id, project_name, row.observation_id)) is None:
                 continue
             stored = await _run(
@@ -406,8 +463,12 @@ async def list_observations(
                 found.append(_summary(stored[0]))
         human_ids = (
             await session.execute(
-                sa.select(QualityHumanObservationModel.observation_id).filter_by(
-                    user_id=user.id, project_name=project_name, profile_id=profile_id, profile_revision=revision
+                sa.select(QualityHumanObservationModel.observation_id).where(
+                    QualityHumanObservationModel.user_id == user.id,
+                    QualityHumanObservationModel.project_name == project_name,
+                    QualityHumanObservationModel.profile_id == profile_id,
+                    QualityHumanObservationModel.profile_revision == revision,
+                    _json_text(QualityHumanObservationModel.observation_json, "subject_digest") == subject_digest,
                 )
             )
         ).scalars()
@@ -434,71 +495,132 @@ def _summary(observation: q.TechnicalObservation | q.NarrativeObservation) -> di
     }
 
 
+def _cursor(value: str | None) -> tuple[datetime, str] | None:
+    if value is None:
+        return None
+    try:
+        sealed_at, run_id = value.split("|", 1)
+        return (datetime.fromisoformat(sealed_at), run_id)
+    except ValueError:
+        raise UnprocessableError(QUALITY_REQUEST_INVALID) from None
+
+
 @router.get("/projects/{project_name}/quality/runs")
-async def list_runs(project_name: str, root: str, user: CurrentUser, deps: Deps) -> dict[str, Any]:
-    """Every sealed run of the root across subjects and profiles, newest first, with its own profile's cohort and
-    surface, validity, readiness and disposition head."""
+async def list_runs(
+    project_name: str,
+    root: str,
+    user: CurrentUser,
+    deps: Deps,
+    before: str | None = Query(default=None, max_length=128),
+) -> dict[str, Any]:
+    """Sealed runs of the root across subjects and profiles, newest first in stable pages (`sealed_at`, `run_id`),
+    each with its own profile's cohort and surface, validity, readiness and disposition head."""
     _available(deps)
     reader = _reader(deps)
     project_root = deps.project_root(project_name)
+    cursor = _cursor(before)
     async with deps.sessions() as session:
+        statement = sa.select(QualityRunModel).where(
+            QualityRunModel.user_id == user.id,
+            QualityRunModel.project_name == project_name,
+            _json_text(QualityRunModel.run_json, "subject", "master_binding", "root", "artifact_key") == root,
+        )
+        if cursor is not None:
+            statement = statement.where(
+                sa.tuple_(QualityRunModel.sealed_at, QualityRunModel.run_id)
+                < sa.tuple_(sa.literal(cursor[0]), sa.literal(cursor[1]))
+            )
         rows = (
             (
                 await session.execute(
-                    sa.select(QualityRunModel)
-                    .where(
-                        QualityRunModel.user_id == user.id,
-                        QualityRunModel.project_name == project_name,
-                        _json_text(QualityRunModel.run_json, "subject", "master_binding", "root", "artifact_key")
-                        == root,
-                    )
-                    .order_by(QualityRunModel.sealed_at.desc())
-                    .limit(50)
+                    statement.order_by(QualityRunModel.sealed_at.desc(), QualityRunModel.run_id.desc()).limit(PAGE + 1)
                 )
             )
             .scalars()
             .all()
         )
-        runs = []
-        for row in rows:
-            run = await QualityRunRepository(session).run(user_id=user.id, project_name=project_name, run_id=row.run_id)
-            if run is None:
-                continue
-            profile = await QualityProfileRepository(session).get_revision(
-                user_id=user.id, project_name=project_name, profile_id=run.profile_id, revision=run.profile_revision
-            )
-            head = await session.get(DispositionHeadModel, (user.id, project_name, run.subject_digest, run.profile_id))
-            runs.append(
-                {
-                    "run": run.model_dump(mode="json"),
-                    "run_digest": run_digest(run),
-                    "cohort_id": None if profile is None else profile.cohort_id,
-                    "product_surface": None if profile is None else profile.product_surface,
-                    "disposition_version": 0 if head is None else head.version,
-                    "current_disposition_id": None if head is None else head.current_disposition_id,
-                }
-            )
+        runs = [await _run_entry(session, user.id, project_name, row.run_id) for row in rows[:PAGE]]
     for item in runs:
-        run = item["run"]
-        validity = await _run(
-            lambda rid=run["run_id"]: run_validity(
-                deps.sessions, reader, project_root=project_root, user_id=user.id, project_name=project_name, run_id=rid
+        await _assess(deps, reader, project_root, user.id, project_name, item)
+    last = rows[PAGE - 1] if len(rows) > PAGE else None
+    return {"runs": runs, "next_before": None if last is None else f"{last.sealed_at.isoformat()}|{last.run_id}"}
+
+
+@router.get("/projects/{project_name}/quality/runs/{run_id}")
+async def read_run(project_name: str, run_id: str, user: CurrentUser, deps: Deps) -> dict[str, Any]:
+    """One run with its exact observation closure (each verified), for deciding on it and choosing waivers."""
+    _available(deps)
+    reader = _reader(deps)
+    async with deps.sessions() as session:
+        item = await _run_entry(session, user.id, project_name, run_id)
+        repository = QualityRunRepository(session)
+        observations = []
+        for observation_id in item["run"]["observation_refs"]:
+            technical = await _run(
+                lambda oid=observation_id: repository.technical_observation(
+                    user_id=user.id, project_name=project_name, observation_id=oid
+                )
             )
-        )
-        readiness = await _run(
-            lambda r=run: quality_readiness(
-                deps.sessions,
-                reader,
-                project_root=project_root,
-                user_id=user.id,
-                project_name=project_name,
-                subject_digest=r["subject_digest"],
-                profile_id=r["profile_id"],
+            if technical is not None:
+                observations.append(_summary(technical[0]))
+                continue
+            human = await _run(
+                lambda oid=observation_id: repository.human_observation(
+                    user_id=user.id, project_name=project_name, observation_id=oid
+                )
             )
+            if human is None:
+                raise ConflictError(QUALITY_REQUEST_INVALID)
+            observations.append(_summary(human.observation))
+    await _assess(deps, reader, deps.project_root(project_name), user.id, project_name, item)
+    return item | {"observations": observations}
+
+
+async def _run_entry(session: Any, user_id: str, project_name: str, run_id: str) -> dict[str, Any]:
+    run = await QualityRunRepository(session).run(user_id=user_id, project_name=project_name, run_id=run_id)
+    if run is None:
+        raise NotFoundError(QUALITY_REQUEST_INVALID)
+    profile = await QualityProfileRepository(session).get_revision(
+        user_id=user_id, project_name=project_name, profile_id=run.profile_id, revision=run.profile_revision
+    )
+    head = await session.get(DispositionHeadModel, (user_id, project_name, run.subject_digest, run.profile_id))
+    return {
+        "run": run.model_dump(mode="json"),
+        "run_digest": run_digest(run),
+        "cohort_id": None if profile is None else profile.cohort_id,
+        "product_surface": None if profile is None else profile.product_surface,
+        "disposition_version": 0 if head is None else head.version,
+        "current_disposition_id": None if head is None else head.current_disposition_id,
+    }
+
+
+async def _assess(
+    deps: QualityDeps, reader: Any, project_root: Path, user_id: str, project_name: str, item: dict[str, Any]
+) -> None:
+    run = item["run"]
+    validity = await _run(
+        lambda: run_validity(
+            deps.sessions,
+            reader,
+            project_root=project_root,
+            user_id=user_id,
+            project_name=project_name,
+            run_id=run["run_id"],
         )
-        item["validity"] = {"state": validity.state, "reasons": list(validity.reasons)}
-        item["readiness"] = {"state": readiness.state, "reasons": list(readiness.reasons)}
-    return {"runs": runs}
+    )
+    readiness = await _run(
+        lambda: quality_readiness(
+            deps.sessions,
+            reader,
+            project_root=project_root,
+            user_id=user_id,
+            project_name=project_name,
+            subject_digest=run["subject_digest"],
+            profile_id=run["profile_id"],
+        )
+    )
+    item["validity"] = {"state": validity.state, "reasons": list(validity.reasons)}
+    item["readiness"] = {"state": readiness.state, "reasons": list(readiness.reasons)}
 
 
 # ---------------------------------------------------------------- publish
@@ -594,21 +716,36 @@ async def prepare_probe(project_name: str, body: ProbeIntent, user: InteractiveU
     return _prepared(deps, "probe", user, project_name, await _run(build))
 
 
+async def _needs_catalog(deps: QualityDeps, request: ProbeRequest) -> bool:
+    """Whether this probe command still needs the catalog: no stored invocation, or an attempt that never got past
+    PLANNED. Replay, ACCEPTED finalization and terminal states (succeeded, failed, unknown) run without it."""
+    async with deps.sessions() as session:
+        stored = await session.get(
+            QualityProbeInvocationModel,
+            (request.user_id, request.project_name, request.actor_id, request.execution_ref),
+        )
+        if stored is None:
+            return True
+        state = (
+            await session.execute(
+                sa.select(ExecutionAttemptModel.state).where(
+                    ExecutionAttemptModel.user_id == request.user_id,
+                    ExecutionAttemptModel.project_name == request.project_name,
+                    ExecutionAttemptModel.execution_id == stored.execution_id,
+                )
+            )
+        ).scalar_one_or_none()
+    return state is None or state == "PLANNED"
+
+
 @router.post("/projects/{project_name}/quality/probes")
 async def run_probe(
     project_name: str, body: SealedBody, user: InteractiveUser, token: Token, deps: Deps
 ) -> dict[str, Any]:
     _available(deps)
     request = _unsealed(deps, "probe", ProbeRequest, user, project_name, body)
-    if deps.catalog is None:
-        # With new probe work disabled only an existing command may continue (receipt replay or ACCEPTED finish).
-        async with deps.sessions() as session:
-            stored = await session.get(
-                QualityProbeInvocationModel,
-                (request.user_id, request.project_name, request.actor_id, request.execution_ref),
-            )
-        if stored is None:
-            raise ServiceUnavailableError(QUALITY_UNAVAILABLE)
+    if deps.catalog is None and await _needs_catalog(deps, request):
+        raise ServiceUnavailableError(QUALITY_UNAVAILABLE)
 
     async def operation() -> q.TechnicalObservation:
         service = await QualityProbeService.for_request(

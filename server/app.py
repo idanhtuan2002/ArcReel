@@ -714,6 +714,7 @@ app.include_router(
     dependencies=[Depends(get_current_user), Depends(require_project_migration_ok)],
     tags=["M10 packaging"],
 )
+app.add_middleware(quality.QualityBodyLimit)
 app.include_router(
     quality.router,
     prefix="/api/v1",
