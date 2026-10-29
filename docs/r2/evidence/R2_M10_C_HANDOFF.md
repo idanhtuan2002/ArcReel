@@ -57,4 +57,7 @@ activated-host qualification + deploy (sudo), then M9-B.
   `QualityRunService.for_request(...).complete`; `DispositionCustodian.for_request` + `DispositionService.issue`.
 - Reads needing additive read-only repository methods: profile heads/revisions list, observations per
   profile/subject, runs per root.
+- Request builders done `8812d7fe1` (`server/services/quality_requests.py`); PG chain test
+  `tests/integration/server/services/test_quality_operator_chain.py` reaches READY PASS through the real custodians and
+  host-v1 probes. Next: `server/routers/quality.py` (prepare/submit + reads) and route tests, then the Quality page.
 
