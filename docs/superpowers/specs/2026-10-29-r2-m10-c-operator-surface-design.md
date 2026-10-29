@@ -24,21 +24,27 @@ host without the sponsor stops the packet.
 
 ## 3. Decisions
 
-**D1 Subject resolver** (`server/services/quality_subjects.py`), the accepted `MasterBindingV1` closure exactly:
-start from the root artifact key; read its R2 metadata from the manifest snapshot; follow only
-`direct_dependencies` whose `ref` starts with `master:`; the child key is
-`episode_video_key(parent_episode, ref.removeprefix("master:"))` with the parent episode from
-`decode_episode_video_key(parent)`, the child metadata must be a `ShotSpec`, and the dependency's `version` and
-`fingerprint` must equal the child head's `selected_candidate_id@host_version_ref` and content digest — the exact
-rules of `MasterBindingV1.coherent` (`r2/contracts/quality.py:236-293`); a mismatch, unknown key or cycle refuses
-before any service call. Other refs (`claim:` …) stay in the metadata body and create no edge. Each closure member's head comes from `DatabaseMasterResolver.get_exact`
-(absent, diverged, or metadata without `approved_master` refuses `M10_SUBJECT_STALE`). Heads, snapshots and edges
-are built as the contract normalizes them (validators sort them; the resolver does not re-sort by hand); digests use
-the existing domains (`m10.master-binding.v1`, artifact digest from the root content digest, `content_basis_digest`
-from the root metadata exactly as `r2/quality/digests.py` defines it); caption/audio digests are `None` (no caption or
-audio slot in the template). The service still runs `_subject_authoritative` and master locks. Tests compare the
-resolver's subject byte-for-byte with the accepted fixture subject (`tests/unit/r2/quality/test_quality_digests.py`
-`valid_subject`) for the fixture manifest.
+**D1 Subject resolver** (`server/services/quality_subjects.py`), the accepted `MasterBindingV1` closure exactly.
+1. Read the manifest snapshot once (`ProjectArtifactManifestAdapter(project_root).snapshot_entries()`); metadata
+   bodies are `R2ArtifactMetadata.model_validate(entry.r2).model_dump(mode="json")` (normalized, as
+   `_subject_authoritative` compares them).
+2. Heads: `DatabaseMasterResolver(authorities=MasterAuthorityRepository(session),
+   legacy_projection=file_master_projection(project_root, session)).get_exact(...)` — the same construction as
+   `_subject_authoritative`, so a diverged file projection refuses. Absent head, divergence, or metadata without
+   `approved_master` whose `approval_record` equals the head's refuses `M10_SUBJECT_STALE`.
+3. Closure: from the root, follow only `direct_dependencies` refs starting with `master:`; the child key is
+   `episode_video_key(parent_episode, ref.removeprefix("master:"))` (`parent_episode` from
+   `decode_episode_video_key(parent)`); the child metadata's `contract_ref.contract_type` must be `ShotSpec` and the
+   dependency `version` must equal the child **metadata** `approved_master.selected_candidate_id + "@" +
+   host_version_ref`, its `fingerprint` media the child head's content digest (`MasterBindingV1.coherent`,
+   `r2/contracts/quality.py:236-293`). Unknown key, mismatch or cycle refuses before any service call. Other refs stay
+   in the body and create no edge.
+4. Build `ArtifactMetadataSnapshot(artifact_key, body, metadata_digest)` with the registered metadata digest domain,
+   then `MasterBindingV1` (its validators order heads/snapshots/edges), then `master_binding_digest` with
+   `m10.master-binding.v1`, `artifact_ref = root.object_ref`, `artifact_digest = "sha256:" + media(root
+   content_digest)`, `content_basis_digest` = the registered content-basis digest of the root metadata
+   `content_basis`, caption/audio `None` (no companion caption/audio evidence; it does not claim the media has no
+   audio). Finish with `verify_caches`. Every digest uses an existing registered domain; none is added.
 
 **D2 Embedded host probe catalog** (`r2/quality/host_catalog.py`). Source-reviewed `ProbeConfig` bodies for
 `CONTAINER_STREAM` and `DECODE` only, with the A4 qualified bodies (parameters, parser version/digest, applicability
@@ -57,45 +63,73 @@ locales, title/description bounds, banned phrases, asset roles), with every pack
 template is a complete V2 policy whose digest the server computes. A PG test drives template → publish → both probes
 → review → seal → PASS disposition through the unchanged closure rules.
 
-**D4 Prepare/submit with server signatures** (stable retry, H4). Each mutation is two calls:
-`POST …/<action>/prepare` builds the complete service request server-side — resolved subject, profile revision,
-generated identities (`uuid7`) and times (`created_at`, `requested_expires_at`), computed digests — and returns it with
-an HMAC-SHA256 seal over its canonical bytes, keyed by a key derived from `AUTH_TOKEN_SECRET` with the purpose
-`m10-quality-prepare` and bound to `(user_id, actor_id, project_name, action)`. `POST …/<action>` accepts only that
-exact sealed request (seal verified in constant time, actor re-checked). Retries after a lost response or a reload
-resend the same sealed request, kept in the browser under its command id until a result is shown, so the service
-replays its receipt; drift is the service's decision (replay of a committed command, or its typed refusal). The seal
-proves the server built the request; every authority check stays in the services. Rejected: rebuilding requests on
-retry (generated fields change, H4); a server-side draft table (new persistence).
+**D4 Prepare/submit with server seals** (stable retry, H4/N4).
+- Actions (allowlist): `publish_profile`, `probe`, `review`, `seal_run`, `dispose`. Each prepare endpoint accepts
+  only its action's intent fields (§D6–D8) and builds the complete typed service request itself; there is no
+  generic "sign this" endpoint.
+- Key: `HKDF-SHA256(ikm=AUTH_TOKEN_SECRET utf-8 bytes, salt=b"arcreel.m10-c", info=b"m10-quality-prepare.v1",
+  length=32)`. Seal: `base64url(HMAC-SHA256(key, canonical_json_bytes({"schema": "m10-c.prepared.v1", "action":
+  action, "user_id", "actor_id", "project_name", "request_type": <class name>, "request": request.model_dump(mode=
+  "json")})))`. Submit re-derives the envelope from its own authenticated principal and the posted request, verifies
+  with `hmac.compare_digest`, re-validates the typed request, and passes it to the service unchanged; it never
+  rebuilds. Rotating `AUTH_TOKEN_SECRET` invalidates every pending seal (the UI drops them and re-prepares).
+- Decision table: committed command resent → service replay of its receipt; first submission → service;
+  root/master drift after prepare → the service's typed refusal (`M10_SUBJECT_STALE`); a newer profile revision after
+  prepare → not refused by M10-C: the prepared request names its exact immutable revision and the services decide
+  (an older revision may be consumed where the services allow it); probe ACCEPTED-but-unfinalized → resending the same
+  sealed request finalizes without a new tool start (A4); probe SUBMIT_OUTCOME_UNKNOWN or FAILED_BEFORE_ACCEPTANCE →
+  never retried under the same command; a new probe needs a deliberate new `execution_ref` chosen by the operator.
+- Browser persistence: the full sealed request is saved under `(user, project, action, command_id)` before the first
+  submit and removed after a result is shown. Losing browser storage or the prepare response loses that envelope;
+  recovery is then a new prepare (a new command), bounded by the services' CAS and duplicate rules — a disclosed
+  limit, since a server draft store would be new persistence.
 
-**D5 Human gates and custody** (H5). Publication and disposition keep the accepted custodians, which take a fresh
-startup proof per issuance (`InteractiveProfilePublicationCustodian.for_request`, `DispositionCustodian.for_request`)
-— a freshness property of A3/A6, not changed. The attestor refuses while busy; the route maps that to a retryable
-503 `m10_quality_busy`, and the UI retries once after a short delay. Probe, review and seal take the app's
-startup-verified reader (`app.state.governance_grants`), as packaging does. Custody owner is host config (root by
-default). Every mutation requires `InteractiveUser`; the embedded-agent token is refused.
+**D5 Human gates and custody** (H5/N3/N5). Publication and disposition use the accepted public factories
+(`InteractiveProfilePublicationCustodian.for_request`, `DispositionCustodian.for_request`) with the caller's bearer
+token, the configured read/attestor directories and the configured custody uid/gid; each issuance takes its own fresh
+startup proof (A3/A6, unchanged). Their refusals stay sanitized: `ProfilePublicationUnauthorizedError` /
+`DispositionUnauthorizedError` → 403 with the existing i18n message, which tells the operator to retry; M10-C does not
+claim to distinguish an attestor that was busy from other unavailability. Review and seal pass the startup-verified
+reader (`app.state.governance_grants`) to the services that accept a reader factory; the probe service takes no
+grant reader (it authenticates the interactive actor and checks profile/root authority itself). Every mutation
+requires `InteractiveUser`; the embedded-agent token is refused.
 
-**D6 Revisions and CAS** (M1). `GET /profiles` lists profile ids with their current revision; `GET
-/profiles/{id}/revisions` lists immutable revisions. Publishing a new revision of an existing profile prepares with
-`expected_profile_revision` = the revision the operator edited and the same cohort/surface; a stale head refuses.
-Probe, review and seal prepare against an explicit `(profile_id, revision)`. Disposition prepares with the run id, the
-disposition head version read by `GET /runs/{id}` and `requested_expires_at` chosen at prepare (default 7 days,
-bounded by the A6 policy).
+**D6 Revisions, supersession and disposition** (M1). `GET /profiles` and `GET /profiles/{id}/revisions` list
+immutable revisions with their digests. Publication intent: `{profile_id | null, expected_profile_revision, cohort_id,
+product_surface, policy, supersession_effect}` — `supersession_effect` is the operator's explicit choice between
+`HISTORICAL_ONLY` and `REEVALUATE_CURRENT`, shown before confirmation (default `HISTORICAL_ONLY`); cohort/surface are
+fixed for an existing profile id. Probe/review/seal intents name `(profile_id, revision)`. Disposition intent: `{run_id,
+decision, reason, waiver_bindings, expected_disposition_version, requested_ttl_seconds}`; prepare computes the absolute
+`requested_expires_at = now + min(requested_ttl, policy.max_disposition_ttl_seconds, 604800)` and for `WAIVE`
+additionally `min(…, policy.max_waiver_ttl_seconds, 86400)`, and refuses a request above those bounds rather than
+silently widening it; the prepared absolute expiry is kept unchanged and final DB-time admission stays authoritative.
+The decision, waiver bindings and expiry are displayed before the Human confirms.
 
-**D7 Human review evidence** (M2). Rubric: one code-embedded rubric `m10.narrative-rubric.v1` (criteria: story
-coherence, legibility of on-screen text, audio presence, visible defects) whose digest is `rubric_digest`.
-Segment closure: the whole master, `compute_digest("m10.review-segments.v1", {"subject_digest", "segments":
-[{"start": "0", "end": "END"}]})`. Notes: written content-addressed under the project
-(`quality/reviews/<sha256>.md`, regular file, no-follow), `reviewer_evidence_digest` = notes digest, `evidence_refs`
-= `["project:quality/reviews/<sha256>.md"]`, `evidence_digest` = digest of the refs; the file is a reference, not
-authority (the observation's digests are). Findings come from the operator's structured rows (rule id, severity,
-locator) with server-generated finding ids.
+**D7 Human review evidence** (M2/N1/N2). No new storage: notes are not retained by M10 (the operator keeps their
+own notes); only digests are bound. Private projections, all `"sha256:" + sha256(canonical_json_bytes(body))` with a
+`schema` field in the body, used only as data the accepted service copies (no registered domain is added):
+- rubric: code-embedded `{"schema": "m10-c.narrative-rubric.v1", "criteria": [coherence, on-screen text legibility,
+  audio presence, visible defects]}` → `rubric_id = "m10-c.narrative-rubric.v1"`, `rubric_digest`;
+- segments: `{"schema": "m10-c.review-segments.v1", "subject_digest", "segments": [{"start": "0", "end": "END"}]}`;
+- reviewer evidence: `{"schema": "m10-c.reviewer-evidence.v1", "criteria_verdicts", "notes_digest"}` where
+  `notes_digest` hashes the UTF-8 notes text (≤ 20 000 chars) → `reviewer_evidence_digest`; `evidence_refs =
+  ["m10-c-review:" + hex(reviewer_evidence_digest)]`; `evidence_digest` hashes `{"schema": "m10-c.review-refs.v1",
+  "refs"}`;
+- each finding: rule id from the rubric criteria ids, severity `BLOCKING|ADVISORY`, locator `whole|t=<ms>`, server
+  `finding_id = uuid7()`, `evidence_digest` hashing `{"schema": "m10-c.review-finding.v1", "rule_id", "severity",
+  "locator", "notes_digest"}`.
+Requirement/slot are fixed to the template's `review`/`human`; status is `PASS|FAIL`; ≤ 32 findings. The operator
+confirms the summary before submit. Identity, qualification and independence stay service-owned.
 
-**D8 Reads and states** (M3). `GET /masters`; `GET /probes?profile_id&revision&root` (technical observations plus the
-M7 attempt state of each probe command: PLANNED, ACCEPTED, FAILED_BEFORE_ACCEPTANCE, unknown → "needs a new
-command"); `GET /reviews?…`; `GET /runs?root` (every run of the root across subjects and profiles, with validity and
-readiness; stale/superseded runs stay listed). Reads require an authenticated user; the quality routes answer 503
-when authentication is disabled. Errors are sanitized through the packaging error map; i18n en/vi/zh.
+**D8 Reads and recovery states** (M3). `GET /masters`; `GET /probes?profile_id&revision&root` (technical observations
+and each probe command's M7 attempt: PLANNED → pending; ACCEPTED → "finish" (resend the sealed request);
+FAILED_BEFORE_ACCEPTANCE → known failure with its recorded ResourceEvidence; SUBMIT_OUTCOME_UNKNOWN → "needs
+review", only a deliberate new `execution_ref` runs a new probe; historical attempts stay listed); `GET /reviews`;
+`GET /runs?root` (every run across subjects and profiles with validity, readiness and disposition versions;
+stale/superseded/expired/invalidated stay visible). "Package this run" is enabled only when the server reports the run
+current and READY. Custody, schema and runtime unavailability are distinct typed states (403 authorization, 503
+`m10_quality_unavailable`, 409 typed M10 errors). Reads require an authenticated user; with authentication disabled
+the quality routes answer 503.
 
 **D9 UI** (`frontend/src/features/quality/`, route `quality`, sidebar before Packaging): master → profile (template,
 edit, publish/revise) → probes (two) → review (rubric, findings, notes) → seal → disposition, with pending sealed

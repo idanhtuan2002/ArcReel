@@ -1,0 +1,354 @@
+{
+  "schema_id": "m10.c.design-delta-review.v1",
+  "reviewer": "Codex",
+  "reviewed_head": "14a2983065bf5a36f3a074de44089a65aa71af01",
+  "branch": "design/r2-m10-c-operator-surface",
+  "worktree": "/home/anhtuan/content-production-os/.worktrees/r2-m10-c",
+  "design": "docs/superpowers/specs/2026-10-29-r2-m10-c-operator-surface-design.md",
+  "design_sha256": "aa50d6ac71b8aa4e8c68b4dc1a87478e9e181e68ce67c7edcab7f0786d71986c",
+  "prior_review": "docs/r2/evidence/m10-c-reviews/design-codex-review.json",
+  "prior_review_sha256": "f86ec4fe9cc9fc6b8140edd58e96be7900a0a26b5350b18014c41d651f0f27da",
+  "verdict": "REWORK",
+  "summary": "r2 fixes the two-slot independence blocker and replaces generated host catalogs with source-reviewed qualification. Exact signed request transport is a viable way to preserve receipt-first replay without a draft table, but its cryptographic framing and drift rules need definition. D7 still violates the explicit no-new-evidence-custody boundary and names an unavailable digest domain. Fresh-proof custodian wiring is now correct, but its promised busy-specific error mapping is not supported by the unchanged APIs. These material findings drive REWORK; Low findings do not.",
+  "counts": {
+    "prior_resolved": 2,
+    "prior_partial": 6,
+    "prior_open": 0,
+    "new_critical": 0,
+    "new_high": 1,
+    "new_medium": 3,
+    "new_low": 1
+  },
+  "prior_findings": [
+    {
+      "id": "H1",
+      "prior_severity": "HIGH",
+      "status": "RESOLVED",
+      "design_evidence": [
+        "docs/superpowers/specs/2026-10-29-r2-m10-c-operator-surface-design.md:53-58"
+      ],
+      "code_evidence": [
+        "server/services/quality_probes.py:69-70,155-165",
+        "r2/quality/runs.py:225-255"
+      ],
+      "assessment": "D3 now has separate one-slot ALL requirements for container, decode and Human review. Cross-slot independence is checked within each requirement, so the unchanged shared host-deterministic-probe group no longer collides. A fresh pure closure probe produced SATISFIED for all three slots.",
+      "remaining": "Actual V2 template and PostgreSQL route-to-PASS qualification remain implementation gates, not evidence already obtained."
+    },
+    {
+      "id": "H2",
+      "prior_severity": "HIGH",
+      "status": "PARTIAL",
+      "design_evidence": [
+        "docs/superpowers/specs/2026-10-29-r2-m10-c-operator-surface-design.md:27-41"
+      ],
+      "code_evidence": [
+        "r2/contracts/quality.py:179-291,698-713",
+        "r2/contracts/artifact_metadata.py:22-50",
+        "r2/contracts/host_hardening.py:285-293",
+        "r2/quality/digests.py:190-205",
+        "r2/host_hardening/master_resolver.py:31-57",
+        "server/services/quality_runs.py:96-125"
+      ],
+      "assessment": "The main error is fixed: only master: refs become same-episode edges and non-master refs remain in metadata. Constructor ordering, child ShotSpec, version/media matching and cycle rejection are correctly delegated. However, selected_candidate_id and host_version_ref belong to child metadata.approved_master, not the child MasterHeadSnapshot as line 32 says. get_exact detects divergence only when constructed with the legacy file projection; D1 still does not specify that injection. The digest recipe remains implicit.",
+      "remaining": "Name the DB repository plus file_master_projection configuration, normalize each complete metadata body before its metadata digest, build binding then binding digest, use root.object_ref and sha256-prefixed normalized root media digest, compute root ContentBasis digest with the registered helper, and finish verify_caches. Explicitly retain approval-record/closure checks. None requires accepted-service changes. None caption/audio is coherent for no separate companion evidence; it does not assert that root media has no audio."
+    },
+    {
+      "id": "H3",
+      "prior_severity": "HIGH",
+      "status": "RESOLVED",
+      "design_evidence": [
+        "docs/superpowers/specs/2026-10-29-r2-m10-c-operator-surface-design.md:43-51"
+      ],
+      "code_evidence": [
+        "docs/superpowers/specs/2026-10-27-r2-m10-a4-probes-design.md:80-103,130-132",
+        "r2/quality/probes.py:503-550,612-667,927",
+        "server/services/quality_probes.py:258-295",
+        "server/services/quality_probe_runtime.py:216-251"
+      ],
+      "assessment": "D2 removes generated JSON and LOUDNESS/INTERVALS defaults. Source-reviewed container/decode configs with pinned tool/parser/policy bodies, same-fixture qualification and route requalification fit the accepted A4 mechanism. host-v1 is a selector for a released immutable catalog, not qualification by configuration flag. Completed observations replay before live catalog resolution.",
+      "remaining": "Before activation, bind actual catalog bytes/config digests and the affected source/runtime/control/tool identities to new qualification evidence. Run the exact new catalog bodies, not freshly regenerated fixture configs. With catalog disabled, do not put a blanket route dependency before service replay: an empty catalog plus unchanged service ordering can preserve completed replay. State how missing new catalog entries map to 503 without reclassifying unrelated evidence failures."
+    },
+    {
+      "id": "H4",
+      "prior_severity": "HIGH",
+      "status": "PARTIAL",
+      "design_evidence": [
+        "docs/superpowers/specs/2026-10-29-r2-m10-c-operator-surface-design.md:60-69,100-103,107-110"
+      ],
+      "code_evidence": [
+        "r2/quality/digests.py:162-170",
+        "server/services/quality_profiles.py:30-48",
+        "server/services/quality_probes.py:245-283,299-308",
+        "server/services/quality_runs.py:272-306,435-489",
+        "server/services/quality_dispositions.py:229-245"
+      ],
+      "assessment": "Keeping the exact server-built request and its seal fixes regeneration of IDs/times/CAS inputs and avoids a new draft table. An authenticated client may transport an immutable request; it does not control its signed contents. This is sound in principle if the entire typed request is sealed and submit never rebuilds it. The protocol lacks a concrete versioned key/context encoding and key-lifecycle policy (N4). The blanket verification claim that drift after prepare is refused is too broad: old immutable profile revisions can still be consumed, while committed exact requests replay historically.",
+      "remaining": "Apply N4. Distinguish committed replay, first submission, ACCEPTED-but-unfinalized probe recovery, and unknown outcomes. Test root drift and profile supersession independently; do not force accepted services to refuse every newer profile revision. Browser persistence must save the full sealed request before first submit and be partitioned by scope/action/command, not command_id alone. Loss of browser storage or prepare response cannot promise recoverability of that same envelope without a server draft store; disclose this bounded limit."
+    },
+    {
+      "id": "H5",
+      "prior_severity": "HIGH",
+      "status": "PARTIAL",
+      "design_evidence": [
+        "docs/superpowers/specs/2026-10-29-r2-m10-c-operator-surface-design.md:71-76"
+      ],
+      "code_evidence": [
+        "server/services/quality_profile_custodian.py:55-78,93-109,140-147",
+        "server/services/quality_dispositions.py:85-107,126-143",
+        "server/services/governance_startup.py:41-58,84-105",
+        "server/services/governance_attestation.py:142-169"
+      ],
+      "assessment": "The authority/API contradiction is fixed: publication and disposition retain their public factories and fresh-proof issuance, with no supplied-reader bypass. But D5 claims a busy-specific retryable 503 even though the accepted factories erase the underlying attestor cause (N3). ProbeService also has no grant-reader parameter (N5).",
+      "remaining": "Preserve sanitized authorization failures unless a separately reviewed change supplies a qualified availability signal. Never inject private activation/reader state or remap all authorization refusals as transient busy."
+    },
+    {
+      "id": "M1",
+      "prior_severity": "MEDIUM",
+      "status": "PARTIAL",
+      "design_evidence": [
+        "docs/superpowers/specs/2026-10-29-r2-m10-c-operator-surface-design.md:78-83,94-98"
+      ],
+      "code_evidence": [
+        "r2/contracts/quality.py:1011-1028,1042-1076",
+        "r2/quality/dispositions.py:52-62",
+        "server/services/quality_dispositions.py:304-317",
+        "server/services/quality_runs.py:640-654"
+      ],
+      "assessment": "Revision history, explicit revision selectors, expected publication revision, stable cohort/surface, disposition head version and requested expiry are now named. D6 still omits the Human choice or documented fixed default for HISTORICAL_ONLY versus REEVALUATE_CURRENT. A seven-day default is valid only after decision-specific policy bounding: WAIVE is capped at one day and the published policy may be stricter.",
+      "remaining": "Include supersession_effect and every required disposition field in the prepared request, displaying decision/waiver bindings and expiry before confirmation. Clamp or reject at prepare using min(policy.max_disposition_ttl_seconds,604800) and additionally min(policy.max_waiver_ttl_seconds,86400) for WAIVE; persist the absolute prepared expiry unchanged. Final DB-time admission stays authoritative. Pure expiry probe confirmed seven-day WAIVE refuses and one-day WAIVE passes with the fixture policy."
+    },
+    {
+      "id": "M2",
+      "prior_severity": "MEDIUM",
+      "status": "PARTIAL",
+      "design_evidence": [
+        "docs/superpowers/specs/2026-10-29-r2-m10-c-operator-surface-design.md:85-92"
+      ],
+      "code_evidence": [
+        "r2/quality/runs.py:60-93",
+        "r2/contracts/quality.py:727-732",
+        "server/services/quality_runs.py:239-259,313-338",
+        "lib/db/repositories/quality_runs.py:119-149",
+        "r2/quality/digests.py:19-60,135-137"
+      ],
+      "assessment": "D7 now names a rubric, segment scope, note locator, refs and reviewer digest, but its segment helper is unavailable (N2), its new file store violates scope (N1), and structured finding rows omit the required per-finding evidence_digest derivation. Accepted HumanObservationService copies these evidence/rubric fields into the observation; it does not resolve a notes file or independently prove these derivations.",
+      "remaining": "Resolve N1/N2 and specify canonical rubric bytes, exact digest algorithms, fixed requirement/slot selection, permitted status/rule/locator inputs, per-finding evidence digest, input bounds and the explicit Human confirmation. Keep identity, qualification and independence server/service-owned."
+    },
+    {
+      "id": "M3",
+      "prior_severity": "MEDIUM",
+      "status": "PARTIAL",
+      "design_evidence": [
+        "docs/superpowers/specs/2026-10-29-r2-m10-c-operator-surface-design.md:94-103"
+      ],
+      "code_evidence": [
+        "server/services/quality_probes.py:258-283,431-440",
+        "server/services/quality_runs.py:592-661",
+        "server/services/quality_dispositions.py:346-425",
+        "server/auth.py:443-493"
+      ],
+      "assessment": "Reloadable probe/review reads, root history across subjects/profiles, validity/readiness and auth-disabled refusal address the principal omissions. More recovery semantics are needed: an unknown attempt is not cleared by a new command, and an ACCEPTED attempt should finalize without a second tool start. D9 does not explicitly gate Package this run on recomputed READY/currentness or enumerate custody/schema/runtime failure states.",
+      "remaining": "Specify pending, known failed, ACCEPTED recovery, submit-outcome-unknown and operator-review displays/actions, preserving historical attempt identity and failure evidence. A distinct execution_ref needs deliberate user action, not automatic retry. Keep stale/superseded/expired/invalidated histories and disposition versions visible; only current server-ready results enable Packaging. Preserve typed auth failures and define unavailable versus busy without N3 misclassification."
+    }
+  ],
+  "prior_low_findings": {
+    "count": 0,
+    "assessment": "The r1 artifact contains exactly H1-H5 and M1-M3; there are no prior Low findings to classify."
+  },
+  "new_findings": [
+    {
+      "id": "N1",
+      "severity": "HIGH",
+      "status": "CONFIRMED",
+      "location": "docs/superpowers/specs/2026-10-29-r2-m10-c-operator-surface-design.md:85-92 (D7), conflicting with :18-23",
+      "scenario": "The router creates project/quality/reviews/<sha256>.md and observations retain a locator/digest to it. This introduces an evidence writer, namespace and byte-retention responsibility outside accepted A3-A6 persistence. A content hash identifies expected bytes but does not make file creation, safe reads, durability, immutability, scope or recovery an existing custody capability. Calling the file a reference does not remove that responsibility. If it is replaced/deleted, unchanged Human observation/run code does not open it, so observation digests alone do not establish that the note bytes remain available or intact.",
+      "evidence": [
+        "r2/quality/ports.py:102-107,189-192",
+        "server/services/quality_runs.py:313-338,364-378",
+        "lib/db/repositories/quality_runs.py:119-149",
+        "docs/superpowers/specs/2026-10-29-r2-m10-c-operator-surface-design.md:20-23,88-91"
+      ],
+      "fix": "Either remove the new notes-file promise and specify a bounded representation carried by existing immutable observation fields, with honest limitations, or stop and separately review a scoped evidence-custody addition. For a file store that review must own canonical bytes/encoding, anchored no-follow access for every path component, exclusive content-addressed create with existing-file hash verification, replace/delete policy, safe scoped reads, size bounds, crash/DB commit ordering, orphan handling, retention and restore. Do not silently alter run validity to inspect new files.",
+      "stop_condition": "Triggered by D7 as written: new evidence custody is explicitly excluded even without a new DB table. No production authority need be created, but the scope amendment must be explicit."
+    },
+    {
+      "id": "N2",
+      "severity": "MEDIUM",
+      "status": "CONFIRMED",
+      "location": "docs/superpowers/specs/2026-10-29-r2-m10-c-operator-surface-design.md:85-92 (D7 segment/evidence derivation)",
+      "scenario": "The exact proposed compute_digest(m10.review-segments.v1, ...) call raises ValueError because the accepted helper supports a closed registered domain set and this domain is absent. Thus review preparation fails before a Human observation can be submitted. The design also does not specify the digest algorithm/envelope for rubric bytes, notes/refs or per-finding evidence; the latter is a required QualityFinding field.",
+      "evidence": [
+        "r2/quality/digests.py:19-60,135-137,175-177",
+        "r2/quality/runs.py:60-78",
+        "r2/contracts/quality.py:727-732",
+        "r2/quality/runs.py:48-53"
+      ],
+      "fix": "Choose and document a precise host-owned canonical projection/digest recipe that existing fields can carry. A private digest_canonical envelope has an in-repo precedent in r2/quality/runs.py; do not claim the closed compute_digest registry accepts arbitrary domains or add a new registered contract silently. Define the subject binding, whole-master segment representation, rubric/version, note encoding, refs order and per-finding evidence digest and test their stability and tamper cases. Any actual accepted-contract change triggers the stop condition.",
+      "verification": "Fresh pure call using the D7 domain/body returned ValueError: unregistered M10-A digest domain."
+    },
+    {
+      "id": "N3",
+      "severity": "MEDIUM",
+      "status": "CONFIRMED",
+      "location": "docs/superpowers/specs/2026-10-29-r2-m10-c-operator-surface-design.md:71-75 (busy mapping and automatic retry)",
+      "scenario": "An attestor busy refusal, corrupt archive, missing socket and other startup failures all become GovernanceStartupUnavailable; publication maps that to ProfilePublicationUnauthorizedError and disposition maps it to DispositionUnauthorizedError, suppressing the cause. The route cannot identify busy from these public errors. Packaging maps disposition authorization to 403 and generic M10 errors to 409, not a busy-specific 503. Remapping every authorization error as busy would hide invalid/revoked grants and other persistent refusals and incorrectly trigger the proposed automatic retry.",
+      "evidence": [
+        "server/services/governance_attestation.py:142-169",
+        "server/services/governance_startup.py:84-105",
+        "server/services/quality_profile_custodian.py:140-147",
+        "server/services/quality_dispositions.py:131-143",
+        "server/routers/packaging.py:109-120"
+      ],
+      "fix": "Keep the accepted sanitized authorization refusal and let the user deliberately retry the same sealed command, or specify a justified host-level serialization/admission mechanism whose locally known contention is distinct from custody failure. A precise new busy signal from accepted custodians/attestor is a separately reviewed service/protocol change. Do not inspect private exceptions/state or replay the proof outside the service to guess the cause."
+    },
+    {
+      "id": "N4",
+      "severity": "MEDIUM",
+      "status": "SPECIFICATION_GAP",
+      "location": "docs/superpowers/specs/2026-10-29-r2-m10-c-operator-surface-design.md:60-69 (D4 protocol)",
+      "scenario": "The signing purpose and scope are named, but the derivation algorithm, unambiguous encoding of the scope/action/type, request normalization and key lifecycle are unspecified. This transport seal is the sole guarantee that caller-returned rubric/evidence/IDs and other host-derived fields were server-built, because accepted services validate several such fields only as data. An implementation that signs only command.request_digest would not bind every full-envelope field (the accepted digest projection omits command_id). Ambiguous tuple concatenation or trusting scope from the submitted body rather than authenticated identity/path would defeat the intended boundary. No implemented exploit is claimed: there is no D4 implementation at this HEAD.",
+      "evidence": [
+        "docs/superpowers/specs/2026-10-29-r2-m10-c-operator-surface-design.md:61-68",
+        "r2/quality/digests.py:162-170",
+        "server/services/quality_runs.py:313-338",
+        "server/auth.py:91-107,463-493"
+      ],
+      "fix": "Freeze a versioned HMAC derivation and canonical envelope, with an unambiguous structured context derived from authenticated user.id/user.sub, server project path, fixed action and expected request type. Authenticate both prepare and submit; allowlist intent inputs at prepare; derive all IDs/caches/paths/qualification fields server-side. Seal the complete validated request including command/execution ID and all generated fields, not merely its domain request_digest. At submit apply size/type bounds, verify the tag in constant time against server-derived context, revalidate the action-specific typed request/caches and scope, then pass exactly that request and the current bearer to the unchanged service. Specify use of the real configured auth secret/accessor, behavior when no stable key is configured, and what key rotation/restart does to pending envelopes. Never accept a caller-selected algorithm, key, lease or live catalog/runtime. Add cross-user/project/action/type, command-ID, expiry/CAS, evidence-body and canonicalization tamper tests.",
+      "stop_condition": "A transport integrity seal does not itself create Human or Production Authority. It fits wiring if it only authenticates server preparation and leaves all accepted authorization/admission/replay decisions in the services."
+    },
+    {
+      "id": "N5",
+      "severity": "LOW",
+      "status": "CONFIRMED",
+      "location": "docs/superpowers/specs/2026-10-29-r2-m10-c-operator-surface-design.md:74-75 (probe reader factory claim)",
+      "scenario": "D5 says probe, review and seal take the startup-verified grant reader. QualityProbeService.for_request accepts catalog/runtime/project_root and interactive_token but no grant-reader argument; a probe needs interactive authentication and exact profile/root authority rather than a separate showrunner grant reader.",
+      "evidence": [
+        "server/services/quality_probes.py:219-243,245-255",
+        "server/services/quality_runs.py:218-237,414-433"
+      ],
+      "fix": "Limit reader-factory injection to HumanObservationService, QualityRunService and the reads that actually require it. Wire probes through their real public signature; retain interactive authentication. No accepted service change is needed."
+    }
+  ],
+  "hmac_prepare_submit_assessment": {
+    "conclusion": "Viable in principle, incomplete as a cryptographic protocol specification; not a new authorization lease. N4 must be resolved before implementation.",
+    "what_is_correct": [
+      "The client can carry the entire immutable typed request while a server HMAC protects its origin/integrity; client transport does not imply client control.",
+      "Scope/action binding and a purpose-derived key can prevent replaying an envelope on a different actor/project/action when constructed and checked from trusted context.",
+      "Keeping exact generated values supports receipt-first services with no server-side draft table. Re-signing/re-preparing after drift is a new envelope and may conflict under the same command key.",
+      "Interactive authentication at submit remains necessary even for a valid seal. A valid seal cannot bypass grant checks, profile publication custody, master authority or disposition admission."
+    ],
+    "field_ownership": {
+      "operator_intent": "Editable policy/platform constraints; selected root and explicit profile revision; Human status/notes/structured findings; disposition decision/reason/waiver intent and selected expected head/version. These inputs still need bounds and validation.",
+      "server_preparation": "Authenticated user/actor/project/action, complete stored profile and resolved subject bodies, generated request UUIDs/times/finding IDs, selected qualified rule/config linkage, canonical caches/digests, rubric/segment/evidence derivations and note locator if separately authorized. Include every value in the seal.",
+      "service_authority": "Persisted publication/disposition authorizations, admitted timestamps/grant evidence, technical measurement/execution evidence, stored observations, final run and disposition results. These are not caller fields in the prepared request."
+    },
+    "replay_and_drift": [
+      "An exact committed request returns verified historical output under current authentication even after master/media/catalog/grant drift where the accepted service permits replay. Return separately recomputed validity/readiness; historical success is not fresh approval.",
+      "A first Human/run submission checks the current full subject closure; a probe checks current root in A4 and run admission later checks dependency closure. Do not promise that A4 certifies dependency currentness.",
+      "First publication/disposition submissions enforce their CAS/head/expiry/authority rules. A stale prepared absolute expiry may refuse; never replace it during submit or retry.",
+      "A newer immutable profile revision alone is not always a stale refusal: exact old revisions can remain valid under HISTORICAL_ONLY. REEVALUATE_CURRENT affects operational validity/readiness through the accepted projection.",
+      "A4 ACCEPTED without a finalized observation resumes finalization and still checks its required current authority; it is not completed historical replay. Unknown/operator-review outcomes never automatically rerun under the same execution_ref.",
+      "Do not gate service replay on current resolver/catalog/grant-reader availability through eager route dependencies. Factories for the relevant services must remain lazy where their public APIs allow it.",
+      "Persist the entire sealed envelope in browser storage before submit; scope by user/actor/project/action/command and show only pending commands for that identity. Recovery is bounded by retention of that envelope and the signing-key policy."
+    ]
+  },
+  "notes_custody_assessment": {
+    "new_custody": true,
+    "new_human_or_production_authority_required": false,
+    "stop_condition_triggered": true,
+    "reason": "D7 adds byte storage and lifecycle of external Human evidence, not just a digest value inside an already accepted observation. Content addressing detects a mismatch only when bytes are actually measured; accepted Human observation/run paths do not measure this file. No DB migration is needed for this to be a new custody responsibility.",
+    "permitted_resolution": "Explicitly remove the file-store dependency or review a separate custody/scope amendment. Do not implement it under the current no-evidence-custody statement."
+  },
+  "conditions": [
+    {
+      "id": "C1_RESOLVE_SCOPE",
+      "gate": "Before implementation",
+      "requirement": "Resolve N1 explicitly. This is a blocking scope decision, not an acceptance already granted by this review."
+    },
+    {
+      "id": "C2_FREEZE_DERIVATIONS",
+      "gate": "Before implementation",
+      "requirement": "Correct D1 field owners/legacy projection and make every metadata/subject/Human evidence digest derivation explicit, using existing contracts or separately reviewed private projections. Resolve N2 without silently changing accepted digest domains."
+    },
+    {
+      "id": "C3_FREEZE_TRANSPORT",
+      "gate": "Before implementation",
+      "requirement": "Resolve N4 with a concrete HMAC protocol and decision table for replay, first submission, drift, probe recovery, browser-storage loss and signing-key changes. Define action-specific prepare intent allowlists; no arbitrary signing oracle."
+    },
+    {
+      "id": "C4_PRESERVE_PUBLIC_APIS",
+      "gate": "Before implementation",
+      "requirement": "Resolve N3/N5; use unchanged public custodian factories with actual current bearer, directories and configured custody UID/GID. Preserve final JWT/grant/DB-time checks and sanitized error distinctions."
+    },
+    {
+      "id": "C5_REVISION_AND_RECOVERY_UX",
+      "gate": "Design completion and route/UI tests",
+      "requirement": "Specify supersession choice/default, exact revision/digest fields, decision-specific bounded expiry, waiver bindings, explicit unknown-attempt handling, current readiness gating and available historical details. Do not turn all profile advancement into stale refusal."
+    },
+    {
+      "id": "C6_QUALIFY_EXACT_CATALOG",
+      "gate": "Before enabling host-v1",
+      "requirement": "Bind exact source/config/tool/parser/runtime/control identities and actual same-fixture recipe plus M7 recovery/confinement/route evidence. Environment host-v1 alone is not qualification. Preserve receipt-first historical replay with no enabled catalog."
+    },
+    {
+      "id": "C7_ACCEPTANCE_LIMITS",
+      "gate": "All completion/deployment statements",
+      "requirement": "Carry R2_M10_ACCEPTANCE C1-C6 and refresh affected implementation evidence at its exact source HEAD. No production/activated-host qualification, deployment, migration execution or release permission is conferred."
+    }
+  ],
+  "verification": {
+    "head_before": "14a2983065bf5a36f3a074de44089a65aa71af01",
+    "head_before_artifact_write": "14a2983065bf5a36f3a074de44089a65aa71af01",
+    "initial_status": "Clean checkout; expected branch matched.",
+    "source_delta": "git diff 89f2f98a22cb1ba8c96580f6bfee5aa5b47d1728..HEAD --stat listed only the rewritten design, original review artifact and handoff. No product-source changes in this delta.",
+    "graph": "Tier 2 requested. list_projects returned the main repository project but no separate current-worktree project. index_status, search_graph and coverage calls were denied by approval policy never. Coverage calls included the relied-on code/design/test paths and quality scopes. No current graph-generation or completeness claim; direct pinned source inspection used instead.",
+    "executed_probes": [
+      {
+        "command": "PYTHONDONTWRITEBYTECODE=1 .venv/bin/python -B (stdin pure probe using existing closure fixtures)",
+        "result": "Exit 0: separate technical-container, technical-decode and review requirements yielded CONTAINER_STREAM=SATISFIED, DECODE=SATISFIED, human=SATISFIED with the shared technical independence group."
+      },
+      {
+        "command": "PYTHONDONTWRITEBYTECODE=1 .venv/bin/python -B (stdin compute_digest with D7 segment domain/body)",
+        "result": "Exit 0 after catching the expected refusal: ValueError unregistered M10-A digest domain; registry membership False."
+      },
+      {
+        "command": "PYTHONDONTWRITEBYTECODE=1 .venv/bin/python -B (stdin A6 _check_expiry with fixture policy and typed WAIVE subject)",
+        "result": "Exit 0: seven-day WAIVE raised M10_WAIVER_FORBIDDEN; one-day WAIVE accepted. Pure expiry check only, not full disposition admission."
+      }
+    ],
+    "not_run": "No pytest suite, PostgreSQL, HTTP/browser, HMAC implementation test, systemd/host qualification, migration or production operation. No D4/D7 implementation exists in this delta to test; source and pure probes establish only the stated design/API facts.",
+    "writes": "Only docs/r2/evidence/m10-c-reviews/design-delta1-codex-review.json. No source modification, formatter, staging, commit, provider/network access or subagent delegation.",
+    "review_scope": "Delta design review of all eight r1 findings and the requested cryptographic/custody questions; not a full accepted A/B source re-audit.",
+    "final_head": "14a2983065bf5a36f3a074de44089a65aa71af01",
+    "artifact_validation": "JSON parsed; all eight prior IDs and statuses checked; new severity counts and required fields checked; git diff --check passed. Final git status showed only the requested JSON untracked."
+  },
+  "files_read": [
+    "docs/superpowers/specs/2026-10-29-r2-m10-c-operator-surface-design.md",
+    "docs/r2/evidence/m10-c-reviews/design-codex-review.json",
+    "docs/r2/evidence/R2_M10_C_HANDOFF.md",
+    "docs/r2/evidence/R2_M10_ACCEPTANCE.json",
+    "docs/superpowers/specs/2026-10-27-r2-m10-a4-probes-design.md (targeted catalog/replay/recovery rules)",
+    "docs/superpowers/specs/2026-10-28-r2-m10-a6-disposition-design.md (issuance/expiry rules)",
+    "r2/contracts/quality.py (binding, subject, finding, publication/disposition requests)",
+    "r2/contracts/artifact_metadata.py",
+    "r2/contracts/host_hardening.py (MasterHeadSnapshot)",
+    "r2/quality/probes.py (config/catalog)",
+    "r2/quality/digests.py (closed domains/projections/cache verification)",
+    "r2/quality/runs.py (Human request, qualification, closure, validity)",
+    "r2/quality/dispositions.py (expiry and decision rules)",
+    "r2/quality/ports.py (evidence-reference seam)",
+    "r2/host_hardening/master_resolver.py",
+    "server/services/quality_probes.py (signature, identity, replay, authority/finalization)",
+    "server/services/quality_probe_runtime.py (tool preflight)",
+    "server/services/quality_runs.py (subject authority, Human writer, closure, validity)",
+    "server/services/quality_profiles.py",
+    "server/services/quality_profile_custodian.py (factory, issuance, error mapping)",
+    "server/services/quality_dispositions.py (factory, issuance, replay, admission)",
+    "server/services/governance_startup.py",
+    "server/services/governance_attestation.py (busy handler)",
+    "server/routers/packaging.py (error and command sealing patterns)",
+    "server/auth.py (secret accessor and authentication)",
+    "lib/db/repositories/quality_runs.py (Human observation persistence)",
+    "tests/unit/r2/quality/test_runs.py and its existing contract/digest/profile fixture dependencies (pure probe imports)"
+  ]
+}
