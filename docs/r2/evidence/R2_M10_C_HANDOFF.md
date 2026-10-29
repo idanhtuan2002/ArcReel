@@ -19,5 +19,12 @@ Rewrite in place; resume entry for the quality operator surface.
   supplied-reader API); M1 profile revision/CAS, disposition head/expiry inputs; M2 Human rubric/segment/evidence
   derivations; M3 reloadable probe/observation states and authenticated reads.
 
+- Design r2 delta1 REWORK (N1 notes file = new custody, N2 unregistered digest domain, N3 busy not
+  distinguishable, N4 HMAC protocol underspecified) → r3 (`613caa59e`) delta2 **ACCEPT_WITH_CONDITIONS**
+  (`design-delta2-codex-review.json`; implementation conditions I1 subject/template tests, I2 transport security, …).
+
 ## Next step
-Rework the design against r1 (all required changes listed in the review), Codex delta review, then implement.
+Implement in order, TDD, each with related tests: C1 subject resolver (`server/services/quality_subjects.py`), C2
+embedded host catalog (`r2/quality/host_catalog.py`) + requalification, C3 prepare/submit seal + quality router
+(`server/routers/quality.py`), C4 Quality page + Packaging prefill; then Codex review, local Chrome acceptance, sponsor
+activated-host qualification + deploy (sudo), then M9-B.

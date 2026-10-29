@@ -39,10 +39,10 @@ host without the sponsor stops the packet.
    host_version_ref`, its `fingerprint` media the child head's content digest (`MasterBindingV1.coherent`,
    `r2/contracts/quality.py:236-293`). Unknown key, mismatch or cycle refuses before any service call. Other refs stay
    in the body and create no edge.
-4. Build `ArtifactMetadataSnapshot(artifact_key, body, metadata_digest)` with the registered metadata digest domain,
+4. Build `ArtifactMetadataSnapshot(artifact_key, body, metadata_digest)` with `m10.artifact-metadata.v1`,
    then `MasterBindingV1` (its validators order heads/snapshots/edges), then `master_binding_digest` with
    `m10.master-binding.v1`, `artifact_ref = root.object_ref`, `artifact_digest = "sha256:" + media(root
-   content_digest)`, `content_basis_digest` = the registered content-basis digest of the root metadata
+   content_digest)`, `content_basis_digest` = `m10.content-basis.v1` over the root metadata
    `content_basis`, caption/audio `None` (no companion caption/audio evidence; it does not claim the media has no
    audio). Finish with `verify_caches`. Every digest uses an existing registered domain; none is added.
 
@@ -96,7 +96,7 @@ requires `InteractiveUser`; the embedded-agent token is refused.
 
 **D6 Revisions, supersession and disposition** (M1). `GET /profiles` and `GET /profiles/{id}/revisions` list
 immutable revisions with their digests. Publication intent: `{profile_id | null, expected_profile_revision, cohort_id,
-product_surface, policy, supersession_effect}` — `supersession_effect` is the operator's explicit choice between
+product_surface, policy}` where the draft/policy field `supersession_effect` (`r2/contracts/quality.py:409,660`) is the operator's explicit choice between
 `HISTORICAL_ONLY` and `REEVALUATE_CURRENT`, shown before confirmation (default `HISTORICAL_ONLY`); cohort/surface are
 fixed for an existing profile id. Probe/review/seal intents name `(profile_id, revision)`. Disposition intent: `{run_id,
 decision, reason, waiver_bindings, expected_disposition_version, requested_ttl_seconds}`; prepare computes the absolute
