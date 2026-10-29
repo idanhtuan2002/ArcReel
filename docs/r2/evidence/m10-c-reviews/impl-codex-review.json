@@ -1,0 +1,409 @@
+{
+  "schema_id": "m10.c.implementation-review.v1",
+  "reviewer": "Codex",
+  "date": "2026-10-29",
+  "reviewed_head": "ce539d0ba83190a799bd2b9d363a42bd0022cc88",
+  "base": "9bb474e4c",
+  "diff": "git diff 9bb474e4c..ce539d0ba83190a799bd2b9d363a42bd0022cc88",
+  "branch": "design/r2-m10-c-operator-surface",
+  "worktree": "/home/anhtuan/content-production-os/.worktrees/r2-m10-c",
+  "design": "docs/superpowers/specs/2026-10-29-r2-m10-c-operator-surface-design.md",
+  "design_sha256": "55205bac6179833120c4341f72a72d427460e9e1787cb6f69c78f02be1d74a60",
+  "design_review": "docs/r2/evidence/m10-c-reviews/design-delta2-codex-review.json",
+  "design_review_sha256": "ac8b24cec5c94d1f61766b7fe797cf60c37f9df3d54cca5e0df3330d7bc6ff09",
+  "verdict": "CHANGES_REQUESTED",
+  "summary": "The additive resolver/catalog/template and request-bound service wiring preserve the accepted authority owners. Implementation acceptance is blocked by missing attempt recovery and incomplete Human confirmation, plus concrete persistence, evidence-selection and multi-profile UI defects. Green happy-path tests do not cover these scenarios. No Critical issue found; two High findings confirmed by source. No accepted-service modification or unauthorized mutation bypass was found in the bounded inspected diff.",
+  "counts": {
+    "critical": 0,
+    "high": 2,
+    "medium": 9,
+    "low": 1
+  },
+  "findings": [
+    {
+      "id": "H1",
+      "severity": "HIGH",
+      "status": "CONFIRMED",
+      "file": "server/routers/quality.py",
+      "line": 314,
+      "location": "server/routers/quality.py:314",
+      "title": "Probe recovery history omits every attempt without a finalized observation",
+      "scenario": "D8 requires PLANNED, ACCEPTED, FAILED_BEFORE_ACCEPTANCE, SUBMIT_OUTCOME_UNKNOWN and operator-review history. The only technical read starts at QualityProbeObservationModel; there is no invocation/attempt read endpoint. An accepted but unfinalized probe, an unknown outcome or a failed probe is absent. After browser storage loss an operator cannot reconcile the old execution, inspect recorded failure resources or distinguish finish from deliberate new work. The UI only shows observation requirement/status and offers another random command.",
+      "fix": "Add scoped invocation/attempt reads using existing M7/A4 records, including execution_ref, execution_id, state and recorded ResourceEvidence. Preserve historical subject identities. Implement pending/finish/known-failed/needs-review UI states and deliberate new-attempt confirmation; never automatically rerun unknown work.",
+      "evidence": [
+        "server/routers/quality.py:303-361",
+        "frontend/src/features/quality/ui/QualityPage.tsx:400-430",
+        "server/services/quality_probes.py:258-282"
+      ],
+      "design_conditions": [
+        "I3_REPLAY_AND_RECOVERY",
+        "I5_END_TO_END"
+      ]
+    },
+    {
+      "id": "H2",
+      "severity": "HIGH",
+      "status": "CONFIRMED",
+      "file": "frontend/src/features/quality/ui/QualityPage.tsx",
+      "line": 121,
+      "location": "frontend/src/features/quality/ui/QualityPage.tsx:121",
+      "title": "Human confirmation does not disclose the sealed target or consequential fields",
+      "scenario": "Summary renders only command, decision/status, expiry and requirement. Publication shows essentially a command ID, with no profile revision, policy or supersession effect; review/seal omit master/profile/evidence; disposition omits run, reason and waiver bindings. Forms/selectors remain editable while an envelope is prepared. Prepare review for master A, switch to B, then confirm: the page still submits the valid sealed review of A without showing A. Restored envelopes have the same problem because the original form context is gone. HMAC preserves bytes but cannot make this an informed Human confirmation.",
+      "fix": "Render action-specific immutable summaries from the sealed request, including project/root identity and digest, profile/revision, publication supersession/policy changes, review evidence summary, selected observations, disposition run/reason/waivers/expiry. Freeze or visibly separate draft controls from pending envelopes; require explicit discard/reprepare when changing intent.",
+      "evidence": [
+        "frontend/src/features/quality/ui/QualityPage.tsx:117-139,254-267",
+        "frontend/src/features/quality/ui/QualityPage.tsx:291-300,310-318"
+      ],
+      "design_conditions": [
+        "I2_TRANSPORT",
+        "I3_REPLAY_AND_RECOVERY",
+        "I5_END_TO_END",
+        "I6_DIGEST_ONLY_EVIDENCE"
+      ]
+    },
+    {
+      "id": "M1",
+      "severity": "MEDIUM",
+      "status": "CONFIRMED",
+      "file": "frontend/src/features/quality/api/qualityClient.ts",
+      "line": 130,
+      "location": "frontend/src/features/quality/api/qualityClient.ts:130",
+      "title": "Pending envelopes are shared across actors and overwritten across commands",
+      "scenario": "pendingKey uses only project and action, contrary to I3. A different interactive actor in the same browser loads the previous actor's full envelope and receives seal refusal; two tabs/commands for the same action share one slot. Clearing or overwriting that slot can erase another command whose outcome is still ambiguous. Server-side principal binding prevents unauthorized acceptance, but does not repair disclosure or recovery loss.",
+      "fix": "Partition storage by authenticated user_id, actor_id, project, action and exact command/execution identity. Enumerate pending envelopes for the current principal; remove only the completed command. Prevent replacing unresolved work without explicit reconciliation.",
+      "evidence": [
+        "frontend/src/features/quality/api/qualityClient.ts:129-132",
+        "frontend/src/features/quality/ui/QualityPage.tsx:38-53,60-63,79-111"
+      ],
+      "design_conditions": [
+        "I3_REPLAY_AND_RECOVERY"
+      ]
+    },
+    {
+      "id": "M2",
+      "severity": "MEDIUM",
+      "status": "CONFIRMED",
+      "file": "frontend/src/features/quality/ui/QualityPage.tsx",
+      "line": 494,
+      "location": "frontend/src/features/quality/ui/QualityPage.tsx:494",
+      "title": "Sealing always consumes all historical observations, preventing corrected evidence selection",
+      "scenario": "After a FAIL review and a corrected PASS on the unchanged subject/profile, the list contains both and the seal intent blindly includes both. The unchanged closure marks that slot INDETERMINATE through disagreement. The UI cannot select the replacement review or exclude obsolete/expired evidence; over 16 observations also exceeds SealIntent.max_length. Repeated checks therefore make the normal repair path unusable.",
+      "fix": "Provide explicit observation selection per requirement/slot, display age/status/identity and preserve history separately. Submit only the confirmed closure, respecting the existing service admission rules and 16-binding limit.",
+      "evidence": [
+        "frontend/src/features/quality/ui/QualityPage.tsx:418-430,484-501",
+        "server/routers/quality.py:605-611",
+        "r2/quality/runs.py:157-169",
+        "Fresh pure closure probe: corrected PASS alone gives SATISFIED; FAIL plus PASS gives INDETERMINATE."
+      ],
+      "design_conditions": [
+        "I3_REPLAY_AND_RECOVERY",
+        "I5_END_TO_END"
+      ]
+    },
+    {
+      "id": "M3",
+      "severity": "MEDIUM",
+      "status": "CONFIRMED",
+      "file": "frontend/src/features/quality/ui/QualityPage.tsx",
+      "line": 471,
+      "location": "frontend/src/features/quality/ui/QualityPage.tsx:471",
+      "title": "Findings and waiver bindings cannot be authored in the UI",
+      "scenario": "The review form always sends findings: [], including FAIL reviews. There are no severity/locator controls. Disposition offers WAIVE but never sends waiver_bindings, so the server defaults to []. A failed Human slot without BLOCKING findings is not waiverable under waiver_requirements; even findings created through HTTP cannot be selected/bound from this UI. The advertised WAIVE workflow cannot succeed for a failed review.",
+      "fix": "Add bounded finding authoring with criterion, severity and locator; display returned finding IDs. Build explicit waiver bindings for the selected run and show them before confirmation, while letting the unchanged service decide whether waiver coverage is valid.",
+      "evidence": [
+        "frontend/src/features/quality/ui/QualityPage.tsx:431-481,508-549",
+        "server/routers/quality.py:673-682",
+        "r2/quality/dispositions.py:68-101,130-133"
+      ],
+      "design_conditions": [
+        "I5_END_TO_END",
+        "I6_DIGEST_ONLY_EVIDENCE"
+      ]
+    },
+    {
+      "id": "M4",
+      "severity": "MEDIUM",
+      "status": "CONFIRMED",
+      "file": "frontend/src/features/quality/ui/QualityPage.tsx",
+      "line": 562,
+      "location": "frontend/src/features/quality/ui/QualityPage.tsx:562",
+      "title": "Run handoff uses the selected profile instead of the run's profile",
+      "scenario": "GET runs intentionally returns all profiles for a root. With profile B selected, a READY run from profile A gets Packaging cohort/surface from B. The link combines A's run/digest with B's slot and fails accepted packaging binding checks. Likewise disposition silently targets runs[0] across profiles rather than a run explicitly selected by the operator, which may belong to A while the controls show B.",
+      "fix": "Select a concrete run for disposition and resolve that run's immutable profile/revision. Include its verified cohort/surface/root in the run read projection or fetch the exact revision. Build Packaging prefill exclusively from that run context.",
+      "evidence": [
+        "frontend/src/features/quality/ui/QualityPage.tsx:244-245,531-543,556-564",
+        "server/routers/quality.py:365-416"
+      ],
+      "design_conditions": [
+        "I5_END_TO_END"
+      ]
+    },
+    {
+      "id": "M5",
+      "severity": "MEDIUM",
+      "status": "CONFIRMED",
+      "file": "frontend/src/features/quality/ui/QualityPage.tsx",
+      "line": 312,
+      "location": "frontend/src/features/quality/ui/QualityPage.tsx:312",
+      "title": "Historical profile revisions are never made selectable",
+      "scenario": "The server exposes revision identities, but the client only loads /profiles, which returns head revisions, and has no revision-fetch UI. Publishing r2 removes r1 from the selector, while profileKey can remain at r1 and selected becomes null. An operator cannot continue an allowed HISTORICAL_ONLY r1 workflow after reload or deliberately choose an older immutable revision as D6 requires.",
+      "fix": "Add revision selection and an exact revision read including its verified policy. Update selection intentionally after publication, preserve allowed historical choices and show supersession/readiness independently.",
+      "evidence": [
+        "server/routers/quality.py:230-264",
+        "frontend/src/features/quality/api/qualityClient.ts:72-78",
+        "frontend/src/features/quality/ui/QualityPage.tsx:175-187,305-318"
+      ],
+      "design_conditions": [
+        "I3_REPLAY_AND_RECOVERY",
+        "I5_END_TO_END"
+      ]
+    },
+    {
+      "id": "M6",
+      "severity": "MEDIUM",
+      "status": "CONFIRMED",
+      "file": "frontend/src/features/quality/ui/QualityPage.tsx",
+      "line": 204,
+      "location": "frontend/src/features/quality/ui/QualityPage.tsx:204",
+      "title": "Scope changes and read failures leave old observations and actionable runs on screen",
+      "scenario": "refreshSubject returns without clearing state when selection is empty, and leaves old data in place during requests and on errors. After switching root A to B, old A runs remain visible; their Packaging links immediately use root B and disposition still targets A. Promise.all also discards a successful historical runs read whenever current-subject resolution for observations refuses after master drift. Thus stale/superseded history can disappear precisely when recovery needs it.",
+      "fix": "Key observations/runs and their loading/error state by full scope, clear or disable actions on scope change, and ignore results outside that scope. Load historical runs independently of current-subject observation resolution; keep failures distinct and permit refreshing/recovery without relying on an unrelated successful mutation.",
+      "evidence": [
+        "frontend/src/features/quality/ui/QualityPage.tsx:202-225,244-245,531-564",
+        "server/routers/quality.py:307-310"
+      ],
+      "design_conditions": [
+        "I3_REPLAY_AND_RECOVERY",
+        "I5_END_TO_END"
+      ]
+    },
+    {
+      "id": "M7",
+      "severity": "MEDIUM",
+      "status": "CONFIRMED",
+      "file": "server/routers/quality.py",
+      "line": 321,
+      "location": "server/routers/quality.py:321",
+      "title": "Observation listing replays every technical chain in the project before filtering",
+      "scenario": "Listing root A/profile A loads all project technical observation IDs and calls technical_observation for each, which reconstructs and verifies the full A4 request/result/M7 chain. Profile/subject filtering happens afterward. Every refresh grows with all historical probes across roots/profiles. A corrupt unrelated historical chain raises 409 before A's results can be returned. Masters similarly re-snapshots the manifest for each candidate, and runs loads/revalidates every project run before root filtering; these costs are unbounded.",
+      "fix": "Select scoped candidates from existing invocation/request/profile/root information before expensive chain verification, then verify only relevant evidence. Paginate history and bound per-request work without changing accepted authority semantics or adding unauthorized persistence. Read one manifest snapshot for the masters projection and avoid duplicate readiness work where safe.",
+      "evidence": [
+        "server/routers/quality.py:273-291,314-334,371-380",
+        "lib/db/repositories/quality_runs.py:172-191"
+      ],
+      "design_conditions": [
+        "I5_END_TO_END"
+      ]
+    },
+    {
+      "id": "M8",
+      "severity": "MEDIUM",
+      "status": "CONFIRMED",
+      "file": "server/routers/quality.py",
+      "line": 525,
+      "location": "server/routers/quality.py:525",
+      "title": "Catalog-disabled new probe submissions return evidence conflict instead of unavailable",
+      "scenario": "Prepare correctly gives 503 when the catalog is disabled. But prepare with host-v1 enabled, disable it, then first-submit the saved envelope: submit substitutes DEFAULT_PROBE_CATALOG. Its resolve raises required-evidence-missing, and _run turns this into 409. The operator is told evidence is missing rather than that new probe work is disabled. Completed and ACCEPTED recovery must still reach receipt/finalization before this availability gate.",
+      "fix": "Use a receipt/attempt-aware route check: preserve committed replay and ACCEPTED finalization, then return 503 m10_quality_unavailable only when new catalog-dependent work is required and no catalog is enabled. Do not translate arbitrary evidence failures into catalog unavailability.",
+      "evidence": [
+        "server/routers/quality.py:488-490,519-530,132-140",
+        "server/services/quality_probes.py:258-283"
+      ],
+      "design_conditions": [
+        "I4_EXACT_CATALOG",
+        "I5_END_TO_END"
+      ]
+    },
+    {
+      "id": "M9",
+      "severity": "MEDIUM",
+      "status": "CONFIRMED",
+      "file": "server/routers/quality.py",
+      "line": 148,
+      "location": "server/routers/quality.py:148",
+      "title": "Full prepare/submit bodies have no operational size bound",
+      "scenario": "SealedBody.request and publication policy are arbitrary dictionaries, and criteria_verdicts has no collection bound before builder validation. There is no quality HTTP body ceiling before JSON/model parsing. A direct fresh model probe accepted a 2,097,193-byte sealed wrapper. Invalid tags do not avoid allocation/model processing; valid oversized intent can also be built and hashed before service-owned persistence limits. I2/I6 explicitly require bounded operational envelopes before side effects.",
+      "fix": "Enforce a documented byte ceiling on quality request streams before decoding, including missing/chunked Content-Length, plus bounded collection/string fields and canonical typed-envelope checks during prepare/submit. Reuse accepted operational-envelope validation where applicable, before issuing a seal or custody request. Add limit and limit+1 tests.",
+      "evidence": [
+        "server/routers/quality.py:143-149,422-430,542-550",
+        "server/services/quality_prepare.py:69-76",
+        "Fresh SealedBody.model_validate probe accepted 2,097,193 JSON bytes; this is shape acceptance, not service acceptance."
+      ],
+      "design_conditions": [
+        "I2_TRANSPORT",
+        "I6_DIGEST_ONLY_EVIDENCE"
+      ]
+    },
+    {
+      "id": "L1",
+      "severity": "LOW",
+      "status": "CONFIRMED",
+      "file": "server/services/quality_prepare.py",
+      "line": 73,
+      "location": "server/services/quality_prepare.py:73",
+      "title": "Python equality admits a noncanonical numeric spelling of a sealed body",
+      "scenario": "typed.model_dump(mode=\"json\") != request uses Python numeric equality. The test request sealed with integer value 7 accepts a posted value 7.0, which Pydantic normalizes back to 7. This contradicts the exact normalized-body check, but the submitted service model remains identical, so this is not a demonstrated authority or digest bypass.",
+      "fix": "Compare canonical JSON bytes for the posted and normalized bodies, or apply a recursive type-sensitive JSON equality check before HMAC verification. Test integral floats and bool/int boundaries.",
+      "evidence": [
+        "server/services/quality_prepare.py:69-77",
+        "Fresh Req probe: int 7 seal accepted posted float 7.0 and returned typed int 7."
+      ],
+      "design_conditions": [
+        "I2_TRANSPORT"
+      ]
+    }
+  ],
+  "focused_assessments": {
+    "subject_and_template": "D1 construction matches normalized manifest metadata, DB resolver plus file projection, master-only same-episode closure, contract-owned ShotSpec/version/fingerprint/cycle checks, registered digests and verify_caches. The new resolver tests cover fixture byte equality/admission, approval mismatch and missing root only; non-master refs, cycles, divergence and other I1 mutations remain unproven independently. Complete V2 template has separate one-slot requirements, Human qualification and declared packaging checks; six pure template tests passed.",
+    "transport_and_auth": "Both endpoints of all five action pairs use InteractiveUser; envelope binds authenticated user.id and user.sub, route project, fixed action and class name, and full normalized model. HKDF salt/info/SHA256/32-byte output and HMAC-SHA256/base64url/constant-time comparison match D4. Action/type mapping is route-owned; host catalog/runtime/custody do not come from payloads. Services revalidate identity and caches. See M9 and L1 for size/exact-body gaps. Authentication secret accessor retains process-local fallback; seals are not promised stable across restart without configured AUTH_TOKEN_SECRET.",
+    "human_authority": "Publication/disposition use the unchanged public custodians and current bearer; review/seal use the configured startup reader. Typed publication/disposition authorization errors explicitly map to sanitized 403; M10 conflicts expose codes through translations; construction errors use generic 422. No attestor-busy inference. H2 concerns meaningful confirmation, not missing backend InteractiveUser or grant checks.",
+    "replay_and_drift": "Submit forwards the verified typed request unchanged and does not rebuild IDs/time/CAS or resolve a fresh subject. Probe replay and ACCEPTED finalization precede catalog resolution in the unchanged service; fresh admissions retain service-owned authority/locking. Publication/disposition factories authenticate before service receipt replay and activate custody only on new issuance. Router-level missing configured reader/directory can still gate entry before replay; tests must cover deployment availability transitions. No independent PostgreSQL drift/replay execution was possible.",
+    "readiness": "UI checks CURRENT and READY before showing Package. Backend readiness is obtained per subject/profile head, not per listed run; historical rows can therefore display the current head readiness alongside SUPERSEDED validity. The CURRENT check ordinarily prevents packaging an older run, but read projections should identify the run readiness was computed for. M4/M6 remain concrete handoff/action defects.",
+    "unchanged_services": "git diff for accepted quality run/probe/profile/custodian/disposition services, quality contracts/core algorithms and run repository was empty. New wiring, app registration, i18n and provider qualification evidence are additive; provider registry updates only evidence/entry digests for the local quality route. No migration or new persisted model in the diff.",
+    "catalog": "Config digests and all six source hashes of the appended host-v1 qualification record match reviewed files. Catalog bodies pin tools, parser and policies. Same-fixture tests change rule_id to the fixture rule for measurement; the exact host catalog is separately exercised in the supplied service/HTTP chain tests. This supports source-bound qualification evidence, not an independent confined-host rerun.",
+    "i18n": "New frontend keys and three backend quality error keys are present in en/vi/zh diffs. Literal mono kickers follow the stated repo exception. Focused UI axe test passed with contrast disabled; it is not live Chrome acceptance."
+  },
+  "implementation_deviations": [
+    {
+      "deviation": "Review findings rule_id=review with criterion in locator",
+      "judgment": "ACCEPT",
+      "reason": "Matches the reviewed D7 text and the accepted slot rule/waiver matching contract. Criterion-specific rule IDs would fail slot matching. UI authoring and waiver coverage remain M3."
+    },
+    {
+      "deviation": "Masters excludes ShotSpec roots",
+      "judgment": "ACCEPT_WITH_DISCLOSURE",
+      "reason": "Narrows the page to final-video roots, fitting Packaging entry purpose, and changes no accepted authority. It is not required by MasterBindingV1, which permits a ShotSpec root. Document final-only UI scope explicitly; if D8 promises every approved master, restore selectable ShotSpec roots or obtain an explicit scope amendment. Not independently a CHANGES_REQUESTED blocker."
+    },
+    {
+      "deviation": "Observations scans all project technical observations",
+      "judgment": "CHANGES_REQUESTED",
+      "reason": "M7: unbounded full-chain verification cost and unrelated corrupted-history coupling are avoidable within existing storage."
+    }
+  ],
+  "conditions": [
+    {
+      "id": "I1_SUBJECT_AND_TEMPLATE",
+      "status": "PARTIAL",
+      "required": "Retain passing template proof; complete resolver mutation corpus and real PG resolver admission at the repaired frozen HEAD."
+    },
+    {
+      "id": "I2_TRANSPORT",
+      "status": "PARTIAL",
+      "required": "Resolve H2/M9/L1. Add action/type/context/body tampering, API-key and agent submit rejection, auth-off, key rotation, TTL/caps and current-session tests. Distinguish configured-secret persistence from process-local fallback."
+    },
+    {
+      "id": "I3_REPLAY_AND_RECOVERY",
+      "status": "NOT_CLOSED",
+      "required": "Resolve H1/M1/M2/M5/M6. Test pending reload with no response, concurrent commands/actors, root drift, old immutable revision, both supersession effects, ACCEPTED finish and known-failed/unknown states."
+    },
+    {
+      "id": "I4_EXACT_CATALOG",
+      "status": "SOURCE_BOUND_SUPPLIED_EVIDENCE",
+      "required": "Preserve exact catalog/source hash binding and supplied host qualification limits. Resolve M8 and rebind affected source qualification after fixes; do not infer cause from generic evidence errors."
+    },
+    {
+      "id": "I5_END_TO_END",
+      "status": "NOT_CLOSED",
+      "required": "Resolve operator findings; run focused PG HTTP chain through revise/probe/review/seal/dispose and Packaging/export on that same run. Existing new chain tests stop at READY and do not establish the combined export flow. Cover scoped historical reads, CAS, TTL/waiver/final DB-time admission and schema/runtime/custody states. Perform planned no-script local Chrome and live axe acceptance."
+    },
+    {
+      "id": "I6_DIGEST_ONLY_EVIDENCE",
+      "status": "PARTIAL",
+      "required": "Digest-only schema-tagged notes/ref projections and server finding IDs are implemented. Resolve M3/M9, freeze criterion/locator bytes and add deterministic projection/mutation tests. Keep raw notes out of persisted/pending service envelopes and logs; retain operator-owned notes copy."
+    },
+    {
+      "id": "I7_INHERITED_LIMITS",
+      "status": "RETAIN",
+      "required": "Carry R2_M10_ACCEPTANCE C1-C6, LOCAL_REGULAR_FILE_IO, trusted root, single operator and activated root-owned custody constraints. No release/deploy/production acceptance is granted. Refresh the stale design r2 status label and handoff when recording the next evidence revision."
+    }
+  ],
+  "verification": {
+    "initial_head": "ce539d0ba83190a799bd2b9d363a42bd0022cc88",
+    "initial_status": "Clean; branch and frozen HEAD matched before artifact inspection.",
+    "graph": "list_projects succeeded but nearest advertised project root was the main checkout rather than this worktree. index_status, search_graph and both relied-path/scope coverage requests were denied by approval policy never. No generation/freshness/completeness claim. Direct source reads used; all findings are bounded to opened files.",
+    "delegation": "None; independent review performed in main session.",
+    "executed": [
+      {
+        "command": "PYTHONDONTWRITEBYTECODE=1 .venv/bin/python -B -m pytest -p no:cacheprovider tests/unit/server/services/test_quality_template.py tests/unit/server/services/test_quality_prepare.py -q",
+        "result": "No test result: stalled in repository shared DB setup, interrupted. A bounded retry with timeout 45s and faulthandler_timeout=20 exited 124; trace identifies tests/conftest.py shared_db_schema -> Alembic -> aiosqlite, before test bodies."
+      },
+      {
+        "command": "PYTHONDONTWRITEBYTECODE=1 timeout 30s .venv/bin/python -B -m pytest --noconftest -p no:cacheprovider tests/unit/server/services/test_quality_prepare.py tests/unit/server/services/test_quality_template.py -q",
+        "result": "15 passed in 0.53s. Explicitly bypassed repo-wide autouse fixtures for these pure tests; not the normal repository fixture gate or DB validation."
+      },
+      {
+        "command": "cd frontend && pnpm exec vitest run src/features/quality/ui/QualityPage.test.tsx src/features/packaging/ui/PackagingPage.test.tsx",
+        "result": "2 files / 17 tests passed, exit 0. Stream-fd permission warnings and Vite native-loader warning were nonfatal. Includes mocked UI and axe without contrast, not browser/real HTTP."
+      },
+      {
+        "command": "PYTHONDONTWRITEBYTECODE=1 .venv/bin/python -B (stdin pure probes using existing fixtures and synthetic secret)",
+        "result": "Seal roundtrip passed; corrected review alone SATISFIED versus FAIL+PASS INDETERMINATE; SealedBody accepts 2,097,193 JSON bytes; int-7 tag accepts posted float 7.0. No fixture/service/source files edited."
+      },
+      {
+        "command": "PYTHONDONTWRITEBYTECODE=1 .venv/bin/python -B (stdin catalog and source hash verification; AF_INET socket creation)",
+        "result": "Both catalog config digests and six recorded source hashes match. socket(AF_INET, SOCK_STREAM) raises PermissionError errno 1, so local PostgreSQL networking unavailable."
+      },
+      {
+        "command": "git diff --check 9bb474e4c..HEAD",
+        "result": "Exit 2: existing added blank line at EOF in docs/r2/evidence/R2_M10_C_HANDOFF.md:69. Low documentation whitespace only; not a verdict blocker."
+      }
+    ],
+    "supplied_not_independently_rerun": "User reports 195 probe/catalog/chain/route tests, 3 resolver, 6 template, 9 seal, pnpm check 2650 tests and clean static gates. Source-bound record carries the 195 count. Independently rerun subset is only that listed above.",
+    "not_run": "PostgreSQL service/router/resolver tests, real custodian/confined runtime, live Chrome/no-script pilot, activated host, full static gates, full suite, providers or production actions. No deploy/push/merge/tag/staging/commit/formatting.",
+    "write_scope": "Only docs/r2/evidence/m10-c-reviews/impl-codex-review.json. Source preserved.",
+    "final_head": "ce539d0ba83190a799bd2b9d363a42bd0022cc88"
+  },
+  "files_read": [
+    "docs/superpowers/specs/2026-10-29-r2-m10-c-operator-surface-design.md",
+    "docs/r2/evidence/m10-c-reviews/design-delta2-codex-review.json",
+    "docs/r2/evidence/R2_M10_ACCEPTANCE.json",
+    "docs/r2/evidence/R2_M10_C_HANDOFF.md",
+    "docs/r2/evidence/m10-a4-reviews/route-qualification.json",
+    "CONTRIBUTING.md",
+    "server/routers/quality.py",
+    "server/services/quality_subjects.py",
+    "server/services/quality_template.py",
+    "server/services/quality_prepare.py",
+    "server/services/quality_requests.py",
+    "r2/quality/host_catalog.py",
+    "r2/contracts/quality.py (binding/subject validators)",
+    "r2/quality/digests.py (domain/model mapping)",
+    "r2/quality/runs.py (admission/closure/validity)",
+    "r2/quality/dispositions.py (waiver/expiry/readiness)",
+    "r2/host_hardening/master_resolver.py",
+    "server/services/quality_runs.py (authority/admission/closure/validity)",
+    "server/services/quality_probes.py (interactive binding/replay/finalization)",
+    "server/services/quality_profiles.py",
+    "server/services/quality_profile_custodian.py (factory/actor/admission)",
+    "server/services/quality_dispositions.py (factory/actor/replay/readiness)",
+    "lib/db/repositories/quality_runs.py (observation/run reads)",
+    "lib/db/repositories/quality.py (profile reads/validation)",
+    "lib/db/models/quality_probes.py",
+    "server/auth.py (secret/current and interactive dependencies)",
+    "server/error_handlers.py",
+    "server/app.py (registration diff)",
+    "frontend/src/features/quality/api/qualityClient.ts",
+    "frontend/src/features/quality/ui/QualityPage.tsx",
+    "frontend/src/features/quality/ui/QualityPage.test.tsx",
+    "frontend/src/features/packaging/ui/PackagingPage.tsx (prefill diff)",
+    "frontend/src/components/canvas/StudioCanvasRouter.tsx (quality registration/key)",
+    "frontend/src/app-routes.ts (diff)",
+    "frontend/src/components/layout/AssetSidebar.tsx (diff)",
+    "frontend/src/i18n/en/dashboard.ts (diff)",
+    "frontend/src/i18n/vi/dashboard.ts (diff)",
+    "frontend/src/i18n/zh/dashboard.ts (diff)",
+    "lib/i18n/en/errors.py (diff)",
+    "r2/provider_capabilities/registry.json (diff)",
+    "tests/integration/server/services/test_quality_subjects.py",
+    "tests/integration/server/services/test_quality_host_catalog.py",
+    "tests/integration/server/services/test_quality_operator_chain.py",
+    "tests/integration/server/routers/test_quality_routes.py",
+    "tests/unit/server/services/test_quality_template.py",
+    "tests/unit/server/services/test_quality_prepare.py",
+    "tests/unit/r2/quality/test_runs.py (pure fixtures)",
+    "tests/integration/server/services/test_quality_runs.py (fixture setup)",
+    "tests/conftest.py (setup)",
+    "frontend/package.json",
+    "pyproject.toml (pytest options)"
+  ]
+}

@@ -66,4 +66,12 @@ activated-host qualification + deploy (sudo), then M9-B.
 - C4 done `3671f2e5b` (Quality page, Packaging prefill; `pnpm check` 236 files/2650 tests). Probe route requalified
   with host-v1 `525af5bab` (195 passed). Codex implementation review running (`m10-c-reviews/impl-codex-review.json`).
   After acceptance: local Chrome acceptance with no scripts, then sponsor activated-host qualification + deploy, then M9-B.
+- Implementation review **CHANGES_REQUESTED** (`m10-c-reviews/impl-codex-review.json`): H1 probe attempt history read
+  (PLANNED/ACCEPTED/FAILED/UNKNOWN + failure resources); H2 confirmation must show the sealed target and every
+  consequential field, inputs locked while prepared; M1 pending envelopes per actor+command; M2 explicit observation
+  selection per requirement; M3 findings and waiver-binding authoring; M4 handoff/disposition use the run's own
+  profile and an explicitly selected run; M5 revision selection + exact revision read; M6 clear scope-bound state,
+  independent reads; M7 SQL-filtered reads (no project-wide replays); M8 catalog-disabled first submit → 503 only when
+  no stored invocation; M9 request byte ceilings and collection bounds; L1 canonical-bytes body equality.
+  Conditions I1-I5 in the review (end-to-end PG chain through Packaging/export, live Chrome acceptance).
 
