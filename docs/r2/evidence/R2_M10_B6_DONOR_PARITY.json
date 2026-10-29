@@ -16,7 +16,7 @@
         "donor_test_inventory_digest": "sha256:0040c80cc2abbbcd418292b5d37c3a4fac2480000f91198836dc7394d35c7731",
         "fixture_set_digest": "sha256:f2b45c49fd1b62633f4d63ab7a47afc3dddb8e35ff40185bd69cc3fe6c673900"
       },
-      "integrated_head": "f4509c145886159349056d4914805c471c54fe12",
+      "integrated_head": "07e69875ccf97f5013a0095b11eb49d862846575",
       "rows": [
         {
           "behavior_id": "kalinga_title_length",
@@ -31,7 +31,7 @@
           "correctness": "PARITY",
           "determinism": "PARITY",
           "failure_safety": "PARITY",
-          "data_integrity": "IMPROVED",
+          "data_integrity": "PARITY",
           "observability": "IMPROVED",
           "performance": "PARITY",
           "resources": "PARITY",
@@ -54,7 +54,7 @@
           "correctness": "PARITY",
           "determinism": "PARITY",
           "failure_safety": "PARITY",
-          "data_integrity": "IMPROVED",
+          "data_integrity": "PARITY",
           "observability": "IMPROVED",
           "performance": "PARITY",
           "resources": "PARITY",
@@ -77,7 +77,7 @@
           "correctness": "PARITY",
           "determinism": "PARITY",
           "failure_safety": "PARITY",
-          "data_integrity": "IMPROVED",
+          "data_integrity": "PARITY",
           "observability": "IMPROVED",
           "performance": "PARITY",
           "resources": "PARITY",
@@ -100,7 +100,7 @@
           "correctness": "PARITY",
           "determinism": "PARITY",
           "failure_safety": "PARITY",
-          "data_integrity": "IMPROVED",
+          "data_integrity": "PARITY",
           "observability": "IMPROVED",
           "performance": "PARITY",
           "resources": "PARITY",
@@ -123,7 +123,7 @@
           "correctness": "PARITY",
           "determinism": "PARITY",
           "failure_safety": "PARITY",
-          "data_integrity": "IMPROVED",
+          "data_integrity": "PARITY",
           "observability": "IMPROVED",
           "performance": "PARITY",
           "resources": "PARITY",
@@ -146,7 +146,7 @@
           "correctness": "PARITY",
           "determinism": "PARITY",
           "failure_safety": "PARITY",
-          "data_integrity": "IMPROVED",
+          "data_integrity": "PARITY",
           "observability": "IMPROVED",
           "performance": "PARITY",
           "resources": "PARITY",
@@ -169,7 +169,7 @@
           "correctness": "PARITY",
           "determinism": "PARITY",
           "failure_safety": "PARITY",
-          "data_integrity": "IMPROVED",
+          "data_integrity": "PARITY",
           "observability": "IMPROVED",
           "performance": "PARITY",
           "resources": "PARITY",
@@ -191,8 +191,8 @@
           "functionality": "PARITY",
           "correctness": "PARITY",
           "determinism": "PARITY",
-          "failure_safety": "IMPROVED",
-          "data_integrity": "IMPROVED",
+          "failure_safety": "PARITY",
+          "data_integrity": "PARITY",
           "observability": "IMPROVED",
           "performance": "PARITY",
           "resources": "PARITY",
@@ -224,9 +224,9 @@
         {
           "command": "uv run python -m pytest -q -p no:cacheprovider tests/integration/server/services/test_packaging_donor_parity.py",
           "exit_code": 0,
-          "summary": "17 passed, 1 warning in 2.09s",
-          "junit_sha256": "7742dbd010664892cebe92ee4f2bd39c41f651ff2ea4fed0870918de280a5322",
-          "wall_ms": 5625
+          "summary": "18 passed, 1 warning in 2.35s",
+          "junit_sha256": "f9e3fe2e1124b5c85d66a7d9c497cd68d981ebc610d41dc727f1ae6a022d604c",
+          "wall_ms": 5852
         }
       ],
       "required_skips": [],
@@ -248,7 +248,7 @@
         "donor_test_inventory_digest": "sha256:a55112f3fe5efca8f21050f072c664534e4ae72e6a692faa18f990631c926f4a",
         "fixture_set_digest": "sha256:f2b45c49fd1b62633f4d63ab7a47afc3dddb8e35ff40185bd69cc3fe6c673900"
       },
-      "integrated_head": "f4509c145886159349056d4914805c471c54fe12",
+      "integrated_head": "07e69875ccf97f5013a0095b11eb49d862846575",
       "rows": [
         {
           "behavior_id": "openmontage_missing_video",
@@ -256,7 +256,8 @@
             "export_bundle.execute:160-162"
           ],
           "fixture_refs": [
-            "tests/integration/server/services/test_packaging_donor_parity.py (metadata defects and assets built in-test from tests/unit/r2/quality/test_packaging_check.py fixtures)"
+            "tests/integration/server/services/test_packaging_donor_parity.py (metadata defects and assets built in-test from tests/unit/r2/quality/test_packaging_check.py fixtures)",
+            "tests/fixtures/r2/m10_b6_donors/openmontage_schema.json@sha256:7643a9d55a05bc1af1ba0e51e73a0e09f6f3fa937eb7c6ce0242c2611cdecdcd"
           ],
           "intentional_difference": null,
           "functionality": "PARITY",
@@ -277,7 +278,8 @@
             "export_bundle.execute:167-172"
           ],
           "fixture_refs": [
-            "tests/integration/server/services/test_packaging_donor_parity.py (metadata defects and assets built in-test from tests/unit/r2/quality/test_packaging_check.py fixtures)"
+            "tests/integration/server/services/test_packaging_donor_parity.py (metadata defects and assets built in-test from tests/unit/r2/quality/test_packaging_check.py fixtures)",
+            "tests/fixtures/r2/m10_b6_donors/openmontage_schema.json@sha256:7643a9d55a05bc1af1ba0e51e73a0e09f6f3fa937eb7c6ce0242c2611cdecdcd"
           ],
           "intentional_difference": null,
           "functionality": "PARITY",
@@ -298,7 +300,8 @@
             "export_bundle.execute:180-197,240-247"
           ],
           "fixture_refs": [
-            "tests/integration/server/services/test_packaging_donor_parity.py (metadata defects and assets built in-test from tests/unit/r2/quality/test_packaging_check.py fixtures)"
+            "tests/integration/server/services/test_packaging_donor_parity.py (metadata defects and assets built in-test from tests/unit/r2/quality/test_packaging_check.py fixtures)",
+            "tests/fixtures/r2/m10_b6_donors/openmontage_schema.json@sha256:7643a9d55a05bc1af1ba0e51e73a0e09f6f3fa937eb7c6ce0242c2611cdecdcd"
           ],
           "intentional_difference": null,
           "functionality": "PARITY",
@@ -310,7 +313,8 @@
           "performance": "PARITY",
           "resources": "IMPROVED",
           "evidence_refs": [
-            "tests/integration/server/services/test_packaging_donor_parity.py::test_the_bundle_layout_matches_the_donor_for_video_metadata_and_thumbnail",
+            "tests/integration/server/services/test_packaging_donor_parity.py::test_one_case_exports_the_same_member_bytes_and_metadata_values",
+            "tests/integration/server/services/test_packaging_donor_parity.py::test_a_publish_log_rejected_by_the_donor_schema_writes_a_partial_bundle",
             "tests/integration/server/services/test_packaging_donor_parity.py::test_the_confined_export_stays_within_the_frozen_performance_rule"
           ]
         },
@@ -320,7 +324,8 @@
             "export_bundle.execute:249-251"
           ],
           "fixture_refs": [
-            "tests/integration/server/services/test_packaging_donor_parity.py (metadata defects and assets built in-test from tests/unit/r2/quality/test_packaging_check.py fixtures)"
+            "tests/integration/server/services/test_packaging_donor_parity.py (metadata defects and assets built in-test from tests/unit/r2/quality/test_packaging_check.py fixtures)",
+            "tests/fixtures/r2/m10_b6_donors/openmontage_schema.json@sha256:7643a9d55a05bc1af1ba0e51e73a0e09f6f3fa937eb7c6ce0242c2611cdecdcd"
           ],
           "intentional_difference": null,
           "functionality": "PARITY",
@@ -342,7 +347,8 @@
             "export_bundle.execute:250-256 status exported"
           ],
           "fixture_refs": [
-            "tests/integration/server/services/test_packaging_donor_parity.py (metadata defects and assets built in-test from tests/unit/r2/quality/test_packaging_check.py fixtures)"
+            "tests/integration/server/services/test_packaging_donor_parity.py (metadata defects and assets built in-test from tests/unit/r2/quality/test_packaging_check.py fixtures)",
+            "tests/fixtures/r2/m10_b6_donors/openmontage_schema.json@sha256:7643a9d55a05bc1af1ba0e51e73a0e09f6f3fa937eb7c6ce0242c2611cdecdcd"
           ],
           "intentional_difference": null,
           "functionality": "PARITY",
@@ -364,7 +370,8 @@
             "export_bundle.execute:202-212"
           ],
           "fixture_refs": [
-            "tests/integration/server/services/test_packaging_donor_parity.py (metadata defects and assets built in-test from tests/unit/r2/quality/test_packaging_check.py fixtures)"
+            "tests/integration/server/services/test_packaging_donor_parity.py (metadata defects and assets built in-test from tests/unit/r2/quality/test_packaging_check.py fixtures)",
+            "tests/fixtures/r2/m10_b6_donors/openmontage_schema.json@sha256:7643a9d55a05bc1af1ba0e51e73a0e09f6f3fa937eb7c6ce0242c2611cdecdcd"
           ],
           "intentional_difference": null,
           "functionality": "PARITY",
@@ -376,7 +383,8 @@
           "performance": "PARITY",
           "resources": "PARITY",
           "evidence_refs": [
-            "tests/integration/server/services/test_packaging_donor_parity.py::test_the_metadata_document_covers_every_donor_metadata_field"
+            "tests/integration/server/services/test_packaging_donor_parity.py::test_one_case_exports_the_same_member_bytes_and_metadata_values",
+            "tests/integration/server/services/test_packaging_donor_parity.py::test_a_corrupted_metadata_value_would_be_detected_by_this_comparison"
           ]
         },
         {
@@ -387,7 +395,8 @@
             "export_bundle.execute:214-237"
           ],
           "fixture_refs": [
-            "tests/integration/server/services/test_packaging_donor_parity.py (metadata defects and assets built in-test from tests/unit/r2/quality/test_packaging_check.py fixtures)"
+            "tests/integration/server/services/test_packaging_donor_parity.py (metadata defects and assets built in-test from tests/unit/r2/quality/test_packaging_check.py fixtures)",
+            "tests/fixtures/r2/m10_b6_donors/openmontage_schema.json@sha256:7643a9d55a05bc1af1ba0e51e73a0e09f6f3fa937eb7c6ce0242c2611cdecdcd"
           ],
           "intentional_difference": "M10 exports structured chapters (start_ms, title) in metadata.json; pasteable description.txt/tags.txt/chapters.txt text is a platform publisher presentation concern outside export-only M10-B",
           "functionality": "EXCLUDED",
@@ -406,7 +415,8 @@
             "export_bundle.execute:189-196 video/subtitles.srt"
           ],
           "fixture_refs": [
-            "tests/integration/server/services/test_packaging_donor_parity.py (metadata defects and assets built in-test from tests/unit/r2/quality/test_packaging_check.py fixtures)"
+            "tests/integration/server/services/test_packaging_donor_parity.py (metadata defects and assets built in-test from tests/unit/r2/quality/test_packaging_check.py fixtures)",
+            "tests/fixtures/r2/m10_b6_donors/openmontage_schema.json@sha256:7643a9d55a05bc1af1ba0e51e73a0e09f6f3fa937eb7c6ce0242c2611cdecdcd"
           ],
           "intentional_difference": "M10 places captions per locale under captions/<locale>.<ext> from captions-<locale> roles, so multi-locale captions never collide",
           "functionality": "EXCLUDED",
@@ -424,9 +434,9 @@
         {
           "command": "uv run python -m pytest -q -p no:cacheprovider tests/integration/server/services/test_packaging_donor_parity.py",
           "exit_code": 0,
-          "summary": "17 passed, 1 warning in 2.09s",
-          "junit_sha256": "7742dbd010664892cebe92ee4f2bd39c41f651ff2ea4fed0870918de280a5322",
-          "wall_ms": 5625
+          "summary": "18 passed, 1 warning in 2.35s",
+          "junit_sha256": "f9e3fe2e1124b5c85d66a7d9c497cd68d981ebc610d41dc727f1ae6a022d604c",
+          "wall_ms": 5852
         }
       ],
       "required_skips": [],

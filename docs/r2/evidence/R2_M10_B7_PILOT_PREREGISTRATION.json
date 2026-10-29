@@ -93,7 +93,7 @@
  },
  "metrics": {
   "seeded_recall": {
-   "threshold": ">= 5 of the seeded defects caught per cohort",
+   "threshold": ">= 6 of the 7 seeded defects caught per cohort (85.7%, preserving the design's >= 5/6 = 83.3%)",
    "record": "caught/missed per defect id; false negatives listed"
   },
   "false_positives_on_clean": {
@@ -118,11 +118,14 @@
   },
   "determinism": {
    "threshold": "byte-identical archives from two clean roots",
-   "record": "archive digest from two exports with fresh commands"
+   "record": "two independent project roots provisioned from the same frozen logical inputs (same master bytes, same package draft, same profile), each exported with its own command; both archive digests and byte sizes recorded and compared"
   }
  },
- "smallest_useful_effect": "seeded recall threshold met in every cohort AND at least one of: a real defect caught on a clean final, or a correction made through the packaging page and re-checked to PASS; 'nothing found' on clean finals never satisfies the effect alone",
- "runtime_network": "the archive builder runs in the confined export unit (SystemCallFilter ~@network-io, EPERM); the dossier records the unit properties; the static scan covers host code",
+ "smallest_useful_effect": "seeded recall >= 6/7 in every cohort AND at least one of: a real defect caught on a clean final, or a correction made through the packaging page and re-checked to PASS; 'nothing found' on clean finals never satisfies the effect alone",
+ "runtime_network": {
+  "experiment": "inside one confined export unit (same launcher, SystemCallFilter ~@network-io, SystemCallErrorNumber=EPERM) run a socket(AF_INET, SOCK_STREAM) attempt and record errno EPERM, plus `systemctl --user show` unit properties",
+  "claim_scope": "confined code only (export worker and probes); host check, rename and verification code are covered by the static scan, recorded as a limit"
+ },
  "human_gates": [
   "publish the cohort's V2 quality profile (A3 custodian)",
   "issue the disposition on the sealed run (A6 custodian)",
@@ -139,5 +142,10 @@
   "approve, waive, dispose or select on the sponsor's behalf",
   "use provider APIs or network",
   "upload or publish"
- ]
+ ],
+ "revision": {
+  "number": 2,
+  "reason": "pre-run correction after independent review: recall threshold preserves design >=5/6; clean-root determinism and in-unit socket denial are explicit experiments",
+  "runs_before_revision": 0
+ }
 }
