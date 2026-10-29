@@ -167,6 +167,34 @@ describe("Quality page", () => {
     });
   });
 
+  it("carries the run's new disposition version into the next decision", async () => {
+    let version = 1;
+    gets["/quality/runs/01a1run000000000"] = () =>
+      json({ ...RUN("READY"), disposition_version: version, observations: [OBS("o-r1", "review", "FAIL", [FINDING])] });
+    posts["/quality/dispositions"] = () => {
+      version = 2;
+      return json({ disposition: { disposition_id: "d-2" } });
+    };
+    await choose();
+    fireEvent.click(await screen.findByRole("radio", { name: /01a1run0/ }));
+    const prepareDecision = async () => {
+      fireEvent.change(screen.getByLabelText(/^Decision$|^Quyết định$|^决定$/), { target: { value: "PASS" } });
+      fireEvent.change(screen.getByLabelText(/^Reason$|^Lý do$|^理由$/), { target: { value: "looks right" } });
+      const button = screen.getByRole("button", { name: /Prepare decision|Chuẩn bị quyết định|准备决定/ });
+      await waitFor(() => expect(button).toBeEnabled());
+      fireEvent.click(button);
+    };
+    await prepareDecision();
+    const group = await screen.findByRole("group", { name: /Confirm the prepared request|Xác nhận|确认/ });
+    fireEvent.click(within(group).getAllByRole("button")[0]);
+    await waitFor(() => expect(sent.some((item) => item.path === "/quality/dispositions")).toBe(true));
+    await waitFor(() => expect(version).toBe(2));
+    await waitFor(() => expect(screen.queryByRole("group", { name: /Confirm the prepared request|Xác nhận|确认/ })).not.toBeInTheDocument());
+    await prepareDecision();
+    await waitFor(() => expect(sent.filter((item) => item.path === "/quality/dispositions/prepare")).toHaveLength(2));
+    expect(sent.filter((item) => item.path === "/quality/dispositions/prepare")[1].body.expected_disposition_version).toBe(2);
+  });
+
   it("hands a READY run to Packaging with that run's own cohort and surface", async () => {
     await choose();
     const link = await screen.findByRole("link", { name: /Package this run|Đóng gói run này|打包此运行/ });

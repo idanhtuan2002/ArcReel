@@ -388,6 +388,15 @@ function QualityWorkspace({ projectName, actor }: QualityPageProps & { actor: st
     const controller = new AbortController();
     await reload(controller.signal);
     await refreshSubject(controller.signal);
+    // A decision moves the run's disposition version; the next decision must carry the new one.
+    if (!runId) return;
+    const key = activeScope.current;
+    try {
+      const detail = await readRun(projectName, runId);
+      if (activeScope.current === key) setRunDetail(detail);
+    } catch (failure: unknown) {
+      setLoadError(errorMessage(failure) ?? t("quality_load_failed"));
+    }
   };
 
   const chooseProfile = async (profileId: string) => {
