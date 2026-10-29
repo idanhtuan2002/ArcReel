@@ -28,3 +28,16 @@ C1 done (resolver; PG test: byte-equal to the accepted fixture subject, authorit
 embedded host catalog (`r2/quality/host_catalog.py`) + requalification, C3 prepare/submit seal + quality router
 (`server/routers/quality.py`), C4 Quality page + Packaging prefill; then Codex review, local Chrome acceptance, sponsor
 activated-host qualification + deploy (sudo), then M9-B.
+
+## C2/D3 implementation notes (facts found while implementing)
+- A4 test configs use `rule_id: "probe"` for both recipes and a placeholder `parser_digest` (`sha256:1…`). The
+  embedded catalog gives each config its own rule id (`probe-container`, `probe-decode`) so policy probe rules are
+  unique, and pins `parser_digest` to the sha256 of `server/services/quality_probe_worker.py`; the qualification test
+  asserts it equals the current file (a worker change forces a catalog revision).
+- Tool identities (this host, ffmpeg 8.0.1): ffprobe exe `fad19fce…c445` build `57a3cf6c…b59e`; ffmpeg exe
+  `84d2f486…4c7d` build `fb056f85…dec2` (values from `config_for` at `3bdb59b03`).
+- `close_run` checks technical slots by rule id + `config_digest` only; Human slots must carry
+  `HUMAN_SHOWRUNNER_POLICY_ID` + `human_showrunner_policy_digest()`. The template's technical slot qualification and
+  disagreement policies are private schema-tagged digests (`m10-c.qualification.host-deterministic-probe.v1`,
+  `m10-c.disagreement.single-slot.v1`), not test placeholders.
+
