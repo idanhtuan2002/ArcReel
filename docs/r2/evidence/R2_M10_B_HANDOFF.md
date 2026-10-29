@@ -143,8 +143,18 @@ Rewrite in place; this is the resume entry for M10-B.
 - `8df2456ac` finalize × run-seal writer pair (carried B4 condition). Codex pre-seal review running
   (`preseal-codex-review.json`: UI, B6, B7 prereg).
 
+- Pre-seal review CHANGES_REQUESTED (`preseal-codex-review.json`, committed `9c385bf94`: H1 UI could not author
+  chapters/localizations/groups/audience/disclosure, H2 weak OpenMontage parity, M1 local ladder flags, M2 stale
+  preview selectable, M3 builder dispositions, M4 undisclosed schema stub, M5 recall, M6 determinism/EPERM) →
+  `07e69875c` (one-case byte/value parity, pinned real schema validator, equal-size timing; parity 18 passed),
+  `023543d2b` (parity report rebuilt at `07e69875c`, B7 preregistration rev 2), `2e3997b74`
+  (`GET /projects/{p}/packaging/slot`; route 16 passed, export+parity 49 passed), `dc75cbcc7` (UI editors,
+  input-signature preview invalidation, unsaved-draft lock, server-driven ladder/export/history; `pnpm check`
+  exit 0, 2641 tests). Static gates clean at `9c385bf94`. Codex delta1 running (`preseal-delta1-codex-review.json`).
+  Parity `integrated_head` predates the `package_export.py` signature refactor in `2e3997b74`; rebuild at the seal HEAD.
+
 ## Next step
 
-Triage the pre-seal review. Then write `R2_M10_B_CANDIDATE.json` (seal candidate: HEAD, packets, reviews, gates run,
+Triage the pre-seal delta1 review; rebuild the B6 parity report at the final HEAD. Then write `R2_M10_B_CANDIDATE.json` (seal candidate: HEAD, packets, reviews, gates run,
 carried conditions, the Human-gated B7 pilots as the only open item) and stop for the sponsor: pilots per the runbook,
 then B8 seal (M10-B acceptance) and M10 integrated acceptance. Nothing pushed; merge/tag/deploy are Human gates.
