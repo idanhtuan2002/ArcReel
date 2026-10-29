@@ -1,0 +1,250 @@
+{
+  "verdict": "ACCEPTED_WITH_CONDITIONS",
+  "head": "3484ae6b82c311d99916720a2fbb365eea0d3b99",
+  "branch": "design/r2-m10-b",
+  "reviewed_at": "2026-10-29",
+  "scope": "Independent review of 0299b0a11, 55edfa11c, 7609bceac and 3484ae6b8; acceptance of these follow-up fixes and bounded pilot evidence only, not B8 seal, integrated M10 acceptance or production activation.",
+  "severity_summary": {
+    "Critical": 0,
+    "High": 0,
+    "Medium": 0,
+    "Low": 3
+  },
+  "findings": [
+    {
+      "id": "L1",
+      "severity": "Low",
+      "status": "CONFIRMED",
+      "file:line": "docs/r2/evidence/m10-b7-pilot/scripts/build_dossier.py.txt:166",
+      "related_locations": [
+        "docs/r2/evidence/R2_M10_B7_PILOT_WESTERN_EXPLAINER.json:267",
+        "docs/r2/evidence/R2_M10_B7_PILOT_VERTICAL_FACTUAL_SHORT.json:268",
+        "docs/r2/evidence/R2_M10_B7_PILOT_ZH_SHUANG.json:267"
+      ],
+      "scenario": "The builder sets smallest_useful_effect.met solely from caught >= 6 and unconditionally labels the historical F1 probe refusal a real defect on the clean final. Run 2 successfully probes those finals and reports no clean findings. The preregistration requires recall AND a real clean-final defect or a confirmed correction through the page. A future recall-only run would therefore receive an unsupported utility pass. This does not invalidate the observed export mechanism: pilot_browser explicitly restores and checks clean-final revision 8 after the seeded revisions, and the inspected western export screenshot shows revision 8 passing. That is the available correction evidence, rather than the fixed F1 refusal.",
+      "fix": "Compute the conjunction from explicit evidence. Record the corrected seeded revision, resulting clean-final revision, check result and supporting UI artifact per cohort; identify it as a seeded correction. Keep F1 in the historical discovery record. Do not infer utility merely from recall. Update the three dossiers when preparing the B8 packet."
+    },
+    {
+      "id": "L2",
+      "severity": "Low",
+      "status": "CONFIRMED",
+      "file:line": "docs/r2/evidence/m10-b7-pilot/scripts/build_dossier.py.txt:195",
+      "scenario": "member_diff iterates only x.namelist(). If root2 contains an extra content member whose name is absent from the main archive, it can still report only manifest.json as different and pass amended determinism. Duplicate names are also not rejected. No such discrepancy is demonstrated in the recorded runs; the production verifier independently requires an exact member list, so this is a pilot-comparator weakness, not an export bypass.",
+      "fix": "Reject duplicate member names, compare both complete name sets, and compare bytes over their union, excluding only manifest.json from the content-byte equality assertion. Preserve both roots' member inventories or their comparison output."
+    },
+    {
+      "id": "L3",
+      "severity": "Low",
+      "status": "CONFIRMED",
+      "file:line": "docs/r2/evidence/R2_M10_B_CANDIDATE.json:131",
+      "scenario": "The candidate ends with a blanket statement that profile publication, disposition and selection were never performed by the agent, although its B7 result and all three dossiers explicitly disclose the agent's sponsor-delegated execution of these gates. A consumer reading the summary field alone gets a contradictory execution history.",
+      "fix": "Separate the standing authority policy from historical actions. State the local B7 delegation exception and link the dossiers; retain the prohibition on unauthorized production actions and the outstanding release gates."
+    }
+  ],
+  "question_assessments": {
+    "Q1_full_range_probe_and_requalification": {
+      "conclusion": "ACCEPTED_WITH_VERIFICATION_LIMITS",
+      "F1_status": "CLOSED",
+      "analysis": [
+        "StreamFacts adds one accepted literal without renaming, defaulting or normalizing any existing field. The worker reports the actual ffprobe value. H.264, AAC, MP4, one-video/one-audio stream restrictions and the bounded execution surface remain in place.",
+        "DECODE consumes the same admitted media and uses ffmpeg's decoder without assuming limited range. LOUDNESS maps audio only. INTERVALS leaves video range interpretation to ffmpeg's detectors. REFERENCE_VMAF decodes both inputs to explicit 8-bit yuv420p rawvideo and retains geometry, rate, start-offset, five-frame and output-size guards. New admission does not pass yuvj420p bytes directly to a VMAF consumer expecting a different layout.",
+        "PackagingCheckService consumes container duration and video width/height, not pixel_format. Run admission binds the technical observation to subject, published profile and config digest; the literal expansion does not change those binding checks.",
+        "An independently executed old/new comparison loaded r2/quality/probes.py from 0299b0a11^ and HEAD and validated the same legacy yuv420p CONTAINER_STREAM measurement. Both returned measurement digest sha256:3591ce67bd683f50b6f95a6037440bcae9bf14554f0be5a81918130b33845fd6. Existing serialized observations are not rewritten. This is a representative digest probe plus source analysis, not a replay of every historical database row.",
+        "All eight source hashes in the appended requalification match current files. The fixture hash matches, and its declared generation command reproduces exactly 26127b8fccc69ac07c0a8ef34562efaa3288bcb070c922ac258c9a2be4b2362a. Registry evidence_digest matches the qualification file and entry_digest recomputes correctly. The existing qualification remains historical and the new qualification is explicitly appended.",
+        "The appended 180-test result and JUnit digest are supplied evidence. The JUnit body and PostgreSQL execution were not independently reproduced. Direct full-range recipe probes and both original-final container/decode checks succeeded in this review. This supports the narrow OFFLINE_VERIFIED admission expansion; it does not establish cohort VMAF thresholds or production activation."
+      ],
+      "source_refs": [
+        "r2/quality/probes.py:125",
+        "r2/quality/probes.py:391",
+        "r2/quality/probes.py:815",
+        "server/services/quality_probe_worker.py:542",
+        "server/services/quality_probe_worker.py:645",
+        "server/services/quality_probe_worker.py:720",
+        "server/services/quality_probe_worker.py:784",
+        "server/services/quality_probe_worker.py:892",
+        "server/services/quality_packaging.py:202",
+        "server/services/quality_packaging.py:397",
+        "server/services/quality_runs.py:343",
+        "r2/quality/runs.py:111",
+        "docs/r2/evidence/m10-a4-reviews/route-qualification.json:92"
+      ]
+    },
+    "Q2_custody_owner": {
+      "conclusion": "ACCEPTED_FOR_ROOT_OWNED_GOVERNANCE",
+      "F3_status": "CLOSED",
+      "analysis": [
+        "The app process's uid is not the governance authority's uid. Using custody_uid/gid defaulting to 0/0 aligns selection startup with the production grant reader and the root attestor/root-owned governance archive model. It also allows an unprivileged app to verify root authority without requiring that app itself to run as root.",
+        "The change preserves checkpoint path ownership/mode/device checks, ancestor checks, signature and ledger verification, fresh attestor challenge, Unix peer credentials, actor binding, current HUMAN_SHOWRUNNER grant, database-time authorization lease and final transactional grant recheck. It changes the expected owner, not whether verification occurs.",
+        "The default activated grant-reader closure still explicitly uses 0/0; it does not dynamically read the dataclass owner fields. Production defaults are consistent. Non-root test/pilot custody requires overriding the entire dependency, including a matching grant_reader, as the scripts do. The change is not a public request-controlled owner override.",
+        "The wrong-owner integration test checks refusal and the default-owner test checks 0/0. Their source was inspected; PostgreSQL/route execution is supplied evidence. A deployed non-root app verifying an actual root service remains an operational acceptance check."
+      ],
+      "source_refs": [
+        "server/routers/packaging.py:70",
+        "server/routers/packaging.py:309",
+        "server/services/quality_package_selection.py:266",
+        "server/services/governance_startup.py:41",
+        "server/services/governance_checkpoint_file.py:120",
+        "server/services/governance_attestation.py:225",
+        "tests/integration/server/routers/test_packaging_routes.py:239"
+      ]
+    },
+    "Q3_determinism_amendment": {
+      "conclusion": "HONESTLY_RECORDED_AND_TECHNICALLY_JUSTIFIED",
+      "F2_status": "CLOSED_BY_EXPLICIT_POST_RUN_AMENDMENT",
+      "analysis": [
+        "The preregistration retains the frozen cross-root whole-archive criterion and appends a dated amendment with the old wording, replacement, reason and unchanged historical failure. Dossiers retain distinct cross-root archive hashes and frozen_pass=false. The summary separately reports amended success. These are not passes against the original preregistration.",
+        "plan_export embeds selection id/digest, disposition id/digest and candidate payload digest in the manifest. Independent roots legitimately allocate different authority identities. Fixed ZIP headers/order cannot make those distinct manifest bytes identical. Same-selection/new-command byte identity is the actual recovery invariant, and content-member equality across roots isolates payload determinism.",
+        "Removing provenance would change the archive contract and the verifier/recovery identity checks. It is unnecessary for the stated determinism objective and would sacrifice the archive's binding to its producing authority. Keeping provenance and naming the amendment is justified.",
+        "The run-2/HEAD source trees under r2, server, lib, alembic, frontend and tests are identical: git diff --name-only 7609bceac..HEAD over those paths returned no changes. B6's integrated_head and rerun_at_head point to 7609bceac923a8972bd5dffae6b96ad075d96507, which is adequate for these documentation-only successor changes. The reported 18-test B6 rerun was not independently executed."
+      ],
+      "source_refs": [
+        "docs/r2/evidence/R2_M10_B7_PILOT_PREREGISTRATION.json:150",
+        "docs/superpowers/specs/2026-10-28-r2-m10-b-packaging-export-design.md:366",
+        "server/services/package_export.py:332",
+        "server/services/package_export.py:560",
+        "server/services/package_export.py:1227",
+        "server/services/package_export_worker.py:91"
+      ]
+    },
+    "Q4_run2_data_and_deviations": {
+      "conclusion": "SUPPORTED_AS_BOUNDED_LOCAL_PILOT_EVIDENCE_WITH_LIMITS",
+      "analysis": [
+        "All dossiers' source/master/video-member digests agree. Both actual source finals were independently hashed and match those declarations; CONTAINER_STREAM reports yuvj420p and DECODE completes for both. The zh cohort reuses the same short final, so there are two distinct source videos across three policy cohorts.",
+        "Seeded caught counts, member sizes, storage ratios and summary metrics are internally consistent. The banned-phrase finding is advisory, so its check_status=PASS is compatible with counting the tone finding as detected. The seven per-defect records include a separate duration-profile experiment after export rather than falsely depicting it as a normal revision in the same frozen profile.",
+        "The record explicitly discloses agent-executed Human gates and reviewer judgments under reported sponsor delegation, local non-production PostgreSQL and test signing keys, user-owned fixture custody, the fixture dependency head rather than the real final's complete production dependency closure, seven-day freshness and English video for zh-Hans. This does not establish sponsor-as-reviewer independence, Chinese-language suitability or end-to-end production provenance.",
+        "The summary reports 1872/1375/1374 ms UI timings and 23597056/15458304/15462400-byte worker peaks; these values agree with the dossiers and their thresholds. Peak measurement is explicitly cgroup memory.peak polling during a root2 export, not whole-host memory. The single shared network experiment is explicitly identified as the same launcher/envelope and has EPERM plus unit/kernel properties; it is not three separately captured network experiments.",
+        "All eleven script hashes verify. The inspected western missing-video and exported screenshots are consistent with the declared master/run and corrected revision 8 passing. Full per-run browser.json, root2 member inventories, downloadable archives, database rows and JUnit bodies are not committed in the named evidence set and were not independently replayed. Their results remain supplied experimental evidence. L1 and L2 narrow the strength of the generated assertions."
+      ]
+    }
+  },
+  "verification": {
+    "independent_passes": [
+      {
+        "command": "PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 timeout -k 2 20 .venv/bin/python -m pytest --noconftest -q -p no:cacheprovider tests/unit/r2/quality/test_probes.py tests/unit/r2/host_hardening/test_provider_capabilities.py",
+        "result": "100 passed in 0.80s; 3 warnings for unloaded asyncio/timeout plugin configuration",
+        "limit": "Shared repository conftest and autoloaded plugins deliberately excluded after normal setup stalled. This is narrow unit verification, not the standard integration gate."
+      },
+      {
+        "command": "PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 timeout -k 2 25 .venv/bin/python -m pytest --noconftest -q -p no:cacheprovider -p pytest_asyncio.plugin -p pytest_timeout tests/unit/server/services/test_quality_probe_worker.py",
+        "result": "47 passed in 1.10s"
+      },
+      {
+        "command": "Direct Python invocation of container_recipe, decode_recipe, loudness_recipe and vmaf_recipe on av_fullrange.mp4, using real ffmpeg/ffprobe and the pinned local VMAF binary/model",
+        "result": "yuvj420p reported; decode complete; loudness FINITE (-21.7 LUFS, -18.0 dBFS); self-reference VMAF mean 99.485745 over five frames",
+        "limit": "Recipe behavior probe outside the systemd/Landlock runtime; does not requalify confinement."
+      },
+      {
+        "command": "Execute av_fullrange.mp4 MANIFEST.json generation argv with output redirected to a temporary directory",
+        "result": "Reproduced exact fixture SHA-256 26127b8fccc69ac07c0a8ef34562efaa3288bcb070c922ac258c9a2be4b2362a"
+      },
+      {
+        "command": "Hash each dossier's corpus.source_final and invoke the real container_recipe/decode_recipe on both distinct originals",
+        "result": "All declared source hashes match; 1920x1080 and 1080x1920 yuvj420p originals admitted and decode complete."
+      },
+      {
+        "command": "Load pinned pre-fix and HEAD probe model source into separate Python modules; validate and hash the same legacy yuv420p container measurement",
+        "result": "Canonical measurement digest unchanged."
+      },
+      {
+        "command": "Recompute all appended qualification source hashes and registry evidence/entry digests; sha256sum -c scripts.sha256 from docs/r2/evidence/m10-b7-pilot",
+        "result": "All eight source hashes, qualification/registry digests and eleven script hashes match."
+      },
+      {
+        "command": "Extract and execute the pinned member_diff function against temporary ZIPs with equal shared content and one root2-only metadata member",
+        "result": "L2 reproduced: comparator returns [] despite the extra root2 member."
+      }
+    ],
+    "execution_limits": [
+      "Initial uv invocation could not create its cache lock on the read-only home filesystem. Redirecting UV_CACHE_DIR allowed startup; later checks used the existing .venv interpreter without dependency installation.",
+      "Standard-conftest pytest attempts stalled in shared database setup; a timeout displayed an aiosqlite connection worker stack and setup errors. These attempts were interrupted and are not recorded as product failures or passes.",
+      "AF_INET socket/connect attempt to local pilot PostgreSQL at 127.0.0.1:55491 returned PermissionError errno 1, Operation not permitted. PostgreSQL/route integration and pilot reruns were unavailable in this sandbox.",
+      "Graph list_projects did not expose this worktree; index_status, search_graph and both check_index_coverage attempts were blocked by the MCP approval policy. Tier-2 graph/generation/coverage could not be established. Material conclusions use the pinned diff, direct source reads and focused probes; no graph completeness claim is made.",
+      "No provider/network calls, source changes, formatting, commits, push, merge, tags, full suite or production actions were performed."
+    ],
+    "supplied_results_not_independently_rerun": [
+      "A4 suite: 180 passed",
+      "Packaging route tests: 21 passed",
+      "Provider capability tests: 19 passed (the current file was also independently included in the 100-test narrow run)",
+      "A4 scope plus host_hardening: 374 passed",
+      "B6 donor parity: 18 passed",
+      "ruff, basedpyright, lint-imports and audit reported clean"
+    ]
+  },
+  "conditions": [
+    {
+      "id": "C1",
+      "gate": "B8 evidence assembly",
+      "requirement": "Retain frozen-preregistration failures and all pilot deviations. Correct the Low evidence-generation/documentation issues without relabeling these local delegated runs as independent Human or production acceptance."
+    },
+    {
+      "id": "C2",
+      "gate": "Integrated/production acceptance",
+      "requirement": "Use an actual root-owned governance archive and root attestor with the intended app uid, and retain successful route and PostgreSQL evidence from an authorized host. This review does not independently verify that deployment."
+    },
+    {
+      "id": "C3",
+      "gate": "Any claim of corpus or reviewer qualification",
+      "requirement": "A sponsor/Human review and an actual zh-Hans final are needed before claiming those missing dimensions. Replace the fixture dependency head with the real production closure before claiming full production provenance. These limitations do not block accepting the export-only fixes."
+    },
+    {
+      "id": "C4",
+      "gate": "B8 seal and integrated M10 acceptance",
+      "requirement": "Carry forward the candidate's crash-cut/disk/fsync/rename, trusted local regular-file I/O, accessibility, slot-contention and M10-A conditions. Refresh B6 parity after any further source change. This review closes none of those unrelated gates."
+    }
+  ],
+  "files_read": [
+    "CONTRIBUTING.md",
+    "r2/quality/probes.py",
+    "r2/quality/runs.py",
+    "r2/quality/digests.py",
+    "r2/provider_capabilities/registry.json",
+    "r2/contracts/packaging.py",
+    "server/routers/packaging.py",
+    "server/services/quality_probe_worker.py",
+    "server/services/quality_probe_runtime.py",
+    "server/services/quality_probes.py",
+    "server/services/quality_runs.py",
+    "server/services/quality_packaging.py",
+    "server/services/quality_package_selection.py",
+    "server/services/governance_startup.py",
+    "server/services/governance_attestation.py",
+    "server/services/governance_checkpoint_file.py",
+    "server/services/package_export.py",
+    "server/services/package_export_worker.py",
+    "tests/conftest.py",
+    "tests/unit/r2/quality/test_probes.py",
+    "tests/unit/r2/host_hardening/test_provider_capabilities.py",
+    "tests/unit/server/services/test_quality_probe_worker.py (executed)",
+    "tests/integration/server/services/test_quality_probe_recipes.py",
+    "tests/integration/server/routers/test_packaging_routes.py (changed hunks)",
+    "tests/fixtures/r2/quality_probes/MANIFEST.json",
+    "docs/r2/evidence/m10-a4-reviews/route-qualification.json",
+    "docs/r2/evidence/R2_M10_B7_PILOT_PREREGISTRATION.json",
+    "docs/r2/evidence/R2_M10_B7_PILOT_SUMMARY.json",
+    "docs/r2/evidence/R2_M10_B7_PILOT_WESTERN_EXPLAINER.json",
+    "docs/r2/evidence/R2_M10_B7_PILOT_VERTICAL_FACTUAL_SHORT.json (targeted fields)",
+    "docs/r2/evidence/R2_M10_B7_PILOT_ZH_SHUANG.json",
+    "docs/r2/evidence/R2_M10_B6_DONOR_PARITY.json",
+    "docs/r2/evidence/R2_M10_B_CANDIDATE.json",
+    "docs/r2/evidence/R2_M10_B_HANDOFF.md",
+    "docs/r2/evidence/m10-b7-pilot/scripts/build_dossier.py.txt",
+    "docs/r2/evidence/m10-b7-pilot/scripts/pilot_host.py.txt (targeted sections)",
+    "docs/r2/evidence/m10-b7-pilot/scripts/pilot_browser.py.txt (targeted sections)",
+    "docs/r2/evidence/m10-b7-pilot/scripts/export_root.py.txt",
+    "docs/r2/evidence/m10-b7-pilot/scripts/export_again.py.txt",
+    "docs/r2/evidence/m10-b7-pilot/scripts/run_cohort.sh.txt",
+    "docs/r2/evidence/m10-b7-pilot/scripts/run_root2.sh.txt",
+    "docs/r2/evidence/m10-b7-pilot/narrative-zh_shuang.json",
+    "docs/r2/evidence/m10-b7-pilot/shots/western_explainer/02-missing_required_asset.png (visually inspected)",
+    "docs/r2/evidence/m10-b7-pilot/shots/western_explainer/22-exported.png (visually inspected)",
+    "docs/superpowers/specs/2026-10-28-r2-m10-b-packaging-export-design.md (determinism/utility sections)",
+    "docs/r2/evidence/m10-b-reviews/preseal-delta3-codex-review.json (opening section)"
+  ],
+  "coverage_note": "Targeted source reads and literal-consumer searches, not an exhaustive whole-repository audit. Historical memory was used only to recall review constraints and carried-condition context; current conclusions were checked against this HEAD.",
+  "workspace": {
+    "initial_head_matches_requested": true,
+    "initial_status": "clean",
+    "source_tree_unchanged_since_evidence_head": true,
+    "authorized_output_only": "docs/r2/evidence/m10-b-reviews/b7-fixes-codex-review.json"
+  }
+}

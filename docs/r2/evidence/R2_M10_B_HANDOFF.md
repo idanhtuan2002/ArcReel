@@ -171,8 +171,11 @@ Rewrite in place; this is the resume entry for M10-B.
   the original finals: all thresholds met under the amended definition (`R2_M10_B7_PILOT_SUMMARY.json` v2).
   B6 parity rebound to `7609bceac`.
 
+- Codex review of the B7 fixes **ACCEPTED_WITH_CONDITIONS** (`b7-fixes-codex-review.json`, no H/M); L1-L3
+  (utility-effect computation, member comparator, candidate wording) fixed; conditions C1-C3 carried in the candidate.
+
 ## Next step
 
-Codex review of `0299b0a11`, `55edfa11c`, `7609bceac` and the run-2 evidence; then B8 seal (M10-B acceptance with
-the carried conditions in `R2_M10_B_CANDIDATE.json`) and M10 integrated acceptance. Nothing pushed; merge/tag/deploy
-are Human gates.
+B8 seal: assemble M10-B acceptance from `R2_M10_B_CANDIDATE.json` (packets, reviews, carried conditions) and run the
+B8 integrated checks the candidate lists (crash cuts, slot contention, accessibility). Then M10 integrated acceptance.
+Nothing pushed; merge/tag/deploy are Human gates.

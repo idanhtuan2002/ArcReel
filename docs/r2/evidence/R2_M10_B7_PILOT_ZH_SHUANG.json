@@ -2,7 +2,7 @@
   "schema_id": "m10.b7-pilot-dossier.v1",
   "cohort": "zh_shuang",
   "preregistration": "docs/r2/evidence/R2_M10_B7_PILOT_PREREGISTRATION.json (revision 2)",
-  "code_head": "7609bceac923a8972bd5dffae6b96ad075d96507",
+  "code_head": "3484ae6b82c311d99916720a2fbb365eea0d3b99",
   "run_at": "2026-10-29",
   "deviations": [
     "Human gates (profile publication, narrative observation, disposition, package selection) were performed by the agent under the sponsor's explicit chat delegation on 2026-10-29 ('ban lam het tat ca cac buoc'), through the real custodians with an interactive token for principal 'actor'. The preregistered reviewer identity (sponsor as HUMAN_SHOWRUNNER) is therefore NOT met; reviewer verdicts below are the agent's.",
@@ -266,7 +266,13 @@
   ],
   "smallest_useful_effect": {
     "seeded_recall_ok": true,
-    "real_defect_on_clean_final": "F1: the approved V2 final (yuvj420p) is refused by the CONTAINER_STREAM probe",
-    "met": true
+    "real_defect_on_clean_final": null,
+    "real_defect_note": "none by the packaging check in this run; run 1 recorded F1 (the quality probe refused the original finals), which is a quality-gate result, not a packaging-check finding",
+    "correction_through_page": {
+      "observed": true,
+      "detail": "seeded-defect revision (missing_locale) FAIL corrected through the page to clean-final PASS; a correction of a seeded defect, weaker than correcting a real defect"
+    },
+    "met": true,
+    "basis": "recall AND correction through the page (seeded defect)"
   }
 }

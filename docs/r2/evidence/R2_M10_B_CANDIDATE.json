@@ -1,6 +1,6 @@
 {
   "schema_id": "m10.b-seal-candidate.v1",
-  "status": "SEAL_CANDIDATE_PENDING_REVIEW_OF_B7_FIXES",
+  "status": "SEAL_CANDIDATE",
   "branch": "design/r2-m10-b",
   "worktree": ".worktrees/r2-m10-b",
   "base": "0af66db9e",
@@ -67,7 +67,8 @@
         "F1": "0299b0a11",
         "F2": "7609bceac",
         "F3": "55edfa11c"
-      }
+      },
+      "review": "docs/r2/evidence/m10-b-reviews/b7-fixes-codex-review.json (ACCEPTED_WITH_CONDITIONS; L1-L3 fixed)"
     },
     "preseal": {
       "verdict": "ACCEPTED_WITH_CONDITIONS",
@@ -121,12 +122,17 @@
     "Pre-seal L2 → B8: live keyboard/focus/contrast and populated refusal-state accessibility checks.",
     "Slot status reads take shared/advisory locks in global order and can briefly block writers; measure under B8.",
     "Any later source change must refresh and rebind B6 parity evidence.",
-    "M10-A-F1 carried items as recorded in the handoff."
+    "M10-A-F1 carried items as recorded in the handoff.",
+    "B7 C1: keep frozen-preregistration failures and pilot deviations; do not relabel delegated local runs as independent Human acceptance",
+    "B7 C2: integrated/production acceptance uses a root-owned governance archive and root attestor with the intended app uid on an authorized host",
+    "B7 C3: sponsor review and a real zh-Hans final are needed before claiming reviewer or zh corpus qualification; replace the fixture dependency head with the real closure before claiming full production provenance"
   ],
   "open_items": [
-    "Codex review of the B7 fixes (0299b0a11, 55edfa11c, 7609bceac)",
     "B8 seal / M10-B acceptance",
     "M10 integrated acceptance"
   ],
-  "human_gates": "push, merge, tag, deploy, profile publication, disposition, package selection — never performed by the agent"
+  "human_gates": {
+    "standing_policy": "push, merge, tag, deploy and anything on the production host stay Human gates; the agent performs none of them",
+    "b7_exception": "on 2026-10-29 the sponsor delegated in chat ('ban lam het tat ca cac buoc') the local B7 pilot Human gates (profile publication, narrative observation, disposition, package selection); the agent performed them on a local non-production host, disclosed in every R2_M10_B7_PILOT_*.json dossier; these runs are not independent Human or production acceptance"
+  }
 }

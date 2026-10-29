@@ -164,10 +164,24 @@ def main(cohort: str, head: str) -> None:
         "screenshots": sorted(p.name for p in (main_root / "shots").glob("*.png")),
     }
     effect = caught >= 6
+    clean_findings = len(clean["findings"])
+    corrected = (
+        checks.get("missing_locale", {}).get("status") == "FAIL" and checks.get("clean-final", {}).get("status") == "PASS"
+    )
     dossier["smallest_useful_effect"] = {
         "seeded_recall_ok": effect,
-        "real_defect_on_clean_final": "F1: the approved V2 final (yuvj420p) is refused by the CONTAINER_STREAM probe",
-        "met": effect,
+        "real_defect_on_clean_final": None
+        if clean_findings == 0
+        else [f["rule_id"] for f in clean["findings"]],
+        "real_defect_note": "none by the packaging check in this run; run 1 recorded F1 (the quality probe refused the "
+        "original finals), which is a quality-gate result, not a packaging-check finding",
+        "correction_through_page": {
+            "observed": corrected,
+            "detail": "seeded-defect revision (missing_locale) FAIL corrected through the page to clean-final PASS; a "
+            "correction of a seeded defect, weaker than correcting a real defect",
+        },
+        "met": effect and (clean_findings > 0 or corrected),
+        "basis": "recall AND correction through the page (seeded defect)" if effect and corrected else None,
     }
     target = OUT / f"R2_M10_B7_PILOT_{cohort.upper()}.json"
     target.write_text(json.dumps(dossier, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
@@ -192,7 +206,11 @@ def member_diff(a: Path, b: Path) -> list[str]:
     import zipfile
 
     with zipfile.ZipFile(a) as x, zipfile.ZipFile(b) as y:
-        return [n for n in x.namelist() if x.read(n) != y.read(n)]
+        left, right = x.namelist(), y.namelist()
+        if len(set(left)) != len(left) or len(set(right)) != len(right):
+            return ["<duplicate member names>"]
+        names = sorted(set(left) | set(right))
+        return [n for n in names if n not in left or n not in right or x.read(n) != y.read(n)]
 
 
 if __name__ == "__main__":
