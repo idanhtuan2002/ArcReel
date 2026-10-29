@@ -11,6 +11,7 @@ from __future__ import annotations
 import base64
 import hashlib
 import hmac
+import json
 from typing import Any, Literal
 
 from cryptography.hazmat.primitives import hashes
@@ -70,7 +71,13 @@ def unseal[M: BaseModel](
         typed = model.model_validate(request)
     except ValueError:
         raise RequiredEvidenceMissingError() from None
-    if typed.model_dump(mode="json") != request:
+    try:
+        # Type-sensitive spelling: 7.0 is not 7 and true is not 1.
+        posted = json.dumps(request, sort_keys=True, separators=(",", ":"), ensure_ascii=False, allow_nan=False)
+    except (TypeError, ValueError):
+        raise RequiredEvidenceMissingError() from None
+    normalized = json.dumps(typed.model_dump(mode="json"), sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+    if normalized != posted:
         # Only the exact normalized body the server sealed is accepted back.
         raise RequiredEvidenceMissingError()
     expected = seal(secret, action, user_id=user_id, actor_id=actor_id, project_name=project_name, request=typed)

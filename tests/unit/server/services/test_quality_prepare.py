@@ -40,6 +40,7 @@ def test_the_exact_sealed_request_is_accepted_back() -> None:
         {"action": "dispose"},
         {"secret": SECRET + "x"},
         {"request": BODY | {"extra": 1}},
+        {"request": BODY | {"value": 7.0}},
     ],
 )
 def test_any_other_request_principal_project_action_or_key_is_refused(change) -> None:

@@ -16,16 +16,20 @@ from pathlib import Path
 from typing import Annotated, Any, Literal
 
 import sqlalchemy as sa
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, Query, Request
 from pydantic import BaseModel, ConfigDict, Field
 
 import r2.contracts.quality as q
 from lib.api_errors import ApiError, ConflictError, NotFoundError, ServiceUnavailableError, UnprocessableError
-from lib.artifact_manifest import ArtifactManifestError, ProjectArtifactManifestAdapter
 from lib.db import async_session_factory
+from lib.db.models.host_hardening import ExecutionAttemptModel
 from lib.db.models.quality import QualityProfileHeadModel, QualityProfileRevisionModel
 from lib.db.models.quality_dispositions import DispositionHeadModel
-from lib.db.models.quality_probes import QualityProbeObservationModel
+from lib.db.models.quality_probes import (
+    QualityProbeFailureModel,
+    QualityProbeInvocationModel,
+    QualityProbeObservationModel,
+)
 from lib.db.models.quality_runs import QualityHumanObservationModel, QualityRunModel
 from lib.db.repositories.quality import QualityProfileRepository
 from lib.db.repositories.quality_runs import QualityRunRepository
@@ -53,14 +57,27 @@ from server.services.quality_requests import (
     review_request,
 )
 from server.services.quality_runs import HumanObservationService, QualityRunService, run_validity
-from server.services.quality_subjects import resolve_assessed_subject
+from server.services.quality_subjects import manifest_bodies, resolve_assessed_subject
 from server.services.quality_template import default_platform_constraints, quality_policy
 
-router = APIRouter()
+MAX_BODY_BYTES = 1 << 20
+
+
+async def _bounded_body(request: Request) -> None:
+    """Refuse any quality request body above the operational ceiling before it is parsed."""
+    declared = request.headers.get("content-length")
+    if declared is not None and (not declared.isdigit() or int(declared) > MAX_BODY_BYTES):
+        raise ApiError(QUALITY_REQUEST_TOO_LARGE, status_code=413)
+    if len(await request.body()) > MAX_BODY_BYTES:
+        raise ApiError(QUALITY_REQUEST_TOO_LARGE, status_code=413)
+
+
+router = APIRouter(dependencies=[Depends(_bounded_body)])
 
 QUALITY_UNAVAILABLE = "m10_quality_unavailable"
 QUALITY_REQUEST_INVALID = "m10_quality_request_invalid"
 QUALITY_UNAUTHORIZED = "m10_quality_unauthorized"
+QUALITY_REQUEST_TOO_LARGE = "m10_quality_request_too_large"
 CATALOG_ENV = "ARCREEL_QUALITY_PROBE_CATALOG"
 
 Token = Annotated[str | None, Depends(oauth2_scheme_optional)]
@@ -203,12 +220,12 @@ async def profile_template(
     project_name: str,
     user: CurrentUser,
     deps: Deps,
-    platform_profile_id: str,
-    width: int,
-    height: int,
-    min_duration_ms: int,
-    max_duration_ms: int,
-    locales: str = "",
+    platform_profile_id: str = Query(max_length=255),
+    width: int = Query(gt=0, le=32768),
+    height: int = Query(gt=0, le=32768),
+    min_duration_ms: int = Query(ge=0),
+    max_duration_ms: int = Query(gt=0),
+    locales: str = Query(default="", max_length=256),
 ) -> dict[str, Any]:
     _available(deps)
     constraints = default_platform_constraints(
@@ -229,6 +246,7 @@ async def _policy(constraints: dict[str, Any]) -> q.QualityPolicyV2:
 
 @router.get("/projects/{project_name}/quality/profiles")
 async def list_profiles(project_name: str, user: CurrentUser, deps: Deps) -> dict[str, Any]:
+    """The current revision of every profile."""
     _available(deps)
     async with deps.sessions() as session:
         heads = (
@@ -264,40 +282,104 @@ async def list_revisions(project_name: str, profile_id: str, user: CurrentUser, 
     return {"revisions": [{"revision": row.revision, "profile_digest": row.profile_digest} for row in rows]}
 
 
+@router.get("/projects/{project_name}/quality/profiles/{profile_id}/revisions/{revision}")
+async def read_revision(
+    project_name: str, profile_id: str, revision: int, user: CurrentUser, deps: Deps
+) -> dict[str, Any]:
+    """One immutable revision, verified, so an older revision can be chosen deliberately."""
+    _available(deps)
+    profile = await _profile(deps, user.id, project_name, profile_id, revision)
+    return {"profile": profile.model_dump(mode="json")}
+
+
 @router.get("/projects/{project_name}/quality/masters")
 async def list_masters(project_name: str, user: CurrentUser, deps: Deps) -> dict[str, Any]:
-    """Approved masters in the manifest, each with whether its subject resolves now."""
+    """Approved deliverable masters (shots excluded) in the manifest, each with whether its subject resolves now."""
     _available(deps)
     root = deps.project_root(project_name)
     try:
-        entries = ProjectArtifactManifestAdapter(root).snapshot_entries()
-    except (ArtifactManifestError, OSError, ValueError) as error:
+        bodies = await manifest_bodies(root)
+    except M10Error as error:
         raise ServiceUnavailableError(QUALITY_UNAVAILABLE) from error
     masters = []
-    for key, entry in sorted(entries.items(), key=lambda item: item[0].encode()):
-        if entry.r2 is None:
-            continue
-        metadata = R2ArtifactMetadata.model_validate(entry.r2)
-        approved = metadata.approved_master
-        if approved is None or metadata.contract_ref.contract_type == "ShotSpec":
-            continue
-        resolvable = True
-        async with deps.sessions() as session:
+    async with deps.sessions() as session:
+        for key in sorted(bodies, key=lambda item: item.encode("utf-8")):
+            metadata = R2ArtifactMetadata.model_validate(bodies[key])
+            approved = metadata.approved_master
+            if approved is None or metadata.contract_ref.contract_type == "ShotSpec":
+                continue
+            resolvable = True
             try:
                 await resolve_assessed_subject(
-                    session, root, user_id=user.id, project_name=project_name, root_artifact_key=key.encode()
+                    session, root, user_id=user.id, project_name=project_name, root_artifact_key=key, bodies=bodies
                 )
             except M10Error:
                 resolvable = False
-        masters.append(
-            {
-                "artifact_key": key.encode(),
-                "artifact_path": entry.artifact_path,
-                "selected_candidate_id": approved.selected_candidate_id,
-                "resolvable": resolvable,
-            }
-        )
+            masters.append(
+                {
+                    "artifact_key": key,
+                    "selected_candidate_id": approved.selected_candidate_id,
+                    "approval_record": approved.approval_record,
+                    "resolvable": resolvable,
+                }
+            )
     return {"masters": masters}
+
+
+def _json_text(column: Any, *path: str) -> Any:
+    return sa.func.json_extract_path_text(column, *path)
+
+
+def _probe_invocations(user_id: str, project_name: str, profile_id: str, revision: int, root: str) -> Any:
+    model = QualityProbeInvocationModel
+    return sa.select(model).where(
+        model.user_id == user_id,
+        model.project_name == project_name,
+        _json_text(model.request_json, "profile", "profile_id") == profile_id,
+        _json_text(model.request_json, "profile", "revision") == str(revision),
+        _json_text(model.request_json, "subject", "master_binding", "root", "artifact_key") == root,
+    )
+
+
+@router.get("/projects/{project_name}/quality/probes")
+async def list_probes(
+    project_name: str, profile_id: str, revision: int, root: str, user: CurrentUser, deps: Deps
+) -> dict[str, Any]:
+    """Every probe command of the root under one profile revision, across subjects, with its M7 attempt state,
+    its observation when finalized and its recorded failure resources when it failed before acceptance."""
+    _available(deps)
+    probes = []
+    async with deps.sessions() as session:
+        rows = (await session.execute(_probe_invocations(user.id, project_name, profile_id, revision, root))).scalars()
+        for row in rows.all():
+            attempt = (
+                await session.execute(
+                    sa.select(ExecutionAttemptModel.state).where(
+                        ExecutionAttemptModel.user_id == user.id,
+                        ExecutionAttemptModel.project_name == project_name,
+                        ExecutionAttemptModel.execution_id == row.execution_id,
+                    )
+                )
+            ).scalar_one_or_none()
+            failure = await session.get(QualityProbeFailureModel, (user.id, project_name, row.execution_id))
+            observed = await session.get(QualityProbeObservationModel, (user.id, project_name, row.observation_id))
+            probes.append(
+                {
+                    "execution_ref": row.execution_ref,
+                    "actor_id": row.actor_id,
+                    "requirement_id": row.request_json.get("requirement_id"),
+                    "subject_digest": compute_digest(
+                        "m10.assessed-subject.v1", q.AssessedSubject.model_validate(row.request_json["subject"])
+                    ),
+                    "attempt_state": None if attempt is None else str(attempt),
+                    "observation_id": None if observed is None else row.observation_id,
+                    "status": None if observed is None else observed.observation_json.get("status"),
+                    "failure": None
+                    if failure is None
+                    else {"error_code": failure.error_code, "resources": failure.resources_json},
+                }
+            )
+    return {"probes": probes}
 
 
 @router.get("/projects/{project_name}/quality/observations")
@@ -311,27 +393,17 @@ async def list_observations(
     found: list[dict[str, Any]] = []
     async with deps.sessions() as session:
         repository = QualityRunRepository(session)
-        technical_ids = (
-            await session.execute(
-                sa.select(QualityProbeObservationModel.observation_id).filter_by(
-                    user_id=user.id, project_name=project_name
-                )
-            )
-        ).scalars()
-        for observation_id in technical_ids.all():
+        rows = (await session.execute(_probe_invocations(user.id, project_name, profile_id, revision, root))).scalars()
+        for row in rows.all():
+            if await session.get(QualityProbeObservationModel, (user.id, project_name, row.observation_id)) is None:
+                continue
             stored = await _run(
-                lambda oid=observation_id: repository.technical_observation(
+                lambda oid=row.observation_id: repository.technical_observation(
                     user_id=user.id, project_name=project_name, observation_id=oid
                 )
             )
-            if stored is None:
-                continue
-            observation, request = stored
-            if (request.profile.profile_id, request.profile.revision) != (profile_id, revision):
-                continue
-            if compute_digest("m10.assessed-subject.v1", request.subject) != subject_digest:
-                continue
-            found.append(_summary(observation))
+            if stored is not None and compute_digest("m10.assessed-subject.v1", stored[1].subject) == subject_digest:
+                found.append(_summary(stored[0]))
         human_ids = (
             await session.execute(
                 sa.select(QualityHumanObservationModel.observation_id).filter_by(
@@ -364,26 +436,44 @@ def _summary(observation: q.TechnicalObservation | q.NarrativeObservation) -> di
 
 @router.get("/projects/{project_name}/quality/runs")
 async def list_runs(project_name: str, root: str, user: CurrentUser, deps: Deps) -> dict[str, Any]:
-    """Every sealed run of the root across subjects and profiles, with validity, readiness and disposition head."""
+    """Every sealed run of the root across subjects and profiles, newest first, with its own profile's cohort and
+    surface, validity, readiness and disposition head."""
     _available(deps)
     reader = _reader(deps)
     project_root = deps.project_root(project_name)
     async with deps.sessions() as session:
         rows = (
-            (await session.execute(sa.select(QualityRunModel).filter_by(user_id=user.id, project_name=project_name)))
+            (
+                await session.execute(
+                    sa.select(QualityRunModel)
+                    .where(
+                        QualityRunModel.user_id == user.id,
+                        QualityRunModel.project_name == project_name,
+                        _json_text(QualityRunModel.run_json, "subject", "master_binding", "root", "artifact_key")
+                        == root,
+                    )
+                    .order_by(QualityRunModel.sealed_at.desc())
+                    .limit(50)
+                )
+            )
             .scalars()
             .all()
         )
         runs = []
-        for row in sorted(rows, key=lambda item: item.sealed_at, reverse=True):
+        for row in rows:
             run = await QualityRunRepository(session).run(user_id=user.id, project_name=project_name, run_id=row.run_id)
-            if run is None or run.subject.master_binding.root.artifact_key != root:
+            if run is None:
                 continue
+            profile = await QualityProfileRepository(session).get_revision(
+                user_id=user.id, project_name=project_name, profile_id=run.profile_id, revision=run.profile_revision
+            )
             head = await session.get(DispositionHeadModel, (user.id, project_name, run.subject_digest, run.profile_id))
             runs.append(
                 {
                     "run": run.model_dump(mode="json"),
                     "run_digest": run_digest(run),
+                    "cohort_id": None if profile is None else profile.cohort_id,
+                    "product_surface": None if profile is None else profile.product_surface,
                     "disposition_version": 0 if head is None else head.version,
                     "current_disposition_id": None if head is None else head.current_disposition_id,
                 }
@@ -392,12 +482,7 @@ async def list_runs(project_name: str, root: str, user: CurrentUser, deps: Deps)
         run = item["run"]
         validity = await _run(
             lambda rid=run["run_id"]: run_validity(
-                deps.sessions,
-                reader,
-                project_root=project_root,
-                user_id=user.id,
-                project_name=project_name,
-                run_id=rid,
+                deps.sessions, reader, project_root=project_root, user_id=user.id, project_name=project_name, run_id=rid
             )
         )
         readiness = await _run(
@@ -425,7 +510,7 @@ class PublishIntent(StrictBody):
     expected_profile_revision: int = Field(ge=0)
     cohort_id: str = Field(min_length=1, max_length=255)
     product_surface: str = Field(min_length=1, max_length=255)
-    policy: dict[str, Any]
+    policy: dict[str, Any] = Field(max_length=32)
     supersession_effect: Literal["HISTORICAL_ONLY", "REEVALUATE_CURRENT"] = "HISTORICAL_ONLY"
 
 
@@ -515,6 +600,15 @@ async def run_probe(
 ) -> dict[str, Any]:
     _available(deps)
     request = _unsealed(deps, "probe", ProbeRequest, user, project_name, body)
+    if deps.catalog is None:
+        # With new probe work disabled only an existing command may continue (receipt replay or ACCEPTED finish).
+        async with deps.sessions() as session:
+            stored = await session.get(
+                QualityProbeInvocationModel,
+                (request.user_id, request.project_name, request.actor_id, request.execution_ref),
+            )
+        if stored is None:
+            raise ServiceUnavailableError(QUALITY_UNAVAILABLE)
 
     async def operation() -> q.TechnicalObservation:
         service = await QualityProbeService.for_request(
@@ -545,7 +639,7 @@ class ReviewIntent(StrictBody):
     revision: int = Field(ge=1)
     root_artifact_key: str
     status: Literal["PASS", "FAIL"]
-    criteria_verdicts: dict[str, Literal["PASS", "FAIL"]]
+    criteria_verdicts: dict[str, Literal["PASS", "FAIL"]] = Field(max_length=8)
     findings: list[FindingRow] = Field(default_factory=list, max_length=32)
     notes: str = Field(default="", max_length=20000)
 

@@ -471,6 +471,7 @@ MESSAGES = {
     "m10_packaging_request_invalid": "该打包请求无效",
     "m10_packaging_unavailable": "本主机激活治理后才能使用打包",
     "m10_quality_request_invalid": "该质量请求无效，请重新准备",
+    "m10_quality_request_too_large": "该质量请求过大",
     "m10_quality_unavailable": "本主机启用认证并激活治理后才能进行质量评估",
     "m10_quality_unauthorized": "无法确认治理授权，请稍后重试",
     "M10_SUBJECT_STALE": "已批准的视频或包已变更，请刷新后重试",

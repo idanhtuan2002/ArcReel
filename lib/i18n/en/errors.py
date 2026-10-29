@@ -529,6 +529,7 @@ MESSAGES = {
     "m10_packaging_request_invalid": "This packaging request is not valid",
     "m10_packaging_unavailable": "Packaging is not available until governance is activated on this host",
     "m10_quality_request_invalid": "This quality request is not valid; prepare it again",
+    "m10_quality_request_too_large": "This quality request is too large",
     "m10_quality_unavailable": "Quality review is not available until authentication and governance are active on this host",
     "m10_quality_unauthorized": "The governance authorization could not be confirmed; try again in a moment",
     "M10_SUBJECT_STALE": "The approved video or package changed; reload and try again",

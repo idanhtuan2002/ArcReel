@@ -45,7 +45,8 @@ def _app(env) -> FastAPI:
 @pytest.fixture
 async def http(closure_host):
     env = closure_host
-    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=_app(env)), base_url="http://test") as client:
+    env["app"] = _app(env)
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=env["app"]), base_url="http://test") as client:
         env["client"] = client
         yield env
 
@@ -192,3 +193,70 @@ async def test_the_routes_are_unavailable_when_authentication_is_disabled(
     monkeypatch.setenv("AUTH_ENABLED", "false")
     response = await env["client"].get(f"{BASE}/profiles")
     assert response.status_code == 503
+
+
+async def test_probe_history_lists_each_command_with_its_attempt_state(http) -> None:
+    env = http
+    chain = await _chain(env)
+    probes = await env["client"].get(
+        f"{BASE}/probes",
+        params={"profile_id": chain["profile"]["profile_id"], "revision": 1, "root": chain["root"]},
+        headers=_headers(),
+    )
+    assert probes.status_code == 200, probes.text
+    rows = sorted(probes.json()["probes"], key=lambda row: row["requirement_id"])
+    assert [(row["requirement_id"], row["attempt_state"], row["status"]) for row in rows] == [
+        ("technical-container", "SUCCEEDED", "PASS"),
+        ("technical-decode", "SUCCEEDED", "PASS"),
+    ]
+
+
+async def test_with_new_probe_work_disabled_only_an_existing_command_continues(http) -> None:
+    env = http
+    chain = await _chain(env)
+    tree, sockets = env["governance"]
+    disabled = quality.QualityDeps(
+        sessions=env["factory"],
+        project_root=lambda _name: env["project"],
+        grant_reader=env["reader"],
+        read_directory=tree / "read",
+        socket_directory=sockets,
+        catalog=None,
+        runtime=env["runtime"],
+        secret=SECRET,
+        custody_uid=os.getuid(),
+        custody_gid=os.getgid(),
+    )
+    env["app"].dependency_overrides[quality.quality_deps] = lambda: disabled
+    replayed = await env["client"].post(f"{BASE}/probes", json=env["sealed"]["probes"], headers=_headers())
+    assert replayed.status_code == 200, replayed.text
+    scope = {"profile_id": chain["profile"]["profile_id"], "revision": 1, "root_artifact_key": chain["root"]}
+    fresh = await env["client"].post(
+        f"{BASE}/probes/prepare",
+        json={"command_id": "probe-new", **scope, "requirement_id": "technical-decode"},
+        headers=_headers(),
+    )
+    assert fresh.status_code == 503
+
+
+async def test_an_oversized_body_is_refused_before_parsing(http) -> None:
+    env = http
+    response = await env["client"].post(
+        f"{BASE}/runs",
+        content=b'{"request": {"x": "' + b"a" * (1 << 20) + b'"}, "seal": "s"}',
+        headers=_headers() | {"Content-Type": "application/json"},
+    )
+    assert response.status_code == 413
+
+
+async def test_an_exact_revision_and_the_runs_own_profile_are_readable(http) -> None:
+    env = http
+    chain = await _chain(env)
+    revision = await env["client"].get(
+        f"{BASE}/profiles/{chain['profile']['profile_id']}/revisions/1", headers=_headers()
+    )
+    assert revision.json()["profile"]["profile_digest"] == chain["profile"]["profile_digest"]
+    [listed] = (await env["client"].get(f"{BASE}/runs", params={"root": chain["root"]}, headers=_headers())).json()[
+        "runs"
+    ]
+    assert (listed["cohort_id"], listed["product_surface"]) == ("cohort-c", "video")

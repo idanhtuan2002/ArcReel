@@ -528,6 +528,7 @@ MESSAGES = {
     "m10_packaging_request_invalid": "Yêu cầu đóng gói không hợp lệ",
     "m10_packaging_unavailable": "Chưa thể đóng gói cho đến khi governance được kích hoạt trên máy chủ này",
     "m10_quality_request_invalid": "Yêu cầu đánh giá chất lượng không hợp lệ; hãy chuẩn bị lại",
+    "m10_quality_request_too_large": "Yêu cầu đánh giá chất lượng quá lớn",
     "m10_quality_unavailable": "Chưa thể đánh giá chất lượng cho đến khi xác thực và governance được kích hoạt trên máy chủ này",
     "m10_quality_unauthorized": "Không xác nhận được quyền governance; hãy thử lại sau ít phút",
     "M10_SUBJECT_STALE": "Video đã duyệt hoặc gói đã thay đổi; tải lại rồi thử lại",

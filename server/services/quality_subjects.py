@@ -43,14 +43,29 @@ def _media_digest(value: str) -> str:
     return "sha256:" + value.removeprefix("sha256:").lower()
 
 
-async def resolve_assessed_subject(
-    session: AsyncSession, project_root: Path, *, user_id: str, project_name: str, root_artifact_key: str
-) -> q.AssessedSubject:
-    """The subject of `root_artifact_key` as the current database masters and manifest describe it."""
+async def manifest_bodies(project_root: Path) -> dict[str, dict[str, Any]]:
+    """The manifest's normalized R2 metadata bodies by artifact key, read once."""
     try:
-        bodies = await asyncio.to_thread(_manifest_bodies, project_root)
+        return await asyncio.to_thread(_manifest_bodies, project_root)
     except (ArtifactManifestError, OSError, ValueError):
         raise SubjectStaleError() from None
+
+
+async def resolve_assessed_subject(
+    session: AsyncSession,
+    project_root: Path,
+    *,
+    user_id: str,
+    project_name: str,
+    root_artifact_key: str,
+    bodies: dict[str, dict[str, Any]] | None = None,
+) -> q.AssessedSubject:
+    """The subject of `root_artifact_key` as the current database masters and manifest describe it.
+
+    `bodies` lets a caller resolving several roots read the manifest once.
+    """
+    if bodies is None:
+        bodies = await manifest_bodies(project_root)
     resolver = DatabaseMasterResolver(
         authorities=MasterAuthorityRepository(session), legacy_projection=file_master_projection(project_root, session)
     )
@@ -111,4 +126,4 @@ async def resolve_assessed_subject(
     return subject
 
 
-__all__ = ["resolve_assessed_subject"]
+__all__ = ["manifest_bodies", "resolve_assessed_subject"]
