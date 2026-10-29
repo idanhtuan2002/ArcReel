@@ -1,0 +1,140 @@
+== heads
+8a5d0f6b1e44 (head)
+== upgrade head
+INFO  [alembic.runtime.migration] Context impl PostgresqlImpl.
+INFO  [alembic.runtime.migration] Will assume transactional DDL.
+INFO  [alembic.runtime.migration] Running upgrade  -> 156fe0aa0414, initial schema
+INFO  [alembic.runtime.migration] Running upgrade 156fe0aa0414 -> ecbb53758daa, add_api_keys_table
+INFO  [alembic.runtime.migration] Running upgrade ecbb53758daa -> b942e8c5d545, unify_timestamps_and_add_fk
+INFO  [alembic.runtime.migration] Running upgrade b942e8c5d545 -> 3c8b0ae43345, fix_truncated_datetime_values
+INFO  [alembic.runtime.migration] Running upgrade 3c8b0ae43345 -> 6cb95261c2b7, add provider currency usage_tokens rename cost_usd to cost_amount
+INFO  [alembic.runtime.migration] Running upgrade 6cb95261c2b7 -> e13e987e2170, add provider_config and system_setting tables
+INFO  [alembic.runtime.migration] Running upgrade e13e987e2170 -> 802fa55d8aff, sdk_session_id upgrade to unique not null
+INFO  [alembic.runtime.migration] Running upgrade 802fa55d8aff -> ea2e1a477bbf, add users table and user_id to models
+INFO  [alembic.runtime.migration] Running upgrade ea2e1a477bbf -> 3c6d6152046e, rename seedance provider to ark
+INFO  [alembic.runtime.migration] Running upgrade 3c6d6152046e -> 2c57c41eca74, add provider credential table
+INFO  [alembic.runtime.migration] Running upgrade 2c57c41eca74 -> 13dcd54b4a4d, add input_tokens and output_tokens to api_calls
+INFO  [alembic.runtime.migration] Running upgrade 13dcd54b4a4d -> 5105eceaf7cb, add custom provider tables
+INFO  [alembic.runtime.migration] Running upgrade 5105eceaf7cb -> 96f747fa47d5, add foreign key to custom_provider_model
+INFO  [alembic.runtime.migration] Running upgrade 96f747fa47d5 -> bda1ff338ff3, add segment_id to api_calls
+INFO  [alembic.runtime.migration] Running upgrade bda1ff338ff3 -> c9b24204c0de, add supported_durations to custom_provider_model
+INFO  [alembic.runtime.migration] Running upgrade c9b24204c0de -> 548f6ca3e91c, add cancelled_by to tasks
+INFO  [alembic.runtime.migration] Running upgrade 548f6ca3e91c -> d67efd76058f, create assets table
+INFO  [alembic.runtime.migration] Running upgrade d67efd76058f -> a89021f43d52, add resolution to custom_provider_model
+INFO  [alembic.runtime.migration] Running upgrade a89021f43d52 -> 0426endpointrefactor, rename api_format→discovery_format, media_type→endpoint
+INFO  [alembic.runtime.migration] Running upgrade 0426endpointrefactor -> a205678752dc, add openai image token columns to api_calls
+INFO  [alembic.runtime.migration] Running upgrade a205678752dc -> eedf0aa985e6, add session store tables
+INFO  [alembic.runtime.migration] Running upgrade eedf0aa985e6 -> 5b87accc10dd, split default_image_backend setting into t2i and i2i
+INFO  [alembic.runtime.migration] Running upgrade 5b87accc10dd -> 4c643f3ff5b9, backfill custom_model supported_durations
+INFO  [alembic.runtime.migration] Running upgrade 4c643f3ff5b9 -> 8b1e8a1290ca, add agent anthropic credentials
+INFO  [alembic.runtime.migration] Running upgrade 8b1e8a1290ca -> 285dbe1e9824, add provider columns to tasks
+INFO  [alembic.runtime.migration] Running upgrade 285dbe1e9824 -> a3f1c9b27e54, extend dedup index to include cancelling status
+INFO  [alembic.runtime.migration] Running upgrade a3f1c9b27e54 -> 7fb52d06b50e, add access_key secret_key to provider_credential
+INFO  [alembic.runtime.migration] Running upgrade 7fb52d06b50e -> a7a9749a1ae0, add max_workers columns to custom_provider
+INFO  [alembic.runtime.migration] Running upgrade a7a9749a1ae0 -> f3d21ac90b17, add session event log table
+INFO  [alembic.runtime.migration] Running upgrade f3d21ac90b17 -> 3b841838ac16, rebuild session event log for typed skill and subagent entries
+INFO  [alembic.runtime.migration] Running upgrade 3b841838ac16 -> bd25b66f82e8, add client_key lookup index for cross-session idempotency
+INFO  [alembic.runtime.migration] Running upgrade bd25b66f82e8 -> e167b56a3e79, add resource_type column to tasks for image_edit dedup
+INFO  [alembic.runtime.migration] Running upgrade e167b56a3e79 -> b41d7c5e9a02, add capability_overrides to custom provider model
+INFO  [alembic.runtime.migration] Running upgrade b41d7c5e9a02 -> 3649100774fa, drop task_events table
+INFO  [alembic.runtime.migration] Running upgrade 3649100774fa -> d10f1df40f96, add audio_path to assets
+INFO  [alembic.runtime.migration] Running upgrade d10f1df40f96 -> b7f2c41d9a30, collapse image backend buckets into the default layer
+INFO  [alembic.runtime.migration] Running upgrade b7f2c41d9a30 -> c4a91f7d2b18, add provider_endpoint to tasks
+INFO  [alembic.runtime.migration] Running upgrade c4a91f7d2b18 -> 6a89c9ef8803, add agent session user message link table
+INFO  [alembic.runtime.migration] Running upgrade 6a89c9ef8803 -> 538db5c3ec76, add agent session superseded_by pointer
+INFO  [alembic.runtime.migration] Running upgrade 538db5c3ec76 -> 9c41ad2f7be5, add agent session fork lineage
+INFO  [alembic.runtime.migration] Running upgrade 9c41ad2f7be5 -> d4f8b1c73a20, add submitted_base_url to tasks
+INFO  [alembic.runtime.migration] Running upgrade d4f8b1c73a20 -> f6a41746c0de, add execution checkpoint to tasks
+INFO  [alembic.runtime.migration] Running upgrade f6a41746c0de -> b3f9c07ae214, split task provider_endpoint (protocol id) from submitted_base_url (request domain)
+INFO  [alembic.runtime.migration] Running upgrade b3f9c07ae214 -> 26c2f9d11c8e, add durable generation batches
+INFO  [alembic.runtime.migration] Running upgrade 26c2f9d11c8e -> 7f2c4d8a91b3, scope active task deduplication by user
+INFO  [alembic.runtime.migration] Running upgrade 7f2c4d8a91b3 -> a1c7e94f0d23, create custom_endpoint table
+INFO  [alembic.runtime.migration] Running upgrade a1c7e94f0d23 -> 3b7c921d5e44, add last provider response
+INFO  [alembic.runtime.migration] Running upgrade 3b7c921d5e44 -> 8c2b1e7d4a90, split minimax video endpoints
+INFO  [alembic.runtime.migration] Running upgrade 8c2b1e7d4a90 -> 9f3c7a52d1b4, create asset_derivatives table
+INFO  [alembic.runtime.migration] Running upgrade 9f3c7a52d1b4 -> c04b7d93e5a1, add budget reservations
+INFO  [alembic.runtime.migration] Running upgrade c04b7d93e5a1 -> 5a7c4a0e0001, add canon authority
+INFO  [alembic.runtime.migration] Running upgrade 5a7c4a0e0001 -> 5b7c4a0e0001, add narrative plans
+INFO  [alembic.runtime.migration] Running upgrade 5b7c4a0e0001 -> 5c7c4a0e0001, add narrative lifecycle evidence
+INFO  [alembic.runtime.migration] Running upgrade 5c7c4a0e0001 -> 5c7c4a0e0002, add narrative decision authority
+INFO  [alembic.runtime.migration] Running upgrade 5c7c4a0e0002 -> 5c7c4a0e0003, add narrative compilation
+INFO  [alembic.runtime.migration] Running upgrade 5c7c4a0e0003 -> 5c7c4a0e0004, add narrative handoff admission
+INFO  [alembic.runtime.migration] Running upgrade 5c7c4a0e0004 -> 6a7c4a0e0001, add adaptation evidence
+INFO  [alembic.runtime.migration] Running upgrade 6a7c4a0e0001 -> 6b7c4a0e0001, add adaptation authority
+INFO  [alembic.runtime.migration] Running upgrade 6b7c4a0e0001 -> 6c7c4a0e0001, add profile reports and waivers
+INFO  [alembic.runtime.migration] Running upgrade 6c7c4a0e0001 -> 6c7c4a0e0002, add screenplay admission
+INFO  [alembic.runtime.migration] Running upgrade 6c7c4a0e0002 -> 7a7c4a0e0001, add execution attempts
+INFO  [alembic.runtime.migration] Running upgrade 7a7c4a0e0001 -> 7b7c4a0e0001, add atomic master promotion
+INFO  [alembic.runtime.migration] Running upgrade 7b7c4a0e0001 -> d80b64c4edcf, add gate a-d receipt tables
+INFO  [alembic.runtime.migration] Running upgrade d80b64c4edcf -> a7c3e9d1f200, add request/task correlation columns
+INFO  [alembic.runtime.migration] Running upgrade a7c3e9d1f200 -> b8d4f0e2a300, add request correlation to api_calls
+INFO  [alembic.runtime.migration] Running upgrade b8d4f0e2a300 -> c9e1f4a2b701, add gate script lock decisions and final cut audio decision (ADR-0092)
+INFO  [alembic.runtime.migration] Running upgrade c9e1f4a2b701 -> 8a8c4a0e0001, add M8 exploration authority (plan 2026-09-13 M8-A, execution contract amendments)
+INFO  [alembic.runtime.migration] Running upgrade 8a8c4a0e0001 -> 8b8c4a0e0001, Add scoped immutable source-frame derivation receipts.
+INFO  [alembic.runtime.migration] Running upgrade 8b8c4a0e0001 -> 8c8c4a0e0001, Add scoped immutable spatial execution evidence.
+INFO  [alembic.runtime.migration] Running upgrade 8c8c4a0e0001 -> 8c9c4a0e0001, Add scoped Take-derived target heads, versions and command receipts.
+INFO  [alembic.runtime.migration] Running upgrade 8c9c4a0e0001 -> 8d8c4a0e0001, Add scoped LOCATION binding heads, versions and command receipts.
+INFO  [alembic.runtime.migration] Running upgrade 8d8c4a0e0001 -> 8e8c4a0e0001, Add scoped spatial pair decision heads and immutable history.
+INFO  [alembic.runtime.migration] Running upgrade 8e8c4a0e0001 -> 8f8c4a0e0001, Add scoped Showrunner grant heads and signed event history.
+INFO  [alembic.runtime.migration] Running upgrade 8f8c4a0e0001 -> 901c4a0e0001, Add scoped spatial review sessions and frame-delivery evidence.
+INFO  [alembic.runtime.migration] Running upgrade 901c4a0e0001 -> 911c4a0e0001, Add scoped V2 pair decision and review session custody.
+INFO  [alembic.runtime.migration] Running upgrade 911c4a0e0001 -> 912c4a0e0001, Add scoped immutable spatial constraint sets.
+INFO  [alembic.runtime.migration] Running upgrade 912c4a0e0001 -> 913c4a0e0001, Add typed spatial promotion sidecars and their coupling to binding-target previews and receipts.
+INFO  [alembic.runtime.migration] Running upgrade 913c4a0e0001 -> 914c4a0e0001, Add scoped append-only M8-D learning observations with a linear correction chain.
+INFO  [alembic.runtime.migration] Running upgrade 914c4a0e0001 -> 915c4a0e0001, Add scoped append-only M8-D recommendations, their evidence and Human decisions.
+INFO  [alembic.runtime.migration] Running upgrade 915c4a0e0001 -> 916c4a0e0001, Add scoped M8-E format profiles, overlay sets, projection plans and append-only reports.
+INFO  [alembic.runtime.migration] Running upgrade 916c4a0e0001 -> 917c4a0e0001, Allow a format slot's first promotion preview to bind no master at version 0 (M8-E amendment).
+INFO  [alembic.runtime.migration] Running upgrade 917c4a0e0001 -> 918c4a0e0001, Bind format review packets to the reviewer's showrunner grant and to neutral review clips (M8-E).
+INFO  [alembic.runtime.migration] Running upgrade 918c4a0e0001 -> 65f53650f3a8, Persist scoped immutable M10 profile publication evidence.
+INFO  [alembic.runtime.migration] Running upgrade 65f53650f3a8 -> 07fd34535384, Persist scoped append-only M10 technical probe custody.
+INFO  [alembic.runtime.migration] Running upgrade 07fd34535384 -> 57f67bae0cb4, Persist scoped M10 run-closure custody.
+INFO  [alembic.runtime.migration] Running upgrade 57f67bae0cb4 -> bed415be3608, Persist scoped M10 Human disposition custody.
+INFO  [alembic.runtime.migration] Running upgrade bed415be3608 -> 4c1f0e2a9b10, Persist known M10 probe failures with their bounded ResourceEvidence.
+INFO  [alembic.runtime.migration] Running upgrade 4c1f0e2a9b10 -> 5d2a7c3e8b11, Admit the M10 PACKAGING candidate kind in the shared M8 revision kernel.
+INFO  [alembic.runtime.migration] Running upgrade 5d2a7c3e8b11 -> 6e3b8d4f9c22, Persist append-only M10-B package-scoped packaging observations.
+INFO  [alembic.runtime.migration] Running upgrade 6e3b8d4f9c22 -> 7f4c9e5a0d33, Persist M10-B package previews, Human selections, their leases and the PACKAGING_SLOT heads.
+INFO  [alembic.runtime.migration] Running upgrade 7f4c9e5a0d33 -> 8a5d0f6b1e44, Persist append-only M10-B export invocations bound to M7 attempts, and their export receipts.
+INFO  [alembic.runtime.migration] Context impl PostgresqlImpl.
+INFO  [alembic.runtime.migration] Will assume transactional DDL.
+8a5d0f6b1e44 (head)
+== downgrade to pre-M10 918c4a0e0001
+INFO  [alembic.runtime.migration] Context impl PostgresqlImpl.
+INFO  [alembic.runtime.migration] Will assume transactional DDL.
+INFO  [alembic.runtime.migration] Running downgrade 8a5d0f6b1e44 -> 7f4c9e5a0d33, Persist append-only M10-B export invocations bound to M7 attempts, and their export receipts.
+INFO  [alembic.runtime.migration] Running downgrade 7f4c9e5a0d33 -> 6e3b8d4f9c22, Persist M10-B package previews, Human selections, their leases and the PACKAGING_SLOT heads.
+INFO  [alembic.runtime.migration] Running downgrade 6e3b8d4f9c22 -> 5d2a7c3e8b11, Persist append-only M10-B package-scoped packaging observations.
+INFO  [alembic.runtime.migration] Running downgrade 5d2a7c3e8b11 -> 4c1f0e2a9b10, Admit the M10 PACKAGING candidate kind in the shared M8 revision kernel.
+INFO  [alembic.runtime.migration] Running downgrade 4c1f0e2a9b10 -> bed415be3608, Persist known M10 probe failures with their bounded ResourceEvidence.
+INFO  [alembic.runtime.migration] Running downgrade bed415be3608 -> 57f67bae0cb4, Persist scoped M10 Human disposition custody.
+INFO  [alembic.runtime.migration] Running downgrade 57f67bae0cb4 -> 07fd34535384, Persist scoped M10 run-closure custody.
+INFO  [alembic.runtime.migration] Running downgrade 07fd34535384 -> 65f53650f3a8, Persist scoped append-only M10 technical probe custody.
+INFO  [alembic.runtime.migration] Running downgrade 65f53650f3a8 -> 918c4a0e0001, Persist scoped immutable M10 profile publication evidence.
+INFO  [alembic.runtime.migration] Context impl PostgresqlImpl.
+INFO  [alembic.runtime.migration] Will assume transactional DDL.
+918c4a0e0001
+== upgrade head again
+INFO  [alembic.runtime.migration] Context impl PostgresqlImpl.
+INFO  [alembic.runtime.migration] Will assume transactional DDL.
+INFO  [alembic.runtime.migration] Running upgrade 918c4a0e0001 -> 65f53650f3a8, Persist scoped immutable M10 profile publication evidence.
+INFO  [alembic.runtime.migration] Running upgrade 65f53650f3a8 -> 07fd34535384, Persist scoped append-only M10 technical probe custody.
+INFO  [alembic.runtime.migration] Running upgrade 07fd34535384 -> 57f67bae0cb4, Persist scoped M10 run-closure custody.
+INFO  [alembic.runtime.migration] Running upgrade 57f67bae0cb4 -> bed415be3608, Persist scoped M10 Human disposition custody.
+INFO  [alembic.runtime.migration] Running upgrade bed415be3608 -> 4c1f0e2a9b10, Persist known M10 probe failures with their bounded ResourceEvidence.
+INFO  [alembic.runtime.migration] Running upgrade 4c1f0e2a9b10 -> 5d2a7c3e8b11, Admit the M10 PACKAGING candidate kind in the shared M8 revision kernel.
+INFO  [alembic.runtime.migration] Running upgrade 5d2a7c3e8b11 -> 6e3b8d4f9c22, Persist append-only M10-B package-scoped packaging observations.
+INFO  [alembic.runtime.migration] Running upgrade 6e3b8d4f9c22 -> 7f4c9e5a0d33, Persist M10-B package previews, Human selections, their leases and the PACKAGING_SLOT heads.
+INFO  [alembic.runtime.migration] Running upgrade 7f4c9e5a0d33 -> 8a5d0f6b1e44, Persist append-only M10-B export invocations bound to M7 attempts, and their export receipts.
+INFO  [alembic.runtime.migration] Context impl PostgresqlImpl.
+INFO  [alembic.runtime.migration] Will assume transactional DDL.
+8a5d0f6b1e44 (head)
+== M10 lineage
+7f4c9e5a0d33 -> 8a5d0f6b1e44 (head), Persist append-only M10-B export invocations bound to M7 attempts, and their export receipts.
+6e3b8d4f9c22 -> 7f4c9e5a0d33, Persist M10-B package previews, Human selections, their leases and the PACKAGING_SLOT heads.
+5d2a7c3e8b11 -> 6e3b8d4f9c22, Persist append-only M10-B package-scoped packaging observations.
+4c1f0e2a9b10 -> 5d2a7c3e8b11, Admit the M10 PACKAGING candidate kind in the shared M8 revision kernel.
+bed415be3608 -> 4c1f0e2a9b10, Persist known M10 probe failures with their bounded ResourceEvidence.
+57f67bae0cb4 -> bed415be3608, Persist scoped M10 Human disposition custody.
+07fd34535384 -> 57f67bae0cb4, Persist scoped M10 run-closure custody.
+65f53650f3a8 -> 07fd34535384, Persist scoped append-only M10 technical probe custody.
+918c4a0e0001 -> 65f53650f3a8, Persist scoped immutable M10 profile publication evidence.
+917c4a0e0001 -> 918c4a0e0001, Bind format review packets to the reviewer's showrunner grant and to neutral review clips (M8-E).

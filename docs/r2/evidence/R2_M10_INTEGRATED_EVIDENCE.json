@@ -1,0 +1,46 @@
+{
+  "schema_id": "m10.integrated-evidence.v1",
+  "integrated_head": "806b46b356927a1c942ba0a02435ea01f2232a27",
+  "code_head": "00912922e",
+  "date": "2026-10-29",
+  "task_c_packet": "NOT_CREATED: the accepted M10-A source head b904bc000 is an ancestor of the M10-A acceptance record 0af66db9e, which is the M10-B base; acceptance binds A and B directly (plan Task C, first item)",
+  "parent_chain": {
+    "m10_a_accepted_source": "b904bc000",
+    "m10_a_acceptance_record": "0af66db9e (docs/r2/evidence/R2_M10_A_ACCEPTANCE.json)",
+    "m10_b_base": "0af66db9e",
+    "m10_b_acceptance": "806b46b35 (docs/r2/evidence/R2_M10_B_ACCEPTANCE.json)",
+    "verified": "git merge-base --is-ancestor b904bc000 HEAD and 0af66db9e HEAD: both true"
+  },
+  "migration_lineage": {
+    "head": "8a5d0f6b1e44",
+    "single_head": true,
+    "m10_chain": [
+      "65f53650f3a8",
+      "07fd34535384",
+      "57f67bae0cb4",
+      "bed415be3608",
+      "4c1f0e2a9b10",
+      "5d2a7c3e8b11",
+      "6e3b8d4f9c22",
+      "7f4c9e5a0d33",
+      "8a5d0f6b1e44"
+    ],
+    "round_trip": "fresh PG16 database: upgrade head -> downgrade 918c4a0e0001 -> upgrade head, all succeeded",
+    "log": "docs/r2/evidence/m10-integrated/migration-lineage.log",
+    "log_sha256": "c4e660b33ee61e442db12f97fa93a16e772b769c6350e1de9b7966dc1fb881a4",
+    "limit": "round trip on an empty database; data-bearing downgrade refusals are covered by the per-migration tests"
+  },
+  "parity": "docs/r2/evidence/R2_M10_B6_DONOR_PARITY.json (Kalinga PASS, OpenMontage PASS, bound to 00912922e); M10-A A7 parity per R2_M10_A_ACCEPTANCE.json",
+  "resources": "B7 run 2: export <= 1.9 s, worker peak <= 23 MB per cohort; probe resource evidence per M10-A",
+  "pilots": "docs/r2/evidence/R2_M10_B7_PILOT_SUMMARY.json: three dossiers, PASSED_WITH_DEVIATIONS",
+  "no_network_no_production_write": {
+    "runtime": "socket(AF_INET) EPERM inside the m10-export unit (m10-b7-pilot/network-experiment.json); probe units under the same A4 envelope",
+    "static": "31 M10 modules (r2/quality, packaging/quality contracts, server/services quality_*/package_export*/packaging_candidates, packaging router, quality repositories): no network/provider SDK imports, no socket use, no Production Authority or upload reference"
+  },
+  "regression": "docs/r2/evidence/R2_M10_B8_SEAL_EVIDENCE.json (2269 passed)",
+  "completion_scope": "local export packages only; no M11, credentials, uploads, publication or deployment",
+  "conditions": {
+    "m10_a": "see R2_M10_A_ACCEPTANCE.json",
+    "m10_b": "see R2_M10_B_ACCEPTANCE.json conditions C1-C6"
+  }
+}
