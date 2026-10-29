@@ -11,6 +11,13 @@ Rewrite in place; resume entry for the quality operator surface.
 - Design: `docs/superpowers/specs/2026-10-29-r2-m10-c-operator-surface-design.md` (subject resolver, host probe
   catalog, quality router, Quality page, Packaging prefill).
 
+## Reviews
+- Design r1 **REWORK** (`m10-c-reviews/design-codex-review.json`): H1 one TECHNICAL requirement with two probe slots
+  can never PASS (shared independence group → INDETERMINATE); H2 closure follows only `master:` refs; H3 a host
+  catalog must be code-embedded, source-reviewed and qualified (A4), not generated JSON; H4 stable command
+  reconstruction / receipt-first replay for every POST; H5 A3/A6 custodians re-verify startup per issuance (no
+  supplied-reader API); M1 profile revision/CAS, disposition head/expiry inputs; M2 Human rubric/segment/evidence
+  derivations; M3 reloadable probe/observation states and authenticated reads.
+
 ## Next step
-Codex design review → implement C1 resolver, C2 catalog, C3 router, C4 UI → review → local Chrome acceptance →
-sponsor activated-host qualification + deploy (sudo) → M9-B.
+Rework the design against r1 (all required changes listed in the review), Codex delta review, then implement.

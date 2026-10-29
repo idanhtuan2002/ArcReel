@@ -1,0 +1,272 @@
+{
+  "schema_id": "m10.c.design-review.v1",
+  "reviewer": "Codex",
+  "review_type": "independent design review against pinned source",
+  "reviewed_head": "89f2f98a22cb1ba8c96580f6bfee5aa5b47d1728",
+  "branch": "design/r2-m10-c-operator-surface",
+  "worktree": "/home/anhtuan/content-production-os/.worktrees/r2-m10-c",
+  "design": "docs/superpowers/specs/2026-10-29-r2-m10-c-operator-surface-design.md",
+  "verdict": "REWORK",
+  "summary": "The operator surface is useful, but the proposed template cannot reach PASS, dependency derivation differs from the accepted closure contract, catalog generation omits its qualification/release boundary, and live request rebuilding loses receipt-first replay. Shared-reader wiring also does not match the accepted publication/disposition factories. These are material design defects, not Low-only objections.",
+  "critical_findings": 0,
+  "high_findings": 5,
+  "findings": [
+    {
+      "id": "H1",
+      "severity": "HIGH",
+      "status": "CONFIRMED",
+      "location": "docs/superpowers/specs/2026-10-29-r2-m10-c-operator-surface-design.md:53-57 (D3)",
+      "scenario": "CONTAINER_STREAM and DECODE both return PASS in the one TECHNICAL requirement. QualityProbeService assigns every technical observation independence_group=host-deterministic-probe. close_run detects the shared group across satisfied slots of that requirement and turns both into INDETERMINATE. PASS disposition is therefore impossible for the intended successful chain. N_OF_M does not fix the shared-group collision when both observations are included.",
+      "evidence": [
+        "server/services/quality_probes.py:69-70,163-164",
+        "r2/quality/runs.py:250-255",
+        "r2/quality/dispositions.py:22-49,104-126"
+      ],
+      "fix": "Use a separate one-slot requirement for each required technical recipe, plus the one-slot Human requirement. Freeze a complete V2 template with explicit rule/config/policy/qualification digests, requirement mode, independence count and freshness for TECHNICAL and NARRATIVE. Do not invent per-recipe independence identities or weaken close_run.",
+      "verification": "Executed pure closure probe: same-requirement PASS observations produced container=INDETERMINATE, decode=INDETERMINATE, human=SATISFIED; separate requirements produced all SATISFIED.",
+      "stop_condition": "Template correction fits existing contracts and services. Changing assessor independence semantics requires separate review."
+    },
+    {
+      "id": "H2",
+      "severity": "HIGH",
+      "status": "CONFIRMED",
+      "location": "docs/superpowers/specs/2026-10-29-r2-m10-c-operator-surface-design.md:34-42 (D1)",
+      "scenario": "D1 traverses every direct_dependencies ref as an approved artifact. The accepted MasterBindingV1 traverses only master: refs; other refs such as claim: are legitimate metadata and do not create master edges. Following them either refuses an otherwise valid master or adds edges the contract rejects. Even master:SH01 is a resource ref, not an encoded artifact key.",
+      "evidence": [
+        "r2/contracts/quality.py:228-293",
+        "r2/contracts/artifact_metadata.py:16-19,38-50",
+        "r2/m3/deliverables.py:62-89",
+        "r2/m3/golden_a.py:74-83"
+      ],
+      "fix": "Decode the parent episode/video key; for each master:<resource> use episode_video_key(parent_episode, resource). Preserve all other dependencies in normalized metadata without adding heads/edges. Require same episode, valid M3 target, child ShotSpec, exact dependency version selected_candidate_id@host_version_ref, normalized media fingerprint equal to the child head, and approval_record equality. Reject missing/cyclic master refs, duplicate/conflicting edges and unreachable heads through the existing constructors. Use DatabaseMasterResolver with file_master_projection, as _subject_authoritative does; get_exact without the projection does not detect manifest/DB divergence. Snapshot every normalized R2 body once and compute each metadata digest, then the binding digest and assessed-subject digest after constructor ordering. artifact_digest must be sha256-prefixed even when head.content_digest is bare hex; artifact_ref is root.object_ref. content_basis_digest is compute_digest(m10.content-basis.v1, normalized root content_basis). Finish with verify_caches. Do not claim independent claim/content-basis owner resolution from this projection.",
+      "verification": "Executed constructor probe: a child claim: dependency is accepted without an extra edge; adding its edge raises master edge closure mismatch.",
+      "stop_condition": "Correct master-only projection needs no new domain contract or accepted-service change. Resolving arbitrary non-master dependencies as approved masters would change the authority model and must stop."
+    },
+    {
+      "id": "H3",
+      "severity": "HIGH",
+      "status": "CONFIRMED",
+      "location": "docs/superpowers/specs/2026-10-29-r2-m10-c-operator-surface-design.md:46-51 (D2)",
+      "scenario": "Hashing whatever ffmpeg/ffprobe is installed and loading generated JSON establishes identity, not qualification. A4 explicitly requires code-embedded, source-reviewed catalogs and same-fixture qualification for new bodies/tools, with no mutable JSON registry. ProbeCatalog validates shape and request matches but has no proof that generated entries passed qualification. The proposed builder also does not specify parser_digest, complete applicability/threshold bodies or recipe-specific parameters: literal ProbeParameters defaults are rejected for LOUDNESS and INTERVALS with SILENCE because require_audio defaults false.",
+      "evidence": [
+        "docs/superpowers/specs/2026-10-27-r2-m10-a4-probes-design.md:Interfaces, trust and input acquisition; Owned paths and qualification gates",
+        "r2/quality/probes.py:408-418,422-453,503-550,612-667,927",
+        "tests/integration/server/services/test_quality_probe_recipes.py:51-68",
+        "tests/unit/r2/quality/test_probes.py:529-537",
+        "docs/r2/evidence/m10-a4-reviews/route-qualification.json"
+      ],
+      "fix": "Choose the accepted source-reviewed immutable catalog mechanism, or explicitly review an amendment for host catalog delivery before implementation. A builder may produce a candidate, but enabling it requires a pinned full catalog/source/tool/parser/runtime/control identity and actual recipe, hostile-input, confinement and M7 recovery fixtures on the intended host. Specify exact policy bodies and per-recipe parameters, canonical entry ordering, bounded immutable loading, ownership and no reload. Unknown, malformed, unqualified or mismatched entries stay unavailable. Keep successful historical replay independent of current catalog/tool availability.",
+      "verification": "Pure ProbeConfig probes confirmed default LOUDNESS and INTERVALS configurations are refused for missing explicit audio requirement. No host qualification was run.",
+      "stop_condition": "Replacing the accepted catalog release/qualification boundary is a design amendment even if ProbeCatalog itself is unchanged. Runtime identity checks alone cannot authorize arbitrary new host configurations."
+    },
+    {
+      "id": "H4",
+      "severity": "HIGH",
+      "status": "CONFIRMED",
+      "location": "docs/superpowers/specs/2026-10-29-r2-m10-c-operator-surface-design.md:43-44,59-69,85 (D1/D4 replay)",
+      "scenario": "The same public command_id is retried after a profile revision/master change or a lost HTTP response. Rebuilding from current root/profile changes the canonical request, so the service conflicts instead of replaying the committed result; if media/manifest is gone, the route fails before service replay. Regenerating profile UUID/created_at, run_id, disposition expiry/head version or finding IDs also changes exact requests even with no authority drift. Blanket 503 when the catalog is absent similarly blocks A4 historical replay before it reaches the service.",
+      "evidence": [
+        "server/services/quality_profiles.py:30-48",
+        "server/services/quality_probes.py:258-283",
+        "server/services/quality_runs.py:261-296,435-469",
+        "server/services/quality_dispositions.py:229-245",
+        "r2/contracts/quality.py:1011-1028,1042-1056"
+      ],
+      "fix": "Specify a stable HTTP command-to-domain-request binding for every mutation. Pin exact profile revision/digest, subject snapshot/digest, generated IDs/timestamps, selected rule and original CAS/expiry inputs at first preparation, and recover/reconstruct the identical envelope on retry before live resolution. Validate that a changed public payload under the same full scoped command key conflicts. Historical replay authenticates the original actor but does not require current media/catalog/grants; report current validity separately. State where the durable binding is recovered from existing storage; if existing rows cannot reconstruct it, stop and review the required persistence/transport extension rather than hiding it in wiring.",
+      "verification": "Source-confirmed receipt-first ordering and canonical-body binding in all four service paths; no HTTP implementation exists to execute.",
+      "stop_condition": "Do not alter accepted replay semantics. A new durable command store, contract or schema requires explicit design review under section 5."
+    },
+    {
+      "id": "H5",
+      "severity": "HIGH",
+      "status": "CONFIRMED",
+      "location": "docs/superpowers/specs/2026-10-29-r2-m10-c-operator-surface-design.md:21,25-27,77-78 (D6)",
+      "scenario": "D6 promises the startup-verified app.state reader for all wiring with unchanged services. HumanObservationService/QualityRunService accept a reader factory, but InteractiveProfilePublicationCustodian and DispositionCustodian do not accept a supplied reader. Every new issuance calls verify_governance_activated_startup again. The attestor refuses a challenge while busy, so concurrent issuance can refuse despite a healthy app reader. Monkeypatching verification or setting private reader/activation fields would bypass accepted custody.",
+      "evidence": [
+        "server/services/quality_profile_custodian.py:55-78,93-109,157-176",
+        "server/services/quality_dispositions.py:85-107,126-143",
+        "server/services/governance_startup.py:41-60,90-94",
+        "server/services/governance_attestation.py:142-156",
+        "server/routers/packaging.py:83-103"
+      ],
+      "fix": "Resolve the contradiction explicitly: retain the accepted custodians and document their fresh-proof path, serialization/refusal behavior and tests, or stop for a separately reviewed host-custody factory change allowing verified-reader reuse without weakening activation, exact request binding, grant locks, DB-time leases and final JWT checks. PackagingDeps cannot be passed directly as publication/disposition custody.",
+      "verification": "Direct factory/signature and issuance-path inspection; no attestor request was made.",
+      "stop_condition": "The shared-reader design as written cannot be implemented through these public factories unchanged. Changing custody admission or injecting private state triggers section 5."
+    },
+    {
+      "id": "M1",
+      "severity": "MEDIUM",
+      "status": "CONFIRMED",
+      "location": "docs/superpowers/specs/2026-10-29-r2-m10-c-operator-surface-design.md:63-69 (revision and CAS DTOs)",
+      "scenario": "Current-only profiles and profile_id-only commands do not identify which immutable revision the operator assessed. Publication edits need expected_profile_revision and stable cohort/surface, while disposition requires expected_disposition_version and requested_expires_at. Silently selecting the newest profile/head when posting changes the action the operator reviewed. The design gives no revision-history/detail route or explicit revision-publication semantics.",
+      "evidence": [
+        "r2/contracts/quality.py:650-696,1011-1028,1042-1056",
+        "server/services/quality_runs.py:169-177,359-376,474-481",
+        "server/services/quality_dispositions.py:268-283,304-317",
+        "server/services/quality_runs.py:647-654"
+      ],
+      "fix": "Define new-profile and revision publication DTOs, immutable revision detail/history reads, expected revision CAS, explicit HISTORICAL_ONLY/REEVALUATE_CURRENT selection, and exact revision/digest selectors in all observation/run actions. Expose the disposition head/version and explicit bounded expiry/waiver inputs or documented stable defaults. Return 409 on stale CAS and require deliberate refresh; preserve user edits and historical runs. No additional domain model is required for these fields."
+    },
+    {
+      "id": "M2",
+      "severity": "MEDIUM",
+      "status": "CONFIRMED",
+      "location": "docs/superpowers/specs/2026-10-29-r2-m10-c-operator-surface-design.md:65-66 (Human evidence)",
+      "scenario": "HumanObservationRequest requires requirement_id, slot_id, rubric_id/digest, segment_closure_digest, reviewer_evidence_digest, evidence_refs and evidence_digest. D4 supplies only status/findings/notes and does not define most derivations. Accepted persistence stores a NarrativeObservation with string refs/digests; it has no evidence-ref body writer. Hashing notes cannot by itself establish a versioned rubric, segment closure, or retrievable immutable evidence body.",
+      "evidence": [
+        "r2/quality/runs.py:60-93",
+        "server/services/quality_runs.py:239-259,313-338",
+        "lib/db/repositories/quality_runs.py:119-149",
+        "r2/quality/ports.py:102-106,189-195"
+      ],
+      "fix": "Specify the fixed Human slot selection, versioned rubric body and canonical digest, exact segment-closure derivation, bounded note/finding normalization and reviewer-evidence digest. Identify an existing scoped immutable evidence owner and reference/read path before claiming notes-body storage. If notes are only stored as observation string evidence_refs, say so explicitly and define that representation and bounds; do not claim a separate body resolver. If a new evidence store/contract is necessary, trigger section 5. Require an explicit Human submission over the displayed exact master/profile and keep agent tokens refused."
+    },
+    {
+      "id": "M3",
+      "severity": "MEDIUM",
+      "status": "CONFIRMED",
+      "location": "docs/superpowers/specs/2026-10-29-r2-m10-c-operator-surface-design.md:59-75,82-89 (reads and failure states)",
+      "scenario": "The page has no specified way to reload outstanding probe invocations or unsealed observations after browser loss. A4 has PLANNED, ACCEPTED-but-unfinalized, FAILED_BEFORE_ACCEPTANCE and unknown/operator-review states with materially different retry rules. A single POST result plus GET runs cannot represent them. Filtering history by a newly resolved subject would also hide stale old-master runs. CurrentUser permits anonymous reads when authentication is disabled, contrary to the stated authenticated surface.",
+      "evidence": [
+        "server/services/quality_probes.py:258-283",
+        "server/services/quality_runs.py:592-661",
+        "server/services/quality_dispositions.py:346-425",
+        "server/auth.py:443-493",
+        "docs/r2/evidence/m10-a4-reviews/route-qualification.json:recovery_properties and limits",
+        "server/routers/packaging.py:109-133"
+      ],
+      "fix": "Define scoped observation/invocation history and detail or an equivalent reloadable aggregate, including failure evidence and pending/unknown states. Never automatically resubmit unknown outcomes; a new execution reference is a separate deliberate attempt. Return immutable run history plus current validity reasons (INVALIDATED, STALE, SUPERSEDED, EXPIRED, CURRENT), readiness/disposition/expiry and head versions, keyed by stored root artifact rather than requiring fresh resolution. Disable Package this run unless current server readiness allows it. Require enabled auth explicitly if all GETs are promised authenticated; otherwise disclose CurrentUser anonymous behavior. Define schema/catalog/custody/runtime unavailability, sanitized error mappings and UI retry behavior. Include auth-off, API-key, cross-scope, expired-session, reload and drift cases in verification."
+    }
+  ],
+  "subject_derivation_assessment": {
+    "verdict": "Incomplete as written; correctable within existing contracts for master-only closure.",
+    "ordering": "Metadata dependencies normalize by ref; MasterBindingV1 orders dependency heads and metadata snapshots by UTF-8 artifact key, and edges by UTF-8 (parent, dependency_ref, child). Build validated models before digesting. Keep root separate from dependency_heads.",
+    "digests": "Compute metadata snapshots with m10.artifact-metadata.v1, then m10.master-binding.v1 and m10.assessed-subject.v1; use m10.content-basis.v1 over the normalized root ContentBasis body. Normalize media SHA-256 exactly as AssessedSubject requires.",
+    "caption_audio": "None is coherent for this explicitly caption/reference/accessibility-free template. It means no separately bound companion artifact, not no embedded audio in the video. DECODE and other recipes may inspect root media audio. Refuse unsupported caption/accessibility/reference requirements rather than fabricating their digests.",
+    "authority": "Final Human/run services lock every consumed DB master and compare every embedded metadata body against the manifest. Resolver results are a projection and may become stale; they grant no authority. This does not certify every non-master dependency owner or extend the accepted file-manifest authority."
+  },
+  "route_boundary_assessment": [
+    {
+      "route": "GET /masters",
+      "boundary": "CurrentUser scope; enabled-auth policy must be explicit. Dry-run projection only; approved metadata alone is not an approved DB master. Per-root refusal status must not expose private object paths."
+    },
+    {
+      "route": "GET /profile-template",
+      "boundary": "CurrentUser; return data only, no UUID/time/publication receipt implying authority. Qualification/config digests must match the qualified host catalog."
+    },
+    {
+      "route": "GET /profiles",
+      "boundary": "CurrentUser; scoped verified repository reads; include revision/history/current-head information. Published data does not confer Human permission."
+    },
+    {
+      "route": "POST /profiles",
+      "boundary": "InteractiveUser plus actual bearer to InteractiveProfilePublicationCustodian and ProfilePublicationService; current signed scoped HUMAN_SHOWRUNNER, persisted issuance, profile CAS and final admission checks. H5 applies."
+    },
+    {
+      "route": "POST /probes",
+      "boundary": "InteractiveUser plus actual bearer to QualityProbeService; exact stored profile/rule, root authority and qualified host runtime/catalog. No separate showrunner lease is required by the accepted technical-probe service. Map command_id deterministically to stable execution_ref. No caller paths/tool/config bodies."
+    },
+    {
+      "route": "POST /reviews",
+      "boundary": "InteractiveUser plus HumanObservationService; exact supported NARRATIVE/HUMAN slot and current scoped showrunner grant through verified reader. Explicit Human evidence submission; server-derived assessor/independence. M2 applies."
+    },
+    {
+      "route": "POST /runs",
+      "boundary": "InteractiveUser plus actual bearer to QualityRunService; server loads scoped observation bodies/digests/types and exact revision/subject. Sealing is evidence completeness, not Human disposition or READY. The accepted service checks current grants of Human evidence producers; it does not require a separate issuer showrunner lease."
+    },
+    {
+      "route": "GET /runs",
+      "boundary": "CurrentUser; scoped stored history and service-computed validity/readiness, using verified reader where required. Never treat replayed historical success as fresh readiness or hide old runs after root drift."
+    },
+    {
+      "route": "POST /dispositions",
+      "boundary": "InteractiveUser plus actual bearer to DispositionCustodian and DispositionService; current signed scoped HUMAN_SHOWRUNNER, persisted DB-time lease, exact run/profile/digests, currentness, CAS and waiver/expiry rules. H5 applies. No Production Authority."
+    }
+  ],
+  "required_design_changes": [
+    "Replace the two-slot technical requirement with separate one-slot requirements; publish a complete digest-bound V2 template and demonstrate PASS through unchanged closure/disposition rules.",
+    "Rewrite D1 as the accepted master:-only closure algorithm with exact key mapping, coherence, normalization, ordering and digest domains.",
+    "Resolve the catalog qualification/release amendment before enabling any generated host catalog; mere hashing and model validation are insufficient.",
+    "Specify durable stable command reconstruction and receipt-first retry for every POST, including drift, missing media/catalog, lost responses and generated identity/time fields.",
+    "Resolve publication/disposition fresh-startup-proof versus shared-reader wiring through public APIs, with an explicit stop if custody behavior must change.",
+    "Define profile revision/history/publication CAS, exact revision selection, supersession policy, disposition head CAS and stable expiry inputs.",
+    "Define Human rubric/segment/reviewer-evidence derivations and the actual notes storage/reference representation; stop if new evidence custody is needed.",
+    "Add reloadable observations/probe-state reads and historical run/readiness states, sanitized unavailability responses and explicit enabled-auth policy.",
+    "Carry R2_M10_ACCEPTANCE conditions C1-C6, including root-owned activated custody, LOCAL_REGULAR_FILE_IO, trusted root, single operator and release/production exclusions; refresh affected evidence at the eventual implementation HEAD."
+  ],
+  "stop_condition_assessment": {
+    "triggered_design_questions": [
+      "H3 changes the accepted catalog delivery/qualification boundary.",
+      "H5 requires either revising the shared-reader promise or reviewing a custody-factory change.",
+      "H4/M2 must identify existing durable command/evidence owners; any new persistence/contract is outside the declared wiring-only scope."
+    ],
+    "not_required_for_corrected_core": "Master-only subject construction, independent one-slot requirements, exact revision/CAS transport fields, scoped reads and UI states can reuse existing domain contracts. No reason was found to alter master locks, run closure, grant qualification, replay rules or disposition authority to build that corrected core.",
+    "production": "No deployment, migration execution, provider/network operation, grant ceremony or production-host action was performed or authorized by this review."
+  },
+  "verification": {
+    "head_before": "89f2f98a22cb1ba8c96580f6bfee5aa5b47d1728",
+    "head_after_source_review": "89f2f98a22cb1ba8c96580f6bfee5aa5b47d1728",
+    "initial_status": "clean; branch matched",
+    "graph": "list_projects succeeded but did not list this worktree as a separate project. index_status, search_graph and check_index_coverage for the requested evidence paths were denied by tool policy (approval policy never). No current graph generation/coverage claim is made; direct numbered source inspection was used.",
+    "executed_probes": [
+      {
+        "command": "PYTHONDONTWRITEBYTECODE=1 .venv/bin/python -B (read-only stdin script using tests.unit.r2.quality.test_runs fixtures)",
+        "result": "Exit 0. Same host group across two technical slots in one requirement => both INDETERMINATE. Separate one-slot requirements => both SATISFIED. No DB/runtime execution."
+      },
+      {
+        "command": "PYTHONDONTWRITEBYTECODE=1 .venv/bin/python -B (ProbeConfig validation with ProbeParameters defaults)",
+        "result": "Exit 0. LOUDNESS and INTERVALS defaults both refused with audio detector requires an explicit audio stream."
+      },
+      {
+        "command": "PYTHONDONTWRITEBYTECODE=1 .venv/bin/python -B (MasterBindingV1 constructor using binding_data fixture)",
+        "result": "Exit 0. claim: dependency retained in metadata without edge is accepted; adding a claim: edge is refused with master edge closure mismatch."
+      }
+    ],
+    "tests_not_run": "No pytest suite, PostgreSQL, HTTP/UI/browser, systemd/confinement, migration or activated-host tests were run. Existing acceptance/test records were read as supplied historical evidence, not independently rerun.",
+    "external_access": "No provider, network or production host access.",
+    "write_scope": "Only docs/r2/evidence/m10-c-reviews/design-codex-review.json; no source edits, formatting, staging or commits.",
+    "limits": "Bounded design review, not a full re-audit of accepted A/B implementations. Live V2 manifest availability and claimed deployed-host observations were not independently verified.",
+    "final_head": "89f2f98a22cb1ba8c96580f6bfee5aa5b47d1728",
+    "artifact_validation": "JSON parsed; verdict and required finding fields validated; severity counts agree; git diff --check passed; only requested review directory untracked."
+  },
+  "files_read": [
+    "docs/superpowers/specs/2026-10-29-r2-m10-c-operator-surface-design.md",
+    "docs/superpowers/specs/2026-10-26-r2-m10-a2-foundation.md",
+    "docs/superpowers/specs/2026-10-27-r2-m10-a3-profile-publication.md",
+    "docs/superpowers/specs/2026-10-27-r2-m10-a4-probes-design.md",
+    "docs/superpowers/specs/2026-10-28-r2-m10-a5-run-closure-design.md",
+    "docs/superpowers/specs/2026-10-28-r2-m10-a6-disposition-design.md",
+    "docs/r2/evidence/R2_M10_ACCEPTANCE.json",
+    "docs/r2/evidence/R2_M10_A_ACCEPTANCE.json",
+    "docs/r2/evidence/m10-a4-reviews/route-qualification.json",
+    "server/services/quality_runs.py",
+    "r2/contracts/quality.py",
+    "r2/contracts/artifact_metadata.py",
+    "r2/quality/digests.py",
+    "r2/quality/runs.py",
+    "r2/quality/probes.py",
+    "r2/quality/ports.py",
+    "server/services/quality_probes.py",
+    "server/services/quality_profiles.py",
+    "server/services/quality_profile_custodian.py",
+    "server/services/quality_dispositions.py",
+    "server/routers/packaging.py",
+    "server/services/quality_probe_runtime.py",
+    "server/services/quality_probe_inputs.py",
+    "server/services/quality_probe_worker.py (targeted build-digest lookup)",
+    "r2/host_hardening/master_resolver.py",
+    "server/services/governance_startup.py",
+    "server/services/governance_attestation.py (targeted attestor handler)",
+    "server/auth.py (authentication dependencies)",
+    "lib/db/repositories/quality_runs.py (targeted receipt/observation/run paths)",
+    "r2/m3/deliverables.py (master ref resolver)",
+    "r2/m3/golden_a.py (non-master dependency producers)",
+    "tests/unit/r2/contracts/test_quality.py (fixtures)",
+    "tests/unit/r2/quality/test_runs.py (fixtures and independence tests)",
+    "tests/unit/r2/quality/test_quality_digests.py (fixtures)",
+    "tests/unit/r2/quality/test_probes.py (config fixtures)",
+    "tests/integration/server/services/test_quality_probe_recipes.py (recipe fixture construction)",
+    "CONTRIBUTING.md (test and verification instructions)",
+    "r2/quality/dispositions.py (decision and readiness rules)"
+  ]
+}
