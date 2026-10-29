@@ -16,7 +16,7 @@
         "donor_test_inventory_digest": "sha256:0040c80cc2abbbcd418292b5d37c3a4fac2480000f91198836dc7394d35c7731",
         "fixture_set_digest": "sha256:f2b45c49fd1b62633f4d63ab7a47afc3dddb8e35ff40185bd69cc3fe6c673900"
       },
-      "integrated_head": "7609bceac923a8972bd5dffae6b96ad075d96507",
+      "integrated_head": "00912922e29c9e991a1aadb695d87fba4426cc40",
       "rows": [
         {
           "behavior_id": "kalinga_title_length",
@@ -224,16 +224,17 @@
         {
           "command": "uv run python -m pytest -q -p no:cacheprovider tests/integration/server/services/test_packaging_donor_parity.py",
           "exit_code": 0,
-          "summary": "18 passed, 1 warning in 2.35s",
-          "junit_sha256": "0c4a95c1ffd0bea4e178df1a79074aecf7d7b2f652abdb9da43b21d8338019c6",
-          "wall_ms": 5899,
-          "rerun_at_head": "7609bceac923a8972bd5dffae6b96ad075d96507",
+          "summary": "18 passed, 1 warning in 2.33s",
+          "junit_sha256": "8262962aa6e52ca29f1bb2ae1a11993ffd98a4c70e01dfdad4bd712d599f0221",
+          "wall_ms": 5866,
+          "rerun_at_head": "00912922e29c9e991a1aadb695d87fba4426cc40",
           "changed_since_07e69875c": [
             "lib/db/repositories/quality_packaging.py",
             "r2/provider_capabilities/registry.json",
             "r2/quality/probes.py",
             "server/routers/packaging.py",
             "server/services/package_export.py",
+            "server/services/package_export_worker.py",
             "server/services/quality_probe_worker.py",
             "tests/fixtures/r2/quality_probes/MANIFEST.json",
             "tests/fixtures/r2/quality_probes/av_fullrange.mp4"
@@ -259,7 +260,7 @@
         "donor_test_inventory_digest": "sha256:a55112f3fe5efca8f21050f072c664534e4ae72e6a692faa18f990631c926f4a",
         "fixture_set_digest": "sha256:f2b45c49fd1b62633f4d63ab7a47afc3dddb8e35ff40185bd69cc3fe6c673900"
       },
-      "integrated_head": "7609bceac923a8972bd5dffae6b96ad075d96507",
+      "integrated_head": "00912922e29c9e991a1aadb695d87fba4426cc40",
       "rows": [
         {
           "behavior_id": "openmontage_missing_video",
@@ -445,16 +446,17 @@
         {
           "command": "uv run python -m pytest -q -p no:cacheprovider tests/integration/server/services/test_packaging_donor_parity.py",
           "exit_code": 0,
-          "summary": "18 passed, 1 warning in 2.35s",
-          "junit_sha256": "0c4a95c1ffd0bea4e178df1a79074aecf7d7b2f652abdb9da43b21d8338019c6",
-          "wall_ms": 5899,
-          "rerun_at_head": "7609bceac923a8972bd5dffae6b96ad075d96507",
+          "summary": "18 passed, 1 warning in 2.33s",
+          "junit_sha256": "8262962aa6e52ca29f1bb2ae1a11993ffd98a4c70e01dfdad4bd712d599f0221",
+          "wall_ms": 5866,
+          "rerun_at_head": "00912922e29c9e991a1aadb695d87fba4426cc40",
           "changed_since_07e69875c": [
             "lib/db/repositories/quality_packaging.py",
             "r2/provider_capabilities/registry.json",
             "r2/quality/probes.py",
             "server/routers/packaging.py",
             "server/services/package_export.py",
+            "server/services/package_export_worker.py",
             "server/services/quality_probe_worker.py",
             "tests/fixtures/r2/quality_probes/MANIFEST.json",
             "tests/fixtures/r2/quality_probes/av_fullrange.mp4"

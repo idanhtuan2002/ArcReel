@@ -1,0 +1,19 @@
+import asyncio, sys, time, collections
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).parent))
+import pilot_host as h
+async def main(pilot, cohort):
+    h._apply_env(pilot, cohort)
+    f = h._factory(); env = await h._env_dict(pilot, f)
+    async def one():
+        t = time.perf_counter()
+        try:
+            await env["reader"](); r = "ok"
+        except Exception as e:
+            r = type(e).__name__ + ":" + repr(e.__cause__ or e.__context__)[:120]
+        return r, (time.perf_counter() - t) * 1000
+    async with h._attestor(env):
+        for n in (1, 2, 4, 8, 16):
+            res = await asyncio.gather(*[one() for _ in range(n)])
+            print(n, dict(collections.Counter(r for r, _ in res)), "max_ms", round(max(t for _, t in res)))
+asyncio.run(main(Path(sys.argv[1]).resolve(), sys.argv[2]))

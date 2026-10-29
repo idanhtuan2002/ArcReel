@@ -1,0 +1,48 @@
+"""Slot reads concurrent with an export of the same slot: latencies, errors and completion (no deadlock)."""
+import asyncio, json, statistics, sys, time
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).parent))
+import pilot_host as h
+async def main(pilot, cohort, readers, out):
+    h._apply_env(pilot, cohort)
+    from server import auth
+    from server.routers import packaging
+    from server.services.package_export import PackageExportService
+    from lib.db import async_session_factory
+    from lib.db.repositories.quality_packaging import PackageSelectionRepository
+    from r2.contracts import packaging as p
+    from r2.quality.digests import compute_digest
+    f = h._factory(); env = await h._env_dict(pilot, f); state = env["state"]
+    slot = {"source_artifact_key": state["root_key"], "cohort_id": "cohort", "product_surface": "video"}
+    key = p.PackagingSlotKey(user_id="default", project_name="project", **slot)
+    async with async_session_factory() as s:
+        sid, _ = await PackageSelectionRepository(s).current_head(key)
+        sel = await PackageSelectionRepository(s).selection(user_id="default", project_name="project", selection_id=sid)
+    cached = {}
+    async def startup_reader():
+        return cached["reader"]
+    def service():
+        return PackageExportService(sessions=async_session_factory, grant_reader=startup_reader, project_root=env["project"], interactive_token=auth.create_token("actor"))
+    async def read(i):
+        t = time.perf_counter()
+        try:
+            st = await service().slot_status(key, "actor"); ok = (st.exportable, st.refusal_code)
+        except Exception as e:
+            ok = repr(e)
+        return (time.perf_counter() - t) * 1000, ok
+    async def export(cmd):
+        t = time.perf_counter()
+        r = await service().export(packaging._export_request("default", "actor", "project", packaging.ExportBody(command_id=cmd, **slot, selection_id=sid, selection_digest=compute_digest("m10.package-selection.v1", sel))))
+        return (time.perf_counter() - t) * 1000, r.archive_digest
+    async with h._attestor(env):
+        cached["reader"] = await env["reader"]()
+        alone = [await read(i) for i in range(5)]
+        started = time.perf_counter()
+        results = await asyncio.wait_for(asyncio.gather(export("contention-export"), *[read(i) for i in range(readers)]), timeout=120)
+        total = (time.perf_counter() - started) * 1000
+    lat = [r[0] for r in results[1:]]
+    doc = {"readers": readers, "uncontended_read_ms_median": statistics.median(r[0] for r in alone),
+           "contended_read_ms": {"median": statistics.median(lat), "max": max(lat)}, "export_ms": results[0][0],
+           "wall_ms": total, "read_outcomes": sorted({str(r[1]) for r in results[1:]}), "export_digest": results[0][1], "completed_without_deadlock": True}
+    Path(out).write_text(json.dumps(doc, indent=2)); print(json.dumps(doc, indent=2))
+asyncio.run(main(Path(sys.argv[1]).resolve(), sys.argv[2], int(sys.argv[3]), sys.argv[4]))

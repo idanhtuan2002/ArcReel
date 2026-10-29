@@ -1,0 +1,90 @@
+{
+  "schema_id": "m10.b8-seal-evidence.v1",
+  "code_head": "00912922e29c9e991a1aadb695d87fba4426cc40",
+  "date": "2026-10-29",
+  "regression_suite": {
+    "selection": [
+      "tests/integration/server/services/test_format_projection_flow.py",
+      "tests/integration/server/services/test_format_render.py",
+      "tests/integration/server/services/test_format_review.py",
+      "tests/integration/server/services/test_format_validation.py",
+      "tests/integration/server/services/test_governance_attestation.py",
+      "tests/integration/server/services/test_package_export.py",
+      "tests/integration/server/services/test_packaging_donor_parity.py",
+      "tests/integration/server/services/test_quality_dispositions.py",
+      "tests/integration/server/services/test_quality_kalinga_parity.py",
+      "tests/integration/server/services/test_quality_package_selection.py",
+      "tests/integration/server/services/test_quality_packaging.py",
+      "tests/integration/server/services/test_quality_probe_recipes.py",
+      "tests/integration/server/services/test_quality_probe_runtime.py",
+      "tests/integration/server/services/test_quality_probes.py",
+      "tests/integration/server/services/test_quality_profile_custodian.py",
+      "tests/integration/server/services/test_quality_profiles.py",
+      "tests/integration/server/services/test_quality_runs.py",
+      "tests/integration/server/routers/test_packaging_routes.py",
+      "tests/integration/lib/db/repositories/test_advanced_creative.py",
+      "tests/integration/lib/db/repositories/test_formats.py",
+      "tests/integration/lib/db/repositories/test_quality_dispositions.py",
+      "tests/integration/lib/db/repositories/test_quality_probes.py",
+      "tests/integration/lib/db/repositories/test_quality_profiles_repository.py",
+      "tests/integration/lib/db/repositories/test_quality_runs.py",
+      "tests/integration/lib/db/migrations/test_07fd34535384_quality_probe_evidence.py",
+      "tests/integration/lib/db/migrations/test_4c1f0e2a9b10_quality_probe_failures.py",
+      "tests/integration/lib/db/migrations/test_57f67bae0cb4_quality_run_closure.py",
+      "tests/integration/lib/db/migrations/test_5d2a7c3e8b11_m8_packaging_candidate_kind.py",
+      "tests/integration/lib/db/migrations/test_65f53650f3a8_quality_profile_publication.py",
+      "tests/integration/lib/db/migrations/test_6e3b8d4f9c22_m10_packaging_observations.py",
+      "tests/integration/lib/db/migrations/test_7f4c9e5a0d33_m10_package_selection.py",
+      "tests/integration/lib/db/migrations/test_8a5d0f6b1e44_m10_export_custody.py",
+      "tests/integration/lib/db/migrations/test_bed415be3608_quality_disposition.py",
+      "tests/unit/r2/quality",
+      "tests/unit/r2/contracts",
+      "tests/unit/r2/advanced_creative",
+      "tests/unit/r2/host_hardening",
+      "tests/unit/r2/governance",
+      "tests/unit/server/services/test_package_export_worker.py",
+      "tests/unit/server/services/test_package_export_plan.py",
+      "tests/unit/lib/i18n/test_i18n_consistency.py"
+    ],
+    "result": {
+      "tests": 2269,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "junit_sha256": "6023d84062441bd2939176193122552eb7bd6fa8f99c472ea8e2d4d17b39428c",
+    "environment": "PG16 disposable container, real systemd/Landlock confined workers, ffmpeg 8.0.1"
+  },
+  "frontend": {
+    "command": "(cd frontend && pnpm check)",
+    "result": "exit 0, 235 files, 2643 passed (at 29168da35; frontend unchanged since)"
+  },
+  "matrix": {
+    "F1": "B0 accepted (b1/b2 reviews); suite above includes 4c1f0e2a9b10 migration + failure-evidence tests",
+    "Step 1": "B1 accepted (b1-codex-delta-review.json)",
+    "Shared schema": "5d2a7c3e8b11 migration round trip in suite; M8 advanced creative unit+integration in suite",
+    "Contracts": "tests/unit/r2/contracts in suite; B1 accepted",
+    "Packaging checks": "tests/unit/r2/quality + test_quality_packaging in suite; B2 accepted; B7 seeded recall 7/7 x3",
+    "Selection": "test_quality_package_selection + route tests (incl. custody owner, slot interleavings) in suite; B3 accepted",
+    "Export": "test_package_export (34 incl. full disk, failed rename, interruption after publication, unknown outcome re-request) in suite; same-selection re-export identical and cross-root content members identical (B7 run 2); export route requalified (export-route-qualification.json requalifications[0])",
+    "Host regression": "format_* (M8-E), advanced creative (M8), quality_* (M10-A), governance attestation in suite; probe route requalified for yuvj420p (route-qualification.json requalifications[0])",
+    "Donor parity": "R2_M10_B6_DONOR_PARITY.json bound to 00912922e29c9e991a1aadb695d87fba4426cc40: Kalinga PASS, OpenMontage PASS",
+    "UI": "i18n consistency in suite; pnpm check; live Chrome axe-core all rules incl. color-contrast: 0 violations empty + populated refusal/history (m10-b8/a11y-live-chrome.json); keyboard traversal: every packaging control focusable with a visible focus ring; app-shell episode button lacks a visible ring (outside M10)",
+    "Pilots": "R2_M10_B7_PILOT_SUMMARY.json v2: PASSED_WITH_DEVIATIONS (agent-performed Human gates under delegation; English master for zh)",
+    "Surface": "socket EPERM in the m10-export unit (m10-b7-pilot/network-experiment.json); no upload/credential surface; static scan per B4"
+  },
+  "b8_changes": {
+    "f5f06b87c": "full disk (ENOSPC/EDQUOT/EFBIG) is a known ENVELOPE_EXCEEDED refusal; crash-cut tests",
+    "00912922e": "routes reuse the startup-verified grant reader (per-request startup proof failed under concurrency: attestor serves one proof at a time)"
+  },
+  "measurements": {
+    "slot_contention": "m10-b8/slot-contention.json: 20 concurrent slot reads + 1 export: all succeed, no deadlock; reads serialize on the slot advisory lock (uncontended 0.44 s, contended median 5.2 s, max 9.9 s; export 9.1 s vs 0.9 s alone)"
+  },
+  "limits": [
+    "fsync failure shares the rename OSError branch and is not separately injected",
+    "slot reads take an exclusive advisory lock and recompute readiness (master hashing): fine for one operator, a follow-up if many concurrent viewers are expected",
+    "Human-gate custodians still request a fresh attestation per authorization; concurrent Human gates refuse one another (one operator)",
+    "export qualification junit was captured before a lint-only assert split in test_package_export.py"
+  ],
+  "carried_to_m10_acceptance": "see R2_M10_B_CANDIDATE.json carried_conditions (B7 C1-C3, LOCAL_REGULAR_FILE_IO trusted root, M10-A-F1 items)"
+}

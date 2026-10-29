@@ -1,0 +1,288 @@
+{
+  "empty": [],
+  "refusal_history_text": "EXPORT\nExport archive\n\nExport is not available right now (M10_DISPOSITION_STALE). Run the check and select again.\n\nExporting creates a local archive only; nothing is uploaded or published.\n\nExported archives\n79d2d6215386 Download is available only while this selection is current",
+  "refusal_history": [],
+  "tab_order": [
+    {
+      "tag": "INPUT",
+      "label": "Quality run digest",
+      "outline": "solid 2px",
+      "shadow": false,
+      "disabled": false
+    },
+    {
+      "tag": "INPUT",
+      "label": "Title",
+      "outline": "solid 2px",
+      "shadow": false,
+      "disabled": false
+    },
+    {
+      "tag": "INPUT",
+      "label": "Tags (comma separated)",
+      "outline": "solid 2px",
+      "shadow": false,
+      "disabled": false
+    },
+    {
+      "tag": "TEXTAREA",
+      "label": "Description",
+      "outline": "solid 2px",
+      "shadow": false,
+      "disabled": false
+    },
+    {
+      "tag": "INPUT",
+      "label": "Hashtags (comma separated)",
+      "outline": "solid 2px",
+      "shadow": false,
+      "disabled": false
+    },
+    {
+      "tag": "TEXTAREA",
+      "label": "Chapters (JSON list of start_ms and titl",
+      "outline": "solid 2px",
+      "shadow": false,
+      "disabled": false
+    },
+    {
+      "tag": "TEXTAREA",
+      "label": "Alternative groups (JSON list)",
+      "outline": "solid 2px",
+      "shadow": false,
+      "disabled": false
+    },
+    {
+      "tag": "TEXTAREA",
+      "label": "Localized metadata (JSON list)",
+      "outline": "solid 2px",
+      "shadow": false,
+      "disabled": false
+    },
+    {
+      "tag": "TEXTAREA",
+      "label": "Assets (JSON list)",
+      "outline": "solid 2px",
+      "shadow": false,
+      "disabled": false
+    },
+    {
+      "tag": "INPUT",
+      "label": "Audience category",
+      "outline": "solid 2px",
+      "shadow": false,
+      "disabled": false
+    },
+    {
+      "tag": "INPUT",
+      "label": "Age restriction (leave blank for none)",
+      "outline": "solid 2px",
+      "shadow": false,
+      "disabled": false
+    },
+    {
+      "tag": "INPUT",
+      "label": "Classification policy digest",
+      "outline": "solid 2px",
+      "shadow": false,
+      "disabled": false
+    },
+    {
+      "tag": "INPUT",
+      "label": "Disclosure policy digest",
+      "outline": "solid 2px",
+      "shadow": false,
+      "disabled": false
+    },
+    {
+      "tag": "INPUT",
+      "label": " Contains synthetic media",
+      "outline": "auto 1px",
+      "shadow": false,
+      "disabled": false
+    },
+    {
+      "tag": "INPUT",
+      "label": " Paid promotion",
+      "outline": "auto 1px",
+      "shadow": false,
+      "disabled": false
+    },
+    {
+      "tag": "INPUT",
+      "label": "Video artifact key",
+      "outline": "solid 2px",
+      "shadow": false,
+      "disabled": false
+    },
+    {
+      "tag": "INPUT",
+      "label": "Cohort",
+      "outline": "solid 2px",
+      "shadow": false,
+      "disabled": false
+    },
+    {
+      "tag": "INPUT",
+      "label": "Product surface",
+      "outline": "solid 2px",
+      "shadow": false,
+      "disabled": false
+    },
+    {
+      "tag": "BUTTON",
+      "label": "Refresh status",
+      "outline": "solid 2px",
+      "shadow": false,
+      "disabled": false
+    },
+    {
+      "tag": "BUTTON",
+      "label": "Open agent panel",
+      "outline": "auto 3px",
+      "shadow": true,
+      "disabled": false
+    },
+    {
+      "tag": "BODY",
+      "label": "Projects\nM\nM10-B7 pilot · zh_shuang\nNARR",
+      "outline": "none 3px",
+      "shadow": false,
+      "disabled": false
+    },
+    {
+      "tag": "BUTTON",
+      "label": "Projects",
+      "outline": "none 1px",
+      "shadow": true,
+      "disabled": false
+    },
+    {
+      "tag": "BUTTON",
+      "label": "M\nM10-B7 pilot · zh_shuang\nNARRATION · 1",
+      "outline": "none 1px",
+      "shadow": true,
+      "disabled": false
+    },
+    {
+      "tag": "BUTTON",
+      "label": "Open notification center",
+      "outline": "none 1px",
+      "shadow": true,
+      "disabled": false
+    },
+    {
+      "tag": "BUTTON",
+      "label": "—",
+      "outline": "none 1px",
+      "shadow": true,
+      "disabled": false
+    },
+    {
+      "tag": "BUTTON",
+      "label": "Toggle task panel",
+      "outline": "none 1px",
+      "shadow": true,
+      "disabled": false
+    },
+    {
+      "tag": "BUTTON",
+      "label": "Export current project ZIP",
+      "outline": "none 1px",
+      "shadow": true,
+      "disabled": false
+    },
+    {
+      "tag": "BUTTON",
+      "label": "Asset Library",
+      "outline": "none 1px",
+      "shadow": true,
+      "disabled": false
+    },
+    {
+      "tag": "BUTTON",
+      "label": "Settings",
+      "outline": "none 1px",
+      "shadow": true,
+      "disabled": false
+    },
+    {
+      "tag": "BUTTON",
+      "label": "Overview",
+      "outline": "none 1px",
+      "shadow": true,
+      "disabled": false
+    },
+    {
+      "tag": "BUTTON",
+      "label": "Story",
+      "outline": "none 1px",
+      "shadow": true,
+      "disabled": false
+    },
+    {
+      "tag": "BUTTON",
+      "label": "Source files\n0",
+      "outline": "none 1px",
+      "shadow": true,
+      "disabled": false
+    },
+    {
+      "tag": "BUTTON",
+      "label": "Characters\n0",
+      "outline": "none 1px",
+      "shadow": true,
+      "disabled": false
+    },
+    {
+      "tag": "BUTTON",
+      "label": "Scenes\n0",
+      "outline": "none 1px",
+      "shadow": true,
+      "disabled": false
+    },
+    {
+      "tag": "BUTTON",
+      "label": "Props\n0",
+      "outline": "none 1px",
+      "shadow": true,
+      "disabled": false
+    },
+    {
+      "tag": "BUTTON",
+      "label": "Formats",
+      "outline": "none 1px",
+      "shadow": true,
+      "disabled": false
+    },
+    {
+      "tag": "BUTTON",
+      "label": "Packaging",
+      "outline": "none 1px",
+      "shadow": true,
+      "disabled": false
+    },
+    {
+      "tag": "BUTTON",
+      "label": "Learning",
+      "outline": "none 1px",
+      "shadow": true,
+      "disabled": false
+    },
+    {
+      "tag": "INPUT",
+      "label": "Search episode by name or number…",
+      "outline": "none 1px",
+      "shadow": true,
+      "disabled": false
+    },
+    {
+      "tag": "BUTTON",
+      "label": "E1\nGió Bão Xé Toạc Màn Đêm Và Chiếc Thuy",
+      "outline": "none 1px",
+      "shadow": false,
+      "disabled": false
+    }
+  ],
+  "focus_visible_all": false
+}

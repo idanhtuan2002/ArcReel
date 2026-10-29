@@ -1,0 +1,15 @@
+{
+  "readers": 20,
+  "uncontended_read_ms_median": 436.6876220010454,
+  "contended_read_ms": {
+    "median": 5211.821450502612,
+    "max": 9937.798065999232
+  },
+  "export_ms": 9070.425606994831,
+  "wall_ms": 9942.064472998027,
+  "read_outcomes": [
+    "(True, None)"
+  ],
+  "export_digest": "sha256:73fbddbeb06316d8c7b1db2012914ae2c800a74d3b7750ee2a56acbcb7a9932a",
+  "completed_without_deadlock": true
+}
