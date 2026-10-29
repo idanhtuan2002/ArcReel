@@ -20,15 +20,20 @@ from r2.contracts.opportunity import (
     CoverageState,
     EffectiveCapabilityEvaluation,
     EvidenceDataClassClock,
+    EvidenceValidityProjection,
+    EvidenceValidityState,
     M9ContractModel,
     NormalizedSourceObservation,
+    OpportunityIdentityRead,
     SnapshotPage,
+    SnapshotReadPage,
     SourceCapabilityGrant,
     SourceDataRule,
     SourcePageRequest,
     SourcePageResult,
     SourceQuery,
     SourceSnapshot,
+    SourceSnapshotView,
 )
 from r2.contracts.opportunity_acquisition_v2 import (
     AcquireSourceQueryV2,
@@ -37,6 +42,7 @@ from r2.contracts.opportunity_acquisition_v2 import (
     AttemptStateV2,
     SnapshotOriginV2,
     SnapshotProvenanceV2,
+    SourceSnapshotViewV2,
 )
 from r2.opportunity.acquisition import (
     AcquisitionProfileReadPort,
@@ -46,7 +52,12 @@ from r2.opportunity.acquisition import (
     verified_query,
 )
 from r2.opportunity.capabilities import validate_capability
-from r2.opportunity.digests import digest_source_observation, digest_source_snapshot
+from r2.opportunity.digests import (
+    digest_capability_grant,
+    digest_evidence_validity,
+    digest_source_observation,
+    digest_source_snapshot,
+)
 from r2.opportunity.errors import OpportunityError, StopCode
 from r2.opportunity.manual_admission import (
     AdmissionClosureIntent,
@@ -292,6 +303,13 @@ class ManualCleanupState(M9ContractModel):
 
 
 class ManualAcquisitionRepositoryPort(Protocol):
+    async def get_snapshot(
+        self, snapshot_id: str, revision: int = 1
+    ) -> tuple[SourceSnapshot, SnapshotProvenanceV2] | None: ...
+    async def list_snapshot_ids(self, query_id: str, *, after_id: str | None, limit: int) -> tuple[str, ...]: ...
+    async def require_snapshot_read(
+        self, attempt_id: str, *, expected_envelope_version: int, operational: bool
+    ) -> None: ...
     async def get_cleanup_subject(
         self, command: AcquireSourceQueryV2
     ) -> tuple[AcquisitionAttemptV2, ManualBindingDescriptor] | None: ...
@@ -363,6 +381,10 @@ class ManualAcquisitionStorePort(Protocol):
     def transaction(self) -> AbstractAsyncContextManager[ManualAcquisitionTransactionPort]: ...
 
 
+class OpportunitySnapshotNotFoundError(LookupError):
+    pass
+
+
 class OpportunityAcquisitionServiceV2:
     def __init__(
         self,
@@ -411,6 +433,169 @@ class OpportunityAcquisitionServiceV2:
             if receipt is None:
                 raise OpportunityError(StopCode.M9_REQUIRED_EVIDENCE_MISSING)
             return receipt
+
+    async def get_snapshot(self, request: OpportunityIdentityRead) -> SourceSnapshotViewV2:
+        try:
+            return await self._get_snapshot(request)
+        except (OpportunityError, OpportunitySnapshotNotFoundError):
+            raise
+        except Exception:
+            raise OpportunityError(StopCode.M9_REQUIRED_EVIDENCE_MISSING) from None
+
+    async def _get_snapshot(self, request: OpportunityIdentityRead) -> SourceSnapshotViewV2:
+        try:
+            request = OpportunityIdentityRead.model_validate(request.model_dump())
+        except (ValueError, TypeError):
+            raise OpportunityError(StopCode.M9_SOURCE_POLICY_FORBIDDEN) from None
+        if (request.user_id, request.project_name) != (self.user_id, self.project_name):
+            raise OpportunityError(StopCode.M9_SOURCE_POLICY_FORBIDDEN)
+        async with self.store.transaction() as tx:
+            stored = await tx.manual.get_snapshot(request.identity, request.revision or 1)
+            if stored is None:
+                raise OpportunitySnapshotNotFoundError
+            snapshot, provenance = stored
+            envelope = await tx.manual.get_envelope(snapshot.attempt_id)
+            checkpoints = await tx.manual.list_checkpoints(snapshot.attempt_id)
+            query = await tx.queries.get_exact(snapshot.query_id, snapshot.query_revision)
+        if envelope is None or len(checkpoints) != 1 or query is None or query.query_digest != snapshot.query_digest:
+            raise OpportunityError(StopCode.M9_REQUIRED_EVIDENCE_MISSING)
+        self._binding(envelope.request.descriptor)
+        state, available, reason = await self._snapshot_read_state(envelope)
+        if available and not await self._snapshot_source_available(query):
+            state, available, reason = EvidenceValidityState.STALE, False, StopCode.M9_SOURCE_CAPABILITY_UNAVAILABLE
+        elif available:
+            state, available, reason = await self._snapshot_read_state(envelope)
+        if available:
+            verified = await self._checkpoint(envelope, None, operational=False)
+            original = checkpoints[0]
+            normalized = original.model_copy(
+                update={
+                    "page": original.page.model_copy(update={"provider_request_id": None}),
+                    "provider_observed_at": None,
+                    "quota_units_observed": None,
+                }
+            )
+            if verified != normalized:
+                raise OpportunityError(StopCode.M9_RAW_DIGEST_MISMATCH)
+            state, available, reason = await self._snapshot_read_state(envelope)
+            if available and not await self._snapshot_source_available(query):
+                state, available, reason = (
+                    EvidenceValidityState.STALE,
+                    False,
+                    StopCode.M9_SOURCE_CAPABILITY_UNAVAILABLE,
+                )
+            elif available:
+                state, available, reason = await self._snapshot_read_state(envelope)
+        async with self.store.transaction() as tx:
+            if await tx.manual.get_snapshot(snapshot.snapshot_id, snapshot.revision) != stored:
+                raise OpportunityError(StopCode.M9_STALE_HEAD)
+        validity = EvidenceValidityProjection(
+            state=state,
+            invalidation_job_id=None,
+            reason_code=None if reason is None else reason.value,
+            invalidated_at=None,
+            erasable_content_available=available,
+            projection_digest="sha256:" + "0" * 64,
+        )
+        validity = validity.model_copy(
+            update={
+                "projection_digest": digest_evidence_validity(
+                    user_id=self.user_id,
+                    project_name=self.project_name,
+                    identity=snapshot.snapshot_id,
+                    revision=snapshot.revision,
+                    projection=validity,
+                )
+            }
+        )
+        return SourceSnapshotViewV2(
+            protocol_version="m9.acquisition.v2",
+            snapshot_view=SourceSnapshotView(snapshot=snapshot, validity=validity),
+            provenance=provenance,
+        )
+
+    async def _snapshot_source_available(self, query: SourceQuery) -> bool:
+        if self.capabilities is None:
+            raise OpportunityError(StopCode.M9_SOURCE_CAPABILITY_UNAVAILABLE)
+        try:
+            grant = SourceCapabilityGrant.model_validate(
+                (await self.capabilities.resolve_grant(query.capability_grant_id)).model_dump()
+            )
+            if digest_capability_grant(grant) != grant.grant_digest:
+                raise ValueError("source grant integrity differs")
+        except Exception:
+            raise OpportunityError(StopCode.M9_SOURCE_CAPABILITY_UNAVAILABLE) from None
+        return (
+            grant.user_id,
+            grant.project_name,
+            grant.source_kind,
+            grant.source_contract_version,
+            grant.grant_id,
+            grant.grant_version,
+            grant.grant_digest,
+        ) == (
+            self.user_id,
+            self.project_name,
+            query.source_kind,
+            query.source_contract_version,
+            query.capability_grant_id,
+            query.capability_grant_version,
+            query.capability_grant_digest,
+        )
+
+    async def _snapshot_read_state(
+        self, envelope: AdmissionEnvelope
+    ) -> tuple[EvidenceValidityState, bool, StopCode | None]:
+        history = {StopCode.M9_STALE_HEAD, StopCode.M9_COHORT_LEAKAGE, StopCode.M9_EVIDENCE_STALE}
+        unavailable = {
+            *history,
+            StopCode.M9_EVIDENCE_RETENTION_EXPIRED,
+            StopCode.M9_INVALIDATION_INCOMPLETE,
+            StopCode.M9_SOURCE_POLICY_FORBIDDEN,
+            StopCode.M9_SOURCE_CAPABILITY_UNAVAILABLE,
+            StopCode.M9_CREDENTIAL_REFERENCE_INVALID,
+        }
+        try:
+            async with self.store.transaction() as tx:
+                await tx.manual.require_snapshot_read(
+                    envelope.request.attempt_id, expected_envelope_version=envelope.version, operational=True
+                )
+        except OpportunityError as error:
+            if error.code not in unavailable:
+                raise
+            if error.code not in history:
+                return EvidenceValidityState.STALE, False, StopCode(error.code)
+            try:
+                async with self.store.transaction() as tx:
+                    await tx.manual.require_snapshot_read(
+                        envelope.request.attempt_id, expected_envelope_version=envelope.version, operational=False
+                    )
+            except OpportunityError as retained:
+                if retained.code not in unavailable:
+                    raise
+                return EvidenceValidityState.STALE, False, StopCode(retained.code)
+            return EvidenceValidityState.STALE, True, StopCode(error.code)
+        return EvidenceValidityState.CURRENT, True, None
+
+    async def list_snapshots(self, request: SnapshotReadPage) -> tuple[SourceSnapshotViewV2, ...]:
+        try:
+            request = SnapshotReadPage.model_validate(request.model_dump())
+        except (ValueError, TypeError):
+            raise OpportunityError(StopCode.M9_SOURCE_POLICY_FORBIDDEN) from None
+        if (request.user_id, request.project_name) != (self.user_id, self.project_name):
+            raise OpportunityError(StopCode.M9_SOURCE_POLICY_FORBIDDEN)
+        async with self.store.transaction() as tx:
+            identities = await tx.manual.list_snapshot_ids(
+                request.query_id, after_id=request.after_id, limit=request.limit
+            )
+        return tuple(
+            [
+                await self.get_snapshot(
+                    OpportunityIdentityRead(user_id=self.user_id, project_name=self.project_name, identity=identity)
+                )
+                for identity in identities
+            ]
+        )
 
     async def acquire(self, command: AcquireSourceQueryV2) -> AcquisitionReceiptV2:
         command = self._command(command)
@@ -847,11 +1032,17 @@ class OpportunityAcquisitionServiceV2:
             command, attempt, envelope, checkpoint, None, origin=SnapshotOriginV2.LOCAL_ADMISSION_RECONSTRUCTION
         )
 
-    async def _checkpoint(self, envelope: AdmissionEnvelope, response: SourcePageResult | None) -> PageCheckpoint:
+    async def _checkpoint(
+        self, envelope: AdmissionEnvelope, response: SourcePageResult | None, *, operational: bool = True
+    ) -> PageCheckpoint:
         binding = self._binding(envelope.request.descriptor)
         async with self.store.transaction() as tx:
+            if not operational:
+                await tx.manual.require_snapshot_read(
+                    envelope.request.attempt_id, expected_envelope_version=envelope.version, operational=False
+                )
             permit = await tx.manual.begin_read(
-                envelope.request.attempt_id, expected_envelope_version=envelope.version, operational=True
+                envelope.request.attempt_id, expected_envelope_version=envelope.version, operational=operational
             )
         try:
             materials = {}

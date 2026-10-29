@@ -28,7 +28,7 @@ from tests.integration.server.services.test_m9_manual_publication import prepare
 
 
 async def service_subject(
-    factory, tmp_path, *, boundary=None, refresh_seconds=60, retention_seconds=120, cleanup=False
+    factory, tmp_path, *, boundary=None, refresh_seconds=60, retention_seconds=120, cleanup=False, read_boundary=None
 ):
     module = importlib.import_module("r2.opportunity.acquisition_v2")
     host = importlib.import_module("server.services.opportunity_acquisition_v2")
@@ -119,7 +119,10 @@ async def service_subject(
         async def read_verified(self, envelope, *, object_ref, permit):
             assert active.get() == 0
             calls.append("read")
-            return await publication.read_verified(envelope, object_ref=object_ref, permit=permit)
+            raw = await publication.read_verified(envelope, object_ref=object_ref, permit=permit)
+            if read_boundary is not None:
+                await read_boundary()
+            return raw
 
         async def delete_exact(self, closure):
             assert active.get() == 0
@@ -1373,3 +1376,487 @@ async def test_v2_cleanup_rechecks_newly_discovered_public_refs_before_deleting_
         state = await tx.manual.get_cleanup_state(acquired.attempt_id)
         assert (state.intent.phase, state.intent.version) == ("CLEANUP_PENDING", 2)
         assert state.proof is None
+
+
+@pytest.mark.parametrize("reconstruction", [False, True])
+async def test_v2_snapshot_readers_verify_original_material_and_keep_provenance(
+    session_factory, tmp_path, reconstruction
+):
+    from r2.contracts.opportunity import OpportunityIdentityRead, SnapshotReadPage
+
+    async def stop_after_claim(name):
+        if reconstruction and name == "claim-committed":
+            raise ConnectionError("synthetic lost claim acknowledgement")
+
+    service, command, calls, _ = await service_subject(session_factory, tmp_path, boundary=stop_after_claim)
+    receipt = await service.acquire(command)
+    if reconstruction:
+        receipt = await service.reconcile_manual_admission(command)
+    assert len(receipt.snapshot_ids) == 1
+    before = calls.count("fetch"), calls.count("admit"), calls.count("read")
+    request = OpportunityIdentityRead(user_id="u1", project_name="show-a", identity=receipt.snapshot_ids[0])
+    view = await service.get_snapshot(request)
+    assert view.protocol_version == "m9.acquisition.v2"
+    assert view.snapshot_view.snapshot.snapshot_id == receipt.snapshot_ids[0]
+    assert view.snapshot_view.validity.state == "CURRENT"
+    assert view.snapshot_view.validity.erasable_content_available is True
+    assert view.provenance.origin == (
+        "LOCAL_ADMISSION_RECONSTRUCTION" if reconstruction else "SOURCE_RESPONSE_VERIFIED"
+    )
+    assert view.provenance.admitted_at == view.snapshot_view.snapshot.capture_completed_at
+    assert view.snapshot_view.snapshot.provider_observed_at is None
+    page = await service.list_snapshots(
+        SnapshotReadPage(user_id="u1", project_name="show-a", query_id=command.query_id, after_id=None, limit=10)
+    )
+    assert page == (view,)
+    assert (calls.count("fetch"), calls.count("admit")) == before[:2]
+    assert calls.count("read") > before[2]
+
+
+@pytest.mark.parametrize("foreign", ["user_id", "project_name", "identity"])
+async def test_v2_snapshot_read_scope_and_missing_identity_never_open_material(session_factory, tmp_path, foreign):
+    from r2.contracts.opportunity import OpportunityIdentityRead
+
+    service, command, calls, _ = await service_subject(session_factory, tmp_path)
+    receipt = await service.acquire(command)
+    body = {"user_id": "u1", "project_name": "show-a", "identity": receipt.snapshot_ids[0]}
+    body[foreign] = "foreign"
+    before = list(calls)
+    if foreign == "identity":
+        with pytest.raises(LookupError):
+            await service.get_snapshot(OpportunityIdentityRead(**body))
+    else:
+        with pytest.raises(OpportunityError, match="M9_SOURCE_POLICY_FORBIDDEN"):
+            await service.get_snapshot(OpportunityIdentityRead(**body))
+    assert calls == before
+
+
+async def await_snapshot_deadline(service, attempt_id, field):
+    async with service.store.transaction() as tx:
+        envelope = await tx.manual.get_envelope(attempt_id)
+        deadline = getattr(envelope.deadlines, field)
+    assert deadline is not None
+    async with asyncio.timeout(50):
+        while True:
+            async with service.store.transaction() as tx:
+                now = await tx.profiles.database_time()
+            if now >= deadline:
+                return
+            reached = asyncio.Event()
+            timer = asyncio.get_running_loop().call_later((deadline - now).total_seconds(), reached.set)
+            try:
+                await reached.wait()
+            finally:
+                timer.cancel()
+
+
+async def test_v2_snapshot_history_becomes_stale_then_unavailable_at_original_deadlines(session_factory, tmp_path):
+    from r2.contracts.opportunity import OpportunityIdentityRead
+
+    service, command, calls, _ = await service_subject(
+        session_factory, tmp_path, refresh_seconds=20, retention_seconds=35
+    )
+    receipt = await service.acquire(command)
+    request = OpportunityIdentityRead(user_id="u1", project_name="show-a", identity=receipt.snapshot_ids[0])
+    await await_snapshot_deadline(service, receipt.attempt_id, "refresh_due_at")
+    stale = await service.get_snapshot(request)
+    assert stale.snapshot_view.validity.state == "STALE"
+    assert stale.snapshot_view.validity.erasable_content_available is True
+    await await_snapshot_deadline(service, receipt.attempt_id, "retention_due_at")
+    before = list(calls)
+    expired = await service.get_snapshot(request)
+    assert expired.snapshot_view.validity.state == "STALE"
+    assert expired.snapshot_view.validity.erasable_content_available is False
+    assert expired.snapshot_view.snapshot == stale.snapshot_view.snapshot
+    assert expired.provenance == stale.provenance
+    assert calls == before
+
+
+async def test_v2_erased_snapshot_history_never_reopens_material(session_factory, tmp_path):
+    from r2.contracts.opportunity import OpportunityIdentityRead
+
+    service, command, calls, _ = await service_subject(session_factory, tmp_path, cleanup=True)
+    receipt = await service.acquire(command)
+    erased = await service.reconcile_cleanup(command)
+    assert erased.phase == "ERASED"
+    before = list(calls)
+    view = await service.get_snapshot(
+        OpportunityIdentityRead(user_id="u1", project_name="show-a", identity=receipt.snapshot_ids[0])
+    )
+    assert view.snapshot_view.validity.state == "STALE"
+    assert view.snapshot_view.validity.erasable_content_available is False
+    assert view.provenance.snapshot_id == receipt.snapshot_ids[0]
+    assert calls == before
+
+
+async def record_known_source_revocation(service, command, *, entered=None, held=None, release=None):
+    from r2.advanced_creative.exploration import uuid7
+    from r2.contracts.opportunity import PermissionDisposition
+    from r2.opportunity.digests import (
+        digest_capability_evaluation,
+        digest_capability_grant,
+        digest_condition_evidence,
+    )
+
+    async with service.store.transaction() as tx:
+        if entered is not None:
+            from sqlalchemy import text
+
+            entered.set_result(await tx.session.scalar(text("SELECT pg_backend_pid()")))
+        query = await tx.queries.get_exact(command.query_id, command.query_revision)
+        grant = await tx.capabilities.get_grant(query.capability_grant_id, query.capability_grant_version)
+        original = await tx.capabilities.get_evaluation(query.capability_evaluation_id)
+        grant = grant.model_copy(
+            update={"grant_version": grant.grant_version + 1, "permission": PermissionDisposition.FORBIDDEN}
+        )
+        grant = grant.model_copy(update={"grant_digest": digest_capability_grant(grant)})
+        evaluation = original.model_copy(
+            update={
+                "evaluation_id": uuid7(),
+                "grant_version": grant.grant_version,
+                "grant_digest": grant.grant_digest,
+                "effective_permission": PermissionDisposition.FORBIDDEN,
+                "condition_evidence_digest": digest_condition_evidence(
+                    grant_id=grant.grant_id,
+                    grant_version=grant.grant_version,
+                    grant_digest=grant.grant_digest,
+                    condition_evidence=original.condition_evidence,
+                ),
+            }
+        )
+        evaluation = evaluation.model_copy(
+            update={"evaluation_digest": digest_capability_evaluation(evaluation, actor_id=command.context.actor_id)}
+        )
+        await tx.capabilities.consume(grant, evaluation, actor_id=command.context.actor_id)
+        if held is not None:
+            held.set()
+        if release is not None:
+            await release.wait()
+
+
+async def test_v2_snapshot_reader_refuses_current_from_known_newer_source_revocation(session_factory, tmp_path):
+    from r2.contracts.opportunity import OpportunityIdentityRead
+
+    service, command, calls, _ = await service_subject(session_factory, tmp_path)
+    receipt = await service.acquire(command)
+    await record_known_source_revocation(service, command)
+    before = list(calls)
+    view = await service.get_snapshot(
+        OpportunityIdentityRead(user_id="u1", project_name="show-a", identity=receipt.snapshot_ids[0])
+    )
+    assert view.snapshot_view.validity.state == "STALE"
+    assert view.snapshot_view.validity.erasable_content_available is False
+    assert calls == before
+
+
+async def test_v2_snapshot_reader_checks_the_configured_source_grant_without_issuing_evaluation(
+    session_factory, tmp_path
+):
+    from r2.contracts.opportunity import OpportunityIdentityRead, PermissionDisposition
+    from r2.opportunity.digests import digest_capability_grant
+
+    service, command, calls, _ = await service_subject(session_factory, tmp_path)
+    receipt = await service.acquire(command)
+    trusted = service.capabilities
+
+    class KnownRevokedSource:
+        async def resolve_grant(self, ref):
+            original = await trusted.resolve_grant(ref)
+            changed = original.model_copy(
+                update={"grant_version": original.grant_version + 1, "permission": PermissionDisposition.FORBIDDEN}
+            )
+            return changed.model_copy(update={"grant_digest": digest_capability_grant(changed)})
+
+        async def evaluate(self, request):
+            raise AssertionError("a snapshot GET cannot issue a capability evaluation")
+
+    service.capabilities = KnownRevokedSource()
+    before = calls.count("read")
+    view = await service.get_snapshot(
+        OpportunityIdentityRead(user_id="u1", project_name="show-a", identity=receipt.snapshot_ids[0])
+    )
+    assert view.snapshot_view.validity.state == "STALE"
+    assert view.snapshot_view.validity.erasable_content_available is False
+    assert calls.count("read") == before
+
+
+@pytest.mark.parametrize("change", ["revocation", "retention", "erase-fence"])
+async def test_v2_snapshot_read_rechecks_authority_after_verified_material(session_factory, tmp_path, change):
+    from r2.contracts.opportunity import OpportunityIdentityRead
+
+    armed = False
+    remaining = 0
+
+    async def pause_cleanup(name):
+        if armed and name == "cleanup-fenced-committed":
+            raise ConnectionError("synthetic lost acknowledgement after the erasure fence")
+
+    async def after_verified_read():
+        nonlocal remaining
+        if not armed:
+            return
+        remaining -= 1
+        if remaining != 0:
+            return
+        if change == "revocation":
+            await record_known_source_revocation(service, command)
+        elif change == "retention":
+            await await_snapshot_deadline(service, receipt.attempt_id, "retention_due_at")
+        else:
+            closure = await service.reconcile_cleanup(command)
+            assert closure.version == 1
+
+    service, command, calls, _ = await service_subject(
+        session_factory,
+        tmp_path,
+        boundary=pause_cleanup,
+        read_boundary=after_verified_read,
+        refresh_seconds=20 if change == "retention" else 60,
+        retention_seconds=35 if change == "retention" else 120,
+        cleanup=True,
+    )
+    receipt = await service.acquire(command)
+    async with service.store.transaction() as tx:
+        envelope = await tx.manual.get_envelope(receipt.attempt_id)
+        remaining = len(envelope.objects)
+    armed = True
+    view = await service.get_snapshot(
+        OpportunityIdentityRead(user_id="u1", project_name="show-a", identity=receipt.snapshot_ids[0])
+    )
+    armed = False
+    assert remaining == 0
+    assert view.snapshot_view.validity.state == "STALE"
+    assert view.snapshot_view.validity.erasable_content_available is False
+    assert calls.count("fetch") == calls.count("admit") == 1
+    if change == "erase-fence":
+        assert (await service.reconcile_cleanup(command)).phase == "ERASED"
+
+
+async def test_v2_snapshot_reader_marks_forged_material_unavailable_even_after_file_restore(session_factory, tmp_path):
+    import hashlib
+
+    from lib.db.models.opportunity import M9EventModel
+    from r2.advanced_creative.digests import canonical_json_bytes
+    from r2.contracts.opportunity import OpportunityIdentityRead
+
+    service, command, calls, publication = await service_subject(session_factory, tmp_path, cleanup=True)
+    receipt = await service.acquire(command)
+    async with service.store.transaction() as tx:
+        envelope = await tx.manual.get_envelope(receipt.attempt_id)
+    obj = next(o for o in envelope.objects if o.evidence_kind == "raw-page")
+    payload = next(publication.root.rglob(obj.payload_ref.rsplit(":", 1)[1] + ".bin"))
+    integrity = next(publication.root.rglob(obj.integrity_ref.rsplit(":", 1)[1] + ".json"))
+    old_payload, old_integrity = payload.read_bytes(), integrity.read_bytes()
+    altered = b"PRIVATE_NATIVE_SOURCE_CANARY"
+    payload.write_bytes(altered)
+    integrity.write_bytes(
+        canonical_json_bytes(
+            {
+                "payload_ref": obj.payload_ref,
+                "integrity_ref": obj.integrity_ref,
+                "digest": "sha256:" + hashlib.sha256(altered).hexdigest(),
+            }
+        )
+    )
+    request = OpportunityIdentityRead(user_id="u1", project_name="show-a", identity=receipt.snapshot_ids[0])
+    with pytest.raises(OpportunityError, match="M9_RAW_DIGEST_MISMATCH") as refused:
+        await service.get_snapshot(request)
+    assert "PRIVATE_NATIVE_SOURCE_CANARY" not in str(refused.value)
+    payload.write_bytes(old_payload)
+    integrity.write_bytes(old_integrity)
+    before = list(calls)
+    with pytest.raises(OpportunityError, match="M9_RAW_DIGEST_MISMATCH"):
+        await service.get_snapshot(request)
+    assert await service.acquire(command) == receipt
+    assert calls == before
+    async with session_factory() as session:
+        events = await session.scalar(
+            select(func.count())
+            .select_from(M9EventModel)
+            .where(
+                M9EventModel.aggregate_id == receipt.attempt_id,
+                M9EventModel.event_kind == "MANUAL_MATERIAL_UNAVAILABLE",
+            )
+        )
+    assert events == 1
+    assert (await service.reconcile_cleanup(command)).phase == "ERASED"
+
+
+async def test_v2_snapshot_reader_sanitizes_transport_failure_and_retries_without_dispatch(session_factory, tmp_path):
+    from r2.contracts.opportunity import OpportunityIdentityRead
+
+    armed = False
+
+    async def lose_read_ack():
+        if armed:
+            raise ConnectionError("SYNTHETIC_PRIVATE_RESPONSE_CANARY")
+
+    service, command, calls, _ = await service_subject(session_factory, tmp_path, read_boundary=lose_read_ack)
+    receipt = await service.acquire(command)
+    request = OpportunityIdentityRead(user_id="u1", project_name="show-a", identity=receipt.snapshot_ids[0])
+    armed = True
+    with pytest.raises(OpportunityError, match="M9_REQUIRED_EVIDENCE_MISSING") as refused:
+        await service.get_snapshot(request)
+    assert "SYNTHETIC_PRIVATE_RESPONSE_CANARY" not in str(refused.value)
+    armed = False
+    recovered = await service.get_snapshot(request)
+    assert recovered.snapshot_view.validity.state == "CURRENT"
+    assert recovered.provenance.snapshot_id == receipt.snapshot_ids[0]
+    assert calls.count("fetch") == calls.count("admit") == 1
+
+
+async def test_v2_snapshot_permission_changed_while_resolving_grant_blocks_first_material_read(
+    session_factory, tmp_path
+):
+    from r2.contracts.opportunity import OpportunityIdentityRead
+
+    service, command, calls, _ = await service_subject(session_factory, tmp_path)
+    receipt = await service.acquire(command)
+    trusted = service.capabilities
+
+    class ChangedDuringResolution:
+        async def resolve_grant(self, ref):
+            original = await trusted.resolve_grant(ref)
+            await record_known_source_revocation(service, command)
+            return original
+
+        async def evaluate(self, request):
+            raise AssertionError("snapshot reads cannot issue evaluations")
+
+    service.capabilities = ChangedDuringResolution()
+    before = calls.count("read")
+    view = await service.get_snapshot(
+        OpportunityIdentityRead(user_id="u1", project_name="show-a", identity=receipt.snapshot_ids[0])
+    )
+    assert view.snapshot_view.validity.state == "STALE"
+    assert view.snapshot_view.validity.erasable_content_available is False
+    assert calls.count("read") == before
+
+
+async def test_v2_known_newer_source_revocation_prevents_admission_and_dispatch(session_factory, tmp_path):
+    service, command, calls, _ = await service_subject(session_factory, tmp_path)
+    await record_known_source_revocation(service, command)
+    with pytest.raises(OpportunityError, match="M9_SOURCE_CAPABILITY_UNAVAILABLE"):
+        await service.acquire(command)
+    assert "fetch" not in calls
+    assert "admit" not in calls
+    async with service.store.transaction() as tx:
+        attempt = await tx.manual.get_for_command(command)
+        assert attempt is None
+
+
+async def wait_for_capability_blocker(session_factory, waiting, blocking, task):
+    from sqlalchemy import text
+
+    async with asyncio.timeout(10), session_factory() as observer:
+        while True:
+            blockers = await observer.scalar(text("SELECT pg_blocking_pids(:pid)"), {"pid": waiting})
+            if blocking in blockers:
+                return
+            if task.done():
+                await task
+                pytest.fail("a newer grant committed while the original grant was being validated")
+
+
+async def test_v2_snapshot_authority_guard_serializes_a_newer_grant_writer(session_factory, tmp_path):
+    from sqlalchemy import text
+
+    from r2.contracts.opportunity import OpportunityIdentityRead
+
+    service, command, calls, _ = await service_subject(session_factory, tmp_path)
+    receipt = await service.acquire(command)
+    async with service.store.transaction() as tx:
+        envelope = await tx.manual.get_envelope(receipt.attempt_id)
+    start = asyncio.Event()
+    writer_pid = asyncio.get_running_loop().create_future()
+
+    async def write_revocation():
+        await start.wait()
+        await record_known_source_revocation(service, command, entered=writer_pid)
+
+    writer = asyncio.create_task(write_revocation())
+    try:
+        async with service.store.transaction() as tx:
+            reader_pid = await tx.session.scalar(text("SELECT pg_backend_pid()"))
+            await tx.manual.require_snapshot_read(
+                receipt.attempt_id, expected_envelope_version=envelope.version, operational=True
+            )
+            start.set()
+            waiting = await asyncio.wait_for(writer_pid, timeout=10)
+            await wait_for_capability_blocker(session_factory, waiting, reader_pid, writer)
+    finally:
+        start.set()
+        await asyncio.gather(writer, return_exceptions=True)
+    await writer
+    before = list(calls)
+    view = await service.get_snapshot(
+        OpportunityIdentityRead(user_id="u1", project_name="show-a", identity=receipt.snapshot_ids[0])
+    )
+    assert view.snapshot_view.validity.state == "STALE"
+    assert view.snapshot_view.validity.erasable_content_available is False
+    assert calls == before
+
+
+async def test_v2_snapshot_waiting_for_newer_grant_commit_refuses_current_without_material_io(
+    session_factory, tmp_path
+):
+    from uuid import uuid4
+
+    from sqlalchemy import text
+
+    from r2.contracts.opportunity import OpportunityIdentityRead
+
+    service, command, calls, _ = await service_subject(session_factory, tmp_path)
+    receipt = await service.acquire(command)
+    held, release = asyncio.Event(), asyncio.Event()
+    writer_pid = asyncio.get_running_loop().create_future()
+    writer = asyncio.create_task(
+        record_known_source_revocation(service, command, entered=writer_pid, held=held, release=release)
+    )
+    reader = None
+    trusted = service.store
+    tag = "m9-snapshot-head-" + uuid4().hex
+
+    class TaggedReader:
+        @asynccontextmanager
+        async def transaction(self):
+            async with trusted.transaction() as tx:
+                await tx.session.execute(text("SELECT set_config('application_name',:tag,true)"), {"tag": tag})
+                yield tx
+
+    try:
+        await asyncio.wait_for(held.wait(), timeout=10)
+        blocking = await writer_pid
+        service.store = TaggedReader()
+        before = list(calls)
+        async with asyncio.timeout(10), session_factory() as observer:
+            await observer.execute(text("SELECT count(*) FROM pg_stat_activity WHERE datname=current_database()"))
+            reader = asyncio.create_task(
+                service.get_snapshot(
+                    OpportunityIdentityRead(user_id="u1", project_name="show-a", identity=receipt.snapshot_ids[0])
+                )
+            )
+            while True:
+                await observer.execute(text("SELECT pg_stat_clear_snapshot()"))
+                waiting = await observer.scalar(
+                    text(
+                        "SELECT pid FROM pg_stat_activity WHERE application_name=:tag "
+                        "AND :blocking = ANY(pg_blocking_pids(pid))"
+                    ),
+                    {"tag": tag, "blocking": blocking},
+                )
+                if waiting is not None:
+                    break
+                if reader.done():
+                    await reader
+                    pytest.fail("snapshot read did not wait for the newer grant authority")
+        release.set()
+        await writer
+        view = await reader
+        assert view.snapshot_view.validity.state == "STALE"
+        assert view.snapshot_view.validity.erasable_content_available is False
+        assert calls == before
+    finally:
+        release.set()
+        await asyncio.gather(writer, *([] if reader is None else [reader]), return_exceptions=True)
+        service.store = trusted

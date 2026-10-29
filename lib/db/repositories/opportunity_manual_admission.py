@@ -796,6 +796,14 @@ class ManualAdmissionRepository:
             account_binding_digest=grant.account_binding_digest,
         )
         validate_capability(grant, evaluation, request, now=await self.profiles.database_time())
+        latest = await self.capabilities.get_latest_grant(query.capability_grant_id)
+        if latest is None:
+            raise OpportunityError(_MISSING)
+        if (latest.grant_version, latest.grant_digest) != (
+            query.capability_grant_version,
+            query.capability_grant_digest,
+        ):
+            raise OpportunityError(StopCode.M9_SOURCE_CAPABILITY_UNAVAILABLE)
 
     async def _upload_guard(self, claim_ref: str, upload_version: int) -> None:
         digest = digest_canonical(
@@ -1847,6 +1855,45 @@ class ManualAdmissionRepository:
         stored = await self._snapshot_record(row)
         return stored.snapshot, stored.provenance
 
+    async def list_snapshot_ids(self, query_id: str, *, after_id: str | None, limit: int) -> tuple[str, ...]:
+        statement = (
+            select(M9SourceSnapshotModel.snapshot_id)
+            .join(
+                M9AcquisitionAttemptModel,
+                (M9AcquisitionAttemptModel.user_id == M9SourceSnapshotModel.user_id)
+                & (M9AcquisitionAttemptModel.project_name == M9SourceSnapshotModel.project_name)
+                & (M9AcquisitionAttemptModel.attempt_id == M9SourceSnapshotModel.attempt_id),
+            )
+            .where(
+                M9SourceSnapshotModel.user_id == self.user_id,
+                M9SourceSnapshotModel.project_name == self.project_name,
+                M9SourceSnapshotModel.query_id == query_id,
+                M9SourceSnapshotModel.revision == 1,
+                M9AcquisitionAttemptModel.protocol_version == "m9.acquisition.v2",
+            )
+            .order_by(M9SourceSnapshotModel.snapshot_id)
+            .limit(limit)
+        )
+        if after_id is not None:
+            statement = statement.where(M9SourceSnapshotModel.snapshot_id > after_id)
+        return tuple(await self.session.scalars(statement))
+
+    async def require_snapshot_read(
+        self, attempt_id: str, *, expected_envelope_version: int, operational: bool
+    ) -> None:
+        _, record = await self._guard(attempt_id, operational=operational)
+        envelope = await self._envelope(record, lock=True)
+        if envelope is None or envelope.version != expected_envelope_version:
+            raise OpportunityError(_STALE)
+        require_admission_access(envelope, now=await self.profiles.database_time(), operational=operational)
+        if await self._material_unavailable(record):
+            raise OpportunityError(StopCode.M9_RAW_DIGEST_MISMATCH)
+        query = await self.queries.get_exact(record.command.query_id, record.command.query_revision)
+        if query is None:
+            raise OpportunityError(_MISSING)
+        if not operational:
+            await self._require_capability(record, query)
+
     async def _snapshot_row_for_attempt(self, attempt_id: str) -> M9SourceSnapshotModel | None:
         return (
             await self.session.scalars(
@@ -1973,6 +2020,7 @@ class ManualAdmissionRepository:
             if query is None:
                 raise OpportunityError(_MISSING)
             queries[attempt_id] = query
+            identities.add(("grant-head", query.capability_grant_id))
             identities.add(("grant", query.capability_grant_id, str(query.capability_grant_version)))
             identities.add(("evaluation", query.capability_evaluation_id))
         # Match CapabilityEvidenceRepository.consume's existing advisory identities.

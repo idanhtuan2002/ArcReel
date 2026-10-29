@@ -131,6 +131,20 @@ class CapabilityEvidenceRepository:
         )
         return None if row is None else _grant(row)
 
+    async def get_latest_grant(self, grant_id: str) -> SourceCapabilityGrant | None:
+        row = await self.session.scalar(
+            select(M9ConsumedCapabilityGrantModel)
+            .where(
+                M9ConsumedCapabilityGrantModel.user_id == self.user_id,
+                M9ConsumedCapabilityGrantModel.project_name == self.project_name,
+                M9ConsumedCapabilityGrantModel.grant_id == grant_id,
+            )
+            .order_by(M9ConsumedCapabilityGrantModel.grant_version.desc())
+            .limit(1)
+            .execution_options(populate_existing=True)
+        )
+        return None if row is None else _grant(row)
+
     async def get_evaluation(self, evaluation_id: str) -> EffectiveCapabilityEvaluation | None:
         row = await self.session.get(
             M9CapabilityEvaluationModel, (self.user_id, self.project_name, evaluation_id), populate_existing=True
@@ -156,7 +170,11 @@ class CapabilityEvidenceRepository:
             raise OpportunityError(StopCode.M9_REQUIRED_EVIDENCE_MISSING)
         # Advisory guards cover absent immutable rows before INSERT; actual rows
         # and complete envelopes remain authority even when guard hashes collide.
-        identities = (("grant", grant.grant_id, str(grant.grant_version)), ("evaluation", evaluation.evaluation_id))
+        identities = (
+            ("grant-head", grant.grant_id),
+            ("grant", grant.grant_id, str(grant.grant_version)),
+            ("evaluation", evaluation.evaluation_id),
+        )
         for identity in sorted(identities, key=lambda item: (item[1], item[0], item[2:])):
             guard = digest_canonical(
                 {
