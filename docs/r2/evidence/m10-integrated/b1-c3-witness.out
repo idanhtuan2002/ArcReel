@@ -1,0 +1,32 @@
+== source 976742443864443e6fe26c1cf1c6de9864aed43a migration sha256 616a6f5ca00089c58f45e4cdc8ec69ef17432e0e96ec901416bda738ffd4b786
+NOTICE:  database "m10_b1_c3_witness" does not exist, skipping
+INFO  [alembic.runtime.migration] Running upgrade bed415be3608 -> 4c1f0e2a9b10, Persist known M10 probe failures with their bounded ResourceEvidence.
+4c1f0e2a9b10
+== at 4c1f0e2a9b10
+fmt-1|1||FORMAT|sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa|2
+fmt-1|2|1|FORMAT|sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb|2
+CHECK (((kind)::text = ANY ((ARRAY['CANVAS'::character varying, 'SPATIAL'::character varying, 'FORMAT'::character varying])::text[])))
+== upgrade head
+INFO  [alembic.runtime.migration] Running upgrade 7f4c9e5a0d33 -> 8a5d0f6b1e44, Persist append-only M10-B export invocations bound to M7 attempts, and their export receipts.
+8a5d0f6b1e44 (head)
+fmt-1|1||FORMAT|sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa|2
+fmt-1|2|1|FORMAT|sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb|2
+CHECK (((kind)::text = ANY ((ARRAY['CANVAS'::character varying, 'SPATIAL'::character varying, 'FORMAT'::character varying, 'PACKAGING'::character varying])::text[])))
+== allowed downgrade (no PACKAGING rows)
+INFO  [alembic.runtime.migration] Running downgrade 5d2a7c3e8b11 -> 4c1f0e2a9b10, Admit the M10 PACKAGING candidate kind in the shared M8 revision kernel.
+4c1f0e2a9b10
+fmt-1|1||FORMAT|sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa|2
+fmt-1|2|1|FORMAT|sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb|2
+CHECK (((kind)::text = ANY ((ARRAY['CANVAS'::character varying, 'SPATIAL'::character varying, 'FORMAT'::character varying])::text[])))
+== re-upgrade
+INFO  [alembic.runtime.migration] Running upgrade 7f4c9e5a0d33 -> 8a5d0f6b1e44, Persist append-only M10-B export invocations bound to M7 attempts, and their export receipts.
+8a5d0f6b1e44 (head)
+fmt-1|1||FORMAT|sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa|2
+fmt-1|2|1|FORMAT|sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb|2
+CHECK (((kind)::text = ANY ((ARRAY['CANVAS'::character varying, 'SPATIAL'::character varying, 'FORMAT'::character varying, 'PACKAGING'::character varying])::text[])))
+== PACKAGING row present: downgrade must refuse
+downgrade exit=1
+M10_PACKAGING_HISTORY_PRESENT
+5d2a7c3e8b11
+FORMAT|2
+PACKAGING|1

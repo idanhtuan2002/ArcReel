@@ -156,6 +156,14 @@
    "replacement": "(a) a new export command for the same selection is byte-identical; (b) every content member is byte-identical across two independent clean roots from the same frozen logical inputs; manifest.json (per-root provenance) excluded",
    "reason": "the frozen wording contradicts the manifest's provenance binding required by design §3 recovery and offline verification",
    "effect_on_recorded_runs": "none: the 2026-10-29 runs stay recorded as failing the frozen wording"
+  },
+  {
+   "date": "2026-10-29",
+   "field": "reviewer",
+   "frozen_text": "sponsor as HUMAN_SHOWRUNNER",
+   "replacement": "the agent as the sponsor-delegated reviewer",
+   "reason": "sponsor decision quoted in R2_M10_B7_PILOT_SUMMARY.json sponsor_decision",
+   "effect_on_recorded_runs": "none; every dossier already records the agent as reviewer"
   }
  ]
 }

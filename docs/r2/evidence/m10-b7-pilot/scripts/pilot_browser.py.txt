@@ -37,12 +37,12 @@ TEXT = {
         "chapters": [],
     },
     "zh_shuang": {
-        "title": "二十秒看懂 Git：从工作区到提交",
-        "alt_title": "git status 到底在说什么",
-        "description": "用二十秒讲清楚改动如何从工作区进入暂存区，再进入一次提交。",
-        "tags": ["Git", "开发", "短视频"],
-        "hashtags": ["#Git"],
-        "chapters": [],
+        "title": "第9章：阿May撬开木箱，账本里藏着的秘密终于说开",
+        "alt_title": "旧仓库里的账本，阿强终于明白了一切",
+        "description": "阿May在旧仓库找到用布包着的账本，从后门溜出与阿强会合，账本揭开了隐瞒多年的秘密。",
+        "tags": ["爽文", "短剧", "悬疑"],
+        "hashtags": ["#爽文"],
+        "chapters": [{"start_ms": 0, "title": "旧仓库"}, {"start_ms": 30000, "title": "账本"}],
     },
 }
 LOCALE = {"western_explainer": "en", "vertical_factual_short": "en", "zh_shuang": "zh-Hans"}

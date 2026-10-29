@@ -29,6 +29,7 @@ PG = "postgresql+asyncpg://postgres:postgres@127.0.0.1:55491"
 V2 = Path("/home/anhtuan/arcreel-v2-staging/data/du-an-01-649c62c1")
 SOURCE_16_9 = V2 / "production/final/du-an-01-649c62c1.mp4"
 FINAL_16_9 = Path(__file__).resolve().parent / "corpus/final-16x9-yuv420p.mp4"
+ZH_SHUANG_9_16 = Path(__file__).resolve().parent / "corpus/zh-shuang-9x16.mp4"
 SOURCE_9_16 = V2 / "formats/c9f5d429e8900516dd22b445a60d388b8e42b5826778ff95bdc055d3d127a2b3.mp4"
 FINAL_9_16 = Path(__file__).resolve().parent / "corpus/final-9x16-yuv420p.mp4"
 
@@ -52,7 +53,7 @@ COHORTS: dict[str, dict[str, Any]] = {
         "platform_profile_id": "youtube-shorts",
     },
     "zh_shuang": {
-        "master": SOURCE_9_16,
+        "master": ZH_SHUANG_9_16,
         "width": 1080,
         "height": 1920,
         "min_duration_ms": 5000,

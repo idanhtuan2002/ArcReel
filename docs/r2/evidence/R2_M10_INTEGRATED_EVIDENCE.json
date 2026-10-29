@@ -32,7 +32,7 @@
   },
   "parity": "docs/r2/evidence/R2_M10_B6_DONOR_PARITY.json (Kalinga PASS, OpenMontage PASS, bound to 00912922e); M10-A A7 parity per R2_M10_A_ACCEPTANCE.json",
   "resources": "B7 run 2: export <= 1.9 s, worker peak <= 23 MB per cohort; probe resource evidence per M10-A",
-  "pilots": "docs/r2/evidence/R2_M10_B7_PILOT_SUMMARY.json: three dossiers, PASSED_WITH_DEVIATIONS",
+  "pilots": "docs/r2/evidence/R2_M10_B7_PILOT_SUMMARY.json v3 (zh_shuang on a native Chinese final; sponsor-delegated reviewer)",
   "no_network_no_production_write": {
     "runtime": "socket(AF_INET) EPERM inside the m10-export unit (m10-b7-pilot/network-experiment.json); probe units under the same A4 envelope",
     "static": "31 M10 modules (r2/quality, packaging/quality contracts, server/services quality_*/package_export*/packaging_candidates, packaging router, quality repositories): no network/provider SDK imports, no socket use, no Production Authority or upload reference"
@@ -42,5 +42,11 @@
   "conditions": {
     "m10_a": "see R2_M10_A_ACCEPTANCE.json",
     "m10_b": "see R2_M10_B_ACCEPTANCE.json conditions C1-C6"
+  },
+  "b1_c3_witness": {
+    "script": "docs/r2/evidence/m10-integrated/b1-c3-witness.sh",
+    "output": "docs/r2/evidence/m10-integrated/b1-c3-witness.out",
+    "sqlite": "docs/r2/evidence/m10-integrated/b1-c3-sqlite.out",
+    "result": "predecessor FORMAT revisions and their referencing head row preserved across upgrade, allowed downgrade and re-upgrade on PG16; downgrade refuses with M10_PACKAGING_HISTORY_PRESENT when a PACKAGING row exists"
   }
 }

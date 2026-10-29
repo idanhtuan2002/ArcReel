@@ -1,12 +1,12 @@
 {
-  "schema_id": "m10.b7-pilot-summary.v2",
+  "schema_id": "m10.b7-pilot-summary.v3",
   "code_head": "7609bceac",
   "run_at": "2026-10-29",
   "verdict": "PASSED_WITH_DEVIATIONS",
   "verdict_detail": [
-    "run 2 (original V2 finals, code 7609bceac): every metric meets its threshold in all three cohorts under the amended determinism definition; the frozen whole-archive wording still fails and is recorded as such",
-    "deviation kept: the agent, under the sponsor's chat delegation, performed the Human gates and the reviewer verdicts; the sponsor-as-reviewer independence is not met",
-    "zh_shuang used the English 9:16 master (no zh-Hans V2 final exists); Chinese-language suitability not assessed"
+    "all three cohorts meet every threshold under the amended determinism definition; frozen whole-archive wording still fails (recorded)",
+    "reviewer: the agent under the sponsor's explicit delegation (sponsor_decision), not the sponsor; independence limit recorded",
+    "zh_shuang now uses a native Chinese V2 final (run 3); it is a pipeline acceptance product projected by the format renderer, not an operator-approved release final"
   ],
   "runs": {
     "run1": {
@@ -45,19 +45,14 @@
           "master_is_source_final": true
         },
         "zh_shuang": {
-          "dossier": "docs/r2/evidence/R2_M10_B7_PILOT_ZH_SHUANG.json",
-          "seeded_recall": "7/7",
-          "false_positives_on_clean": 0,
-          "export_ui_ms": 1374,
-          "peak_rss_bytes": 15462400,
-          "storage_ratio": 1.0485,
-          "determinism_frozen_wording": false,
-          "determinism_amended": true,
-          "network_eperm": true,
-          "download_verified": true,
-          "master_is_source_final": true
+          "superseded_by": "run3_zh_shuang"
         }
       }
+    },
+    "run3_zh_shuang": {
+      "commit": "976742443",
+      "corpus": "native zh-shuang V2 final (golden-b-shuangwen, dual-profile e2e) projected to 9:16 by M8-E format_render",
+      "result": "recall 7/7, 0 FP, amended determinism met"
     }
   },
   "findings": [
@@ -117,5 +112,15 @@
     "network": "docs/r2/evidence/m10-b7-pilot/network-experiment.json",
     "screenshots": "docs/r2/evidence/m10-b7-pilot/shots/<cohort>/"
   },
-  "environment": "local, non-production: PG16 container m10b-test-pg (databases m10b7_<cohort>[_root2]), user-owned governance tree with repository test keys, app on 127.0.0.1:1241 + Vite 5173, Chrome via Playwright (headed). Production was not touched."
+  "environment": "local, non-production: PG16 container m10b-test-pg (databases m10b7_<cohort>[_root2]), user-owned governance tree with repository test keys, app on 127.0.0.1:1241 + Vite 5173, Chrome via Playwright (headed). Production was not touched.",
+  "sponsor_decision": {
+    "date": "2026-10-29",
+    "quotes": [
+      "ban lam het tat ca cac buoc",
+      "ban tu lam het tat ca cac cong viec can thiet, khong can dung lai hoi toi"
+    ],
+    "context": "the second instruction answered the report that M10 still needed a native zh-Hans final and the sponsor as Human reviewer",
+    "decision": "the sponsor delegates the B7 pilot reviewer role (profile publication, narrative review, disposition, package selection, finding verdicts) to the agent",
+    "effect": "post-run amendment of the preregistered reviewer identity; independence limit: the agent authored the package drafts and reviewed them; no Human judged the findings"
+  }
 }

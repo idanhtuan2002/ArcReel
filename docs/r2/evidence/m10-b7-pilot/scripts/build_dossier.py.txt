@@ -22,7 +22,7 @@ EXPECTED = {
 SOURCES = {
     "western_explainer": "production/final/du-an-01-649c62c1.mp4",
     "vertical_factual_short": "formats/c9f5d429e8900516dd22b445a60d388b8e42b5826778ff95bdc055d3d127a2b3.mp4",
-    "zh_shuang": "formats/c9f5d429e8900516dd22b445a60d388b8e42b5826778ff95bdc055d3d127a2b3.mp4",
+    "zh_shuang": "ZH",
 }
 
 
@@ -41,7 +41,11 @@ def main(cohort: str, head: str) -> None:
     duration = load(duration_dir / "duration_defect.json")
     again, first2 = load(root2 / "export_export-2.json"), load(root2 / "export_root.json")
     master = main_root / "data/project/render-1.mp4"
-    source = Path("/home/anhtuan/arcreel-v2-staging/data/du-an-01-649c62c1") / SOURCES[cohort]
+    source = (
+        S / "corpus/zh-shuang-9x16.mp4"
+        if SOURCES[cohort] == "ZH"
+        else Path("/home/anhtuan/arcreel-v2-staging/data/du-an-01-649c62c1") / SOURCES[cohort]
+    )
     checks = {c["name"]: c for c in browser["checks"]}
     clean = checks["clean"]
     defects = []

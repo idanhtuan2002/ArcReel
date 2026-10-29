@@ -1,0 +1,15 @@
+"""Project the native zh-shuang V2 final to 9:16 with the product's M8-E format_render (PAD keeps the subtitles whole)."""
+import hashlib, json, subprocess, sys
+from pathlib import Path
+sys.path.insert(0, "/home/anhtuan/content-production-os/.worktrees/r2-m10-b")
+from r2.advanced_creative.format_render import ADAPTER_VERSION, materialize, render_argv
+from r2.advanced_creative.formats import ReframeKind, build_plan, reframe_decision
+from tests.unit.r2.advanced_creative.test_formats import overlay, profile
+src, out = Path(sys.argv[1]), Path(sys.argv[2])
+digest = "sha256:" + hashlib.sha256(src.read_bytes()).hexdigest()
+target = profile()
+decision = reframe_decision(decision_id="r1", kind=ReframeKind.PAD, source_size=(1920, 1080), profile=target, focal=None, rationale="keep the full Chinese subtitle lines")
+plan = build_plan(plan_id="zh-shuang-9x16", source_master_id="golden-b-shuangwen", source_master_digest=digest, profile=target, overlay=overlay(()), decisions=(decision,))
+argv = materialize(render_argv(plan, source_width=1920, source_height=1080, has_audio=True), source=str(src), output=str(out))
+subprocess.run(argv, check=True)
+print(json.dumps({"adapter": ADAPTER_VERSION, "plan_id": plan.plan_id, "source_digest": digest, "output_digest": "sha256:" + hashlib.sha256(out.read_bytes()).hexdigest(), "argv": argv}, indent=1))

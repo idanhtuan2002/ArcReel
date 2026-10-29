@@ -1,0 +1,25 @@
+{
+  "products": {
+    "golden-a-h264": {
+      "digest": "sha256:c2eba91531d357674c45dd2a3bb5b805f6d39f4eedbbb728d4da4a31554fef1b",
+      "bytes": 8027494
+    },
+    "golden-b-western": {
+      "digest": "sha256:4ca9250f9de63ac28e5cd617db61b185cdca2a10e26ed6f69e46a9fdfc4fcfc7",
+      "bytes": 6653279
+    },
+    "golden-b-shuangwen": {
+      "digest": "sha256:ed6bd13ea626aab41eaacf57ad8f7bac9e9b3fdf4ad20c6d464fb4b19a4ae563",
+      "bytes": 6282244
+    }
+  },
+  "refused_gate_c_status": 400,
+  "publish_approval_recorded": "sha256:c2eba91531d357674c45dd2a3bb5b805f6d39f4eedbbb728d4da4a31554fef1b",
+  "foreign_token_status": 403,
+  "unknown_digest_status": 404,
+  "restart_reopen_digest": "sha256:c2eba91531d357674c45dd2a3bb5b805f6d39f4eedbbb728d4da4a31554fef1b",
+  "sse_resync": {
+    "page": "/app/projects/golden-a-h264",
+    "title_after_outage": "Golden A: how H.264 works (resync 1790609246)"
+  }
+}
