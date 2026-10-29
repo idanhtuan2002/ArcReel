@@ -37,7 +37,13 @@ def recovery_candidate():
             "unselected": [],
         }
     ).encode()
-    identities = sorted(recovery.RESTART_FAULTS)
+    view.blobs[recovery.RECOVERY_SCHEMA] = _schema("R2_M9_B_RECOVERY_V2.schema.json")
+    view.blobs[m9b.SCHEMA] = _schema("R2_M9_B_ACQUISITION.schema.json")
+    for path in recovery.RUNTIME_SEALED:
+        view.blobs.setdefault(path, b"# runtime\n")
+    runner_unit = recovery.RUNNER_TESTS[0].removesuffix(".py").replace("/", ".") + "::test_gate_fixture"
+    identities = sorted([*recovery.RESTART_FAULTS, runner_unit])
+    view.inventory.extend(identities)
     report = _put(view, document, ART + "restarts/junit.xml", _junit(identities))
     log = b"%d passed in 1800.0s\n" % len(identities)
     log_ref = _put(view, document, ART + "restarts/pytest.log", log)
@@ -76,8 +82,11 @@ def recovery_candidate():
             "result": result_ref,
         }
     )
+    tail = ["-q", "--basetemp=/tmp/m9b10r/pytest-temp", "--junitxml=/tmp/m9b10r/junit.xml"]
     manifest = {
         "schema": "m9-manual-recovery-gate.v1",
+        "argv": [PY, "-m", "pytest", *recovery.RUNNER_TESTS, *tail],
+        "source_hashes": "PLACEHOLDER",
         "status": "PASS",
         "exit_code": 0,
         "subprocess_exit_code": 0,
@@ -90,31 +99,68 @@ def recovery_candidate():
     }
     records = {}
     for index, case in enumerate(CASES):
+        uid = 31001 if case["principal"] == "issuer" else 31002
+        killed = 200 + index
+        arrival = json.dumps(
+            {
+                "schema": "m9-manual-recovery-arrival.v1",
+                "case_id": case["case_id"],
+                "boundary": case["boundary"],
+                "pid": killed,
+                "uid": uid,
+            }
+        ).encode()
+        armed = json.dumps(
+            {
+                "schema": "m9-manual-recovery-armed.v1",
+                "case_id": case["case_id"],
+                "arrival_sha256": sha(arrival),
+                "pid": killed,
+            }
+        ).encode()
         record = {
+            "schema": "m9-manual-recovery-restart.v1",
             "case_id": case["case_id"],
-            "worker_uid": 31001 if case["principal"] == "issuer" else 31002,
+            "worker_uid": uid,
             "parent_pid": 100 + index,
-            "killed_pid": 200 + index,
+            "killed_pid": killed,
             "restarted_pid": 300 + index,
             "passed": True,
             "parent_killed": True,
             "reaped": True,
             "marker_fsynced": True,
+            "wait_exit_code": 137,
+            "kernel": {
+                "pid": killed,
+                "uid": uid,
+                "parent_sent_sigkill": True,
+                "pidfd_pinned": True,
+                "argv_sha256": "0" * 64,
+            },
+            "marker_sha256": sha(arrival),
+            "armed_sha256": sha(armed),
+            "source_hashes": {path: sha(view.blobs[path]) for path in recovery.RUNTIME_SEALED},
         }
-        records[case["case_id"]] = _put(
-            view, document, ART + f"restarts/{case['case_id']}.json", json.dumps(record).encode()
-        )
+        base = ART + f"restarts/restarts/{case['case_id']}"
+        records[case["case_id"]] = {
+            "record": _put(view, document, base + ".json", json.dumps(record).encode()),
+            "arrival": _put(view, document, base + ".arrival.json", arrival),
+            "armed": _put(view, document, base + ".armed.json", armed),
+        }
     document["restart"] = {
         "schema": "m9-manual-recovery-restarts.v1",
         "seed": 20261020,
         "mandatory_cases": len(CASES),
-        "manifest": _put(view, document, ART + "restarts/manifest.json", json.dumps(manifest).encode()),
+        "manifest": _put(
+            view,
+            document,
+            ART + "restarts/manifest.json",
+            json.dumps(manifest | {"source_hashes": view.tree_sha256(HEAD)}).encode(),
+        ),
         "report": report,
         "records": records,
     }
-    document["fault_matrix"]["restart"] = {"test_refs": identities}
-    view.blobs[recovery.RECOVERY_SCHEMA] = _schema("R2_M9_B_RECOVERY_V2.schema.json")
-    view.blobs[m9b.SCHEMA] = _schema("R2_M9_B_ACQUISITION.schema.json")
+    document["fault_matrix"]["restart"] = {"test_refs": sorted(recovery.RESTART_FAULTS)}
     return view, document
 
 
@@ -131,10 +177,10 @@ def test_the_complete_recovery_candidate_passes():
     assert verify(view, document) == []
 
 
-def _record(view, document, case_id, **changes):
-    ref = document["restart"]["records"][case_id]
-    record = json.loads(view.artifacts[ref["path"]]) | changes
-    document["restart"]["records"][case_id] = _put(view, document, ref["path"], json.dumps(record).encode())
+def _record(view, document, case_id, kind="record", **changes):
+    ref = document["restart"]["records"][case_id][kind]
+    body = json.loads(view.artifacts[ref["path"]]) | changes
+    document["restart"]["records"][case_id][kind] = _put(view, document, ref["path"], json.dumps(body).encode())
 
 
 def _manifest(view, document, **changes):
@@ -162,6 +208,23 @@ def _manifest(view, document, **changes):
         (lambda v, d: _manifest(v, d, log_sha256="0" * 64), "manifest log differs"),
         (lambda v, d: d["fault_matrix"]["restart"]["test_refs"].pop(), "fault category restart"),
         (lambda v, d: v.artifacts.pop(ART + "restarts/manifest.json"), "not a retained artifact"),
+        (
+            lambda v, d: v.artifacts.pop(ART + "restarts/restarts/claim-after.arrival.json"),
+            "restart record is not retained",
+        ),
+        (lambda v, d: d["restart"]["records"]["claim-after"].pop("armed"), "'armed' is a required property"),
+        (lambda v, d: _record(v, d, "claim-after", "arrival", boundary="other"), "fresh-PID parent kill"),
+        (lambda v, d: _record(v, d, "issuer-publish", "armed", pid=1), "fresh-PID parent kill"),
+        (lambda v, d: _record(v, d, "claim-after", wait_exit_code=0), "fresh-PID parent kill"),
+        (lambda v, d: _record(v, d, "claim-after", kernel={}), "fresh-PID parent kill"),
+        (lambda v, d: _record(v, d, "claim-after", source_hashes={}), "worker source seal"),
+        (
+            lambda v, d: _record(v, d, "claim-after", source_hashes=dict.fromkeys(recovery.RUNTIME_SEALED, "0" * 64)),
+            "worker source seal",
+        ),
+        (lambda v, d: _manifest(v, d, source_hashes={}), "manifest source seal differs"),
+        (lambda v, d: _manifest(v, d, argv=[PY, "-m", "pytest", recovery.RUNNER_TESTS[1]]), "clean PASS"),
+        (lambda v, d: _manifest(v, d, junit={"tests": 1}), "manifest JUnit count"),
     ],
 )
 def test_incomplete_or_forged_restart_evidence_is_refused(mutate, expected):
@@ -200,3 +263,29 @@ def test_the_restart_gate_must_run_the_pinned_runner_with_its_owned_basetemp():
     assert m9b.restart_command_problems("python", rest) == ["restart command does not own its pytest basetemp"]
     rest[-1] = "/a/pytest-temp"
     assert m9b.restart_command_problems("python", rest) == []
+
+
+def _restart_junit(view, document, identities):
+    ref = _put(view, document, ART + "restarts/junit.xml", _junit(identities))
+    document["restart"]["report"] = ref
+    command = next(item for item in document["commands"] if item["gate"] == "restarts")
+    result = json.loads(view.artifacts[command["result"]["path"]]) | {"test_report": ref, "passed": len(identities)}
+    command["result"] = _put(view, document, command["result"]["path"], json.dumps(result).encode())
+    command["passed"] = len(identities)
+
+
+def test_a_restart_junit_missing_a_collected_parameterization_is_refused():
+    view, document = recovery_candidate()
+    view.inventory.append(sorted(recovery.RESTART_FAULTS)[0] + "[another-boundary]")
+    found = verify(view, document)
+    assert any("restarts: executed JUnit cases differ from the collected test inventory" in item for item in found), (
+        found
+    )
+
+
+def test_a_reduced_restart_junit_contradicting_its_log_is_refused():
+    view, document = recovery_candidate()
+    _restart_junit(view, document, sorted(recovery.RESTART_FAULTS))
+    found = verify(view, document)
+    assert any("restarts: test log summary differs" in item for item in found), found
+    assert any("collected test inventory" in item for item in found), found

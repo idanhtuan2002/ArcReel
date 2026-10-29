@@ -34,6 +34,8 @@ def _modules() -> dict[str, list[str]]:
             modules.setdefault(module.replace(".", "/") + ".py", []).append(function)
     modules[UNIT] = ["test_unit_fixture"]
     modules[MIGRATION] = ["test_migration_fixture"]
+    for path in m9b.REQUIRED_REGRESSIONS:
+        modules.setdefault(path, ["test_regression_fixture"])
     return modules
 
 
@@ -54,6 +56,7 @@ class FakeView:
         self.evidences: dict[str, bytes] = {}
         self.current = HEAD
         self.child_changes: set[str] = set()
+        self.inventory: list[str] = []
 
     def blob(self, ref: str, path: str) -> bytes:
         if ref != HEAD:
@@ -80,6 +83,18 @@ class FakeView:
     def evidence(self, path: str) -> bytes:
         return self.evidences[path]
 
+    def tree_sha256(self, ref: str) -> dict[str, str]:
+        assert ref == HEAD
+        return {path: sha(raw) for path, raw in self.blobs.items()}
+
+    def collected(self, paths) -> list[str]:
+        modules = [path.removesuffix(".py").replace("/", ".") for path in paths]
+        return [
+            identity
+            for identity in self.inventory
+            if any(identity.split("::")[0] == module or identity.startswith(module + ".") for module in modules)
+        ]
+
 
 def schema(name: str) -> dict:
     return json.loads((ROOT / "docs/r2/evidence/schemas" / name).read_text(encoding="utf-8"))
@@ -91,7 +106,7 @@ def candidate() -> tuple[FakeView, dict]:
     for path, functions in modules.items():
         view.blobs[path] = "".join(f"def {name}():\n    pass\n\n\n" for name in functions).encode()
     view.blobs[RUNTIME] = b"from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey\n"
-    owned = sorted([*modules, RUNTIME])
+    owned = sorted({*modules, RUNTIME} - set(m9b.REQUIRED_REGRESSIONS))
     view.blobs[m9b.ORIGINAL_RELEASE] = json.dumps({"owned_create_paths": owned[:3], "owned_modify_paths": []}).encode()
     view.blobs[m9b.RECOVERY_RELEASE] = json.dumps(
         {"owned_create_paths": owned[3:], "owned_modify_paths": [], "inherited_unimplemented_create_paths": []}
@@ -99,6 +114,7 @@ def candidate() -> tuple[FakeView, dict]:
     tests = [path for path in modules if not path.startswith(m9b.MIGRATION_DIRECTORY)]
     unit_ids = [path.removesuffix(".py").replace("/", ".") + "::" + name for path in tests for name in modules[path]]
     migration_ids = [MIGRATION.removesuffix(".py").replace("/", ".") + "::test_migration_fixture"]
+    view.inventory = [*unit_ids, *migration_ids]
     test_report = {"path": ART + "tests.junit.xml", "sha256": ""}
     migration_report = {"path": ART + "migration.junit.xml", "sha256": ""}
     reports = {"tests": (_junit(unit_ids), test_report), "migration": (_junit(migration_ids), migration_report)}
@@ -329,3 +345,26 @@ def test_the_repository_schema_files_are_strict_and_parse():
         body = schema(name)
         assert body["additionalProperties"] is False
         assert set(body["required"]) == set(body["properties"])
+
+
+def test_a_required_original_b_regression_must_run_in_the_tests_gate():
+    _, document = candidate()
+    command = next(item for item in document["commands"] if item["gate"] == "tests")
+    argv = [part for part in shlex.split(command["command"]) if part != "tests/unit/r2/learning/test_adapters.py"]
+    found = m9b.command_shape_problems("tests", tuple(argv), document)
+    assert found == ["test command omits an owned test file"]
+
+
+def test_executed_cases_must_equal_the_collected_inventory_of_the_selected_paths():
+    view, document = candidate()
+    view.inventory.append("tests.unit.scripts.r2.test_fixture_only::test_unit_fixture[extra-parameter]")
+    found = problems(view, document)
+    assert any("tests: executed JUnit cases differ from the collected test inventory" in item for item in found), found
+
+
+def test_selected_paths_ignore_options_and_their_values():
+    argv = (PY, "-m", "pytest", "tests/a.py", "-n", "4", "--dist", "loadfile", "-q", "--junitxml=/x", "tests/b/")
+    assert m9b.selected_paths(argv) == ["tests/a.py", "tests/b"]
+    assert (
+        m9b.junit_identity("tests/a/test_b.py::Outer::Inner::test_x[p-1]") == "tests.a.test_b.Outer.Inner::test_x[p-1]"
+    )

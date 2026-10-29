@@ -11,11 +11,13 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import subprocess
 import sys
 from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import Any
 
+from scripts.r2.run_m9b_recovery_gate import REQUIRED_TESTS as RUNNER_TESTS
 from scripts.r2.verify_m9_prerequisites import LOAD_ERRORS, loads_unique_json
 from scripts.r2.verify_m9b_evidence import (
     EVIDENCE,
@@ -25,6 +27,7 @@ from scripts.r2.verify_m9b_evidence import (
     RecordedCommandResult,
     RepoView,
     junit_identities,
+    summary_problems,
     verify_m9b_evidence,
 )
 
@@ -40,14 +43,74 @@ RESTART_FAULTS = frozenset(
     }
 )
 _UID = {"application": 31002, "issuer": 31001}
+# The runtime sources every worker must have sealed; the full tree is bound through the runner manifest.
+RUNTIME_SEALED = frozenset(
+    {
+        "r2/opportunity/acquisition_v2.py",
+        "lib/db/repositories/opportunity_manual_admission.py",
+        "server/services/m9_manual_publication.py",
+        "server/services/opportunity_acquisition_v2.py",
+    }
+)
 
 
 def _sha(raw: bytes) -> str:
     return hashlib.sha256(raw).hexdigest()
 
 
+def _record_problems(
+    case: Mapping[str, Any], raw: Mapping[str, bytes], manifest_hashes: Mapping[str, str]
+) -> list[str]:
+    """The runner's own per-case proof, re-derived: arrival and armed markers, kernel kill, fresh PIDs, source seal."""
+    identity = case.get("case_id")
+    uid = _UID.get(case.get("principal"))
+    try:
+        record = loads_unique_json(raw["record"])
+        arrival = loads_unique_json(raw["arrival"])
+        armed = loads_unique_json(raw["armed"])
+    except (*LOAD_ERRORS, KeyError):
+        return [f"restart record is not retained: {identity}"]
+    pids = [record.get(key) for key in ("parent_pid", "killed_pid", "restarted_pid")]
+    kernel = record.get("kernel") or {}
+    seal = record.get("source_hashes") or {}
+    proven = (
+        record.get("schema") == "m9-manual-recovery-restart.v1"
+        and record.get("case_id") == identity
+        and record.get("worker_uid") == uid
+        and all(record.get(key) is True for key in ("passed", "parent_killed", "reaped", "marker_fsynced"))
+        and all(type(pid) is int and pid > 0 for pid in pids)
+        and len(set(pids)) == 3
+        and record.get("wait_exit_code") == 137
+        and kernel.get("pid") == record.get("killed_pid")
+        and kernel.get("uid") == uid
+        and kernel.get("parent_sent_sigkill") is True
+        and kernel.get("pidfd_pinned") is True
+        and record.get("marker_sha256") == _sha(raw["arrival"])
+        and record.get("armed_sha256") == _sha(raw["armed"])
+        and arrival
+        == {
+            "schema": "m9-manual-recovery-arrival.v1",
+            "case_id": identity,
+            "boundary": case.get("boundary"),
+            "pid": record.get("killed_pid"),
+            "uid": uid,
+        }
+        and armed
+        == {
+            "schema": "m9-manual-recovery-armed.v1",
+            "case_id": identity,
+            "arrival_sha256": _sha(raw["arrival"]),
+            "pid": record.get("killed_pid"),
+        }
+    )
+    problems = [] if proven else [f"restart record does not prove a fresh-PID parent kill: {identity}"]
+    if not RUNTIME_SEALED.issubset(seal) or any(manifest_hashes.get(path) != digest for path, digest in seal.items()):
+        problems.append(f"restart worker source seal differs from the tested code: {identity}")
+    return problems
+
+
 def restart_problems(document: Mapping[str, Any], view: RepoView, tested_head: str) -> list[str]:
-    """The restart gate ran the pinned runner at the tested HEAD and proved every mandatory parent-kill case."""
+    """The restart gate ran the pinned runner on the tested code and proved every mandatory parent-kill case."""
     problems: list[str] = []
     artifacts = {item["path"]: item["sha256"] for item in document["artifacts"]}
 
@@ -66,8 +129,9 @@ def restart_problems(document: Mapping[str, Any], view: RepoView, tested_head: s
         command = next(item for item in document["commands"] if item["gate"] == "restarts")
         result = RecordedCommandResult.model_validate(loads_unique_json(read(command["result"])))
         junit = read(restart["report"])
+        log = read(command["log"])
     except (*LOAD_ERRORS, KeyError, StopIteration, ValueError):
-        return ["restart gate manifest, result or report is not a retained artifact"]
+        return ["restart gate manifest, result, log or report is not a retained artifact"]
     cases = inventory.get("cases", [])
     ids = [case.get("case_id") for case in cases]
     if (inventory.get("schema"), inventory.get("seed")) != ("m9-manual-recovery-restarts.v1", 20261020):
@@ -89,45 +153,53 @@ def restart_problems(document: Mapping[str, Any], view: RepoView, tested_head: s
         "source_unchanged": True,
         "errors": [],
         "restart_cases": len(ids),
+        "argv": [manifest.get("argv", [""])[0], "-m", "pytest", *RUNNER_TESTS, *manifest.get("argv", [])[5:]],
     }
     if any(manifest.get(key) != value for key, value in expected.items()):
         problems.append("restart manifest does not record a clean PASS of every case at the tested HEAD")
+    try:
+        tree = view.tree_sha256(tested_head)
+    except (*LOAD_ERRORS, OSError):
+        return [*problems, "the tested code tree cannot be hashed"]
+    manifest_hashes = manifest.get("source_hashes") or {}
+    if manifest_hashes != tree:
+        problems.append("restart manifest source seal differs from the tested code tree")
     if manifest.get("log_sha256") != command["log"]["sha256"]:
         problems.append("restart manifest log differs from the retained gate log")
     if result.test_report is None or result.test_report.model_dump() != restart["report"]:
         problems.append("restart result does not bind its exact JUnit artifact")
+    problems.extend("restarts: " + item for item in summary_problems(log, command["passed"], command["skipped"]))
     identities, junit_problems = junit_identities(junit, command["passed"])
     problems.extend("restarts: " + item for item in junit_problems)
-    if (manifest.get("junit") or {}).get("tests") != command["passed"]:
+    if (manifest.get("junit") or {}) != {"tests": command["passed"], "failures": 0, "errors": 0, "skipped": 0}:
         problems.append("restart manifest JUnit count differs from the recorded gate")
+    try:
+        collected = view.collected(list(RUNNER_TESTS))
+    except (OSError, ValueError, subprocess.CalledProcessError):
+        collected = None
+        problems.append("restarts: the runner tests cannot be collected from the tested code")
+    if collected is not None and sorted(collected) != sorted(identities):
+        problems.append("restarts: executed JUnit cases differ from the collected test inventory")
     executed = {identity.split("[", 1)[0] for identity in identities}
     claimed = document["fault_matrix"].get("restart", {}).get("test_refs", [])
     if not RESTART_FAULTS.issubset(executed) or set(claimed) != {
         identity for identity in identities if identity.split("[", 1)[0] in RESTART_FAULTS
     }:
         problems.append("fault category restart does not bind its complete executed test inventory")
-    killed: list[int] = []
-    for case in cases:
-        identity = case.get("case_id")
-        try:
-            record = loads_unique_json(read(restart["records"][identity]))
-        except (*LOAD_ERRORS, KeyError, ValueError, TypeError):
-            problems.append(f"restart record is not retained: {identity}")
-            continue
-        pids = [record.get(key) for key in ("parent_pid", "killed_pid", "restarted_pid")]
-        if (
-            record.get("case_id") != identity
-            or record.get("worker_uid") != _UID.get(case.get("principal"))
-            or any(record.get(key) is not True for key in ("passed", "parent_killed", "reaped", "marker_fsynced"))
-            or any(type(pid) is not int or pid <= 0 for pid in pids)
-            or len(set(pids)) != 3
-        ):
-            problems.append(f"restart record does not prove a fresh-PID parent kill: {identity}")
-        killed.append(record.get("killed_pid"))
-    if len(set(killed)) != len(killed):
-        problems.append("restart cases reuse a killed process")
     if set(restart["records"]) != set(ids):
         problems.append("restart records differ from the mandatory case inventory")
+    killed: list[object] = []
+    for case in cases:
+        refs = restart["records"].get(case.get("case_id"), {})
+        try:
+            raw = {kind: read(refs[kind]) for kind in ("record", "arrival", "armed")}
+        except (KeyError, ValueError, OSError, TypeError):
+            problems.append(f"restart record is not retained: {case.get('case_id')}")
+            continue
+        problems.extend(_record_problems(case, raw, manifest_hashes))
+        killed.append(loads_unique_json(raw["record"]).get("killed_pid"))
+    if len(set(killed)) != len(killed):
+        problems.append("restart cases reuse a killed process")
     return problems
 
 

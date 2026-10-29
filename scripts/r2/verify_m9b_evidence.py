@@ -10,8 +10,10 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
 import re
 import shlex
+import subprocess
 import sys
 import xml.etree.ElementTree as ET
 from collections.abc import Mapping, Sequence
@@ -36,6 +38,18 @@ ARTIFACT_ROOT = "docs/r2/evidence/m9b-recovery-v2/"
 MIGRATION_DIRECTORY = "tests/integration/lib/db/migrations"
 RESTART_TESTS = "tests/integration/r2/opportunity/test_acquisition_v2_restarts.py"
 SCOPE_COMMAND = ("scripts/r2/verify_m9b_recovery_scope.py", RECOVERY_RELEASE)
+# Original B6 regressions over the accepted A surface and M8 adapters; they run in the tests gate by name.
+REQUIRED_REGRESSIONS = (
+    "tests/unit/r2/contracts/test_opportunity.py",
+    "tests/unit/r2/opportunity/test_digests.py",
+    "tests/unit/r2/opportunity/test_profiles.py",
+    "tests/unit/server/routers/test_opportunity_router.py",
+    "tests/unit/scripts/r2/test_verify_m9_scope.py",
+    "tests/unit/scripts/r2/test_verify_m9_parity.py",
+    "tests/unit/scripts/r2/test_verify_m9_evidence.py",
+    "tests/unit/r2/learning/test_adapters.py",
+    "tests/unit/lib/i18n/test_i18n_consistency.py",
+)
 GATES = frozenset(
     {"ruff", "format", "types", "imports", "dependencies", "audit", "diff", "scope", "tests", "migration"}
 )
@@ -92,6 +106,8 @@ class RepoView(Protocol):
     def changed(self, base: str, head: str) -> set[str]: ...
     def artifact(self, path: str) -> bytes: ...
     def evidence(self, path: str) -> bytes: ...
+    def tree_sha256(self, ref: str) -> dict[str, str]: ...
+    def collected(self, paths: Sequence[str]) -> list[str]: ...
 
 
 class GitRepoView:
@@ -121,6 +137,58 @@ class GitRepoView:
         if path not in EVIDENCE_OUTPUTS:
             raise ValueError("not an evidence output")
         return (self.repo / path).read_bytes()
+
+    def tree_sha256(self, ref: str) -> dict[str, str]:
+        """SHA-256 of every blob in `ref`'s tree (a symlink hashes its target), as the restart runner seals them."""
+        entries = [
+            entry.split("\t", 1)
+            for entry in self.git._run("ls-tree", "-r", "-z", "--full-tree", ref).decode().split("\0")
+            if entry
+        ]
+        paths, oids = [], []
+        for meta, path in entries:
+            mode, kind, oid = meta.split()
+            if kind != "blob" or mode == "160000":
+                raise ValueError("tree holds a non-blob entry: " + path)
+            paths.append(path)
+            oids.append(oid)
+        batch = subprocess.run(
+            ["git", "cat-file", "--batch"],
+            cwd=self.repo,
+            input="".join(oid + "\n" for oid in oids).encode(),
+            capture_output=True,
+            check=True,
+        ).stdout
+        digests, offset = {}, 0
+        for path, oid in zip(paths, oids, strict=True):
+            header_end = batch.index(b"\n", offset)
+            name, _, size = batch[offset:header_end].decode().split()
+            if name != oid:
+                raise ValueError("git cat-file returned another object")
+            start = header_end + 1
+            digests[path] = _sha(batch[start : start + int(size)])
+            offset = start + int(size) + 1
+        return digests
+
+    def collected(self, paths: Sequence[str]) -> list[str]:
+        """JUnit-style identities pytest collects for `paths` in this clean checkout of the tested code."""
+        if self.git._run("status", "--porcelain", "--untracked-files=no").strip():
+            raise ValueError("collection requires a clean checkout")
+        output = subprocess.run(
+            [sys.executable, "-m", "pytest", "--collect-only", "-q", "-p", "no:cacheprovider", *paths],
+            cwd=self.repo,
+            env={**os.environ, "PYTHONPATH": str(self.repo)},
+            capture_output=True,
+            check=True,
+        ).stdout.decode()
+        return [junit_identity(line) for line in output.splitlines() if "::" in line and line.startswith("tests/")]
+
+
+def junit_identity(node_id: str) -> str:
+    """`tests/a/test_b.py::Class::test[x]` as JUnit writes it: `tests.a.test_b.Class::test[x]`."""
+    path, *names = node_id.split("::")
+    module = path.removesuffix(".py").replace("/", ".")
+    return ".".join([module, *names[:-1]]) + "::" + names[-1]
 
 
 class RecordedCommandResult(M8ContractModel):
@@ -181,6 +249,20 @@ def runtime_signing_problems(view: RepoView, tested_head: str, sources: Mapping[
     ]
 
 
+def selected_paths(argv: Sequence[str]) -> list[str]:
+    """The test paths a recorded pytest argv selects (options and their values excluded)."""
+    rest, selected, index = list(argv)[3:], [], 0
+    while index < len(rest):
+        value = rest[index]
+        if value in {"-n", "--dist", "--durations"}:
+            index += 2
+            continue
+        if not value.startswith("-"):
+            selected.append(value.rstrip("/"))
+        index += 1
+    return selected
+
+
 def command_shape_problems(gate: str, argv: tuple[str, ...], document: Mapping[str, Any]) -> list[str]:
     args = list(argv)
     if not args:
@@ -236,6 +318,7 @@ def command_shape_problems(gate: str, argv: tuple[str, ...], document: Mapping[s
         and not path.startswith(MIGRATION_DIRECTORY + "/")
         and path != RESTART_TESTS
     ]
+    required.extend(REQUIRED_REGRESSIONS)
     if any(not any(path == item or path.startswith(item + "/") for item in selected) for path in required):
         return ["test command omits an owned test file"]
     return []
@@ -263,7 +346,7 @@ def junit_identities(raw: bytes, passed: int) -> tuple[list[str], list[str]]:
     return identities, problems
 
 
-def _summary_problems(log: bytes, passed: int, skipped: int) -> list[str]:
+def summary_problems(log: bytes, passed: int, skipped: int) -> list[str]:
     summaries = re.findall(rb"(\d+) passed(?:, (\d+) skipped)?", log)
     if not summaries or int(summaries[-1][0]) != passed or int(summaries[-1][1] or 0) != skipped:
         return ["test log summary differs from recorded logical counts"]
@@ -371,7 +454,7 @@ def verify_m9b_evidence(
             if command["passed"] <= 0:
                 problems.append(f"{command['gate']}: gate collected no passing tests")
             problems.extend(
-                f"{command['gate']}: {item}" for item in _summary_problems(log, command["passed"], command["skipped"])
+                f"{command['gate']}: {item}" for item in summary_problems(log, command["passed"], command["skipped"])
             )
             try:
                 found, junit_problems = junit_identities(read(report), command["passed"])
@@ -380,6 +463,13 @@ def verify_m9b_evidence(
                 continue
             identities[command["gate"]] = found
             problems.extend(f"{command['gate']}: {item}" for item in junit_problems)
+            try:
+                inventory = view.collected(selected_paths(result.argv))
+            except (OSError, ValueError, subprocess.CalledProcessError):
+                problems.append(f"{command['gate']}: the selected tests cannot be collected from the tested code")
+                continue
+            if sorted(inventory) != sorted(found):
+                problems.append(f"{command['gate']}: executed JUnit cases differ from the collected test inventory")
     executed = {identity.split("[", 1)[0] for gate in ("tests", "migration") for identity in identities.get(gate, [])}
     scoped = {"sources": [path for path in bindings["sources"] if path != RESTART_TESTS]}
     if identities.get("tests") and not expected_test_functions(
