@@ -355,6 +355,18 @@ describe("Packaging page", () => {
     await waitFor(() => expect(screen.getByRole("button", { name: EXPORT })).toBeEnabled());
   });
 
+  it("prefills the run and slot handed over by the Quality page", () => {
+    window.history.pushState({}, "", "/app/projects/demo/packaging?run=run-9&digest=sha256%3Ad&artifact=key-1&cohort=c-1&surface=s-1");
+    try {
+      render(<PackagingPage projectName="demo" />);
+      expect(screen.getByLabelText(/Quality run ID|Mã lượt|质量评估运行 ID/)).toHaveValue("run-9");
+      expect(screen.getByLabelText(/Quality run digest|Digest của lượt|质量评估运行摘要/)).toHaveValue("sha256:d");
+      expect(screen.getByLabelText(/Video artifact key|Khóa artifact|视频工件键/)).toHaveValue("key-1");
+    } finally {
+      window.history.pushState({}, "", "/");
+    }
+  });
+
   it("has no detectable accessibility violations when empty", async () => {
     const { container } = render(<PackagingPage projectName="demo" />);
     await waitFor(() => expect(screen.getByRole("heading", { level: 1 })).toBeInTheDocument());

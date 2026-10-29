@@ -82,3 +82,18 @@
     transition: border-color 160ms ease;
   }
 }
+
+/* M10-C: the server-prepared request a Human confirms before a gate. */
+.qa-confirm {
+  border-left: 2px solid var(--color-accent);
+  padding-left: 0.75rem;
+}
+.qa-summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+  gap: 0.375rem 1rem;
+  margin-top: 0.5rem;
+}
+.qa-summary dd {
+  overflow-wrap: anywhere;
+}

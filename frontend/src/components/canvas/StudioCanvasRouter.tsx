@@ -7,6 +7,7 @@ import {
   WORKSPACE_ROUTE_LEARNING,
   WORKSPACE_ROUTE_FORMATS,
   WORKSPACE_ROUTE_PACKAGING,
+  WORKSPACE_ROUTE_QUALITY,
   WORKSPACE_ROUTE_STORY,
   WORKSPACE_ROUTE_SOURCE,
   WORKSPACE_ROUTE_CHARACTERS,
@@ -68,6 +69,7 @@ const ShotWorkflowPage = lazy(() => import("@/features/spatial-analysis/ui/ShotW
 const LearningPage = lazy(() => import("@/features/learning/ui/LearningPage"));
 const FormatsPage = lazy(() => import("@/features/formats/ui/FormatsPage"));
 const PackagingPage = lazy(() => import("@/features/packaging/ui/PackagingPage"));
+const QualityPage = lazy(() => import("@/features/quality/ui/QualityPage"));
 const StoryAuthoringPage = lazy(() => import("@/features/story-authoring/ui/StoryAuthoringPage"));
 
 /** 集级路由 path，与渲染该集的 `<Route>` 共用一份。 */
@@ -623,6 +625,16 @@ export function StudioCanvasRouter() {
         ) : (
           <Suspense fallback={null}>
             <FormatsPage key={currentProjectName} projectName={currentProjectName} />
+          </Suspense>
+        )}
+      </Route>
+
+      <Route path={`/${WORKSPACE_ROUTE_QUALITY}`}>
+        {demoMode ? (
+          <Redirect to="/" />
+        ) : (
+          <Suspense fallback={null}>
+            <QualityPage key={currentProjectName} projectName={currentProjectName} />
           </Suspense>
         )}
       </Route>

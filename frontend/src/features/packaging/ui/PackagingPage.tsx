@@ -134,6 +134,11 @@ function parseList<T>(text: string, field: string, message: (field: string) => s
 
 type StepState = "todo" | "done" | "blocked";
 
+/** A value handed over in the query string (the Quality page's "Package this run" link); empty otherwise. */
+function prefill(name: string): string {
+  return new URLSearchParams(window.location.search).get(name) ?? "";
+}
+
 interface PackagingPageProps {
   projectName: string;
 }
@@ -141,8 +146,8 @@ interface PackagingPageProps {
 export default function PackagingPage({ projectName }: PackagingPageProps) {
   const { t } = useTranslation("dashboard");
   const step = useStep();
-  const [runId, setRunId] = useState("");
-  const [runDigest, setRunDigest] = useState("");
+  const [runId, setRunId] = useState(() => prefill("run"));
+  const [runDigest, setRunDigest] = useState(() => prefill("digest"));
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [tags, setTags] = useState("");
@@ -157,7 +162,11 @@ export default function PackagingPage({ projectName }: PackagingPageProps) {
   const [syntheticMedia, setSyntheticMedia] = useState(true);
   const [paidPromotion, setPaidPromotion] = useState(false);
   const [disclosureDigest, setDisclosureDigest] = useState(ZERO_DIGEST);
-  const [slot, setSlot] = useState<Slot>({ source_artifact_key: "", cohort_id: "", product_surface: "" });
+  const [slot, setSlot] = useState<Slot>(() => ({
+    source_artifact_key: prefill("artifact"),
+    cohort_id: prefill("cohort"),
+    product_surface: prefill("surface"),
+  }));
   const [revision, setRevision] = useState<CandidateRevision | null>(null);
   const [savedDraft, setSavedDraft] = useState<string | null>(null);
   const [headVersion, setHeadVersion] = useState<number | null>(null);
