@@ -1,0 +1,219 @@
+{
+  "schema_id": "m10.b-preseal-review.v1",
+  "reviewed_head": "8df2456ac2e8265388ab371be42fb8340bd6b296",
+  "reviewer": "Codex, independent single-agent source review",
+  "verdict": "CHANGES_REQUESTED",
+  "commands_run": [
+    {
+      "command": "git status --short; git branch --show-current; git rev-parse HEAD",
+      "result": "At entry: clean worktree, design/r2-m10-b, exact requested 8df2456ac2e8265388ab371be42fb8340bd6b296."
+    },
+    {
+      "command": "git show --stat --oneline 27f90c235; git show --format=fuller --no-patch 988321186 f4509c145 8df2456ac; git diff 8df2456ac^ 8df2456ac -- tests/integration/server/services/test_package_export.py",
+      "result": "Inspected UI scope, baseline/measurement chronology, and the complete new writer-pair test diff."
+    },
+    {
+      "command": "git merge-base --is-ancestor 988321186 f4509c145",
+      "exit_code": 0,
+      "result": "Frozen baseline commit is an ancestor of measurement. Baseline committed 2026-10-29 05:53:59 +0700; measurement committed 06:05:09 +0700."
+    },
+    {
+      "command": "python read-only hashlib/subprocess inspection: git show <donor-pin>:<selected-path>, fixture SHA-256 and each recorded function slice/hash; git diff 988321186 8df2456ac -- <baseline-and-fixture-paths>",
+      "exit_code": 0,
+      "result": "Fixture SHA-256 21124a2f89c98029cf4a2fef4eab55abd90c2d1281f321b06c7eb3b4547834f4 matches baseline. Kalinga e4b5a2173ca03d365aad565a89fcc43159b44f9b pipeline/src/validate.py blob and seo_lint slice match Git. OpenMontage 08e2151fa02de28a5d6a312b3d575692bf147ad7 tools/publishers/export_bundle.py blob and _format_chapter_time/_chapter_lines/execute slices match Git. Baseline and donor fixture unchanged through reviewed_head."
+    },
+    {
+      "command": "cd frontend && npx vitest run src/features/packaging",
+      "exit_code": 0,
+      "result": "1 test file, 4 tests passed; duration 3.09s. Includes empty-page axe run with color-contrast disabled."
+    },
+    {
+      "command": "uv run python -m pytest -q tests/integration/server/services/test_packaging_donor_parity.py tests/unit/lib/i18n",
+      "exit_code": 2,
+      "result": "uv failed before pytest: cannot create lock temporary file under read-only /home/anhtuan/.cache/uv."
+    },
+    {
+      "command": "UV_CACHE_DIR=/tmp/m10-preseal-uv-cache uv run python -m pytest -q tests/integration/server/services/test_packaging_donor_parity.py tests/unit/lib/i18n",
+      "exit_code": 130,
+      "result": "Interrupted after remaining silent before any test output. No pass/fail conclusion from this attempt."
+    },
+    {
+      "command": "UV_CACHE_DIR=/tmp/m10-preseal-uv-cache uv run --offline --no-sync python -m pytest -q tests/integration/server/services/test_packaging_donor_parity.py tests/unit/lib/i18n",
+      "exit_code": 130,
+      "result": "Interrupted after remaining silent before any test output. No pass/fail conclusion from this attempt."
+    },
+    {
+      "command": ".venv/bin/python -m pytest -q tests/integration/server/services/test_packaging_donor_parity.py tests/unit/lib/i18n",
+      "exit_code": 0,
+      "result": "37 passed, 1 warning in 2.10s. Warning: unsupported reflection of expression-based index idx_tasks_dedupe_active. Used the existing environment without dependency synchronization; only authorized test paths ran."
+    },
+    {
+      "command": "Targeted numbered source reads and literal searches of the files listed in conditions.files_read; git diff --name-status 8df2456ac HEAD; git status --short; git rev-parse HEAD",
+      "result": "Concurrent branch advance to 2d0ba47dd64b33e986900491317df6f24e13b699 changed only docs/r2/evidence/R2_M10_B_HANDOFF.md. Reviewed source and test inputs remained identical to reviewed_head. Handoff change was not used as candidate evidence."
+    }
+  ],
+  "not_verified": [
+    "Graph MCP tools, including list_projects/index_status/check_index_coverage, are not exposed in this session. Direct source fallback was used; no verified graph generation or graph completeness is claimed.",
+    "The new PostgreSQL test test_a_run_sealed_during_export_finalize_waits_for_it was read but not executed: test_package_export.py is outside the user-authorized test paths. No fresh PostgreSQL writer-pair acceptance is claimed.",
+    "No live browser, real keyboard traversal, populated-state axe/color-contrast audit, screen-reader, or visual responsive check was performed. Vitest covers four mocked page cases only.",
+    "No B7 pilot, Human publication/disposition/selection, live utility measurement, two-clean-root pilot comparison, or pilot socket-denial experiment was performed.",
+    "Git ordering establishes committed baseline before committed measurement, not the absence of undocumented earlier working-tree executions.",
+    "Donor origin URLs and pinned objects were verified from local repositories; no fresh remote fetch was performed. OpenMontage checkout used: /tmp/claude-1000/-home-anhtuan-content-production-os/d4870d56-34f2-481b-bd28-fb82e19f6306/scratchpad/donors/OpenMontage. Kalinga checkout used: /home/anhtuan/Kalinga-Shorts-Factory.",
+    "OpenMontage schema source was inspected at its pin, but the parity execution replaces schemas.artifacts.validate_artifact with a no-op. Green tests do not prove the real schema-validation behavior.",
+    "No broad static gates, full suite, unrelated packets, production readiness, or license assessment was performed. Historical report command results are not substituted for fresh verification."
+  ],
+  "findings": {
+    "H": [
+      {
+        "id": "H1",
+        "status": "CONFIRMED",
+        "file": "frontend/src/features/packaging/ui/PackagingPage.tsx",
+        "line": 117,
+        "title": "The panel cannot author required chapters, locales, or alternative groups",
+        "scenario": "Every save unconditionally sends chapters=[], localization_variants=[], and variant_groups=[] (117-121). There are no editors or load-existing-candidate path for those fields. The server builds the payload from this draft (server/services/packaging_candidates.py:98-120); it does not generate the groups returned by the frontend test mock. Thus groups at page line 245 are always empty in the real flow, required locale checks fail without a UI correction path, and a chapter or variant correction required by B7 cannot be made through the panel. Audience/disclosure choices are also silently fixed with zero policy digests at 119-120.",
+        "requirement": "Design scope lines 30-32 and section 3.3 require authored metadata/thumbnail variants; section 6 requires variants in the panel; B7 runbook step 4 requires preparing seeded chapter/locale revisions through the page.",
+        "fix": "Provide editors or an existing-revision loading/editing flow for the complete supported draft, including chapters, localized metadata, variants and explicit audience/disclosure choices. Preserve the server-owned binding/provenance boundary. Make the UI test response derive from the posted draft rather than inventing title groups absent from that request."
+      },
+      {
+        "id": "H2",
+        "status": "CONFIRMED",
+        "file": "tests/integration/server/services/test_packaging_donor_parity.py",
+        "line": 294,
+        "title": "OpenMontage PASS is not established by same-fixture output and performance comparisons",
+        "scenario": "The metadata row compares only set(donor_metadata) <= set(ours) at 303, with M10 populated from a separate clean_body fixture. Wrong titles, descriptions, tags, hashtags or chapter values still pass as long as keys exist. The layout row at 281-291 compares helper-generated path names, not an actual M10 bundle or member bytes. The performance test uses an M10 video of 4108 bytes at 346 with a different fixture, while donor _inputs at 234 uses 76 video bytes plus a thumbnail and different metadata. Consequently the cited tests do not establish the frozen same-fixture functionality/correctness/performance claims. scripts/r2/build_m10_b6_parity.py:62-85 supplies passing labels unconditionally, and the pure fold checks those labels rather than the measurements.",
+        "requirement": "Frozen baseline dimension_criteria.functionality/correctness/performance; design section 8 same-fixture donor parity. R2_M10_B6_DONOR_PARITY.json assigns these rows PARITY and reports PASS with no material unknowns.",
+        "fix": "Drive both implementations from one frozen metadata/asset case, compare materialized archive paths and every included value/member digest with explicit unit conversions and the three frozen exclusions, and time equivalent fixtures. Add assertions that fail for value corruption. Bind row dispositions to these results; retain BLOCKED/material unknowns until each claimed dimension is supported."
+      }
+    ],
+    "M": [
+      {
+        "id": "M1",
+        "status": "CONFIRMED",
+        "file": "frontend/src/features/packaging/ui/PackagingPage.tsx",
+        "line": 235,
+        "title": "Local completion flags cannot project the required current lifecycle states",
+        "scenario": "The ladder derives done solely from the presence of local revision/observation/selection/receipt objects. A second session can supersede the selection or a run/profile/disposition can change while this page continues to show Selected and an exported download. Even a 409 from a later action only sets step.error; it does not invalidate the existing completion state. On remount, all durable history disappears into the empty state. The client exposes no status/history/readiness read operation, so disposition, stale, waived, superseded and invalidated states required by section 6 cannot be projected.",
+        "requirement": "Design section 6 lines 351-355 separates historical status from current exportable with typed refusal reasons and requires every named lifecycle state.",
+        "fix": "Consume server read DTOs for the scoped slot, disposition/readiness and export history; render historical receipts separately from current exportability and refresh on mutations/refusals. Keep currentness decisions on the server and add populated-state tests for each required state."
+      },
+      {
+        "id": "M2",
+        "status": "CONFIRMED",
+        "file": "frontend/src/features/packaging/ui/PackagingPage.tsx",
+        "line": 342,
+        "title": "Editing preview inputs leaves an earlier preview selectable",
+        "scenario": "After a successful preview, changing a waiver reason (342), slot field (359-367), or variant choice (379) leaves preview and selection intact. Select at 202-218 submits only the old preview ID/digest, so the Human can select a prior waiver/variant/slot while seeing newly edited controls. Export at 227 additionally combines the old selection with the newly edited slot and is then refused. Resetting only after successful save/check/preview does not cover edits or a failed replacement preview.",
+        "fix": "Invalidate preview and downstream action state whenever any preview dependency changes; invalidate the pending request's result if its input generation changed while awaiting it. Render the immutable server preview's actual choice/waiver/slot summary before Human selection, and test editing during and after preview."
+      },
+      {
+        "id": "M3",
+        "status": "CONFIRMED",
+        "file": "scripts/r2/build_m10_b6_parity.py",
+        "line": 28,
+        "title": "Several assigned improvements contradict the frozen winning criteria",
+        "scenario": "_SEO gives all seven pure text rows data_integrity=IMPROVED, whereas baseline line 30 explicitly assigns PARITY for pure text rules. kalinga_metadata_missing at builder 50-52 receives failure_safety=IMPROVED even though its cited test shows the donor returning the refusal ['seo.json missing'] and M10 rejecting a missing title: both refuse, which baseline line 29 classifies PARITY. The input defects are also different. The generated report copies these annotations into a PASS; evaluate_quality_parity cannot detect criterion misuse.",
+        "fix": "Assess every row/dimension against the original criteria and the exact cited fixture. Correct unsupported improvements to PARITY where proven; otherwise record the missing proof and block the fold. Do not revise the frozen criteria to fit measured outcomes."
+      },
+      {
+        "id": "M4",
+        "status": "CONFIRMED",
+        "file": "tests/integration/server/services/test_packaging_donor_parity.py",
+        "line": 57,
+        "title": "The reachable donor schema-validation bypass is absent from parity limitations",
+        "scenario": "schemas.artifacts.validate_artifact is replaced by an unconditional no-op for every donor export. At the pinned execute lines 268-275, this is a reachable dependency that can turn an otherwise written export into a failure. Success, no-upload and determinism observations therefore use a modified donor dependency surface. A comment calls it outside the measured rows, but it is not one of the three frozen exclusions, and the report declares material_unknowns=[] at 433. This is a scope/evidence limitation, not a demonstrated failure of the supplied valid schema payloads.",
+        "fix": "Run the pinned validator/schema on the measured output, with a schema-refusal fixture if failure safety is claimed. Otherwise explicitly disclose that schema validation and its failure/partial-output behavior were not compared and keep affected claims blocked rather than representing an unqualified donor PASS."
+      },
+      {
+        "id": "M5",
+        "status": "CONFIRMED",
+        "file": "docs/r2/evidence/R2_M10_B7_PILOT_PREREGISTRATION.json",
+        "line": 96,
+        "title": "Five catches out of seven lowers the design's recall threshold",
+        "scenario": "The preregistration lists seven seeded defects but accepts '>= 5 of the seeded defects caught per cohort'. Catching five and missing two therefore passes at 5/7 (71.4%), below section 7's >=5/6 (83.3%). The smallest_useful_effect at 124 inherits this weaker threshold, so the pilot can claim utility while failing the accepted design.",
+        "fix": "Preregister an explicit numerator/denominator rule preserving recall >=5/6. For the current seven equally weighted seeds require at least six catches, or freeze six scored seeds and report the seventh separately before any run. Propagate the same rule into the effect and dossier pass calculation."
+      },
+      {
+        "id": "M6",
+        "status": "CONFIRMED",
+        "file": "docs/r2/evidence/R2_M10_B7_PILOT_RUNBOOK.md",
+        "line": 19,
+        "title": "The pilot procedure omits clean-root determinism and the in-unit socket denial proof",
+        "scenario": "Step 7 asks for two exports with fresh commands in one workflow, not two clean roots. Preregistration line 121 likewise records two fresh-command exports, which can reuse the same published content-addressed object. Its runtime_network at 125 requests unit properties but no socket() attempt returning EPERM; the runbook adds none. Following all eight steps can consequently mark a dossier complete without either section 7 experiment.",
+        "fix": "Specify how to provision two clean independent roots with the same frozen logical inputs and verify both independently built archive bytes/digests. Add the confined-unit socket attempt, EPERM result and unit-property evidence, with the claim explicitly limited to confined code and the host static-scan limit retained. Require these artifacts before cohort pass."
+      }
+    ],
+    "L": [
+      {
+        "id": "L1",
+        "status": "CONFIRMED_NOTE_ONLY",
+        "file": "frontend/src/features/packaging/ui/PackagingPage.tsx",
+        "line": 257,
+        "title": "Completed rungs all receive aria-current=step",
+        "scenario": "After several successful actions multiple items in the same ladder are marked current. The sr-only completion text already communicates done/blocked status.",
+        "fix": "Apply aria-current to at most the actual current step and retain separate completion text. This note does not block review completion."
+      },
+      {
+        "id": "L2",
+        "status": "VERIFICATION_LIMIT_NOTE_ONLY",
+        "file": "frontend/src/features/packaging/ui/PackagingPage.test.tsx",
+        "line": 112,
+        "title": "The axe result covers only the empty panel",
+        "scenario": "The single axe check disables color-contrast and runs before findings, waiver fields, variant radios and the download link exist. No test exercises keyboard traversal or focus recovery. Native controls, inherited focus outlines and the reduced-motion CSS are present on source inspection; the four passing tests do not establish full accessibility.",
+        "fix": "Include populated/refusal states in accessibility verification and perform a real keyboard/focus/contrast check before claiming that acceptance gate. This is a verification note, not an additional stopping condition."
+      }
+    ]
+  },
+  "conditions": {
+    "stopping_rule": "H and M require disposition before pre-seal acceptance. L entries are notes only. Review completed without code fixes, staging, committing, formatting, or spawning agents; only this review artifact is authored.",
+    "critical_status": "No confirmed Critical issue identified within the bounded reviewed source. Two High findings remain; this is not M10-B seal acceptance.",
+    "head_binding": "Entry HEAD matched the requested SHA. Subsequent HEAD 2d0ba47dd64b33e986900491317df6f24e13b699 differs only in the handoff document; reviewed scope remains bound to 8df2456ac2e8265388ab371be42fb8340bd6b296.",
+    "baseline_and_exclusions": "Git ancestry, unchanged baseline/fixture bytes, both donor blob digests and all four extracted functions verified. The three frozen wholly EXCLUDED rows and their reasons are preserved: kalinga_media_variants, openmontage_chapter_text, openmontage_subtitles_path. No license issue considered. No fourth exclusion or criteria amendment is implicitly approved.",
+    "row_coverage": "Read every frozen row and generated row. Kalinga's seven SEO cases have positive clean/defect tests; their output-code stability is checked, not full observation digest stability. Missing-metadata refusal is compared using different defects. OpenMontage missing-video/optional-asset cases exercise pure M10 checks with synthetic facts, not both complete export paths. Layout, metadata, determinism, no-upload and performance evidence has the specific limits described above. A green suite and a recomputed label fold alone do not resolve these limits.",
+    "finalize_run_seal_pair": "Source inspection found no new defect in the added finalize-first scenario. SecondCallGate pauses the second readiness_in call, reached from finalize after prepare; _require_current has already locked masters/profile/run/disposition/packaging head. Gate captures that transaction's PostgreSQL PID; assert_blocked observes a contender via pg_blocking_pids before release. The test then awaits an exported receipt and a distinct new sealed run. This establishes an appropriate source-level test shape, not a fresh runtime pass or coverage of the seal-first ordering.",
+    "pilot_status": "Preregistration only. All three cohorts, sponsor single-reviewer limit, ordering, false positives, disagreement, time/memory/storage metrics and the nontrivial smallest-effect condition are stated. Human publication/disposition/selection gates and prohibitions on agent approval, network and upload are preserved. No pilot execution or utility acceptance is implied. Backend exports require an interactive user; the agent preparation language must not be interpreted as permission to borrow Human authority.",
+    "files_read": [
+      ".claude/rules/frontend-async-race.md",
+      ".claude/rules/frontend-design-first.md",
+      ".claude/rules/frontend-ui-conventions.md",
+      "CONTRIBUTING.md (relevant test/tooling sections)",
+      "docs/superpowers/specs/2026-10-28-r2-m10-b-packaging-export-design.md",
+      "frontend/src/features/packaging/api/packagingClient.ts",
+      "frontend/src/features/packaging/ui/PackagingPage.tsx",
+      "frontend/src/features/packaging/ui/PackagingPage.test.tsx",
+      "frontend/src/features/packaging/ui/packaging.css",
+      "frontend/src/features/formats/ui/formats.css (shared controls/focus)",
+      "frontend/src/app-routes.ts (packaging wiring)",
+      "frontend/src/components/canvas/StudioCanvasRouter.tsx (imports and packaging route)",
+      "frontend/src/components/layout/AssetSidebar.tsx (navigation)",
+      "frontend/src/i18n/en/dashboard.ts (packaging keys)",
+      "frontend/src/i18n/vi/dashboard.ts (packaging keys)",
+      "frontend/src/i18n/zh/dashboard.ts (packaging keys)",
+      "docs/r2/evidence/R2_M10_B6_DONOR_BASELINE.json",
+      "docs/r2/evidence/R2_M10_B6_DONOR_PARITY.json",
+      "tests/fixtures/r2/m10_b6_donors/donor_functions.json",
+      "scripts/r2/extract_m10_b6_donor_fixture.py",
+      "scripts/r2/build_m10_b6_parity.py",
+      "tests/integration/server/services/test_packaging_donor_parity.py",
+      "tests/unit/r2/quality/test_packaging_check.py (fixture and assertion seams)",
+      "r2/quality/packaging_check.py (relevant check implementations)",
+      "r2/quality/parity.py",
+      "r2/advanced_creative/parity.py",
+      "r2/contracts/quality.py (finding/observation/status contracts)",
+      "r2/contracts/packaging.py (observation/selection contracts)",
+      "server/routers/packaging.py (draft/check/preview/selection/export routes)",
+      "server/services/packaging_candidates.py (draft and payload assembly)",
+      "server/services/package_export.py (resolve/currentness/prepare/finalize/worker seams)",
+      "server/services/quality_runs.py (seal locking)",
+      "server/services/quality_probe_runtime.py (worker launch)",
+      "tests/integration/server/services/test_package_export.py (new diff and relevant fixtures)",
+      "tests/integration/server/services/test_quality_package_selection.py (Gate and blocked-waiter helpers)",
+      "tests/conftest.py (autouse runtime assumptions)",
+      "tests/integration/server/conftest.py (runtime fixture search)",
+      "docs/r2/evidence/R2_M10_B7_PILOT_PREREGISTRATION.json",
+      "docs/r2/evidence/R2_M10_B7_PILOT_RUNBOOK.md",
+      "Kalinga pin: pipeline/src/validate.py (Git blob and selected function)",
+      "OpenMontage pin: tools/publishers/export_bundle.py (Git blob and selected functions)",
+      "OpenMontage pin: schemas/artifacts/__init__.py and publish_log.schema.json"
+    ]
+  }
+}
