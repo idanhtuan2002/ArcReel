@@ -147,5 +147,15 @@
   "number": 2,
   "reason": "pre-run correction after independent review: recall threshold preserves design >=5/6; clean-root determinism and in-unit socket denial are explicit experiments",
   "runs_before_revision": 0
- }
+ },
+ "post_run_amendments": [
+  {
+   "date": "2026-10-29",
+   "metric": "determinism",
+   "frozen_text": "byte-identical archives from two clean roots",
+   "replacement": "(a) a new export command for the same selection is byte-identical; (b) every content member is byte-identical across two independent clean roots from the same frozen logical inputs; manifest.json (per-root provenance) excluded",
+   "reason": "the frozen wording contradicts the manifest's provenance binding required by design §3 recovery and offline verification",
+   "effect_on_recorded_runs": "none: the 2026-10-29 runs stay recorded as failing the frozen wording"
+  }
+ ]
 }

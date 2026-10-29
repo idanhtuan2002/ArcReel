@@ -363,7 +363,15 @@ waived/superseded/invalidated states; keyboard/focus/reduced-motion; axe-core; a
 - Metrics, each with its preregistered threshold: seeded recall ≥ 5/6 per cohort (false negatives listed);
   false positives on the clean final ≤ 1 per cohort as judged by the reviewer; reviewer disagreement (per finding:
   check verdict vs Human verdict) reported in full; runtime per bundle ≤ 30 s; peak RSS ≤ 512 MiB; bundle storage
-  bytes reported against master bytes; determinism = byte-identical archives from two clean roots.
+  bytes reported against master bytes; determinism = (a) a new export command for the same selection produces the
+  byte-identical archive (the §3 recovery property), and (b) every content member (video, thumbnails, captions,
+  metadata) is byte-identical across two independent clean roots built from the same frozen logical inputs.
+  `manifest.json` binds the selection, disposition and candidate payload of its own root, so whole archives from
+  independent roots differ by design and are not compared.
+  _Post-run amendment 2026-10-29:_ the frozen wording "byte-identical archives from two clean roots" contradicted the
+  manifest's provenance binding; B7 measured it as written (failed in every cohort, only `manifest.json` differed)
+  and the definition above replaces it for later runs. Provenance stays in the archive because finalize, recovery
+  and offline verification check the archive against the selection that produced it.
 - Smallest useful effect: the seeded recall threshold is met **and** at least one of (a real defect caught on a
   clean final, or a confirmed correction made through the panel) is recorded. "Nothing found" on clean finals
   never satisfies the effect on its own.
