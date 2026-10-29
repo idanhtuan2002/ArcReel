@@ -115,7 +115,8 @@ own notes); only digests are bound. Private projections, all `"sha256:" + sha256
   `notes_digest` hashes the UTF-8 notes text (≤ 20 000 chars) → `reviewer_evidence_digest`; `evidence_refs =
   ["m10-c-review:" + hex(reviewer_evidence_digest)]`; `evidence_digest` hashes `{"schema": "m10-c.review-refs.v1",
   "refs"}`;
-- each finding: rule id from the rubric criteria ids, severity `BLOCKING|ADVISORY`, locator `whole|t=<ms>`, server
+- each finding: the slot rule id `review`, severity `BLOCKING|ADVISORY`, subject locator `<criterion>@whole|<criterion>@t=<ms>`
+  (the rubric criterion travels in the locator because a finding rule id must be the slot's rule), server
   `finding_id = uuid7()`, `evidence_digest` hashing `{"schema": "m10-c.review-finding.v1", "rule_id", "severity",
   "locator", "notes_digest"}`.
 Requirement/slot are fixed to the template's `review`/`human`; status is `PASS|FAIL`; ≤ 32 findings. The operator
