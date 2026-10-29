@@ -1,16 +1,19 @@
 {
   "schema_id": "m10.b-seal-candidate.v1",
-  "status": "SEAL_CANDIDATE",
+  "status": "SUPERSEDED_BY_ACCEPTANCE",
   "branch": "design/r2-m10-b",
   "worktree": ".worktrees/r2-m10-b",
   "base": "0af66db9e",
   "candidate_head": "10c9a1dc8c3892f0559d53efdd02f8719632b783",
-  "code_head_for_evidence": "7609bceac",
+  "code_head_for_evidence": "00912922e",
   "design": "docs/superpowers/specs/2026-10-28-r2-m10-b-packaging-export-design.md",
   "packets": {
     "B0": {
-      "verdict": "ACCEPTED",
-      "review": "docs/r2/evidence/m10-b-reviews/design-b0-review.json"
+      "verdict": "ACCEPTED_WITH_CONDITIONS",
+      "reviews": [
+        "docs/r2/evidence/m10-b-reviews/design-b0-review.json (REWORK)",
+        "docs/r2/evidence/m10-b-reviews/design-r2-delta-review.json (ACCEPT_WITH_CONDITIONS, includes B0 C4 tests 1a93a16e5)"
+      ]
     },
     "B1": {
       "verdict": "ACCEPTED_WITH_CONDITIONS",
@@ -52,7 +55,7 @@
       "verdict": "PASS (Kalinga, OpenMontage)",
       "report": "docs/r2/evidence/R2_M10_B6_DONOR_PARITY.json",
       "baseline": "docs/r2/evidence/R2_M10_B6_DONOR_BASELINE.json",
-      "bound_code_head": "7609bceac"
+      "bound_code_head": "00912922e"
     },
     "B7": {
       "verdict": "PASSED_WITH_DEVIATIONS",
@@ -128,11 +131,11 @@
     "B7 C3: sponsor review and a real zh-Hans final are needed before claiming reviewer or zh corpus qualification; replace the fixture dependency head with the real closure before claiming full production provenance"
   ],
   "open_items": [
-    "B8 seal / M10-B acceptance",
     "M10 integrated acceptance"
   ],
   "human_gates": {
     "standing_policy": "push, merge, tag, deploy and anything on the production host stay Human gates; the agent performs none of them",
     "b7_exception": "on 2026-10-29 the sponsor delegated in chat ('ban lam het tat ca cac buoc') the local B7 pilot Human gates (profile publication, narrative observation, disposition, package selection); the agent performed them on a local non-production host, disclosed in every R2_M10_B7_PILOT_*.json dossier; these runs are not independent Human or production acceptance"
-  }
+  },
+  "superseded_by": "docs/r2/evidence/R2_M10_B_ACCEPTANCE.json"
 }

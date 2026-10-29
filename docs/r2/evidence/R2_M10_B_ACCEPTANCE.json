@@ -1,0 +1,150 @@
+{
+  "schema_id": "m10.b-acceptance.v1",
+  "milestone": "M10-B packaging and export",
+  "verdict": "ACCEPTED_WITH_CONDITIONS",
+  "date": "2026-10-29",
+  "seal_review": "docs/r2/evidence/m10-b-reviews/b8-seal-codex-review.json",
+  "seal_review_head": "bcead9f4e87265e75ca3d7e5cb2f512c3a0a011a",
+  "code_head": "00912922e",
+  "documentation_head_at_review": "bcead9f4e",
+  "branch": "design/r2-m10-b",
+  "base": "0af66db9e",
+  "packets": {
+    "B0": {
+      "verdict": "ACCEPTED_WITH_CONDITIONS",
+      "reviews": [
+        "docs/r2/evidence/m10-b-reviews/design-b0-review.json (REWORK)",
+        "docs/r2/evidence/m10-b-reviews/design-r2-delta-review.json (ACCEPT_WITH_CONDITIONS, includes B0 C4 tests 1a93a16e5)"
+      ]
+    },
+    "B1": {
+      "verdict": "ACCEPTED_WITH_CONDITIONS",
+      "reviews": [
+        "docs/r2/evidence/m10-b-reviews/b1-codex-review.json",
+        "docs/r2/evidence/m10-b-reviews/b1-codex-delta-review.json"
+      ],
+      "migration": "5d2a7c3e8b11"
+    },
+    "B2": {
+      "verdict": "ACCEPTED_WITH_CONDITIONS",
+      "reviews": [
+        "docs/r2/evidence/m10-b-reviews/b2-codex-delta3-review.json"
+      ],
+      "migration": "6e3b8d4f9c22"
+    },
+    "B3": {
+      "verdict": "ACCEPTED_WITH_CONDITIONS",
+      "reviews": [
+        "docs/r2/evidence/m10-b-reviews/b3-codex-delta2-review.json"
+      ],
+      "migration": "7f4c9e5a0d33"
+    },
+    "B4": {
+      "verdict": "ACCEPTED_WITH_CONDITIONS",
+      "reviews": [
+        "docs/r2/evidence/m10-b-reviews/b4-codex-delta3-review.json"
+      ],
+      "migration": "8a5d0f6b1e44",
+      "route_qualification": "docs/r2/evidence/m10-b-reviews/export-route-qualification.json"
+    },
+    "B5": {
+      "verdict": "ACCEPTED_WITH_VERIFICATION_LIMITS",
+      "reviews": [
+        "docs/r2/evidence/m10-b-reviews/b5-codex-delta2-review.json"
+      ]
+    },
+    "B6": {
+      "verdict": "PASS (Kalinga, OpenMontage)",
+      "report": "docs/r2/evidence/R2_M10_B6_DONOR_PARITY.json",
+      "baseline": "docs/r2/evidence/R2_M10_B6_DONOR_BASELINE.json",
+      "bound_code_head": "7609bceac"
+    },
+    "B7": {
+      "verdict": "PASSED_WITH_DEVIATIONS",
+      "summary": "docs/r2/evidence/R2_M10_B7_PILOT_SUMMARY.json",
+      "dossiers": [
+        "docs/r2/evidence/R2_M10_B7_PILOT_WESTERN_EXPLAINER.json",
+        "docs/r2/evidence/R2_M10_B7_PILOT_VERTICAL_FACTUAL_SHORT.json",
+        "docs/r2/evidence/R2_M10_B7_PILOT_ZH_SHUANG.json"
+      ],
+      "result": "run 2 on the original V2 finals at 7609bceac: recall 7/7 x3, 0 FP, export <= 1.9 s, worker peak <= 23 MB, EPERM, amended determinism met; frozen whole-archive wording fails (recorded); Human gates performed by the agent under sponsor delegation",
+      "fixes": {
+        "F1": "0299b0a11",
+        "F2": "7609bceac",
+        "F3": "55edfa11c"
+      },
+      "review": "docs/r2/evidence/m10-b-reviews/b7-fixes-codex-review.json (ACCEPTED_WITH_CONDITIONS; L1-L3 fixed)"
+    },
+    "preseal": {
+      "verdict": "ACCEPTED_WITH_CONDITIONS",
+      "reviews": [
+        "docs/r2/evidence/m10-b-reviews/preseal-codex-review.json",
+        "docs/r2/evidence/m10-b-reviews/preseal-delta1-codex-review.json",
+        "docs/r2/evidence/m10-b-reviews/preseal-delta2-codex-review.json",
+        "docs/r2/evidence/m10-b-reviews/preseal-delta3-codex-review.json"
+      ]
+    },
+    "B8": {
+      "verdict": "ACCEPTED_WITH_CONDITIONS",
+      "evidence": "docs/r2/evidence/R2_M10_B8_SEAL_EVIDENCE.json",
+      "review": "docs/r2/evidence/m10-b-reviews/b8-seal-codex-review.json",
+      "changes": {
+        "f5f06b87c": "full disk is a known refusal; crash-cut tests; export route requalified",
+        "00912922e": "routes reuse the startup-verified grant reader"
+      }
+    }
+  },
+  "evidence": {
+    "seal": "docs/r2/evidence/R2_M10_B8_SEAL_EVIDENCE.json",
+    "parity": "docs/r2/evidence/R2_M10_B6_DONOR_PARITY.json (bound to 00912922e)",
+    "pilots": "docs/r2/evidence/R2_M10_B7_PILOT_SUMMARY.json",
+    "design": "docs/superpowers/specs/2026-10-28-r2-m10-b-packaging-export-design.md"
+  },
+  "conditions": [
+    {
+      "id": "C1_PILOT_TRUTH",
+      "gate": "All downstream acceptance statements",
+      "requirement": "Retain frozen-preregistration failures, the post-run amendment, delegated-agent reviewer/gate provenance and seeded-only correction. Obtain actual sponsor/Human review and a genuine zh-Hans final before claiming those missing qualifications; use real dependency closure before production-provenance claims."
+    },
+    {
+      "id": "C2_ACTIVATED_HOST",
+      "gate": "M10 integrated / production acceptance",
+      "requirement": "Prove root-owned governance archive/read copies, root attestor and intended application uid, pinned deployment/key custody and restore preflight on an authorized host. Restore/offline migration stops app/workers. Runtime reader reuse does not support online restore or key-registry reconfiguration. Human custodians continue fresh per-authorization attestation."
+    },
+    {
+      "id": "C3_STORAGE_RECOVERY",
+      "gate": "Supported operation and stronger recovery qualification",
+      "requirement": "Keep LOCAL_REGULAR_FILE_IO and trusted project-root constraints. Carry separate fsync fault injection and abrupt process/power-loss durability gaps; the existing refusal/cancellation tests are not evidence of every storage crash cut."
+    },
+    {
+      "id": "C4_SCHEMA_AND_SERIALIZATION",
+      "gate": "M10 integrated evidence closure",
+      "requirement": "Carry B1 C3 exact migration commands/SHA/raw result and predecessor/FK preservation witness; retain B2 deterministic contention and B3 multi-principal/disjoint-master/later-head schedule limits. Successful suite totals do not prove missing witnesses. Reproduce applicable PG/systemd checks where permitted when claiming their independent execution."
+    },
+    {
+      "id": "C5_SINGLE_OPERATOR",
+      "gate": "Current operating envelope / before wider concurrent use",
+      "requirement": "Scope contention evidence to the measured 20-read/one-export schedule. Reads serialize on an exclusive advisory lock and rehash readiness: median about 5.2 s, max about 9.9 s; export about 9.1 s versus about 0.9 s alone. Concurrent Human authorization challenges still refuse while busy. Do not advertise multi-user throughput or general deadlock freedom from this measurement."
+    },
+    {
+      "id": "C6_PROVENANCE_AND_REBIND",
+      "gate": "Seal record and any later source change",
+      "requirement": "Reconcile the stale candidate with this frozen review/B8 snapshot. Preserve source-head versus documentation-head distinction, supplied-runtime provenance and JUnit hashes; retain raw JUnit output where reproducibility is required. Refresh affected route/parity/regression evidence after later source changes."
+    },
+    {
+      "id": "C7_M10_A_AND_RELEASE",
+      "gate": "M10 integrated acceptance / release",
+      "requirement": "Retain inherited M10-A/F1 and recommended independent-review conditions. This seal does not itself authorize push, merge, tag, deploy, production-host actions or a Production Authority mutation."
+    }
+  ],
+  "supersedes": "docs/r2/evidence/R2_M10_B_CANDIDATE.json",
+  "human_gates": {
+    "standing_policy": "push, merge, tag, deploy and anything on the production host stay Human gates; the agent performs none of them",
+    "b7_exception": "on 2026-10-29 the sponsor delegated in chat ('ban lam het tat ca cac buoc') the local B7 pilot Human gates (profile publication, narrative observation, disposition, package selection); the agent performed them on a local non-production host, disclosed in every R2_M10_B7_PILOT_*.json dossier; these runs are not independent Human or production acceptance"
+  },
+  "not_done": [
+    "push, merge, tag, deploy (Human gates)",
+    "sponsor-reviewed pilots and a zh-Hans corpus (C1)",
+    "activated-host/production acceptance (C2)"
+  ]
+}

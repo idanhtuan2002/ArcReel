@@ -1,0 +1,518 @@
+{
+  "schema_id": "m10.b8-seal-codex-review.v1",
+  "verdict": "ACCEPTED_WITH_CONDITIONS",
+  "head": "bcead9f4e87265e75ca3d7e5cb2f512c3a0a011a",
+  "branch": "design/r2-m10-b",
+  "base": "05aa1692a",
+  "reviewer": "Codex, independent single-agent source and evidence review",
+  "critical_high_status": "No confirmed Critical, High or Medium defect found in the bounded B8 implementation delta. One Low evidence-summary finding; it does not determine CHANGES_REQUESTED.",
+  "acceptance_scope": "M10-B packaging/export implementation and its explicitly qualified local acceptance evidence. This is a conditional seal review, not M10 integrated acceptance, independent Human acceptance, zh corpus qualification, production activation, or authorization to push/merge/tag/deploy.",
+  "pin_and_preservation": {
+    "entry_head": "bcead9f4e87265e75ca3d7e5cb2f512c3a0a011a",
+    "pre_write_head": "bcead9f4e87265e75ca3d7e5cb2f512c3a0a011a",
+    "entry_worktree": "clean",
+    "source_evidence_head": "00912922e29c9e991a1aadb695d87fba4426cc40",
+    "source_equivalence": "git diff --name-status 00912922e..bcead9f4e lists only evidence documents/scripts/screenshot. Product code, tests, registry and design at the recorded regression source snapshot equal the reviewed HEAD.",
+    "changes_reviewed": [
+      "f5f06b87c",
+      "00912922e",
+      "bcead9f4e (evidence assembly)"
+    ],
+    "mutations": "Only this requested review JSON is authored in the repository. Temporary logs/probes under /tmp. No source/test edit, formatting, staging, commit, push, merge, tag, full suite, provider call or production operation."
+  },
+  "answers": {
+    "1_b8_correctness_and_authority": {
+      "conclusion": "B8 changes are correct and safe within the existing activated-host, operator-custody and offline-restore model.",
+      "capacity_errors": "The inner OSError handler spans archive writing, flush/fsync and output-handle close. ENOSPC/EDQUOT/EFBIG produce ENVELOPE_EXCEEDED with exit 1; unrelated OSError remains WORKER_FAILED. The host accepts a known refusal only after verified runtime cleanup and the expected exit/result, and never publishes that output. A later replay remains refused under the same command; a new command can re-plan. Real-worker file-size-limit evidence exercises EFBIG, not actual disk/quota exhaustion. Five independent controlled main-code probes separately cover all three errnos, EIO and success.",
+      "startup_reader": "packaging_deps obtains governance_grants from app.state, and exposes no reader if activated startup supplied none. server/app.py:385-394 initializes it to None and assigns it only after verify_governance_activated_startup succeeds. The closure returns the reader object, not a cached grant/checkpoint/authorization.",
+      "per_use_freshness": "CheckpointedShowrunnerGrantReader.require_current_locked first verifies the locked signed grant chain and active DB-time ISSUE; it then invokes _load_checkpoint on every call, verifies signature/deployment/pinned key, and compares the exact scope sequence/event digest. GovernanceCheckpointFile reopens the fixed checkpoint pathname and rechecks root/ancestor/file custody and stable bytes on each load. Here fresh means newly loaded current checkpoint bytes plus locked-ledger equality; it is not a new wall-clock TTL for the checkpoint signature.",
+      "what_is_no_longer_repeated": "Packaging reads/export no longer perform a new full schema/global-ledger/public-four-file/archive challenge on every request. That incidental extra checking was stronger than the promised M8-C runtime composition and caused competing requests to fail at the attestor busy guard. The M8-C design explicitly constructs runtime services with the same app-state reader, rechecks checkpoint custody per later use, and requires stopped applications/workers for restore. This change does not authorize online restore, online key-registry changes or treating startup proof as an authorization.",
+      "human_boundary": "PackageSelectionCustodian.authorize_selection still calls verify_governance_activated_startup per authorization before issuing its bound DB-time lease. Profile/disposition custodians are unchanged. Concurrent Human authorizations may still fail closed while the one-proof attestor is busy; no bypass or retry-as-approval is introduced.",
+      "evidence": [
+        "server/routers/packaging.py:83",
+        "server/app.py:385",
+        "server/services/governance_startup.py:70",
+        "server/services/governance_grants.py:329",
+        "server/services/governance_checkpoint_file.py:39",
+        "server/services/governance_checkpoint_file.py:114",
+        "server/services/quality_package_selection.py:307",
+        "server/services/governance_attestation.py:152",
+        "docs/superpowers/specs/2026-10-13-r2-m8c-startup-attestor-design.md:69",
+        "server/services/package_export_worker.py:233",
+        "server/services/package_export.py:1150"
+      ]
+    },
+    "2_acceptance_matrix": "Every section 8 row has identifiable cited evidence. This is not a claim that every subcriterion is independently reproduced or exhaustively proven: shared-schema reproducibility/FK preservation, some serialization schedules, fsync fault injection, Human/corpus qualifications and environment provenance remain qualified below. The B8 evidence is generally candid; the older candidate summary needs the Low reconciliation noted in L1.",
+    "3_seal": "Yes, ACCEPTED_WITH_CONDITIONS is supportable for the stated M10-B local packaging/export scope. The recorded sponsor chat delegation is treated as a disclosed local pilot exception, not independent proof of Human review. The failed frozen whole-archive metric remains failed; the post-run amendment accepts same-selection archive determinism and cross-root content-member determinism while preserving provenance. Production/integrated and missing reviewer/corpus dimensions remain open."
+  },
+  "findings": [
+    {
+      "id": "L1",
+      "severity": "Low",
+      "status": "CONFIRMED",
+      "file:line": "docs/r2/evidence/R2_M10_B_CANDIDATE.json:7",
+      "related_locations": [
+        "docs/r2/evidence/R2_M10_B_CANDIDATE.json:13",
+        "docs/r2/evidence/R2_M10_B_CANDIDATE.json:118",
+        "docs/r2/evidence/R2_M10_B_CANDIDATE.json:120"
+      ],
+      "scenario": "A consumer using the candidate alone sees obsolete code/parity heads, no measured contention, and pending B8 work that the later seal evidence has now addressed. Its B0 ACCEPTED entry links only design-b0-review.json, whose actual verdict is REWORK; subsequent resolution evidence must also be followed. The B8 file resolves much of this, but the acceptance record currently requires manual reconciliation.",
+      "fix": "When recording the seal, link this frozen review and B8 evidence as the superseding acceptance snapshot; reconcile candidate heads, B0 resolution links and closed/partial carried items. Keep original reviews and pilot failures intact. Retain genuinely open schema, recovery, host and Human/corpus conditions. No product-code repair or new review round is required for this note."
+    }
+  ],
+  "matrix_review": [
+    {
+      "gate": "F1",
+      "status": "SUPPORTED_WITH_SUPPLIED_RUNTIME_EVIDENCE",
+      "evidence": [
+        "docs/r2/evidence/m10-b-reviews/design-r2-delta-review.json",
+        "docs/r2/evidence/R2_M10_B8_SEAL_EVIDENCE.json:10",
+        "tests/integration/server/services/test_quality_probes.py",
+        "tests/integration/lib/db/migrations/test_4c1f0e2a9b10_quality_probe_failures.py"
+      ],
+      "assessment": "Failure-evidence persistence/replay is covered by B0 follow-up and the selected regression files; the original design REWORK is historical, not the final B0 disposition.",
+      "limits": "The 2269 result is supplied, not independently rerun PostgreSQL evidence. This seal does not erase M10-A independent-review conditions."
+    },
+    {
+      "gate": "Step 1",
+      "status": "SUPPORTED",
+      "evidence": [
+        "docs/r2/evidence/m10-b-reviews/b1-codex-delta-review.json",
+        "docs/superpowers/specs/2026-10-28-r2-m10-b-packaging-export-design.md:34"
+      ],
+      "assessment": "The B1 seam inventory and later reviewed implementations preserve generic M8 refusal and reuse its append receipts/digests.",
+      "limits": "This B8 review checks the delta and the prior review chain, not a new exhaustive re-audit of all M8 consumers."
+    },
+    {
+      "gate": "Shared schema",
+      "status": "SUPPORTED_WITH_CARRIED_EVIDENCE_LIMITS",
+      "evidence": [
+        "docs/r2/evidence/m10-b-reviews/b1-codex-delta-review.json",
+        "docs/r2/evidence/m10-b-reviews/b1-pg-migration-roundtrip.json",
+        "tests/integration/lib/db/migrations/test_5d2a7c3e8b11_m8_packaging_candidate_kind.py",
+        "tests/unit/r2/advanced_creative/test_exploration_promotion.py:311",
+        "docs/r2/evidence/R2_M10_B8_SEAL_EVIDENCE.json"
+      ],
+      "assessment": "Golden/refusal tests and CHECK migration round trips are cited. The full promote refusal regression now persists and asserts exactly command/head/preview with no authority write; it passed in the independent 726-test run.",
+      "limits": "B1 C3 is still partial: its PG note lacks exact executed SHA/commands/raw output and a predecessor/FK preservation witness; SQLite witness inserts disable FKs. A broad successful suite does not supply that missing witness."
+    },
+    {
+      "gate": "Contracts",
+      "status": "SUPPORTED",
+      "evidence": [
+        "docs/r2/evidence/m10-b-reviews/b1-codex-delta-review.json",
+        "tests/unit/r2/contracts/test_packaging.py",
+        "tests/unit/r2/quality/test_packaging_check.py",
+        "docs/r2/evidence/R2_M10_B8_SEAL_EVIDENCE.json"
+      ],
+      "assessment": "Closed safety semantics, immutable payloads, digests/roles/provenance and malformed cases are linked through the B1/B2 reviews. Independent contracts plus advanced-creative run: 726 passed.",
+      "limits": "Runtime host/selection/export authority comes from the separately reviewed consumers, not pure model validation alone."
+    },
+    {
+      "gate": "Packaging checks",
+      "status": "SUPPORTED_WITH_STORAGE_LIMIT",
+      "evidence": [
+        "docs/r2/evidence/m10-b-reviews/b2-codex-delta3-review.json",
+        "tests/integration/server/services/test_quality_packaging.py:514",
+        "tests/integration/server/services/test_quality_packaging.py:529",
+        "docs/r2/evidence/R2_M10_B7_PILOT_SUMMARY.json"
+      ],
+      "assessment": "B2 accepted generation-stable bounded checks; later source adds probe-result tamper and PG key/status/JSON-ceiling cases. B7 records 7/7 seeded recall per cohort and correction through the page.",
+      "limits": "LOCAL_REGULAR_FILE_IO remains mandatory. The concurrent-exact-check case is functional concurrency evidence, not proof that a particular commit race occurred. No fresh PG/DDL execution by this reviewer."
+    },
+    {
+      "gate": "Selection",
+      "status": "SUPPORTED_WITH_SERIALIZATION_LIMITS",
+      "evidence": [
+        "docs/r2/evidence/m10-b-reviews/b3-codex-delta2-review.json",
+        "docs/r2/evidence/m10-b-reviews/b5-codex-delta-review.json",
+        "docs/r2/evidence/m10-b-reviews/b5-codex-delta2-review.json",
+        "docs/r2/evidence/m10-b-reviews/preseal-delta3-codex-review.json",
+        "tests/integration/server/services/test_quality_package_selection.py",
+        "tests/integration/server/routers/test_packaging_routes.py"
+      ],
+      "assessment": "Lease/currentness/waiver/replay RED cases and observed writer waits have reviewed evidence. B5 supplies revocation-after-lease and existing-head crash/rollback recovery; the preseal delta closes moved-head projection.",
+      "limits": "Distinguish actual blocked waiters from lock-order reasoning and unexecuted multi-principal/disjoint-master or later-head-mode schedules. Do not claim every possible writer pair/order was independently run here."
+    },
+    {
+      "gate": "Export",
+      "status": "SUPPORTED_WITH_RECOVERY_CONDITIONS",
+      "evidence": [
+        "docs/r2/evidence/m10-b-reviews/b4-codex-delta3-review.json",
+        "docs/r2/evidence/m10-b-reviews/export-route-qualification.json",
+        "tests/integration/server/services/test_package_export.py:642",
+        "tests/integration/server/services/test_package_export.py:704",
+        "tests/integration/server/services/test_package_export.py:715",
+        "tests/integration/server/services/test_package_export.py:741",
+        "docs/r2/evidence/R2_M10_B7_PILOT_SUMMARY.json"
+      ],
+      "assessment": "New tests exercise a real worker with reduced FSIZE, occupied-destination rename refusal, and cancellation after publication followed by a new command reconciling the published digest. Existing cancellation/unknown/refusal and finalize/run-seal tests complement golden archives and path/drift refusal. Qualification hashes all match.",
+      "limits": "No separate fsync failure injection; no claim that cancellation is a machine power-loss/durability drill. Real FSIZE tests cover EFBIG; ENOSPC/EDQUOT classification independently branch-probed only. Cross-root whole ZIP equality remains false by design and historically failed."
+    },
+    {
+      "gate": "Host regression",
+      "status": "SUPPORTED_WITH_SUPPLIED_RUNTIME_EVIDENCE",
+      "evidence": [
+        "docs/r2/evidence/R2_M10_B8_SEAL_EVIDENCE.json:6",
+        "docs/r2/evidence/m10-b-reviews/b7-fixes-codex-review.json",
+        "docs/r2/evidence/m10-a4-reviews/route-qualification.json"
+      ],
+      "assessment": "The recorded 2269-test selection includes format, advanced-creative, M10-A and governance regression files. B8 changes no A4 launcher/worker confinement algorithm or M8 authority writer.",
+      "limits": "This is the listed affected-domain regression selection, not all historical Gate C/D/production acceptance. Startup-reader and checkpoint semantics are source-verified here; live governance sockets/PG not independently verified."
+    },
+    {
+      "gate": "Donor parity",
+      "status": "SUPPORTED_AT_IDENTICAL_CODE_SNAPSHOT",
+      "evidence": [
+        "docs/r2/evidence/R2_M10_B6_DONOR_BASELINE.json",
+        "docs/r2/evidence/R2_M10_B6_DONOR_PARITY.json",
+        "r2/quality/parity.py:15"
+      ],
+      "assessment": "Both reports validate and independently fold PASS at 00912922e29c9e991a1aadb695d87fba4426cc40. Reported fresh donor run: 18 passed. Git proves only evidence changes after that source snapshot.",
+      "limits": "Literal fold at documentation HEAD bcead9f4e returns BLOCKED under the exact-head contract. Accepted binding is explicitly to the source-identical code snapshot, not a claim that this literal-HEAD fold passes. Real donor performance was not rerun here."
+    },
+    {
+      "gate": "UI",
+      "status": "SUPPORTED_WITH_BROWSER_PROVENANCE_LIMIT",
+      "evidence": [
+        "docs/r2/evidence/m10-b-reviews/preseal-delta3-codex-review.json",
+        "docs/r2/evidence/m10-b8/a11y-live-chrome.json",
+        "docs/r2/evidence/m10-b8/a11y.py.txt",
+        "docs/r2/evidence/R2_M10_B8_SEAL_EVIDENCE.json:52"
+      ],
+      "assessment": "Supplied live Chrome axe results show zero violations for empty and populated refusal/history states with contrast enabled; tab evidence records packaging focus indicators. The unchanged frontend has a recorded pnpm check pass.",
+      "limits": "Browser evidence is supplied, not a fresh browser run by this reviewer. App-shell episode control focus-ring omission is outside M10-B and remains disclosed. No claim of exhaustive keyboard/focus-recovery coverage."
+    },
+    {
+      "gate": "Pilots",
+      "status": "SUPPORTED_WITH_DEVIATIONS",
+      "evidence": [
+        "docs/r2/evidence/R2_M10_B7_PILOT_PREREGISTRATION.json",
+        "docs/r2/evidence/R2_M10_B7_PILOT_SUMMARY.json",
+        "docs/r2/evidence/R2_M10_B7_PILOT_WESTERN_EXPLAINER.json",
+        "docs/r2/evidence/R2_M10_B7_PILOT_VERTICAL_FACTUAL_SHORT.json",
+        "docs/r2/evidence/R2_M10_B7_PILOT_ZH_SHUANG.json",
+        "docs/r2/evidence/m10-b-reviews/b7-fixes-codex-review.json"
+      ],
+      "assessment": "Three dossiers record gates, recall, false positives, runtime/RSS/storage, downloads, useful seeded correction, same-selection equality, and amended clean-root member equality. Original preregistration and failed whole-archive comparisons are retained.",
+      "limits": "Agent-performed delegated gates/reviewer judgments do not satisfy sponsor-as-reviewer identity. English master does not qualify zh-Hans content. Fixture dependency head does not prove full production closure. These dimensions remain open."
+    },
+    {
+      "gate": "Surface",
+      "status": "SUPPORTED_WITH_ENVELOPE_SCOPE_LIMIT",
+      "evidence": [
+        "docs/r2/evidence/m10-b-reviews/b4-codex-delta3-review.json",
+        "docs/r2/evidence/m10-b7-pilot/network-experiment.json",
+        "server/services/package_export_worker.py:201",
+        "server/services/package_export.py:1134"
+      ],
+      "assessment": "Recorded socket experiment uses QualityProbeRuntime.launch with m10-export prefix and records EPERM, cgroup limits and cleanup. B8 adds no credential/upload/publish or Production Authority write surface.",
+      "limits": "Runtime network claim is confined-worker/probe only, not host process network isolation. Static/source review covers the host path; the network experiment is supplied evidence, not independently executed here."
+    }
+  ],
+  "prior_condition_disposition": {
+    "B1_H1_M1_M4": "CLOSED by the cited B1 delta; retained as historical resolutions, not freshly re-reviewed in full.",
+    "B1_C3": "PARTIAL; carry reproducible PG migration and predecessor/FK-preservation evidence.",
+    "B1_C5": "CLOSED for persisted promotion refusal: test_exploration_promotion.py:311 passed in the fresh contracts/advanced-creative run.",
+    "B2_C2": "PARTIAL: later probe-tamper and PG enforcement cases exist; supplied suite covers their file. Exact deterministic same-command commit contention and comprehensive migration/FK witnesses are not established by its total count.",
+    "B2_LOCAL_REGULAR_FILE_IO": "NOT CLOSED by design; permanent supported-storage condition.",
+    "B3_REVOCATION_AFTER_LEASE_CRASH_AFTER_LEASE": "CLOSED in the B5 review chain with supplied PG evidence; independent PG reproduction remains unavailable.",
+    "B3_SERIALIZATION_EVIDENCE": "PARTIAL; keep observed waits distinct from source-construction arguments.",
+    "B4_source_findings": "CLOSED in delta3; no regression found in B8 bounded source changes.",
+    "B4_crash_cuts": "PARTIAL: FSIZE, rename refusal, before-publication cancellation/unknown behavior and post-publication/new-command recovery have cited tests; fsync fault injection and real process/power-loss durability remain unproven.",
+    "B5_source_findings": "CLOSED in delta2 with the historical verification limits retained.",
+    "preseal_N3": "CLOSED in delta3; the supplied regression selection includes the amended slot-interleaving tests.",
+    "preseal_L2": "CLOSED for the named empty/refusal-history axe/contrast and packaging focus check by supplied B8 browser evidence; broader accessibility is not implied.",
+    "B7_L1_L3": "CLOSED in the current candidate/dossiers: utility is recall AND explicit seeded correction; frozen failures remain; Human-gate policy distinguishes local delegated execution. No new independent Human review is claimed.",
+    "slot_contention": "MEASURED with limits: 20 readers + one export complete in the recorded schedule, not proof of universal deadlock freedom or scalability.",
+    "B6_rebind": "CLOSED at source-identical code snapshot 00912922e; further source changes require affected rerun/rebinding.",
+    "M10_A_conditions": "CARRIED to integrated acceptance; B0 F1 evidence does not replace the recommended independent A6/A7/amendment/acceptance review."
+  },
+  "conditions": [
+    {
+      "id": "C1_PILOT_TRUTH",
+      "gate": "All downstream acceptance statements",
+      "requirement": "Retain frozen-preregistration failures, the post-run amendment, delegated-agent reviewer/gate provenance and seeded-only correction. Obtain actual sponsor/Human review and a genuine zh-Hans final before claiming those missing qualifications; use real dependency closure before production-provenance claims."
+    },
+    {
+      "id": "C2_ACTIVATED_HOST",
+      "gate": "M10 integrated / production acceptance",
+      "requirement": "Prove root-owned governance archive/read copies, root attestor and intended application uid, pinned deployment/key custody and restore preflight on an authorized host. Restore/offline migration stops app/workers. Runtime reader reuse does not support online restore or key-registry reconfiguration. Human custodians continue fresh per-authorization attestation."
+    },
+    {
+      "id": "C3_STORAGE_RECOVERY",
+      "gate": "Supported operation and stronger recovery qualification",
+      "requirement": "Keep LOCAL_REGULAR_FILE_IO and trusted project-root constraints. Carry separate fsync fault injection and abrupt process/power-loss durability gaps; the existing refusal/cancellation tests are not evidence of every storage crash cut."
+    },
+    {
+      "id": "C4_SCHEMA_AND_SERIALIZATION",
+      "gate": "M10 integrated evidence closure",
+      "requirement": "Carry B1 C3 exact migration commands/SHA/raw result and predecessor/FK preservation witness; retain B2 deterministic contention and B3 multi-principal/disjoint-master/later-head schedule limits. Successful suite totals do not prove missing witnesses. Reproduce applicable PG/systemd checks where permitted when claiming their independent execution."
+    },
+    {
+      "id": "C5_SINGLE_OPERATOR",
+      "gate": "Current operating envelope / before wider concurrent use",
+      "requirement": "Scope contention evidence to the measured 20-read/one-export schedule. Reads serialize on an exclusive advisory lock and rehash readiness: median about 5.2 s, max about 9.9 s; export about 9.1 s versus about 0.9 s alone. Concurrent Human authorization challenges still refuse while busy. Do not advertise multi-user throughput or general deadlock freedom from this measurement."
+    },
+    {
+      "id": "C6_PROVENANCE_AND_REBIND",
+      "gate": "Seal record and any later source change",
+      "requirement": "Reconcile the stale candidate with this frozen review/B8 snapshot. Preserve source-head versus documentation-head distinction, supplied-runtime provenance and JUnit hashes; retain raw JUnit output where reproducibility is required. Refresh affected route/parity/regression evidence after later source changes."
+    },
+    {
+      "id": "C7_M10_A_AND_RELEASE",
+      "gate": "M10 integrated acceptance / release",
+      "requirement": "Retain inherited M10-A/F1 and recommended independent-review conditions. This seal does not itself authorize push, merge, tag, deploy, production-host actions or a Production Authority mutation."
+    }
+  ],
+  "verification": {
+    "fresh_successful_runs": [
+      {
+        "command": "PYTHONDONTWRITEBYTECODE=1 DATABASE_URL=postgresql+asyncpg://postgres:postgres@127.0.0.1:55491/arcreel_test timeout 30s .venv/bin/python -m pytest -q -p no:cacheprovider tests/unit/server/services/test_package_export_worker.py tests/unit/server/services/test_package_export_plan.py tests/unit/r2/host_hardening/test_provider_capabilities.py tests/integration/server/routers/test_packaging_routes.py::test_an_activated_host_expects_root_owned_custody tests/integration/server/routers/test_packaging_routes.py::test_routes_reuse_the_reader_verified_at_startup_instead_of_a_new_proof_per_request tests/integration/server/routers/test_packaging_routes.py::test_a_host_that_did_not_verify_governance_at_startup_has_no_grant_reader",
+        "result": "56 passed in 1.34s; exit 0",
+        "log": "/tmp/m10-b8-review-core.log"
+      },
+      {
+        "command": "PYTHONDONTWRITEBYTECODE=1 DATABASE_URL=postgresql+asyncpg://postgres:postgres@127.0.0.1:55491/arcreel_test timeout 30s .venv/bin/python -m pytest -q -p no:cacheprovider tests/unit/r2/contracts tests/unit/r2/advanced_creative",
+        "result": "726 passed in 2.38s; exit 0",
+        "log": "/tmp/m10-b8-review-contracts.log"
+      },
+      {
+        "command": "Isolated FunctionType execution of actual package_export_worker.main.__code__, external filesystem-error injection, isolated confinement stand-in, real temporary manifest/output descriptors",
+        "result": "5 passed: ENOSPC/EDQUOT/EFBIG -> ENVELOPE_EXCEEDED exit 1; EIO -> WORKER_FAILED exit 1; ordinary archive -> OK exit 0. No source/global production object patched. Branch evidence only, not real confinement/disk/quota proof."
+      },
+      {
+        "command": "Recompute all eight export-route requalification source SHA256 values; validate/fold both DonorParityReport bodies; submit_route_inventory_problems()",
+        "result": "8/8 hashes match; parity PASS at recorded code head, BLOCKED at literal documentation HEAD; route inventory []"
+      },
+      {
+        "command": "git diff --check 05aa1692a...HEAD; ruff check and ruff format --check on the two changed production and two changed test files",
+        "result": "exit 0; All checks passed; 4 files already formatted. Formatting was check-only."
+      }
+    ],
+    "unavailable_or_incomplete": [
+      {
+        "command": "AF_INET connect probe to 127.0.0.1:55491",
+        "result": "PermissionError [Errno 1] Operation not permitted at socket creation. No independent live PostgreSQL pass/fail conclusion."
+      },
+      {
+        "command": "Related unit attempt including contracts, governance, host-hardening, advanced-creative and route tests; -k filter; output /tmp/m10-b8-review-unit.log",
+        "result": "Interrupted with exit 130 after stalled progress; no complete suite result. Passing progress is not counted as a successful run."
+      },
+      {
+        "command": "Focused verbose run additionally including tests/unit/server/services/test_governance_checkpoint_file.py; timeout 45s; output /tmp/m10-b8-review-focused.log",
+        "result": "Exit 124; 53 cases had passed before the first checkpoint-loader test stalled. No checkpoint-loader pass/fail conclusion. Completed core checks were rerun without that file in the 56-pass run above."
+      }
+    ],
+    "supplied_not_reproduced": {
+      "regression": {
+        "source_head": "00912922e29c9e991a1aadb695d87fba4426cc40",
+        "tests": 2269,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "junit_sha256": "6023d84062441bd2939176193122552eb7bd6fa8f99c472ea8e2d4d17b39428c",
+        "environment": "Recorded PG16 disposable container, real systemd/Landlock workers, ffmpeg 8.0.1",
+        "limit": "Reviewed recorded selection/result/hash. Raw JUnit bytes are not attached by this evidence document; this review does not authenticate a run from its hash alone."
+      },
+      "export_requalification": "71 passed; JUnit 27034d402e76262950aaea4c2ff9ef3ba27df5a39e559011c02a33e291387e47; recorded before lint-only assert split.",
+      "parity": "18 passed at source head 00912922e; JUnit 8262962aa6e52ca29f1bb2ae1a11993ffd98a4c70e01dfdad4bd712d599f0221.",
+      "frontend": "Recorded pnpm check: 2643 passed, 4 skipped at 29168da35; frontend unchanged since.",
+      "pilots_browser_contention_network": "Committed dossiers/Chrome axe/tab records, one contention schedule and m10-export socket experiment inspected as supplied evidence; none independently rerun in this sandbox."
+    },
+    "graph_limit": "No graph MCP tools appear in the active ALL_TOOLS list. list_projects/index_status/search_graph/trace_path/get_code_snippet/check_index_coverage could not be called. Direct diff and source fallback used; no graph freshness or exhaustive graph coverage claim.",
+    "external_research": "No vendor/API recommendation or new architecture decision is introduced; compared the actual in-repository M8-C accepted design and runtime source. No network/provider calls made."
+  },
+  "review_inventory": [
+    {
+      "path": "docs/r2/evidence/m10-b-reviews/b1-codex-delta-review.json",
+      "sha256": "6969947955e464bf7e042545c5eb6b115bc0a17160d1b3ae0652326c62f85cce",
+      "recorded_verdict": "ACCEPT_WITH_CONDITIONS",
+      "interpretation": "Historical review/evidence; later delta reviews supersede defect dispositions, not unclosed conditions."
+    },
+    {
+      "path": "docs/r2/evidence/m10-b-reviews/b1-codex-review.json",
+      "sha256": "b409d1c462b42fdc325f4fd18ea54106620a780536989df3cf418a2a941e94d7",
+      "recorded_verdict": "REWORK",
+      "interpretation": "Historical review/evidence; later delta reviews supersede defect dispositions, not unclosed conditions."
+    },
+    {
+      "path": "docs/r2/evidence/m10-b-reviews/b1-pg-migration-roundtrip.json",
+      "sha256": "2762827a72a8fa9c977fa99b84039834f5b7dda6c057c895cd7c1a838b231ea6",
+      "recorded_verdict": null,
+      "interpretation": "Historical review/evidence; later delta reviews supersede defect dispositions, not unclosed conditions."
+    },
+    {
+      "path": "docs/r2/evidence/m10-b-reviews/b2-codex-delta-review.json",
+      "sha256": "4abccbdd46f24e3e45321333e1a3f741b457f31dde6bc966c1e13dc920c424ec",
+      "recorded_verdict": "REWORK",
+      "interpretation": "Historical review/evidence; later delta reviews supersede defect dispositions, not unclosed conditions."
+    },
+    {
+      "path": "docs/r2/evidence/m10-b-reviews/b2-codex-delta2-review.json",
+      "sha256": "decffb9bfd1ad7a4fee622f67ffbdbd1d7a591a1ae296f820b92fb9ed971a241",
+      "recorded_verdict": "REWORK",
+      "interpretation": "Historical review/evidence; later delta reviews supersede defect dispositions, not unclosed conditions."
+    },
+    {
+      "path": "docs/r2/evidence/m10-b-reviews/b2-codex-delta3-review.json",
+      "sha256": "eb3aea9c674f24b2a0df3e8300b881a2ce56920714b08ac84002ff3873e5fbc1",
+      "recorded_verdict": "ACCEPT_WITH_CONDITIONS",
+      "interpretation": "Historical review/evidence; later delta reviews supersede defect dispositions, not unclosed conditions."
+    },
+    {
+      "path": "docs/r2/evidence/m10-b-reviews/b2-codex-review.json",
+      "sha256": "7f5a11517156309d1a1ac1bc16252c69e8dcf2a07409ec93580f9e0e023452b1",
+      "recorded_verdict": "REWORK",
+      "interpretation": "Historical review/evidence; later delta reviews supersede defect dispositions, not unclosed conditions."
+    },
+    {
+      "path": "docs/r2/evidence/m10-b-reviews/b3-codex-delta-review.json",
+      "sha256": "235986c9a44673f079062a5cc06333c05b8d04a5000f8e64b4778c0ff472df25",
+      "recorded_verdict": "REWORK",
+      "interpretation": "Historical review/evidence; later delta reviews supersede defect dispositions, not unclosed conditions."
+    },
+    {
+      "path": "docs/r2/evidence/m10-b-reviews/b3-codex-delta2-review.json",
+      "sha256": "ba4936c5676f4895658cd5b42640294cc1b8033c524a8ad75e4d416d3c8fb7cc",
+      "recorded_verdict": "ACCEPT_WITH_CONDITIONS",
+      "interpretation": "Historical review/evidence; later delta reviews supersede defect dispositions, not unclosed conditions."
+    },
+    {
+      "path": "docs/r2/evidence/m10-b-reviews/b3-codex-review.json",
+      "sha256": "79ed4c66619e062a0f7291e3059560d62a5bdf40348d18056eefe89590975a4c",
+      "recorded_verdict": "REWORK",
+      "interpretation": "Historical review/evidence; later delta reviews supersede defect dispositions, not unclosed conditions."
+    },
+    {
+      "path": "docs/r2/evidence/m10-b-reviews/b4-codex-delta-review.json",
+      "sha256": "c01023bd1c5846a6e7ea29e181a830280de8348e1884948954602be8b15c394b",
+      "recorded_verdict": "REWORK",
+      "interpretation": "Historical review/evidence; later delta reviews supersede defect dispositions, not unclosed conditions."
+    },
+    {
+      "path": "docs/r2/evidence/m10-b-reviews/b4-codex-delta2-review.json",
+      "sha256": "2eab9869ee8eba516d1bc8a7b9efcac3d9862a6bc482a8eb8c5cf2f72a91fef1",
+      "recorded_verdict": "REWORK",
+      "interpretation": "Historical review/evidence; later delta reviews supersede defect dispositions, not unclosed conditions."
+    },
+    {
+      "path": "docs/r2/evidence/m10-b-reviews/b4-codex-delta3-review.json",
+      "sha256": "c8d90ba43c3ef59e293b716d5a2efbb31a5292d8b2f966d1a66263743dbf7b93",
+      "recorded_verdict": "ACCEPT_WITH_CONDITIONS",
+      "interpretation": "Historical review/evidence; later delta reviews supersede defect dispositions, not unclosed conditions."
+    },
+    {
+      "path": "docs/r2/evidence/m10-b-reviews/b4-codex-review.json",
+      "sha256": "16a49b05757c302be72c5756a2c7e4ca8f9dc08b2d1264dde9b372ea79b31217",
+      "recorded_verdict": "REWORK",
+      "interpretation": "Historical review/evidence; later delta reviews supersede defect dispositions, not unclosed conditions."
+    },
+    {
+      "path": "docs/r2/evidence/m10-b-reviews/b5-codex-delta-review.json",
+      "sha256": "ecb314dd8ad14e595c91ad42db1d11c2a9e809079c4b8f4413e327427be699f3",
+      "recorded_verdict": "NOT ACCEPTED",
+      "interpretation": "Historical review/evidence; later delta reviews supersede defect dispositions, not unclosed conditions."
+    },
+    {
+      "path": "docs/r2/evidence/m10-b-reviews/b5-codex-delta2-review.json",
+      "sha256": "c1430eafcd662ce7bc6e508dece2a07675de1bc60321a83157459b2e6e16c4c5",
+      "recorded_verdict": "ACCEPTED WITH VERIFICATION LIMITS",
+      "interpretation": "Historical review/evidence; later delta reviews supersede defect dispositions, not unclosed conditions."
+    },
+    {
+      "path": "docs/r2/evidence/m10-b-reviews/b5-codex-review.json",
+      "sha256": "0fae87da10b149fc1885a3cc9a3692efd8d7493a62fa24e83fc3dc7228412d06",
+      "recorded_verdict": "NOT ACCEPTED",
+      "interpretation": "Historical review/evidence; later delta reviews supersede defect dispositions, not unclosed conditions."
+    },
+    {
+      "path": "docs/r2/evidence/m10-b-reviews/b7-fixes-codex-review.json",
+      "sha256": "bff888d5c01a07f5a9bab80162ab861bba9272713d4a3ff38965a6157bf5b126",
+      "recorded_verdict": "ACCEPTED_WITH_CONDITIONS",
+      "interpretation": "Historical review/evidence; later delta reviews supersede defect dispositions, not unclosed conditions."
+    },
+    {
+      "path": "docs/r2/evidence/m10-b-reviews/design-b0-review.json",
+      "sha256": "25e01c37d383ac0f02a7ca3c431b460bbc49f12aaf1b55010715ca6624049426",
+      "recorded_verdict": "REWORK",
+      "interpretation": "Historical review/evidence; later delta reviews supersede defect dispositions, not unclosed conditions."
+    },
+    {
+      "path": "docs/r2/evidence/m10-b-reviews/design-r2-delta-review.json",
+      "sha256": "ed10492c04e3bade1810e7170a21bb42231d0bc599774b6c02e94428978e39df",
+      "recorded_verdict": "ACCEPT_WITH_CONDITIONS",
+      "interpretation": "Historical review/evidence; later delta reviews supersede defect dispositions, not unclosed conditions."
+    },
+    {
+      "path": "docs/r2/evidence/m10-b-reviews/export-route-qualification.json",
+      "sha256": "23c40423f970239841e33c0559efede494042d839b16978dad7f15c408f61c44",
+      "recorded_verdict": "LOCAL_PACKAGE_EXPORT_ROUTE_OFFLINE_VERIFIED",
+      "interpretation": "Historical review/evidence; later delta reviews supersede defect dispositions, not unclosed conditions."
+    },
+    {
+      "path": "docs/r2/evidence/m10-b-reviews/preseal-codex-review.json",
+      "sha256": "e6bdf377ba35a4925c95d618d6be00b914a554e0742be6191006b3357abc9006",
+      "recorded_verdict": "CHANGES_REQUESTED",
+      "interpretation": "Historical review/evidence; later delta reviews supersede defect dispositions, not unclosed conditions."
+    },
+    {
+      "path": "docs/r2/evidence/m10-b-reviews/preseal-delta1-codex-review.json",
+      "sha256": "9166e087a2714ac563544797bcf7f15c97375107f79ba25de6c30c678676b613",
+      "recorded_verdict": "CHANGES_REQUESTED",
+      "interpretation": "Historical review/evidence; later delta reviews supersede defect dispositions, not unclosed conditions."
+    },
+    {
+      "path": "docs/r2/evidence/m10-b-reviews/preseal-delta2-codex-review.json",
+      "sha256": "0f0b0161df6a9f32c60a4b5793dedfa715905de700fd668ac5fc326c1835b6c6",
+      "recorded_verdict": "CHANGES_REQUESTED",
+      "interpretation": "Historical review/evidence; later delta reviews supersede defect dispositions, not unclosed conditions."
+    },
+    {
+      "path": "docs/r2/evidence/m10-b-reviews/preseal-delta3-codex-review.json",
+      "sha256": "bfb02507686b22bccd7482eb3f1c42f37c0051f59d680c8a82ada1d78d037172",
+      "recorded_verdict": "ACCEPTED_WITH_CONDITIONS",
+      "interpretation": "Historical review/evidence; later delta reviews supersede defect dispositions, not unclosed conditions."
+    }
+  ],
+  "additional_material_read": [
+    "CONTRIBUTING.md (test selection and substitution conventions)",
+    "docs/superpowers/specs/2026-10-28-r2-m10-b-packaging-export-design.md (especially sections 2, D5-D8, 4, 7, 8)",
+    "docs/superpowers/specs/2026-10-13-r2-m8c-startup-attestor-design.md (startup/runtime composition and restore boundary)",
+    "docs/adr/0103-showrunner-grants-and-spatial-review-custody.md",
+    "docs/r2/evidence/R2_M10_B_CANDIDATE.json",
+    "docs/r2/evidence/R2_M10_B8_SEAL_EVIDENCE.json",
+    "docs/r2/evidence/R2_M10_B7_PILOT_SUMMARY.json",
+    "docs/r2/evidence/R2_M10_B_HANDOFF.md",
+    "docs/r2/evidence/R2_M10_A_ACCEPTANCE.json",
+    "server/routers/packaging.py (full delta and host wiring/reader boundary)",
+    "server/services/package_export_worker.py (full delta and main/archive writer)",
+    "server/services/package_export.py (runtime report, publish, currentness, acceptance/recovery)",
+    "server/app.py (activated startup wiring)",
+    "server/services/governance_startup.py",
+    "server/services/governance_grants.py (current locked grant/checkpoint reader)",
+    "server/services/governance_checkpoint_file.py",
+    "server/services/governance_attestation.py (busy guard/challenge)",
+    "server/services/quality_package_selection.py (custodian/lease)",
+    "r2/governance/checkpoint_signature.py",
+    "r2/quality/parity.py",
+    "lib/db/models/quality_packaging.py",
+    "tests/integration/server/services/test_package_export.py (full B8 delta and relevant inherited tests)",
+    "tests/integration/server/routers/test_packaging_routes.py (full B8 delta, dependency fixture and prior interleavings)",
+    "tests/integration/server/services/test_quality_packaging.py (current later tamper/enforcement/concurrency tests)",
+    "tests/integration/server/services/test_packaging_donor_parity.py (pinned donor loading/fold usage)",
+    "tests/integration/lib/db/migrations/test_5d2a7c3e8b11_m8_packaging_candidate_kind.py",
+    "tests/integration/lib/db/migrations/test_6e3b8d4f9c22_m10_packaging_observations.py",
+    "tests/integration/lib/db/migrations/test_7f4c9e5a0d33_m10_package_selection.py",
+    "tests/integration/r2/governance/test_checkpointed_grant_reader.py",
+    "tests/integration/r2/governance/test_activated_governance_startup.py",
+    "tests/unit/server/services/test_governance_checkpoint_file.py",
+    "tests/unit/r2/advanced_creative/test_exploration_promotion.py (PACKAGING promotion refusal)",
+    "docs/r2/evidence/m10-b8/a11y-live-chrome.json",
+    "docs/r2/evidence/m10-b8/a11y.py.txt",
+    "docs/r2/evidence/m10-b8/slot-contention.json",
+    "docs/r2/evidence/m10-b8/reader_concurrency.py.txt",
+    "docs/r2/evidence/m10-b7-pilot/network-experiment.json",
+    "B7 preregistration and all three run-2 pilot dossiers; B6 parity/baseline and recorded code-binding commands"
+  ]
+}
