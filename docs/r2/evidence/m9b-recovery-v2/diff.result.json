@@ -1,0 +1,18 @@
+{
+  "schema_version": "m9.command-result.v1",
+  "gate": "diff",
+  "tested_head": "7e6cccb457bbac6e4387371a05ca1cc6a9cbfb4a",
+  "argv": [
+    "git",
+    "diff",
+    "--check"
+  ],
+  "exit": 0,
+  "passed": 0,
+  "skipped": 0,
+  "log": {
+    "path": "docs/r2/evidence/m9b-recovery-v2/diff.log",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "test_report": null
+}

@@ -1,0 +1,17 @@
+{
+  "schema_version": "m9.command-result.v1",
+  "gate": "types",
+  "tested_head": "7e6cccb457bbac6e4387371a05ca1cc6a9cbfb4a",
+  "argv": [
+    "/home/anhtuan/content-production-os/.worktrees/r2-v2-main/.venv/bin/basedpyright",
+    "--warnings"
+  ],
+  "exit": 0,
+  "passed": 0,
+  "skipped": 0,
+  "log": {
+    "path": "docs/r2/evidence/m9b-recovery-v2/types.log",
+    "sha256": "56882e01cb80173ef053c4096e4ee43e3123a15f5c0a06715f96988d48fbd91c"
+  },
+  "test_report": null
+}

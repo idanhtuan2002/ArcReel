@@ -1,0 +1,1285 @@
+{
+  "schema_version": "1",
+  "status": "M9_B_CANDIDATE",
+  "packet": "M9-B",
+  "tested_head": "7e6cccb457bbac6e4387371a05ca1cc6a9cbfb4a",
+  "tested_parent": "5c15b7f34b38ad090e419bc513c73f4ec5f9f936",
+  "branch": "impl/r2-m9b-acquisition-observations",
+  "releases": {
+    "docs/r2/evidence/R2_M9_B_PACKET_RELEASE.json": "ba61ad5085fbfc4a786f4de9dae055b10a578afc0691ed9610f2b7ed00fd365e",
+    "docs/r2/evidence/R2_M9_B_RECOVERY_V2_RELEASE.json": "1a3fac2206e2d2abd095fb991adf07bfbf86ea40ad7bebc9e03b7ed034f999ea"
+  },
+  "sources": {
+    "alembic/versions/9b9c4a0e0001_add_m9_acquisition_observations.py": "52cc09968e780cc76898e52131a060bbb8717242279f7122ddce75c01caba352",
+    "alembic/versions/9b9c4a0e0002_add_m9_manual_admission.py": "13dbf0a27494f125000cd5a9c40b849dbf2dbdfbe5e82dd1887a85a738d6d48d",
+    "docs/r2/evidence/R2_M9_B_RECOVERY_V2_E_CLOSURE_HANDOFF.md": "f9e1467415db54a065facb31a7d7aa81d310a70bbe02080ad418a052bef7d9a3",
+    "docs/r2/evidence/R2_M9_B_RECOVERY_V2_RELEASE.json": "1a3fac2206e2d2abd095fb991adf07bfbf86ea40ad7bebc9e03b7ed034f999ea",
+    "docs/r2/evidence/schemas/R2_M9_B_ACQUISITION.schema.json": "47d4cf0f6ff1ef9e0c06ce8d9f92e333f33dc89cb89d7ab0affc7730574f5497",
+    "docs/r2/evidence/schemas/R2_M9_B_RECOVERY_V2.schema.json": "7a901044f19ec346d0cdfcf25d7d3fec46d741560eba0ffebe880556e58af4a4",
+    "docs/research/2026-10-20-r2-m9b-upload-custody.md": "da5d72a1b3dafbfed13ff42500273e409f33ad29a74f4fc55dcbc92facc50e07",
+    "docs/superpowers/plans/2026-10-20-r2-m9b-manual-recovery-v2.md": "486d13bc154849b1aa426120e136e5bc735e6d040428736ddb7cd3851fe3bf8f",
+    "docs/superpowers/specs/2026-10-20-r2-m9b-manual-recovery-v2-design.md": "9aaf6e65103a7e15be1c87f2f9d972b4fbc60eca0016eff0c6df71a3000ac520",
+    "lib/db/models/__init__.py": "91cae305f107ee9cc3abe8fc3c44236688c707e0aabfcbe2eb47526486f4ee09",
+    "lib/db/models/opportunity_acquisition.py": "0b1dd0bd91f4f79af65474f926d9e0cb60853ab7c2a420ef357c32c68cdc52fc",
+    "lib/db/models/opportunity_manual_admission.py": "98c3b883656e1364c42166818f53d86a840deb095d3cbf644c66b2b306402759",
+    "lib/db/repositories/__init__.py": "b2ddb73d24b0c23611757aa3bccefaaa9a61c1e2602181bbb294e0484ea94c6e",
+    "lib/db/repositories/opportunity_acquisition.py": "26b40ccea43194fbd4d88e422a64c311cf79e51db4b68b65120ce99ea9a54499",
+    "lib/db/repositories/opportunity_manual_admission.py": "ef979bdb5342ce84c4505447663bbf9892390f2142e85a4c4f127874b3cf858a",
+    "lib/i18n/en/errors.py": "63e65d8a5d4f979eba72f00af65282a8ce828eb14587ba2ba0b13df064cb5393",
+    "lib/i18n/vi/errors.py": "f8cdf3baf8e8762df402a0a589a6868bead2601e09fc8c77b383a2c7b1275995",
+    "lib/i18n/zh/errors.py": "ae53562cd2d6edb02527f7557a3fa498a62959d0d95692fe03350351defba3c2",
+    "r2/contracts/opportunity_acquisition_v2.py": "b225fefb1b4d498977cdfe4fd1ee43622944cd8e87c4d8cbf679a50f41c04e6e",
+    "r2/opportunity/acquisition.py": "2fec344550a67ed3f5a38c8841fc7824078e35795b5a33d31c04d38bcdf93df9",
+    "r2/opportunity/acquisition_v2.py": "1de1d42af862adb0e34bf7b516c5ec2907a9c14ae6395301e7776606282958a0",
+    "r2/opportunity/acquisition_v2_digests.py": "a57f4b79762c5db7ef62c17974967dfc2a316da19e878f83714731c8b78d84ec",
+    "r2/opportunity/capabilities.py": "4055f08115738e6170475bea0f5bedf8b3da5209d2dbcf25f868be64fe2fbe3b",
+    "r2/opportunity/manual_admission.py": "e6e15215f8003b11f21abe945e9eeaa888bc8922a140b841f71a44d6fbbf3428",
+    "r2/opportunity/manual_admission_ports.py": "93f6e92046bb47100cc867b5018d284aefe2e1df067718eca9f277051db02dc9",
+    "r2/opportunity/manual_import.py": "1d7f12cca61cb986af20d5a7ea51f410431843026d43cf7f6ad4d178abc25254",
+    "r2/opportunity/normalization.py": "d613354f237076541c1c4185f1de996c4404478c3466d3977a539be836428630",
+    "scripts/r2/run_m9b_recovery_gate.py": "d629eaeca363574d511e8aed15ce7929dd81a173da690052d85c1c0190f0cb52",
+    "scripts/r2/verify_m9b_evidence.py": "bbb598c5fa9301f499787592ddfafa7e6f11ebdad3048dd7ad468ce9e44952aa",
+    "scripts/r2/verify_m9b_recovery_evidence.py": "3c9a8cd9bf3caec578a136b686a44c9c6524836b91e82ed90110b0915e0e7b06",
+    "scripts/r2/verify_m9b_recovery_scope.py": "f78b2fc0a125713f3162b71aa7ce0e92a42900c108775277feac4c1210c7451d",
+    "scripts/r2/verify_m9b_scope.py": "1e904b6774994f1a690294a2111309212476f7b4937fa9d1fc6960402b4ba380",
+    "server/app.py": "c6b56dab688769e5fc7ae2a6c63485b0aed05b581cfd434adc964901ddf83c03",
+    "server/routers/opportunity_acquisition.py": "a8f1ec41bcb354b2c20c6388d9dccdb53d73e56baef42ab6c41cf274a3134b87",
+    "server/services/m9_evidence_store.py": "93a18d2296601531182528a1f556db72152fa087e426508c5367d73d083e3478",
+    "server/services/m9_manual_authenticity.py": "e0cc0beee6d1757c76903feaca4ffed35c2b209de160d7ea51f9f713da6df463",
+    "server/services/m9_manual_publication.py": "77159b3f20e2cc564bc5eb9a0309e89a7bdf6f3108a9726aff36941a2684ef0a",
+    "server/services/opportunity.py": "52e50c5a909ae3d6c5ea41d24f7a403104d445e2872dc912717c52d26bc47f6d",
+    "server/services/opportunity_acquisition_v2.py": "cb40a477ab32c8f925c1308dfa66e16424d587f95273de5910360c63fb2c3fe8",
+    "tests/fixtures/r2/opportunity/manual_admission_custodian.py": "a62daddda68f5812239e11b819b05d1397bcad1d38def4fb55a2914b06446a14",
+    "tests/fixtures/r2/opportunity/manual_import.json": "05e1b8a10574e0dd17879bc7504b92f9500b15dd708f66cb602b2a67296bd88b",
+    "tests/fixtures/r2/opportunity/manual_recovery_restarts.json": "eb250979a2ccffdfe0e744d2c77d6f49e0aba90a5dc4708ccd702d1d2c7aad7a",
+    "tests/fixtures/r2/opportunity/manual_recovery_worker.py": "d6edb7b15b2c42d21c1fac588c97c83a6671d18caf921c83fff038dd7f05b0ac",
+    "tests/fixtures/r2/opportunity/source_capabilities.json": "348a11818f06a2f2278b60018a4c54057a98158dafb5a71127f187e9ba953e99",
+    "tests/integration/lib/db/migrations/test_alembic_m8_exploration.py": "49769f286f873098d411258cc72201860767680a32248597c3a3d69bb9a18595",
+    "tests/integration/lib/db/migrations/test_alembic_m9_acquisition.py": "82a9f0ebe009402c20cd0b5361caa6722922abb54a7d4852d2252cf1ff561bf7",
+    "tests/integration/lib/db/migrations/test_alembic_m9_foundation.py": "615cffca1aa38c45bdc49ef38c54d63652b90e5f9b6f74fc995e9d79fe15a3d0",
+    "tests/integration/lib/db/migrations/test_alembic_m9_manual_admission.py": "1fecab367fc8703fd8e321024c38399472cefc92eea01a8966d1fa95b1e3434d",
+    "tests/integration/lib/db/migrations/test_format_projections.py": "e70a93c438c9ecf0c3369b288d73f37fe1c504260bbe3ecd31a8c180caa323e5",
+    "tests/integration/lib/db/migrations/test_learning_observations.py": "d048c75166f351c24778729156450c8c6dca043d4324df0281028bc1a52d8907",
+    "tests/integration/lib/db/migrations/test_production_binding_authority.py": "c6e7d85dec6c20b52cd6a3513e002360dda68c58322f6f7cabc79d94505d376f",
+    "tests/integration/lib/db/migrations/test_production_target_registry.py": "c4680ea61d8ce645c2de2133b8e79f0dd6877fdf7606e69de23e6aa65c0a62fa",
+    "tests/integration/lib/db/migrations/test_spatial_constraint_sets.py": "38f706887f0b65ca4649ed585bb7ed6f87789e02f9a9fbdca43c1dc6b455c7a1",
+    "tests/integration/lib/db/migrations/test_spatial_execution_evidence.py": "0f9975d3a80585c1a205114ab4492fb806d9a6c60a6bd979d1d54477f9bdaea5",
+    "tests/integration/lib/db/migrations/test_spatial_frame_receipts.py": "146b2f504eb0b7533e3d737ef3ea2d0578e83861f08923ab75f5d095abca139a",
+    "tests/integration/lib/db/migrations/test_spatial_pair_authority.py": "e0c1af48a4a2f2ef3af75c06a198e70d3ffba681bde81a69b2b493bb4929549b",
+    "tests/integration/lib/db/migrations/test_spatial_pair_v2_custody.py": "e7897109b6517b885ab46b99f19bc5efbcecf684ca9fed7afa8c3db597085ea8",
+    "tests/integration/lib/db/migrations/test_spatial_promotion_sidecars.py": "c7a953e42106ed0ab806ca4eb69d4fd6034ea2d5a3f76c968ff7a70aaf421ca6",
+    "tests/integration/lib/db/migrations/test_spatial_review_custody.py": "98553cfeb32173bffb354496e3feac90ffd3b6d4e8d2b8b71e82317d2b221564",
+    "tests/integration/lib/db/repositories/test_opportunity_acquisition.py": "0d39c7f0719fbe02f8c9fbfe79966da2cdb9d9fdb388570bb52769a899f9ddb1",
+    "tests/integration/lib/db/repositories/test_opportunity_manual_admission.py": "f40bef3f0a7de9bd796876e6895e7acdce71f7cf0c4672ccecd979f39d6766b6",
+    "tests/integration/r2/opportunity/test_acquisition_concurrency.py": "2a99b42a20941305493c6be90125288c85c7b480ba8263025a449fb8b4c1c801",
+    "tests/integration/r2/opportunity/test_acquisition_v2.py": "3a8b24867c29230f98c81b70d25f8e6abe597e73b9b7ed01291197200ce82b70",
+    "tests/integration/r2/opportunity/test_acquisition_v2_restarts.py": "0d41f952a9558eec8222d3976bb40b59bffc41ab4a73a1a4dd1661f1a41f4b30",
+    "tests/integration/scripts/r2/test_verify_m9b_recovery_scope.py": "a095e7989b88659300e94b7317ba715a80888f7e37056f6d701f8f943a45d030",
+    "tests/integration/server/services/test_m9_evidence_store.py": "acd75066ac7db43bac72de947f0b55811545ed7befcaa3e963cc73c501b44658",
+    "tests/integration/server/services/test_m9_manual_custody_isolation.py": "e2cfb38d3522431bb6e433fc8c6838f1af33632ed55687c34904a7b3bb8c5754",
+    "tests/integration/server/services/test_m9_manual_publication.py": "82b4b7508a01c35b75a4c1e5c5899b39def55ff3303ed1f7ccd831360e3d656f",
+    "tests/unit/r2/contracts/test_opportunity_acquisition_v2.py": "ad796bd5ea6a44eda875a1db49cb929f1b0cdee7cee2d580b85abc0c3b0823a5",
+    "tests/unit/r2/opportunity/test_acquisition_v2_digests.py": "7b25cd31b8965d5a86644f425210479c51124d8b91684acca4a4662f560e2f6a",
+    "tests/unit/r2/opportunity/test_capabilities.py": "5e45ce649eb5dfdbb770bf8d7da739c0e56365d3dcc328ae543f439e4085f038",
+    "tests/unit/r2/opportunity/test_manual_admission.py": "ecc3bbef8c2b62cee8ef22a08ee6992a75585df72f34c737f65dbf767c5bb6b4",
+    "tests/unit/r2/opportunity/test_manual_import.py": "dcb6b2825559b1eb9435c0c245eeebe49f8064e68403f7d00dd2e4224a4d3043",
+    "tests/unit/r2/opportunity/test_normalization.py": "ad05e4ae2dd0028581aa0478ec433ab7068965f155a02636fdce7390cf46bf25",
+    "tests/unit/scripts/r2/test_run_m9b_recovery_gate.py": "da27a3abe304e2edb4ffc337eb3d9529640e0ab2315ae634866b77e84d8e8c07",
+    "tests/unit/scripts/r2/test_verify_m9_scope.py": "428efe19550588b719b0f36fb833883fba04e31b5a6cf05244d55036431d9dd5",
+    "tests/unit/scripts/r2/test_verify_m9b_evidence.py": "b7947d5ed98a89dec80bad6a04936669bad63bde585c1f3e444baaab6ab97d28",
+    "tests/unit/scripts/r2/test_verify_m9b_recovery_evidence.py": "316d04974ae43dfa21a7a34f3b5c9d962285587deffb5efada10d01d929b396e",
+    "tests/unit/scripts/r2/test_verify_m9b_scope.py": "f77d66330b8652fcb83d4e4061c5d009f7ba0e0d45eafca091925c745ae5eb41",
+    "tests/unit/server/routers/test_opportunity_acquisition_router.py": "63123cc689f0fa5613df1446c9545877d15db11b2b983c40e0ab5125ee1711de",
+    "tests/unit/server/services/test_m9_manual_authenticity.py": "1b1df08d71a158c512293fa85b5ca0e018f2b7b71a5900260381f50ad3b6f974"
+  },
+  "commands": [
+    {
+      "gate": "audit",
+      "command": "/home/anhtuan/content-production-os/.worktrees/r2-v2-main/.venv/bin/python scripts/audit_tests.py --check",
+      "exit": 0,
+      "tested_head": "7e6cccb457bbac6e4387371a05ca1cc6a9cbfb4a",
+      "passed": 0,
+      "skipped": 0,
+      "log": {
+        "path": "docs/r2/evidence/m9b-recovery-v2/audit.log",
+        "sha256": "f591aeb7ae019180ab0411cbdc541672aecf0992e3a48f5a907291b55afe7a55"
+      },
+      "result": {
+        "path": "docs/r2/evidence/m9b-recovery-v2/audit.result.json",
+        "sha256": "9be1c2376de11d1fc5f5948e917a37c73a4c1c63e34dda6c54069c694c017b18"
+      }
+    },
+    {
+      "gate": "dependencies",
+      "command": "/home/anhtuan/content-production-os/.worktrees/r2-v2-main/.venv/bin/deptry lib server alembic scripts tests r2",
+      "exit": 0,
+      "tested_head": "7e6cccb457bbac6e4387371a05ca1cc6a9cbfb4a",
+      "passed": 0,
+      "skipped": 0,
+      "log": {
+        "path": "docs/r2/evidence/m9b-recovery-v2/dependencies.log",
+        "sha256": "a3181052042f527dff485160320d821d40c4ca56a4bc4db05eefb55b411d10d2"
+      },
+      "result": {
+        "path": "docs/r2/evidence/m9b-recovery-v2/dependencies.result.json",
+        "sha256": "1f05cea53464eaff8fda0401e7dec69749db7b2c2efec9410d33c99177c01469"
+      }
+    },
+    {
+      "gate": "diff",
+      "command": "git diff --check",
+      "exit": 0,
+      "tested_head": "7e6cccb457bbac6e4387371a05ca1cc6a9cbfb4a",
+      "passed": 0,
+      "skipped": 0,
+      "log": {
+        "path": "docs/r2/evidence/m9b-recovery-v2/diff.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "result": {
+        "path": "docs/r2/evidence/m9b-recovery-v2/diff.result.json",
+        "sha256": "e46a4b0198332dc2d15623117bf6117c7af2c590814483f300e7214db03ff882"
+      }
+    },
+    {
+      "gate": "format",
+      "command": "/home/anhtuan/content-production-os/.worktrees/r2-v2-main/.venv/bin/ruff format --check .",
+      "exit": 0,
+      "tested_head": "7e6cccb457bbac6e4387371a05ca1cc6a9cbfb4a",
+      "passed": 0,
+      "skipped": 0,
+      "log": {
+        "path": "docs/r2/evidence/m9b-recovery-v2/format.log",
+        "sha256": "054e0d4491e9ee8ad5b5a75b347a7f0224d9c308b31b68789659a0bffefadedf"
+      },
+      "result": {
+        "path": "docs/r2/evidence/m9b-recovery-v2/format.result.json",
+        "sha256": "2b8cb88a4c03ab22be3a888d2b21aa172abe4ba55d1ab869eb195604b9da139b"
+      }
+    },
+    {
+      "gate": "imports",
+      "command": "/home/anhtuan/content-production-os/.worktrees/r2-v2-main/.venv/bin/lint-imports",
+      "exit": 0,
+      "tested_head": "7e6cccb457bbac6e4387371a05ca1cc6a9cbfb4a",
+      "passed": 0,
+      "skipped": 0,
+      "log": {
+        "path": "docs/r2/evidence/m9b-recovery-v2/imports.log",
+        "sha256": "add8e10fb73be2503802775c2aeee3267aabba81f0beff29d391f395c8cbe520"
+      },
+      "result": {
+        "path": "docs/r2/evidence/m9b-recovery-v2/imports.result.json",
+        "sha256": "af1c57a07701f8217f26913ae78a2d8d20b6ea273d96d20ade3ec11d29a7b211"
+      }
+    },
+    {
+      "gate": "migration",
+      "command": "/home/anhtuan/content-production-os/.worktrees/r2-v2-main/.venv/bin/python -m pytest tests/integration/lib/db/migrations -n 4 --dist loadfile -q --basetemp=/tmp/claude-1000/-home-anhtuan-content-production-os/d4870d56-34f2-481b-bd28-fb82e19f6306/scratchpad/m9b-t10/out/migration-temp --junitxml=/tmp/claude-1000/-home-anhtuan-content-production-os/d4870d56-34f2-481b-bd28-fb82e19f6306/scratchpad/m9b-t10/out/docs/r2/evidence/m9b-recovery-v2/migration.junit.xml",
+      "exit": 0,
+      "tested_head": "7e6cccb457bbac6e4387371a05ca1cc6a9cbfb4a",
+      "passed": 166,
+      "skipped": 0,
+      "log": {
+        "path": "docs/r2/evidence/m9b-recovery-v2/migration.log",
+        "sha256": "e08fa5314ef0fa64549126dde5991b1e9055d4ca55558862d0b3b29ece7f0669"
+      },
+      "result": {
+        "path": "docs/r2/evidence/m9b-recovery-v2/migration.result.json",
+        "sha256": "ce9c3b3de0c9d03dd0e3151ca92ac7caf1ba9aedaef6c9795b5a47edf902cb92"
+      }
+    },
+    {
+      "gate": "ruff",
+      "command": "/home/anhtuan/content-production-os/.worktrees/r2-v2-main/.venv/bin/ruff check .",
+      "exit": 0,
+      "tested_head": "7e6cccb457bbac6e4387371a05ca1cc6a9cbfb4a",
+      "passed": 0,
+      "skipped": 0,
+      "log": {
+        "path": "docs/r2/evidence/m9b-recovery-v2/ruff.log",
+        "sha256": "82b3e6a6c090a57601d22943bd23fca9218d1031dbe5a7b754092f9a156b4f18"
+      },
+      "result": {
+        "path": "docs/r2/evidence/m9b-recovery-v2/ruff.result.json",
+        "sha256": "38eea369c163295e1d1740c189a25ba4289dc79b389285ba90b68086fd2d2b71"
+      }
+    },
+    {
+      "gate": "scope",
+      "command": "/home/anhtuan/content-production-os/.worktrees/r2-v2-main/.venv/bin/python scripts/r2/verify_m9b_recovery_scope.py docs/r2/evidence/R2_M9_B_RECOVERY_V2_RELEASE.json",
+      "exit": 0,
+      "tested_head": "7e6cccb457bbac6e4387371a05ca1cc6a9cbfb4a",
+      "passed": 0,
+      "skipped": 0,
+      "log": {
+        "path": "docs/r2/evidence/m9b-recovery-v2/scope.log",
+        "sha256": "28061924ea2639d25d1b1e7763adf63250e00384c8dd701fae82c4575803ad21"
+      },
+      "result": {
+        "path": "docs/r2/evidence/m9b-recovery-v2/scope.result.json",
+        "sha256": "01cc065ec17593c3e5f2d364a1f740be997c6ec0c7c482f1e4b998b16a371ac2"
+      }
+    },
+    {
+      "gate": "tests",
+      "command": "/home/anhtuan/content-production-os/.worktrees/r2-v2-main/.venv/bin/python -m pytest tests/integration/lib/db/repositories/test_opportunity_acquisition.py tests/integration/lib/db/repositories/test_opportunity_manual_admission.py tests/integration/r2/opportunity/test_acquisition_concurrency.py tests/integration/r2/opportunity/test_acquisition_v2.py tests/integration/scripts/r2/test_verify_m9b_recovery_scope.py tests/integration/server/services/test_m9_evidence_store.py tests/integration/server/services/test_m9_manual_custody_isolation.py tests/integration/server/services/test_m9_manual_publication.py tests/unit/r2/contracts/test_opportunity_acquisition_v2.py tests/unit/r2/opportunity/test_acquisition_v2_digests.py tests/unit/r2/opportunity/test_capabilities.py tests/unit/r2/opportunity/test_manual_admission.py tests/unit/r2/opportunity/test_manual_import.py tests/unit/r2/opportunity/test_normalization.py tests/unit/scripts/r2/test_run_m9b_recovery_gate.py tests/unit/scripts/r2/test_verify_m9_scope.py tests/unit/scripts/r2/test_verify_m9b_evidence.py tests/unit/scripts/r2/test_verify_m9b_recovery_evidence.py tests/unit/scripts/r2/test_verify_m9b_scope.py tests/unit/server/routers/test_opportunity_acquisition_router.py tests/unit/server/services/test_m9_manual_authenticity.py tests/unit/server/routers/test_opportunity_router.py tests/unit/lib/i18n/test_i18n_consistency.py tests/unit/r2/contracts/test_opportunity.py -n 4 --dist loadfile -q --basetemp=/tmp/claude-1000/-home-anhtuan-content-production-os/d4870d56-34f2-481b-bd28-fb82e19f6306/scratchpad/m9b-t10/out/tests-temp --junitxml=/tmp/claude-1000/-home-anhtuan-content-production-os/d4870d56-34f2-481b-bd28-fb82e19f6306/scratchpad/m9b-t10/out/docs/r2/evidence/m9b-recovery-v2/tests.junit.xml",
+      "exit": 0,
+      "tested_head": "7e6cccb457bbac6e4387371a05ca1cc6a9cbfb4a",
+      "passed": 1030,
+      "skipped": 0,
+      "log": {
+        "path": "docs/r2/evidence/m9b-recovery-v2/tests.log",
+        "sha256": "ff839be78ae0955d3679df60577b131d129e2c09841b1ea4c3e64a0a06105bf5"
+      },
+      "result": {
+        "path": "docs/r2/evidence/m9b-recovery-v2/tests.result.json",
+        "sha256": "ec7311a20e299ff36c5d96d97ea9ab336cb1b398b1ca65561123fa744a2fc222"
+      }
+    },
+    {
+      "gate": "types",
+      "command": "/home/anhtuan/content-production-os/.worktrees/r2-v2-main/.venv/bin/basedpyright --warnings",
+      "exit": 0,
+      "tested_head": "7e6cccb457bbac6e4387371a05ca1cc6a9cbfb4a",
+      "passed": 0,
+      "skipped": 0,
+      "log": {
+        "path": "docs/r2/evidence/m9b-recovery-v2/types.log",
+        "sha256": "56882e01cb80173ef053c4096e4ee43e3123a15f5c0a06715f96988d48fbd91c"
+      },
+      "result": {
+        "path": "docs/r2/evidence/m9b-recovery-v2/types.result.json",
+        "sha256": "bc7fede2a7b98d8f143c3712525e9ba258d4895983252c3e064a885d21807ebf"
+      }
+    }
+  ],
+  "test_report": {
+    "path": "docs/r2/evidence/m9b-recovery-v2/tests.junit.xml",
+    "sha256": "a744c4d17dd7dffaf4868fac2c9f57aadc66bc48d866cbc9af4fe7f63f65416a"
+  },
+  "migration_report": {
+    "path": "docs/r2/evidence/m9b-recovery-v2/migration.junit.xml",
+    "sha256": "4c4958f98c4420831e890b0bebab206eee00702c7dccf4be26c0a39a54afae7c"
+  },
+  "fault_matrix": {
+    "replay": {
+      "test_refs": [
+        "tests.integration.r2.opportunity.test_acquisition_v2::test_v2_acquire_uses_committed_custody_before_dispatch_and_replays_without_ports",
+        "tests.integration.r2.opportunity.test_acquisition_v2::test_v2_http_declares_acquires_replays_and_reads_through_the_scoped_service"
+      ]
+    },
+    "scope": {
+      "test_refs": [
+        "tests.integration.r2.opportunity.test_acquisition_v2::test_v2_snapshot_read_scope_and_missing_identity_never_open_material[identity]",
+        "tests.integration.r2.opportunity.test_acquisition_v2::test_v2_snapshot_read_scope_and_missing_identity_never_open_material[project_name]",
+        "tests.integration.r2.opportunity.test_acquisition_v2::test_v2_snapshot_read_scope_and_missing_identity_never_open_material[user_id]",
+        "tests.unit.server.routers.test_opportunity_acquisition_router::test_body_scope_injection_is_rejected_before_the_application[actor_id]",
+        "tests.unit.server.routers.test_opportunity_acquisition_router::test_body_scope_injection_is_rejected_before_the_application[context]",
+        "tests.unit.server.routers.test_opportunity_acquisition_router::test_body_scope_injection_is_rejected_before_the_application[project_name]",
+        "tests.unit.server.routers.test_opportunity_acquisition_router::test_body_scope_injection_is_rejected_before_the_application[user_id]"
+      ]
+    },
+    "interactive": {
+      "test_refs": [
+        "tests.integration.r2.opportunity.test_acquisition_v2::test_v2_http_on_an_unconfigured_host_refuses_before_source_or_custody_contact",
+        "tests.unit.server.routers.test_opportunity_acquisition_router::test_api_keys_and_disabled_auth_cannot_mutate[/acquisitions-acquisition-False]",
+        "tests.unit.server.routers.test_opportunity_acquisition_router::test_api_keys_and_disabled_auth_cannot_mutate[/acquisitions-acquisition-True]",
+        "tests.unit.server.routers.test_opportunity_acquisition_router::test_api_keys_and_disabled_auth_cannot_mutate[/queries-declaration-False]",
+        "tests.unit.server.routers.test_opportunity_acquisition_router::test_api_keys_and_disabled_auth_cannot_mutate[/queries-declaration-True]"
+      ]
+    },
+    "retention": {
+      "test_refs": [
+        "tests.integration.r2.opportunity.test_acquisition_v2::test_v2_expiry_uses_original_deadline_without_any_content_or_port_call[False]",
+        "tests.integration.r2.opportunity.test_acquisition_v2::test_v2_expiry_uses_original_deadline_without_any_content_or_port_call[True]",
+        "tests.integration.r2.opportunity.test_acquisition_v2::test_v2_snapshot_history_becomes_stale_then_unavailable_at_original_deadlines"
+      ]
+    },
+    "revocation": {
+      "test_refs": [
+        "tests.integration.r2.opportunity.test_acquisition_v2::test_v2_known_newer_source_revocation_prevents_admission_and_dispatch",
+        "tests.integration.r2.opportunity.test_acquisition_v2::test_v2_snapshot_reader_refuses_current_from_known_newer_source_revocation"
+      ]
+    },
+    "erasure": {
+      "test_refs": [
+        "tests.integration.r2.opportunity.test_acquisition_v2::test_v2_cleanup_commits_only_after_real_private_and_public_erasure[never-published]",
+        "tests.integration.r2.opportunity.test_acquisition_v2::test_v2_cleanup_commits_only_after_real_private_and_public_erasure[published-unattached]",
+        "tests.integration.r2.opportunity.test_acquisition_v2::test_v2_cleanup_commits_only_after_real_private_and_public_erasure[ready]",
+        "tests.integration.r2.opportunity.test_acquisition_v2::test_v2_cleanup_drains_admitted_reads_before_any_private_erasure",
+        "tests.integration.r2.opportunity.test_acquisition_v2::test_v2_cleanup_retry_reconciles_physical_erasure_with_sql_rollback[cleanup-authorization-before-commit-2-True-False]",
+        "tests.integration.r2.opportunity.test_acquisition_v2::test_v2_cleanup_retry_reconciles_physical_erasure_with_sql_rollback[cleanup-authorized-committed-3-True-False]",
+        "tests.integration.r2.opportunity.test_acquisition_v2::test_v2_cleanup_retry_reconciles_physical_erasure_with_sql_rollback[cleanup-completion-before-commit-3-True-True]",
+        "tests.integration.r2.opportunity.test_acquisition_v2::test_v2_cleanup_retry_reconciles_physical_erasure_with_sql_rollback[cleanup-drain-before-commit-1-False-False]",
+        "tests.integration.r2.opportunity.test_acquisition_v2::test_v2_cleanup_retry_reconciles_physical_erasure_with_sql_rollback[cleanup-drained-committed-2-False-False]",
+        "tests.integration.r2.opportunity.test_acquisition_v2::test_v2_cleanup_retry_reconciles_physical_erasure_with_sql_rollback[cleanup-erased-committed-4-True-True]",
+        "tests.integration.r2.opportunity.test_acquisition_v2::test_v2_cleanup_retry_reconciles_physical_erasure_with_sql_rollback[cleanup-fence-before-commit-None-False-False]",
+        "tests.integration.r2.opportunity.test_acquisition_v2::test_v2_cleanup_retry_reconciles_physical_erasure_with_sql_rollback[cleanup-fenced-committed-1-False-False]",
+        "tests.integration.r2.opportunity.test_acquisition_v2::test_v2_cleanup_retry_reconciles_physical_erasure_with_sql_rollback[cleanup-private-erasure-returned-2-True-False]",
+        "tests.integration.r2.opportunity.test_acquisition_v2::test_v2_cleanup_retry_reconciles_physical_erasure_with_sql_rollback[cleanup-public-erasure-returned-3-True-True]",
+        "tests.integration.r2.opportunity.test_acquisition_v2::test_v2_cleanup_retry_reconciles_physical_erasure_with_sql_rollback[cleanup-publication-fenced-1-False-False]"
+      ]
+    }
+  },
+  "full_backend": {
+    "executed": false,
+    "reason": "Sponsor rule 2026-10-14: pytest runs explicit related paths only; the full suite runs only on explicit request."
+  },
+  "runtime_signing_key_dependency": false,
+  "production_activation_authorized": false,
+  "provider_network_executed": false,
+  "independent_review": {
+    "budget": 1,
+    "used": 0
+  },
+  "graph_coverage": {
+    "method": "direct-read fallback (codebase-memory index does not cover this worktree)",
+    "paths": [
+      "alembic/versions/9b9c4a0e0001_add_m9_acquisition_observations.py",
+      "alembic/versions/9b9c4a0e0002_add_m9_manual_admission.py",
+      "docs/r2/evidence/R2_M9_B_RECOVERY_V2_E_CLOSURE_HANDOFF.md",
+      "docs/r2/evidence/R2_M9_B_RECOVERY_V2_RELEASE.json",
+      "docs/r2/evidence/schemas/R2_M9_B_ACQUISITION.schema.json",
+      "docs/r2/evidence/schemas/R2_M9_B_RECOVERY_V2.schema.json",
+      "docs/research/2026-10-20-r2-m9b-upload-custody.md",
+      "docs/superpowers/plans/2026-10-20-r2-m9b-manual-recovery-v2.md",
+      "docs/superpowers/specs/2026-10-20-r2-m9b-manual-recovery-v2-design.md",
+      "lib/db/models/__init__.py",
+      "lib/db/models/opportunity_acquisition.py",
+      "lib/db/models/opportunity_manual_admission.py",
+      "lib/db/repositories/__init__.py",
+      "lib/db/repositories/opportunity_acquisition.py",
+      "lib/db/repositories/opportunity_manual_admission.py",
+      "lib/i18n/en/errors.py",
+      "lib/i18n/vi/errors.py",
+      "lib/i18n/zh/errors.py",
+      "r2/contracts/opportunity_acquisition_v2.py",
+      "r2/opportunity/acquisition.py",
+      "r2/opportunity/acquisition_v2.py",
+      "r2/opportunity/acquisition_v2_digests.py",
+      "r2/opportunity/capabilities.py",
+      "r2/opportunity/manual_admission.py",
+      "r2/opportunity/manual_admission_ports.py",
+      "r2/opportunity/manual_import.py",
+      "r2/opportunity/normalization.py",
+      "scripts/r2/run_m9b_recovery_gate.py",
+      "scripts/r2/verify_m9b_evidence.py",
+      "scripts/r2/verify_m9b_recovery_evidence.py",
+      "scripts/r2/verify_m9b_recovery_scope.py",
+      "scripts/r2/verify_m9b_scope.py",
+      "server/app.py",
+      "server/routers/opportunity_acquisition.py",
+      "server/services/m9_evidence_store.py",
+      "server/services/m9_manual_authenticity.py",
+      "server/services/m9_manual_publication.py",
+      "server/services/opportunity.py",
+      "server/services/opportunity_acquisition_v2.py",
+      "tests/fixtures/r2/opportunity/manual_admission_custodian.py",
+      "tests/fixtures/r2/opportunity/manual_import.json",
+      "tests/fixtures/r2/opportunity/manual_recovery_restarts.json",
+      "tests/fixtures/r2/opportunity/manual_recovery_worker.py",
+      "tests/fixtures/r2/opportunity/source_capabilities.json",
+      "tests/integration/lib/db/migrations/test_alembic_m8_exploration.py",
+      "tests/integration/lib/db/migrations/test_alembic_m9_acquisition.py",
+      "tests/integration/lib/db/migrations/test_alembic_m9_foundation.py",
+      "tests/integration/lib/db/migrations/test_alembic_m9_manual_admission.py",
+      "tests/integration/lib/db/migrations/test_format_projections.py",
+      "tests/integration/lib/db/migrations/test_learning_observations.py",
+      "tests/integration/lib/db/migrations/test_production_binding_authority.py",
+      "tests/integration/lib/db/migrations/test_production_target_registry.py",
+      "tests/integration/lib/db/migrations/test_spatial_constraint_sets.py",
+      "tests/integration/lib/db/migrations/test_spatial_execution_evidence.py",
+      "tests/integration/lib/db/migrations/test_spatial_frame_receipts.py",
+      "tests/integration/lib/db/migrations/test_spatial_pair_authority.py",
+      "tests/integration/lib/db/migrations/test_spatial_pair_v2_custody.py",
+      "tests/integration/lib/db/migrations/test_spatial_promotion_sidecars.py",
+      "tests/integration/lib/db/migrations/test_spatial_review_custody.py",
+      "tests/integration/lib/db/repositories/test_opportunity_acquisition.py",
+      "tests/integration/lib/db/repositories/test_opportunity_manual_admission.py",
+      "tests/integration/r2/opportunity/test_acquisition_concurrency.py",
+      "tests/integration/r2/opportunity/test_acquisition_v2.py",
+      "tests/integration/r2/opportunity/test_acquisition_v2_restarts.py",
+      "tests/integration/scripts/r2/test_verify_m9b_recovery_scope.py",
+      "tests/integration/server/services/test_m9_evidence_store.py",
+      "tests/integration/server/services/test_m9_manual_custody_isolation.py",
+      "tests/integration/server/services/test_m9_manual_publication.py",
+      "tests/unit/r2/contracts/test_opportunity_acquisition_v2.py",
+      "tests/unit/r2/opportunity/test_acquisition_v2_digests.py",
+      "tests/unit/r2/opportunity/test_capabilities.py",
+      "tests/unit/r2/opportunity/test_manual_admission.py",
+      "tests/unit/r2/opportunity/test_manual_import.py",
+      "tests/unit/r2/opportunity/test_normalization.py",
+      "tests/unit/scripts/r2/test_run_m9b_recovery_gate.py",
+      "tests/unit/scripts/r2/test_verify_m9_scope.py",
+      "tests/unit/scripts/r2/test_verify_m9b_evidence.py",
+      "tests/unit/scripts/r2/test_verify_m9b_recovery_evidence.py",
+      "tests/unit/scripts/r2/test_verify_m9b_scope.py",
+      "tests/unit/server/routers/test_opportunity_acquisition_router.py",
+      "tests/unit/server/services/test_m9_manual_authenticity.py"
+    ]
+  },
+  "required_skips": [],
+  "material_unknowns": [],
+  "artifacts": [
+    {
+      "path": "docs/r2/evidence/m9b-recovery-v2/audit.log",
+      "sha256": "f591aeb7ae019180ab0411cbdc541672aecf0992e3a48f5a907291b55afe7a55"
+    },
+    {
+      "path": "docs/r2/evidence/m9b-recovery-v2/audit.result.json",
+      "sha256": "9be1c2376de11d1fc5f5948e917a37c73a4c1c63e34dda6c54069c694c017b18"
+    },
+    {
+      "path": "docs/r2/evidence/m9b-recovery-v2/dependencies.log",
+      "sha256": "a3181052042f527dff485160320d821d40c4ca56a4bc4db05eefb55b411d10d2"
+    },
+    {
+      "path": "docs/r2/evidence/m9b-recovery-v2/dependencies.result.json",
+      "sha256": "1f05cea53464eaff8fda0401e7dec69749db7b2c2efec9410d33c99177c01469"
+    },
+    {
+      "path": "docs/r2/evidence/m9b-recovery-v2/diff.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "docs/r2/evidence/m9b-recovery-v2/diff.result.json",
+      "sha256": "e46a4b0198332dc2d15623117bf6117c7af2c590814483f300e7214db03ff882"
+    },
+    {
+      "path": "docs/r2/evidence/m9b-recovery-v2/format.log",
+      "sha256": "054e0d4491e9ee8ad5b5a75b347a7f0224d9c308b31b68789659a0bffefadedf"
+    },
+    {
+      "path": "docs/r2/evidence/m9b-recovery-v2/format.result.json",
+      "sha256": "2b8cb88a4c03ab22be3a888d2b21aa172abe4ba55d1ab869eb195604b9da139b"
+    },
+    {
+      "path": "docs/r2/evidence/m9b-recovery-v2/imports.log",
+      "sha256": "add8e10fb73be2503802775c2aeee3267aabba81f0beff29d391f395c8cbe520"
+    },
+    {
+      "path": "docs/r2/evidence/m9b-recovery-v2/imports.result.json",
+      "sha256": "af1c57a07701f8217f26913ae78a2d8d20b6ea273d96d20ade3ec11d29a7b211"
+    },
+    {
+      "path": "docs/r2/evidence/m9b-recovery-v2/migration.junit.xml",
+      "sha256": "4c4958f98c4420831e890b0bebab206eee00702c7dccf4be26c0a39a54afae7c"
+    },
+    {
+      "path": "docs/r2/evidence/m9b-recovery-v2/migration.log",
+      "sha256": "e08fa5314ef0fa64549126dde5991b1e9055d4ca55558862d0b3b29ece7f0669"
+    },
+    {
+      "path": "docs/r2/evidence/m9b-recovery-v2/migration.result.json",
+      "sha256": "ce9c3b3de0c9d03dd0e3151ca92ac7caf1ba9aedaef6c9795b5a47edf902cb92"
+    },
+    {
+      "path": "docs/r2/evidence/m9b-recovery-v2/restarts.log",
+      "sha256": "18d9278f2d821087ec64692f35b4f3c237ced4a641014c1d84217ad5a5b9c546"
+    },
+    {
+      "path": "docs/r2/evidence/m9b-recovery-v2/restarts.result.json",
+      "sha256": "8ed19a4c88e9af17fbe2fbb27a1caae164ac4aa13fb21c8649f2fd014aba37e8"
+    },
+    {
+      "path": "docs/r2/evidence/m9b-recovery-v2/restarts/junit.xml",
+      "sha256": "4e0cbbc9de75bfa2b628b08d6f4c7eb471ccf271476bd7df2c569cf2a8ffe66a"
+    },
+    {
+      "path": "docs/r2/evidence/m9b-recovery-v2/restarts/manifest.json",
+      "sha256": "bcf62a1c4af3f5ed68274e3362f0f2d7e732976bdb0bd2e9473f28a7b694a394"
+    },
+    {
+      "path": "docs/r2/evidence/m9b-recovery-v2/restarts/pytest.log",
+      "sha256": "c25b3cde5e797faba9c9dfcfbb19fc4beaeb20400e0c70e0eb88f6d471fdbb2b"
+    },
+    {
+      "path": "docs/r2/evidence/m9b-recovery-v2/restarts/restarts/application-acquire-before-source-dispatch.armed.json",
+      "sha256": "1dd0a43ca87dc9dcc86858c9f467f29f1b2abc3fe193f44cbe96ca63266c507a"
+    },
+    {
+      "path": "docs/r2/evidence/m9b-recovery-v2/restarts/restarts/application-acquire-before-source-dispatch.arrival.json",
+      "sha256": "7a7724773e3b1e94c7cc4e5b7a3d5f253e4c2c5119c811274f435741f67389a2"
+    },
+    {
+      "path": "docs/r2/evidence/m9b-recovery-v2/restarts/restarts/application-acquire-before-source-dispatch.json",
+      "sha256": "b754822639e98c4fdb838f0f56c8f22c7d823c0cb40a9eb547a09833c9e07d2e"
+    },
+    {
+      "path": "docs/r2/evidence/m9b-recovery-v2/restarts/restarts/application-acquire-checkpoint-before-commit.armed.json",
+      "sha256": "ff715782c6198d582febb3dccff648776929a1b5fcd9fa01f1c85cd02a1fb908"
+    },
+    {
+      "path": "docs/r2/evidence/m9b-recovery-v2/restarts/restarts/application-acquire-checkpoint-before-commit.arrival.json",
+      "sha256": "f9303061e2cbc1f67532a60a345da1ea279d714026ba5f488d6bba71084db9bb"
+    },
+    {
+      "path": "docs/r2/evidence/m9b-recovery-v2/restarts/restarts/application-acquire-checkpoint-before-commit.json",
+      "sha256": "05abf227189d9a0e0f80d9225f1facdb2285896e61c14ef6d8e5626768892dd7"
+    },
+    {
+      "path": "docs/r2/evidence/m9b-recovery-v2/restarts/restarts/application-acquire-checkpoint-committed.armed.json",
+      "sha256": "f9a014b53e4dd42948a43c86988768c0ec0dad1412cf95140dcd06f7427cd106"
+    },
+    {
+      "path": "docs/r2/evidence/m9b-recovery-v2/restarts/restarts/application-acquire-checkpoint-committed.arrival.json",
+      "sha256": "c1adcea3e95569f8cbedb7bdecae6c2657d5c8d82e4a788008292d8142871374"
+    },
+    {
+      "path": "docs/r2/evidence/m9b-recovery-v2/restarts/restarts/application-acquire-checkpoint-committed.json",
+      "sha256": "1ad2569c36780187380f144c33b0801888935c0d7e3418bdb1eb2981cd93e49f"
+    },
+    {
+      "path": "docs/r2/evidence/m9b-recovery-v2/restarts/restarts/application-acquire-claim-before-commit.armed.json",
+      "sha256": "654f7fd6e3aaf4307a58a449940123ded1b1662453106e238ce5d274c6f74eab"
+    },
+    {
+      "path": "docs/r2/evidence/m9b-recovery-v2/restarts/restarts/application-acquire-claim-before-commit.arrival.json",
+      "sha256": "b0e7a98cb7be8a5455535be69bc501c69efe973ccba7d8de9262b6d6eb3d8c84"
+    },
+    {
+      "path": "docs/r2/evidence/m9b-recovery-v2/restarts/restarts/application-acquire-claim-before-commit.json",
+      "sha256": "365578000c10c722e8ef575671bd308202e75dd6242121f24394e07e5cd42081"
+    },
+    {
+      "path": "docs/r2/evidence/m9b-recovery-v2/restarts/restarts/application-acquire-claim-committed.armed.json",
+      "sha256": "8dc6967f5e609cc533513176efe332208d0376a770bda12576fb831248102672"
+    },
+    {
+      "path": "docs/r2/evidence/m9b-recovery-v2/restarts/restarts/application-acquire-claim-committed.arrival.json",
+      "sha256": "5e54561bc07215b14e647232376c1ed606ac16c501235d8073bf78d71742d308"
+    },
+    {
+      "path": "docs/r2/evidence/m9b-recovery-v2/restarts/restarts/application-acquire-claim-committed.json",
+      "sha256": "bad5d2f4d5d0dbde4ef912d179e588ca7d29a78867c1eb4f46471582d7f408c6"
+    },
+    {
+      "path": "docs/r2/evidence/m9b-recovery-v2/restarts/restarts/application-acquire-finalization-before-commit.armed.json",
+      "sha256": "74ff038927c49fb819986f4df596b0c5dcbad69b84610f5cd1a470d61030eabc"
+    },
+    {
+      "path": "docs/r2/evidence/m9b-recovery-v2/restarts/restarts/application-acquire-finalization-before-commit.arrival.json",
+      "sha256": "4e4b542f5f989ce6f75b3edb94c980f82648e18094eeb0fe06e2db3b53d44a21"
+    },
+    {
+      "path": "docs/r2/evidence/m9b-recovery-v2/restarts/restarts/application-acquire-finalization-before-commit.json",
+      "sha256": "1e208bfbf764c2f7f6ac79a0a308dcdea530c142c3b808cf9302d418d410ab2c"
+    },
+    {
+      "path": "docs/r2/evidence/m9b-recovery-v2/restarts/restarts/application-acquire-finalization-committed.armed.json",
+      "sha256": "aba691ef8756c4aa47d492f567b91be4d91f96d73b07a656f7472940f96bdb65"
+    },
+    {
+      "path": "docs/r2/evidence/m9b-recovery-v2/restarts/restarts/application-acquire-finalization-committed.arrival.json",
+      "sha256": "7979c8a49c06beeef7f3cd4742c018d8ab51a467cfacf1f288aa8b335f25dce9"
+    },
+    {
+      "path": "docs/r2/evidence/m9b-recovery-v2/restarts/restarts/application-acquire-finalization-committed.json",
+      "sha256": "9e3a5e95e43e04f5ff4bfd0b56306f13ed91edc8f98b2db777da3131432c855b"
+    },
+    {
+      "path": "docs/r2/evidence/m9b-recovery-v2/restarts/restarts/application-acquire-planned-committed.armed.json",
+      "sha256": "625b8f82dd1f1f141ef1aefba914e9d4ded4b5d3f17eb4770c7564ea461486a5"
+    },
+    {
+      "path": "docs/r2/evidence/m9b-recovery-v2/restarts/restarts/application-acquire-planned-committed.arrival.json",
+      "sha256": "ab48b3e938cccfef7c263a8867ac70ab7a15ad99f619597161644906cf0b3b5e"
+    },
+    {
+      "path": "docs/r2/evidence/m9b-recovery-v2/restarts/restarts/application-acquire-planned-committed.json",
+      "sha256": "6fa10682a07ebf02fe69416df963e1e7db643df2a9cb4b0606ccfade11eed4fc"
+    },
+    {
+      "path": "docs/r2/evidence/m9b-recovery-v2/restarts/restarts/application-acquire-publication-returned.armed.json",
+      "sha256": "cd72e11909682e9145c24c9f28b772f5bd4966391aa129c2bc36b4d7d021378f"
+    },
+    {
+      "path": "docs/r2/evidence/m9b-recovery-v2/restarts/restarts/application-acquire-publication-returned.arrival.json",
+      "sha256": "3906a1633d51c3296048d4c0d3acff7062034441d2d106762a560e0b5c085613"
+    },
+    {
+      "path": "docs/r2/evidence/m9b-recovery-v2/restarts/restarts/application-acquire-publication-returned.json",
+      "sha256": "8c884c1a8cc25a7391b30392d3fdc2550be4dbd830077f97aeb9a59f3e0c4d2a"
+    },
+    {
+      "path": "docs/r2/evidence/m9b-recovery-v2/restarts/restarts/application-acquire-ready-before-commit.armed.json",
+      "sha256": "0e12c998bc8aad9c3dc6e0d761867692a7e04d4a3c08f4ae2f2a3b4c9421dde7"
+    },
+    {
+      "path": "docs/r2/evidence/m9b-recovery-v2/restarts/restarts/application-acquire-ready-before-commit.arrival.json",
+      "sha256": "dc812e2f46e5c65d0655c81d36f2b3ef5d4dfa0f47f8a14c6853c85817d4b154"
+    },
+    {
+      "path": "docs/r2/evidence/m9b-recovery-v2/restarts/restarts/application-acquire-ready-before-commit.json",
+      "sha256": "a2f4586f02e26bab8c3b1f8ad9446b2261ab6b6073f7e23fa41ac51ba9b99792"
+    },
+    {
+      "path": "docs/r2/evidence/m9b-recovery-v2/restarts/restarts/application-acquire-ready-committed.armed.json",
+      "sha256": "b878da83337672351584d5f76b7392b0c959975c3b738430258931c78b3881d1"
+    },
+    {
+      "path": "docs/r2/evidence/m9b-recovery-v2/restarts/restarts/application-acquire-ready-committed.arrival.json",
+      "sha256": "381041297f62845a2f74531b16b340fe17353f515465800de6ece67f1cf761b9"
+    },
+    {
+      "path": "docs/r2/evidence/m9b-recovery-v2/restarts/restarts/application-acquire-ready-committed.json",
+      "sha256": "8501b9a748d8ccf115fa00b68a3ff8b3454881ed254e055d9e68193415466230"
+    },
+    {
+      "path": "docs/r2/evidence/m9b-recovery-v2/restarts/restarts/application-acquire-reserved-committed.armed.json",
+      "sha256": "1ad387aa24b6992971f2b5454630788d22e7b6271e5f7a5d0ce95103848f9ec5"
+    },
+    {
+      "path": "docs/r2/evidence/m9b-recovery-v2/restarts/restarts/application-acquire-reserved-committed.arrival.json",
+      "sha256": "4ab113b1a9c5c49d0cdb58555a60b85dc9c9d1366948ff27ce9686dd4a40fb3f"
+    },
+    {
+      "path": "docs/r2/evidence/m9b-recovery-v2/restarts/restarts/application-acquire-reserved-committed.json",
+      "sha256": "4dc9128273c9873088ffaa67905d21d3034f0f960f2b8542ebd87ce2222fa243"
+    },
+    {
+      "path": "docs/r2/evidence/m9b-recovery-v2/restarts/restarts/application-acquire-source-response-returned.armed.json",
+      "sha256": "1bd0d5af7058472df939343d845e1c7ed19c6d628ce65efdc9694655ea5b906f"
+    },
+    {
+      "path": "docs/r2/evidence/m9b-recovery-v2/restarts/restarts/application-acquire-source-response-returned.arrival.json",
+      "sha256": "dc3d249b8ac4d6fe77603a5f1774989bc02348e80ea908291d4c33d230ad807f"
+    },
+    {
+      "path": "docs/r2/evidence/m9b-recovery-v2/restarts/restarts/application-acquire-source-response-returned.json",
+      "sha256": "13f8c2e0cdf7db905967a142397f484d542a2194cb9b421bc4d7e22fe53f1a09"
+    },
+    {
+      "path": "docs/r2/evidence/m9b-recovery-v2/restarts/restarts/application-cleanup-cleanup-authorization-before-commit.armed.json",
+      "sha256": "e450b202d6db2bf1dbd96bf739ef8f88ffe59863faff5d7375343e963bece958"
+    },
+    {
+      "path": "docs/r2/evidence/m9b-recovery-v2/restarts/restarts/application-cleanup-cleanup-authorization-before-commit.arrival.json",
+      "sha256": "47ec3e5f4f1fae633966d5d6d6eebb5edd9cf540cd46e9d60e543876ed43ac7e"
+    },
+    {
+      "path": "docs/r2/evidence/m9b-recovery-v2/restarts/restarts/application-cleanup-cleanup-authorization-before-commit.json",
+      "sha256": "da3eaa42597004e32013037b92d3e354e0698f4e532cd4b1b13fc982dde9539f"
+    },
+    {
+      "path": "docs/r2/evidence/m9b-recovery-v2/restarts/restarts/application-cleanup-cleanup-authorized-committed.armed.json",
+      "sha256": "00f05c829689e58d28dea39cf39ee0d92eb9b6d4db24b0730208fadf4fe04d26"
+    },
+    {
+      "path": "docs/r2/evidence/m9b-recovery-v2/restarts/restarts/application-cleanup-cleanup-authorized-committed.arrival.json",
+      "sha256": "e5e1b0d6221aa5d88e7bd3cf8c82dfebab379565aee90160c1c24ff9981fa0dc"
+    },
+    {
+      "path": "docs/r2/evidence/m9b-recovery-v2/restarts/restarts/application-cleanup-cleanup-authorized-committed.json",
+      "sha256": "076771682432946c5503a74b333005c0ce06ba721968e03abaf32d8b05e18ffd"
+    },
+    {
+      "path": "docs/r2/evidence/m9b-recovery-v2/restarts/restarts/application-cleanup-cleanup-completion-before-commit.armed.json",
+      "sha256": "683fb25ae059f649d1bb78c655b28fccd317cd42d00fc12bc10c6a729809b222"
+    },
+    {
+      "path": "docs/r2/evidence/m9b-recovery-v2/restarts/restarts/application-cleanup-cleanup-completion-before-commit.arrival.json",
+      "sha256": "60e5c2a9e9591fac1469700d9291cf7453c72226655e9134e90f05982f293476"
+    },
+    {
+      "path": "docs/r2/evidence/m9b-recovery-v2/restarts/restarts/application-cleanup-cleanup-completion-before-commit.json",
+      "sha256": "be0450b2cffccb718730c5a60fedb4ca43868779591270daf9a0f884d3e95f00"
+    },
+    {
+      "path": "docs/r2/evidence/m9b-recovery-v2/restarts/restarts/application-cleanup-cleanup-drain-before-commit.armed.json",
+      "sha256": "6ff221d367444b7ffc7ed0f64a74cf3b5b16fc45f449199d392828992ac73ef8"
+    },
+    {
+      "path": "docs/r2/evidence/m9b-recovery-v2/restarts/restarts/application-cleanup-cleanup-drain-before-commit.arrival.json",
+      "sha256": "eda92aaa13186d459a90f03cd93bb3d509aee75b77fd77265463d1980126c56d"
+    },
+    {
+      "path": "docs/r2/evidence/m9b-recovery-v2/restarts/restarts/application-cleanup-cleanup-drain-before-commit.json",
+      "sha256": "b725c1fcf1228d6c23f9a0e3a8b74d8b055a8841c95f185b604f7655ff457723"
+    },
+    {
+      "path": "docs/r2/evidence/m9b-recovery-v2/restarts/restarts/application-cleanup-cleanup-drained-committed.armed.json",
+      "sha256": "9fc023941652a5253fd53d65fbacf6403a5b19615b0a150a91fd6e862962110e"
+    },
+    {
+      "path": "docs/r2/evidence/m9b-recovery-v2/restarts/restarts/application-cleanup-cleanup-drained-committed.arrival.json",
+      "sha256": "4add31f65e4b1302e69c47a2d3b1a788ef6098c4223f775c16e080f979309f56"
+    },
+    {
+      "path": "docs/r2/evidence/m9b-recovery-v2/restarts/restarts/application-cleanup-cleanup-drained-committed.json",
+      "sha256": "844bb9e4afc7af3bf4adb84aa3d9e69727b6d172060eef045359dd8cd9a81acc"
+    },
+    {
+      "path": "docs/r2/evidence/m9b-recovery-v2/restarts/restarts/application-cleanup-cleanup-erased-committed.armed.json",
+      "sha256": "38955995dbb21becf08e1fdcc3d7e1b9e2ee34b3607c50ad11d42e75c700406b"
+    },
+    {
+      "path": "docs/r2/evidence/m9b-recovery-v2/restarts/restarts/application-cleanup-cleanup-erased-committed.arrival.json",
+      "sha256": "8e1121fbc66d424a0afb705533192f370dc9b7cadd91914a9def1ef6f379b1c1"
+    },
+    {
+      "path": "docs/r2/evidence/m9b-recovery-v2/restarts/restarts/application-cleanup-cleanup-erased-committed.json",
+      "sha256": "c992d1f475dbe67b1f3e52ffbca827b8711e5af88b8082270a16b42d1b339b5e"
+    },
+    {
+      "path": "docs/r2/evidence/m9b-recovery-v2/restarts/restarts/application-cleanup-cleanup-fence-before-commit.armed.json",
+      "sha256": "02d441d1953595ca21d3213a4919e8c14dc30d4baffbc12852b240bd19863413"
+    },
+    {
+      "path": "docs/r2/evidence/m9b-recovery-v2/restarts/restarts/application-cleanup-cleanup-fence-before-commit.arrival.json",
+      "sha256": "4b56728d44c9ce9d05627e298aee95e20c64ef0a4f4010eba669281b465fb0bb"
+    },
+    {
+      "path": "docs/r2/evidence/m9b-recovery-v2/restarts/restarts/application-cleanup-cleanup-fence-before-commit.json",
+      "sha256": "36cf8467de0a16aeb8942b69ee2dbbe994add9b43399e6ed036392abdbec8e06"
+    },
+    {
+      "path": "docs/r2/evidence/m9b-recovery-v2/restarts/restarts/application-cleanup-cleanup-fenced-committed.armed.json",
+      "sha256": "c8667bb7ed721bea15c31ea68fd73cf4c283b3da819164ad895ca3b861593e93"
+    },
+    {
+      "path": "docs/r2/evidence/m9b-recovery-v2/restarts/restarts/application-cleanup-cleanup-fenced-committed.arrival.json",
+      "sha256": "e1b38ffe4698aa8fb503724f92fb55617589ce26e2feae561cd2c595a99111da"
+    },
+    {
+      "path": "docs/r2/evidence/m9b-recovery-v2/restarts/restarts/application-cleanup-cleanup-fenced-committed.json",
+      "sha256": "4f4ec92c154a47cbf1013c4d2e4957c2dabc04b110742b34454c242b510f2cbe"
+    },
+    {
+      "path": "docs/r2/evidence/m9b-recovery-v2/restarts/restarts/application-cleanup-cleanup-private-erasure-returned.armed.json",
+      "sha256": "c1bfb23782ebf79d6b294119439d9c6b5e2580584acdcd7141991a97d8ff3e62"
+    },
+    {
+      "path": "docs/r2/evidence/m9b-recovery-v2/restarts/restarts/application-cleanup-cleanup-private-erasure-returned.arrival.json",
+      "sha256": "d6f6b6583233cff49bf8debe8c22d3a8af22ed9fc8ca231e76aff06e7129a809"
+    },
+    {
+      "path": "docs/r2/evidence/m9b-recovery-v2/restarts/restarts/application-cleanup-cleanup-private-erasure-returned.json",
+      "sha256": "600d4c146fa602f770d106dd3cc5774b07eb021ff308aefb254348b0288623ee"
+    },
+    {
+      "path": "docs/r2/evidence/m9b-recovery-v2/restarts/restarts/application-cleanup-cleanup-public-erasure-returned.armed.json",
+      "sha256": "d7ad91d27d29ccd963e9ed97da8fb91bb70e9bc1c1870180da94097c0799e554"
+    },
+    {
+      "path": "docs/r2/evidence/m9b-recovery-v2/restarts/restarts/application-cleanup-cleanup-public-erasure-returned.arrival.json",
+      "sha256": "5b9b2a5f5cec4a1cefd718a93a1afe90362e43331097db004eb142a3189eabaa"
+    },
+    {
+      "path": "docs/r2/evidence/m9b-recovery-v2/restarts/restarts/application-cleanup-cleanup-public-erasure-returned.json",
+      "sha256": "75026e65a6d257612d05bebfb4dad8d0dffb38333b94a948b724a3f3c0697bdc"
+    },
+    {
+      "path": "docs/r2/evidence/m9b-recovery-v2/restarts/restarts/application-cleanup-cleanup-publication-fenced.armed.json",
+      "sha256": "c243ff6277fc172a08755c19bb7caf956db810e345b93ac4339c113f20e46b7b"
+    },
+    {
+      "path": "docs/r2/evidence/m9b-recovery-v2/restarts/restarts/application-cleanup-cleanup-publication-fenced.arrival.json",
+      "sha256": "3f502ea8b46d419fe408125a6af90b9ca00679fe6e7ff43e6a270c33c14ab297"
+    },
+    {
+      "path": "docs/r2/evidence/m9b-recovery-v2/restarts/restarts/application-cleanup-cleanup-publication-fenced.json",
+      "sha256": "49526491ffdb5f3213f81c262220736ff9cec9c954ad0936bf432ea786b76df6"
+    },
+    {
+      "path": "docs/r2/evidence/m9b-recovery-v2/restarts/restarts/application-cleanup-recovery-publication-fence-durable.armed.json",
+      "sha256": "eed88af7aa45dc170f7b3f515ed635b7f135881428aef63beba7e1bd8f6d4e16"
+    },
+    {
+      "path": "docs/r2/evidence/m9b-recovery-v2/restarts/restarts/application-cleanup-recovery-publication-fence-durable.arrival.json",
+      "sha256": "057b71d90dc4d7352942deb6a2cb2f69705c13f5d63a4974dc374c6c4a39c59f"
+    },
+    {
+      "path": "docs/r2/evidence/m9b-recovery-v2/restarts/restarts/application-cleanup-recovery-publication-fence-durable.json",
+      "sha256": "696910fc12a92801b35d98ddf7fee778e338a2c4df0ba5a4f244c745bb391ff0"
+    },
+    {
+      "path": "docs/r2/evidence/m9b-recovery-v2/restarts/restarts/application-delete-recovery-deletion-attestations-durable.armed.json",
+      "sha256": "e00e6cacf69913af8c52c3d5e848018df7d235255ff47031fe1753281d2f922a"
+    },
+    {
+      "path": "docs/r2/evidence/m9b-recovery-v2/restarts/restarts/application-delete-recovery-deletion-attestations-durable.arrival.json",
+      "sha256": "32949d421ad0c32eb3a7db30c2da63dc0666c82b67858237f5efe44ec37e70e5"
+    },
+    {
+      "path": "docs/r2/evidence/m9b-recovery-v2/restarts/restarts/application-delete-recovery-deletion-attestations-durable.json",
+      "sha256": "cc470cbae7bc51a17ed584f523add3d922c68009420b1d8007d88386717fa063"
+    },
+    {
+      "path": "docs/r2/evidence/m9b-recovery-v2/restarts/restarts/application-delete-recovery-deletion-fence-durable.armed.json",
+      "sha256": "a7247418b6758713f47130436dba084b36c107911a1f56c7676a25dde6d6f75d"
+    },
+    {
+      "path": "docs/r2/evidence/m9b-recovery-v2/restarts/restarts/application-delete-recovery-deletion-fence-durable.arrival.json",
+      "sha256": "6d8e168b7945bd1a5223709a99f9351a4728f0c83168bd882747082881894a93"
+    },
+    {
+      "path": "docs/r2/evidence/m9b-recovery-v2/restarts/restarts/application-delete-recovery-deletion-fence-durable.json",
+      "sha256": "17b518ebcede7fa5f0e87fec68927a7b179478b224182771a233e73fda56c094"
+    },
+    {
+      "path": "docs/r2/evidence/m9b-recovery-v2/restarts/restarts/application-delete-recovery-deletion-headers-durable.armed.json",
+      "sha256": "4168ac91c289f3a518f994019872695847203d77d85e0bd0aae8f7e6fe4feb02"
+    },
+    {
+      "path": "docs/r2/evidence/m9b-recovery-v2/restarts/restarts/application-delete-recovery-deletion-headers-durable.arrival.json",
+      "sha256": "550b9cf93d1641962ea86aaed24bc8c5cba5d8ff4906e90046ca9193ca96ca5a"
+    },
+    {
+      "path": "docs/r2/evidence/m9b-recovery-v2/restarts/restarts/application-delete-recovery-deletion-headers-durable.json",
+      "sha256": "228d4517c0803268a7129050793fa1205d9dbe98a9478f76e00647cb0978dd6e"
+    },
+    {
+      "path": "docs/r2/evidence/m9b-recovery-v2/restarts/restarts/application-delete-recovery-deletion-integrities-durable.armed.json",
+      "sha256": "99864aee8130c7261f735309429ce79cb36435b02b8a56c457dd3be6e84c8642"
+    },
+    {
+      "path": "docs/r2/evidence/m9b-recovery-v2/restarts/restarts/application-delete-recovery-deletion-integrities-durable.arrival.json",
+      "sha256": "4633fb38d0b8bbeb16aeee1a656c4fb9f8d01cdf69d4c922c7817fbf7ae8e905"
+    },
+    {
+      "path": "docs/r2/evidence/m9b-recovery-v2/restarts/restarts/application-delete-recovery-deletion-integrities-durable.json",
+      "sha256": "9917e7d1906bd7b5a2f4b3359b21942919de266b94c280d2cb0839f91c86bd3d"
+    },
+    {
+      "path": "docs/r2/evidence/m9b-recovery-v2/restarts/restarts/application-delete-recovery-deletion-payloads-durable.armed.json",
+      "sha256": "ac61061815bab2183aebdf762d7caca34d7fec59392b570be6b85c00ec072fea"
+    },
+    {
+      "path": "docs/r2/evidence/m9b-recovery-v2/restarts/restarts/application-delete-recovery-deletion-payloads-durable.arrival.json",
+      "sha256": "568f14e485bd1e3212cc3e611ac6e461eb0c268fbe0a8247c2f8781b8bbb756c"
+    },
+    {
+      "path": "docs/r2/evidence/m9b-recovery-v2/restarts/restarts/application-delete-recovery-deletion-payloads-durable.json",
+      "sha256": "8626c2bba31cad1a329a8544ecf995f89df2551db6329626f7b1e46cdbbb2d97"
+    },
+    {
+      "path": "docs/r2/evidence/m9b-recovery-v2/restarts/restarts/application-delete-recovery-deletion-plan-durable.armed.json",
+      "sha256": "dcb133a5d78312d4aa0acd3ad46b8047e2a0277f59efbf6e5a05ad38da25267b"
+    },
+    {
+      "path": "docs/r2/evidence/m9b-recovery-v2/restarts/restarts/application-delete-recovery-deletion-plan-durable.arrival.json",
+      "sha256": "e42bc49cb9f8f4c850a504f6410486eb0c73a562e0b5663cf280c454c33e52a3"
+    },
+    {
+      "path": "docs/r2/evidence/m9b-recovery-v2/restarts/restarts/application-delete-recovery-deletion-plan-durable.json",
+      "sha256": "88893a742c554dce6df98e1a0f8c3ab4535bcc421a9f2b9bd8c5821ed75543b0"
+    },
+    {
+      "path": "docs/r2/evidence/m9b-recovery-v2/restarts/restarts/application-delete-recovery-deletion-receipt-durable.armed.json",
+      "sha256": "8b70e24317fc25a6f420e02be8e0ac731dec115150382d1e465ba44368025487"
+    },
+    {
+      "path": "docs/r2/evidence/m9b-recovery-v2/restarts/restarts/application-delete-recovery-deletion-receipt-durable.arrival.json",
+      "sha256": "0166515b232b5f1dd600e90a22ed9b499c80427c6596e607dd2f19f8f20163c4"
+    },
+    {
+      "path": "docs/r2/evidence/m9b-recovery-v2/restarts/restarts/application-delete-recovery-deletion-receipt-durable.json",
+      "sha256": "19717734fc58a29c0b3df9b67b74f568527bc8a0c6765674828327b30656eca3"
+    },
+    {
+      "path": "docs/r2/evidence/m9b-recovery-v2/restarts/restarts/application-expire-expiry-committed.armed.json",
+      "sha256": "e16b3afdc7e94cd514248af76cbeb22e9541cb085e9e6778a468ca063ad14f5f"
+    },
+    {
+      "path": "docs/r2/evidence/m9b-recovery-v2/restarts/restarts/application-expire-expiry-committed.arrival.json",
+      "sha256": "b6cdf67d1464864aab0c7c72cdeb10ea59dd5629154ea0aa7e14948adff3fa7a"
+    },
+    {
+      "path": "docs/r2/evidence/m9b-recovery-v2/restarts/restarts/application-expire-expiry-committed.json",
+      "sha256": "249b42d790f55c7ddb0d13ccd3259627c4eba196193843bd67d6604ed3851292"
+    },
+    {
+      "path": "docs/r2/evidence/m9b-recovery-v2/restarts/restarts/application-reconstruct-reconstruction-checkpoint-committed.armed.json",
+      "sha256": "570b2009ce821a666194bd1835f43428ab9ac64da40cdc269caf40a1cd938ee5"
+    },
+    {
+      "path": "docs/r2/evidence/m9b-recovery-v2/restarts/restarts/application-reconstruct-reconstruction-checkpoint-committed.arrival.json",
+      "sha256": "3bfc1251acc9484645068b0ffefab510fd4634e084fd649033c0ff5a2f7838b2"
+    },
+    {
+      "path": "docs/r2/evidence/m9b-recovery-v2/restarts/restarts/application-reconstruct-reconstruction-checkpoint-committed.json",
+      "sha256": "8a0c440da9ebeff0963463f9095e630c30159db40f00bb11794cf62a9839ba84"
+    },
+    {
+      "path": "docs/r2/evidence/m9b-recovery-v2/restarts/restarts/application-reconstruct-reconstruction-fenced.armed.json",
+      "sha256": "7fcc01dc43ffe1287808e5563820f8392f96c2cf6376b4cda4429ef3bbf87ae6"
+    },
+    {
+      "path": "docs/r2/evidence/m9b-recovery-v2/restarts/restarts/application-reconstruct-reconstruction-fenced.arrival.json",
+      "sha256": "fdc2eb8da87df272985cfb5ce4984589b49e18dc3764ac45ffbbec085578ccda"
+    },
+    {
+      "path": "docs/r2/evidence/m9b-recovery-v2/restarts/restarts/application-reconstruct-reconstruction-fenced.json",
+      "sha256": "913571fe6d1dc22126833f471a77cb5bda354da7cf04b77b040b9cb5a205d5a8"
+    },
+    {
+      "path": "docs/r2/evidence/m9b-recovery-v2/restarts/restarts/issuer-admit-custodian-claim-custody-durable.armed.json",
+      "sha256": "308b6b4d461be54c4e6c9f5dc22969b1e78a4d54e44718f6cb37b35a1beb0752"
+    },
+    {
+      "path": "docs/r2/evidence/m9b-recovery-v2/restarts/restarts/issuer-admit-custodian-claim-custody-durable.arrival.json",
+      "sha256": "483717614cbc825bab2d91b53bf63b76e5ad936bf28564701051af3fec19798d"
+    },
+    {
+      "path": "docs/r2/evidence/m9b-recovery-v2/restarts/restarts/issuer-admit-custodian-claim-custody-durable.json",
+      "sha256": "e3dbee1ada829e58d78c62112923e19ec8a88b5cbcd8177817088dbcd19246fe"
+    },
+    {
+      "path": "docs/r2/evidence/m9b-recovery-v2/restarts/restarts/issuer-admit-custodian-command-index-durable.armed.json",
+      "sha256": "075291e045ca1dcde4ca2d9f2577f34459aacb7cd2b80cdb0f80f7efdd9f3ac4"
+    },
+    {
+      "path": "docs/r2/evidence/m9b-recovery-v2/restarts/restarts/issuer-admit-custodian-command-index-durable.arrival.json",
+      "sha256": "6adb17b9a260cdd1816d38e2dc6b5094d0b9beb24992e151089e202ad55b1745"
+    },
+    {
+      "path": "docs/r2/evidence/m9b-recovery-v2/restarts/restarts/issuer-admit-custodian-command-index-durable.json",
+      "sha256": "687d9d2317478598661d61d853921b52d00c3223d6d13ecd5dd3252656614019"
+    },
+    {
+      "path": "docs/r2/evidence/m9b-recovery-v2/restarts/restarts/issuer-admit-custodian-comparison-durable.armed.json",
+      "sha256": "8b42527e7ecdc187bb84896939bedffce5b4765cce7efed9a053e982842168d3"
+    },
+    {
+      "path": "docs/r2/evidence/m9b-recovery-v2/restarts/restarts/issuer-admit-custodian-comparison-durable.arrival.json",
+      "sha256": "422ce7d6ff06c210f3d567eb5f96563606a0ac61fe55eebfb7c2cac1b482e77b"
+    },
+    {
+      "path": "docs/r2/evidence/m9b-recovery-v2/restarts/restarts/issuer-admit-custodian-comparison-durable.json",
+      "sha256": "675c582559d656d6c4d27182c5d0a6ab361bdb559c2b62d2639ae4dfd9e475a7"
+    },
+    {
+      "path": "docs/r2/evidence/m9b-recovery-v2/restarts/restarts/issuer-admit-custodian-original-header-durable.armed.json",
+      "sha256": "a706c410be1b777dfe8d93dfff6251a48282ad0222b56df3913d5c8c8f37a719"
+    },
+    {
+      "path": "docs/r2/evidence/m9b-recovery-v2/restarts/restarts/issuer-admit-custodian-original-header-durable.arrival.json",
+      "sha256": "841762a82fac0daa0b0d9ddab7de93c87bc27ab3986aaff7767fc8683dd07129"
+    },
+    {
+      "path": "docs/r2/evidence/m9b-recovery-v2/restarts/restarts/issuer-admit-custodian-original-header-durable.json",
+      "sha256": "7f0cd4aac31b763518b1400d4ce8ecf982fc65487aaf731d5649b1f9080c60a4"
+    },
+    {
+      "path": "docs/r2/evidence/m9b-recovery-v2/restarts/restarts/issuer-admit-custodian-upload-index-durable.armed.json",
+      "sha256": "4b366b8287977d7376a77d24f6460620079a8cd85fa399ae094a3dbff65d2ec9"
+    },
+    {
+      "path": "docs/r2/evidence/m9b-recovery-v2/restarts/restarts/issuer-admit-custodian-upload-index-durable.arrival.json",
+      "sha256": "5d59e753557d975559941989b64dc3537e5d0af2f108a31912567fadad6689b0"
+    },
+    {
+      "path": "docs/r2/evidence/m9b-recovery-v2/restarts/restarts/issuer-admit-custodian-upload-index-durable.json",
+      "sha256": "7d772c7c8b1421ae8e1772d84a4faae6ca547cfbaf134e57d4f74f0df4135ab5"
+    },
+    {
+      "path": "docs/r2/evidence/m9b-recovery-v2/restarts/restarts/issuer-admit-issuer-header-seal-durable.armed.json",
+      "sha256": "181d0fade8c95a8b5b94252ed084addefa4275282219bfc1f4de03c5e4111a1b"
+    },
+    {
+      "path": "docs/r2/evidence/m9b-recovery-v2/restarts/restarts/issuer-admit-issuer-header-seal-durable.arrival.json",
+      "sha256": "d6b9ca45606fd5b5d2d8399c842b9aa016845cc1ecae56fa3a31bcb8379f4726"
+    },
+    {
+      "path": "docs/r2/evidence/m9b-recovery-v2/restarts/restarts/issuer-admit-issuer-header-seal-durable.json",
+      "sha256": "07422168f88a239167288e20db9e44d2c77179bb20d57b47bfd0dcec599165c3"
+    },
+    {
+      "path": "docs/r2/evidence/m9b-recovery-v2/restarts/restarts/issuer-admit-issuer-material-manual-native-index-seal-durable.armed.json",
+      "sha256": "b17cd0c44be004777384b1210c7bd89f635f76b701068329a3566ac706f584d6"
+    },
+    {
+      "path": "docs/r2/evidence/m9b-recovery-v2/restarts/restarts/issuer-admit-issuer-material-manual-native-index-seal-durable.arrival.json",
+      "sha256": "a8c849dcd08cc17e6b8e676bc1c0d7076c682d832e80f047a52cc415a00711fd"
+    },
+    {
+      "path": "docs/r2/evidence/m9b-recovery-v2/restarts/restarts/issuer-admit-issuer-material-manual-native-index-seal-durable.json",
+      "sha256": "ca9fd85496550231a9cf73c749ac171dca1684d13c3d9b3a99a6e710b43fa39e"
+    },
+    {
+      "path": "docs/r2/evidence/m9b-recovery-v2/restarts/restarts/issuer-admit-issuer-material-native-field-1-seal-durable.armed.json",
+      "sha256": "221ba6d36bfd20a8e7642aeb1af7b065d4ac7271adfab539e55da7bb20ba2446"
+    },
+    {
+      "path": "docs/r2/evidence/m9b-recovery-v2/restarts/restarts/issuer-admit-issuer-material-native-field-1-seal-durable.arrival.json",
+      "sha256": "995f6023c8875f4e988fe0a19a434b8a1d27fa9fa67f48a300b6524d510f2dae"
+    },
+    {
+      "path": "docs/r2/evidence/m9b-recovery-v2/restarts/restarts/issuer-admit-issuer-material-native-field-1-seal-durable.json",
+      "sha256": "910e3c3593f5496d920c6934cda263e42a8108def71afe573405c23a2bde9eb8"
+    },
+    {
+      "path": "docs/r2/evidence/m9b-recovery-v2/restarts/restarts/issuer-admit-issuer-material-native-field-2-seal-durable.armed.json",
+      "sha256": "4595f14b792960893c4ecedde229fe90ed703f70c23558439f88f0abff3b87be"
+    },
+    {
+      "path": "docs/r2/evidence/m9b-recovery-v2/restarts/restarts/issuer-admit-issuer-material-native-field-2-seal-durable.arrival.json",
+      "sha256": "f8e4b6cc8fdb94a6fb4e6c09b1381181eb20ef0617a21465bc091b2a47d68ce4"
+    },
+    {
+      "path": "docs/r2/evidence/m9b-recovery-v2/restarts/restarts/issuer-admit-issuer-material-native-field-2-seal-durable.json",
+      "sha256": "cea18050b8b03c2c41bdd55882e195dbc617f32fb342002d0a52f4eaed7ba33e"
+    },
+    {
+      "path": "docs/r2/evidence/m9b-recovery-v2/restarts/restarts/issuer-admit-issuer-material-raw-page-seal-durable.armed.json",
+      "sha256": "c402f2494074ea4d6584361263f3dee88795c9abd9743676069d9a3ed2fe36b8"
+    },
+    {
+      "path": "docs/r2/evidence/m9b-recovery-v2/restarts/restarts/issuer-admit-issuer-material-raw-page-seal-durable.arrival.json",
+      "sha256": "0bb5d7f106727226acd0dca8780dc2ff86d82788867c56a916fa533451f9687e"
+    },
+    {
+      "path": "docs/r2/evidence/m9b-recovery-v2/restarts/restarts/issuer-admit-issuer-material-raw-page-seal-durable.json",
+      "sha256": "9b903b762b10acd94e676e25bfdd41cbc4081ba40de4d0c4c9f91417591d241e"
+    },
+    {
+      "path": "docs/r2/evidence/m9b-recovery-v2/restarts/restarts/issuer-admit-issuer-material-source-identity-1-seal-durable.armed.json",
+      "sha256": "f00a0ec0135e24a4b3e90c93cc55311943f2f0a27a0445bed3386fae8cea8c3c"
+    },
+    {
+      "path": "docs/r2/evidence/m9b-recovery-v2/restarts/restarts/issuer-admit-issuer-material-source-identity-1-seal-durable.arrival.json",
+      "sha256": "40b05c2481da93b14af68daec90ade25b5c785f241cc079ceba71d46bd933ced"
+    },
+    {
+      "path": "docs/r2/evidence/m9b-recovery-v2/restarts/restarts/issuer-admit-issuer-material-source-identity-1-seal-durable.json",
+      "sha256": "6291a79d9c7003be16b70fdb4037f28168d2d89806b9561e9f8d486b59f26a44"
+    },
+    {
+      "path": "docs/r2/evidence/m9b-recovery-v2/restarts/restarts/issuer-admit-issuer-material-source-identity-2-seal-durable.armed.json",
+      "sha256": "6bdf5a0cf7df4b8ee63e3f0bf24d38e4a4600751aca9e15663527c1ad6b735ba"
+    },
+    {
+      "path": "docs/r2/evidence/m9b-recovery-v2/restarts/restarts/issuer-admit-issuer-material-source-identity-2-seal-durable.arrival.json",
+      "sha256": "d1406287861a71bfee56d0e160b324676d84be699a2fcfe076430d477c23a03e"
+    },
+    {
+      "path": "docs/r2/evidence/m9b-recovery-v2/restarts/restarts/issuer-admit-issuer-material-source-identity-2-seal-durable.json",
+      "sha256": "1a6e3bc01e4e15090b62f6d1dbbe4639ab814d4cb8d67b1b72d3dd35c2564ea1"
+    },
+    {
+      "path": "docs/r2/evidence/m9b-recovery-v2/restarts/restarts/issuer-admit-publication-attestations-durable.armed.json",
+      "sha256": "11e2c5123c8c9e87df3524828ec9566f97fcd48a1e7a7a065f45037e952e371e"
+    },
+    {
+      "path": "docs/r2/evidence/m9b-recovery-v2/restarts/restarts/issuer-admit-publication-attestations-durable.arrival.json",
+      "sha256": "423aa6f4467af8e5127cebcd82fb3497a3fc24ee067be7ee377edd1f9810323f"
+    },
+    {
+      "path": "docs/r2/evidence/m9b-recovery-v2/restarts/restarts/issuer-admit-publication-attestations-durable.json",
+      "sha256": "250125d459275c38989db790f7b0dbf646cff6412ed5789416f78392d59777f7"
+    },
+    {
+      "path": "docs/r2/evidence/m9b-recovery-v2/restarts/restarts/issuer-admit-publication-complete.armed.json",
+      "sha256": "5d5c47dc935722072f7765c38b230c7b3208e638ecc6975250cbc5a29438b05e"
+    },
+    {
+      "path": "docs/r2/evidence/m9b-recovery-v2/restarts/restarts/issuer-admit-publication-complete.arrival.json",
+      "sha256": "b414adb0f8b1077541a4ff427693cbfd2baba4c7a31450aa5193219d45775203"
+    },
+    {
+      "path": "docs/r2/evidence/m9b-recovery-v2/restarts/restarts/issuer-admit-publication-complete.json",
+      "sha256": "b6e8cefbc7f97dee57fa206e9fda64e7535f9189ab327ffd291ec49b65f50ae1"
+    },
+    {
+      "path": "docs/r2/evidence/m9b-recovery-v2/restarts/restarts/issuer-admit-publication-header-durable.armed.json",
+      "sha256": "04172a2817882daf318ab901902d3ec745993e439c6c67a3fc151db2537b5483"
+    },
+    {
+      "path": "docs/r2/evidence/m9b-recovery-v2/restarts/restarts/issuer-admit-publication-header-durable.arrival.json",
+      "sha256": "d68f0c1fcfe7299d8823473ece5326c11817c3331b3a8f151581e9a9bf7b7c69"
+    },
+    {
+      "path": "docs/r2/evidence/m9b-recovery-v2/restarts/restarts/issuer-admit-publication-header-durable.json",
+      "sha256": "c5d547ac8ec912219f03419b4b4c27416ae2cc344b1a66f6e03248f0a16038bd"
+    },
+    {
+      "path": "docs/r2/evidence/m9b-recovery-v2/restarts/restarts/issuer-admit-publication-integrities-durable.armed.json",
+      "sha256": "d75b2a4d69ea96a0da3295c3d19560b7f1a09586277cd168b2cf27d96b480faa"
+    },
+    {
+      "path": "docs/r2/evidence/m9b-recovery-v2/restarts/restarts/issuer-admit-publication-integrities-durable.arrival.json",
+      "sha256": "c696b6b140bebd4d2b502cd6d368b53a05dfd5c6a2206a5a61eff961de536000"
+    },
+    {
+      "path": "docs/r2/evidence/m9b-recovery-v2/restarts/restarts/issuer-admit-publication-integrities-durable.json",
+      "sha256": "587f14fd73774b37cb8d0d3cdec000e4f025312ad85a4eba3353634721f51167"
+    },
+    {
+      "path": "docs/r2/evidence/m9b-recovery-v2/restarts/restarts/issuer-admit-publication-payloads-durable.armed.json",
+      "sha256": "92a26ec4af86e0164f8503bf14cc7a8a541c2118d086483de61522a9a7482ccb"
+    },
+    {
+      "path": "docs/r2/evidence/m9b-recovery-v2/restarts/restarts/issuer-admit-publication-payloads-durable.arrival.json",
+      "sha256": "09a44e74848091724ec548e5224310f73796e2705da767a58ddb9c27cf4a66dc"
+    },
+    {
+      "path": "docs/r2/evidence/m9b-recovery-v2/restarts/restarts/issuer-admit-publication-payloads-durable.json",
+      "sha256": "0ce07830098c9ba3360cd67c75926bf81ea3dd14534af5a14884c6a93bd829c5"
+    },
+    {
+      "path": "docs/r2/evidence/m9b-recovery-v2/restarts/restarts/issuer-close-custodian-comparison-unlinked.armed.json",
+      "sha256": "93b7bb84d5904b24ab87889ae8df3d78b8afb929ea4d4235a9c436765b335aef"
+    },
+    {
+      "path": "docs/r2/evidence/m9b-recovery-v2/restarts/restarts/issuer-close-custodian-comparison-unlinked.arrival.json",
+      "sha256": "cd98692a382fa2b01f610d8afdf789bc223aa59f949f701c4618121b2f9e3379"
+    },
+    {
+      "path": "docs/r2/evidence/m9b-recovery-v2/restarts/restarts/issuer-close-custodian-comparison-unlinked.json",
+      "sha256": "e0e7bb1f0fc48ee3cebe83bc53caa8e21929ea471167b69ced450842acae2519"
+    },
+    {
+      "path": "docs/r2/evidence/m9b-recovery-v2/restarts/restarts/issuer-close-custodian-header-unlinked.armed.json",
+      "sha256": "8d06dee8911756eaa8923b0b8b7feba47832bb09a60bb9d23167f1001ef42859"
+    },
+    {
+      "path": "docs/r2/evidence/m9b-recovery-v2/restarts/restarts/issuer-close-custodian-header-unlinked.arrival.json",
+      "sha256": "3dfdb9482e7efdb82b211b30aa9f4bf97b8ef84bc0e29a1eefaf246c0974a5e9"
+    },
+    {
+      "path": "docs/r2/evidence/m9b-recovery-v2/restarts/restarts/issuer-close-custodian-header-unlinked.json",
+      "sha256": "5150e800f5b74f9f0d9130dbe434aa6e5faf4cecf1d7da2f11528edebf2c141c"
+    },
+    {
+      "path": "docs/r2/evidence/m9b-recovery-v2/restarts/restarts/issuer-close-custodian-material-seal-unlinked.armed.json",
+      "sha256": "1d14c70be211dd4a0f0949c63ff7b35e836014722745c503ff356548f9c60046"
+    },
+    {
+      "path": "docs/r2/evidence/m9b-recovery-v2/restarts/restarts/issuer-close-custodian-material-seal-unlinked.arrival.json",
+      "sha256": "f43bd3efca137fc6951434025217a552b74bb1fabc67c7f3051f76a56b98e785"
+    },
+    {
+      "path": "docs/r2/evidence/m9b-recovery-v2/restarts/restarts/issuer-close-custodian-material-seal-unlinked.json",
+      "sha256": "d7ef70346d8344feb3d66a42523ccd6a778ae49f4c1bd33e9d5b0f19e52765ff"
+    },
+    {
+      "path": "docs/r2/evidence/m9b-recovery-v2/restarts/restarts/issuer-close-custodian-original-unlinked.armed.json",
+      "sha256": "2fa586a08a9c29cc24a9c2c7a72dc93441b95fb38d2f045f3f789cc9165f8947"
+    },
+    {
+      "path": "docs/r2/evidence/m9b-recovery-v2/restarts/restarts/issuer-close-custodian-original-unlinked.arrival.json",
+      "sha256": "d22b566aef4e20356297fc8b8fc8cf59807ca02bfbe4975926c02193593ccb14"
+    },
+    {
+      "path": "docs/r2/evidence/m9b-recovery-v2/restarts/restarts/issuer-close-custodian-original-unlinked.json",
+      "sha256": "52a698d60423834fe570d1c0f0304d160209876d35fd4241286f81231fd4703d"
+    },
+    {
+      "path": "docs/r2/evidence/m9b-recovery-v2/restarts/restarts/issuer-close-custodian-private-object-unlinked.armed.json",
+      "sha256": "808321509ff6e2698686d7ca9039294b41e71bacf9ffb6370d7cd47f906496ff"
+    },
+    {
+      "path": "docs/r2/evidence/m9b-recovery-v2/restarts/restarts/issuer-close-custodian-private-object-unlinked.arrival.json",
+      "sha256": "577428265e2f04b41c106a7d65a6a1a827c7ef5764af7f50f6f014aca9f6d90b"
+    },
+    {
+      "path": "docs/r2/evidence/m9b-recovery-v2/restarts/restarts/issuer-close-custodian-private-object-unlinked.json",
+      "sha256": "cd766d9acc6c7e9c6b9cd8d216d3724452ce807a61564995beece3fdb042e1c6"
+    },
+    {
+      "path": "docs/r2/evidence/m9b-recovery-v2/restarts/restarts/issuer-close-custodian-spend-plan-durable.armed.json",
+      "sha256": "88ae805779ffc6e1becab58108583e34b7afbf6b09545b9b46a7b2201075948f"
+    },
+    {
+      "path": "docs/r2/evidence/m9b-recovery-v2/restarts/restarts/issuer-close-custodian-spend-plan-durable.arrival.json",
+      "sha256": "45ce9ee9c127945d89b8f50af2e9c735eb4feb2bed16db8d2e8d504100f4785b"
+    },
+    {
+      "path": "docs/r2/evidence/m9b-recovery-v2/restarts/restarts/issuer-close-custodian-spend-plan-durable.json",
+      "sha256": "f8fd78ee11b23624b77baee75fb7ad2fab8b8594ce6ace7a20799f48d8888f16"
+    },
+    {
+      "path": "docs/r2/evidence/m9b-recovery-v2/restarts/restarts/issuer-close-custodian-spend-receipt-durable.armed.json",
+      "sha256": "7eba2070ec748685ec61ac1f471c0b5205b03a373b41c51d06338bf2fdd5cce3"
+    },
+    {
+      "path": "docs/r2/evidence/m9b-recovery-v2/restarts/restarts/issuer-close-custodian-spend-receipt-durable.arrival.json",
+      "sha256": "7baab7912cbea82438dc07f2531175fe0ae74d5dc007ccb3bfdf8d736329caad"
+    },
+    {
+      "path": "docs/r2/evidence/m9b-recovery-v2/restarts/restarts/issuer-close-custodian-spend-receipt-durable.json",
+      "sha256": "c5cc21164513bc21114bd7914b86d054a1e2fef62025f9cd4655cfa4e9e84bbb"
+    },
+    {
+      "path": "docs/r2/evidence/m9b-recovery-v2/restarts/restarts/issuer-close-custodian-spent-fence-durable.armed.json",
+      "sha256": "9498bf6b7b82b5466b951e2c825349bd54edde9f7a69a26162ee3cb2a9d1c762"
+    },
+    {
+      "path": "docs/r2/evidence/m9b-recovery-v2/restarts/restarts/issuer-close-custodian-spent-fence-durable.arrival.json",
+      "sha256": "e0f84111ebe2f62137e222b6f1d5a6585003f8b3a05bb2d64743690c2ab67e54"
+    },
+    {
+      "path": "docs/r2/evidence/m9b-recovery-v2/restarts/restarts/issuer-close-custodian-spent-fence-durable.json",
+      "sha256": "09e0e248e8cac977fbcf20aa92d3facb61b4ef541f22c3d885f1fd5ebf465203"
+    },
+    {
+      "path": "docs/r2/evidence/m9b-recovery-v2/restarts/restarts/issuer-close-custodian-spent-state-durable.armed.json",
+      "sha256": "74311930aa5fc44ca38755d79e6054e9cad4c571f95899a46fd2dc3fc70a2add"
+    },
+    {
+      "path": "docs/r2/evidence/m9b-recovery-v2/restarts/restarts/issuer-close-custodian-spent-state-durable.arrival.json",
+      "sha256": "9c1008ed804fb0812738505bc3dd21e67705b13a5833209425aed079b0078aeb"
+    },
+    {
+      "path": "docs/r2/evidence/m9b-recovery-v2/restarts/restarts/issuer-close-custodian-spent-state-durable.json",
+      "sha256": "c762544d2cd6244e12ead5bf2f91d31f218ebcbcdfed3abbebd035c8e0df0591"
+    },
+    {
+      "path": "docs/r2/evidence/m9b-recovery-v2/restarts/restarts/issuer-close-custodian-temporary-unlinked.armed.json",
+      "sha256": "f08499f84103a19000e7927ac19116bd2affbb393e39c058103e9d5ddc21b0dc"
+    },
+    {
+      "path": "docs/r2/evidence/m9b-recovery-v2/restarts/restarts/issuer-close-custodian-temporary-unlinked.arrival.json",
+      "sha256": "3389fd08c15d13920da199e5e4afc1a84b6736b900bdbf9f6e04d034f0ad199e"
+    },
+    {
+      "path": "docs/r2/evidence/m9b-recovery-v2/restarts/restarts/issuer-close-custodian-temporary-unlinked.json",
+      "sha256": "1e845a212a095c50d0ff59f6a1d170cecce40876d8e7aaa300604458ca090470"
+    },
+    {
+      "path": "docs/r2/evidence/m9b-recovery-v2/ruff.log",
+      "sha256": "82b3e6a6c090a57601d22943bd23fca9218d1031dbe5a7b754092f9a156b4f18"
+    },
+    {
+      "path": "docs/r2/evidence/m9b-recovery-v2/ruff.result.json",
+      "sha256": "38eea369c163295e1d1740c189a25ba4289dc79b389285ba90b68086fd2d2b71"
+    },
+    {
+      "path": "docs/r2/evidence/m9b-recovery-v2/scope.log",
+      "sha256": "28061924ea2639d25d1b1e7763adf63250e00384c8dd701fae82c4575803ad21"
+    },
+    {
+      "path": "docs/r2/evidence/m9b-recovery-v2/scope.result.json",
+      "sha256": "01cc065ec17593c3e5f2d364a1f740be997c6ec0c7c482f1e4b998b16a371ac2"
+    },
+    {
+      "path": "docs/r2/evidence/m9b-recovery-v2/tests.junit.xml",
+      "sha256": "a744c4d17dd7dffaf4868fac2c9f57aadc66bc48d866cbc9af4fe7f63f65416a"
+    },
+    {
+      "path": "docs/r2/evidence/m9b-recovery-v2/tests.log",
+      "sha256": "ff839be78ae0955d3679df60577b131d129e2c09841b1ea4c3e64a0a06105bf5"
+    },
+    {
+      "path": "docs/r2/evidence/m9b-recovery-v2/tests.result.json",
+      "sha256": "ec7311a20e299ff36c5d96d97ea9ab336cb1b398b1ca65561123fa744a2fc222"
+    },
+    {
+      "path": "docs/r2/evidence/m9b-recovery-v2/types.log",
+      "sha256": "56882e01cb80173ef053c4096e4ee43e3123a15f5c0a06715f96988d48fbd91c"
+    },
+    {
+      "path": "docs/r2/evidence/m9b-recovery-v2/types.result.json",
+      "sha256": "bc7fede2a7b98d8f143c3712525e9ba258d4895983252c3e064a885d21807ebf"
+    }
+  ],
+  "limits": [
+    "Selected-domain gates only: the complete backend suite was not run (sponsor rule 2026-10-14: explicit related tests; full suite only on explicit request).",
+    "Disposable PostgreSQL 18.6 container arcreel-m9b-disposable-20261019; restart cases run worker UIDs 31001/31002 in Docker; no real provider, credential or network call.",
+    "Graph coverage: the codebase-memory index does not cover this worktree; changed paths were read directly.",
+    "No independent acceptance, E global closure, production activation, push or merge is claimed."
+  ],
+  "created_at": "2026-10-29T16:46:32Z"
+}

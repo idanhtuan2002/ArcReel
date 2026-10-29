@@ -1,0 +1,29 @@
+{
+  "schema_version": "m9.command-result.v1",
+  "gate": "migration",
+  "tested_head": "7e6cccb457bbac6e4387371a05ca1cc6a9cbfb4a",
+  "argv": [
+    "/home/anhtuan/content-production-os/.worktrees/r2-v2-main/.venv/bin/python",
+    "-m",
+    "pytest",
+    "tests/integration/lib/db/migrations",
+    "-n",
+    "4",
+    "--dist",
+    "loadfile",
+    "-q",
+    "--basetemp=/tmp/claude-1000/-home-anhtuan-content-production-os/d4870d56-34f2-481b-bd28-fb82e19f6306/scratchpad/m9b-t10/out/migration-temp",
+    "--junitxml=/tmp/claude-1000/-home-anhtuan-content-production-os/d4870d56-34f2-481b-bd28-fb82e19f6306/scratchpad/m9b-t10/out/docs/r2/evidence/m9b-recovery-v2/migration.junit.xml"
+  ],
+  "exit": 0,
+  "passed": 166,
+  "skipped": 0,
+  "log": {
+    "path": "docs/r2/evidence/m9b-recovery-v2/migration.log",
+    "sha256": "e08fa5314ef0fa64549126dde5991b1e9055d4ca55558862d0b3b29ece7f0669"
+  },
+  "test_report": {
+    "path": "docs/r2/evidence/m9b-recovery-v2/migration.junit.xml",
+    "sha256": "4c4958f98c4420831e890b0bebab206eee00702c7dccf4be26c0a39a54afae7c"
+  }
+}

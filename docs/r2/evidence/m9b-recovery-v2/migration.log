@@ -1,0 +1,91 @@
+bringing up nodes...
+bringing up nodes...
+
+........................................................................ [ 43%]
+........................................................................ [ 86%]
+......................                                                   [100%]
+=============================== warnings summary ===============================
+tests/integration/lib/db/migrations/test_alembic_custom_provider_max_workers.py: 8 warnings
+tests/integration/lib/db/migrations/test_alembic_execution_attempts.py: 14 warnings
+tests/integration/lib/db/migrations/test_alembic_collapse_image_backend_buckets.py: 15 warnings
+tests/integration/lib/db/migrations/test_alembic_tasks_index_preservation.py: 8 warnings
+tests/integration/lib/db/migrations/test_alembic_atomic_master_promotion.py: 6 warnings
+tests/integration/lib/db/migrations/test_alembic_gate_receipt_tables.py: 6 warnings
+tests/integration/lib/db/migrations/test_alembic_m9_manual_admission.py: 3 warnings
+tests/integration/lib/db/migrations/test_alembic_task_endpoint_base_url_split.py: 5 warnings
+tests/integration/lib/db/migrations/test_alembic_asset_derivatives_table.py: 4 warnings
+tests/integration/lib/db/migrations/test_alembic_custom_provider_capability_overrides.py: 3 warnings
+tests/integration/lib/db/migrations/test_alembic_m8_exploration.py: 3 warnings
+tests/integration/lib/db/migrations/test_alembic_tasks_submitted_base_url.py: 3 warnings
+tests/integration/lib/db/migrations/test_alembic_adaptation_authority.py: 2 warnings
+tests/integration/lib/db/migrations/test_alembic_adaptation_profiles.py: 2 warnings
+tests/integration/lib/db/migrations/test_alembic_adaptation.py: 2 warnings
+tests/integration/lib/db/migrations/test_alembic_api_call_request_id.py: 2 warnings
+tests/integration/lib/db/migrations/test_alembic_budget_reservations.py: 2 warnings
+tests/integration/lib/db/migrations/test_alembic_split_default_image_backend.py: 4 warnings
+tests/integration/lib/db/migrations/test_alembic_canon_authority.py: 2 warnings
+tests/integration/lib/db/migrations/test_alembic_correlation_columns.py: 2 warnings
+tests/integration/lib/db/migrations/test_alembic_custom_endpoint_table.py: 2 warnings
+tests/integration/lib/db/migrations/test_alembic_gate_script_lock.py: 2 warnings
+tests/integration/lib/db/migrations/test_alembic_custom_provider_endpoint.py: 2 warnings
+tests/integration/lib/db/migrations/test_alembic_narrative_decision_authority.py: 2 warnings
+tests/integration/lib/db/migrations/test_alembic_narrative_lifecycle_evidence.py: 2 warnings
+tests/integration/lib/db/migrations/test_alembic_narrative_compilation.py: 2 warnings
+tests/integration/lib/db/migrations/test_alembic_narrative_handoff_admission.py: 2 warnings
+tests/integration/lib/db/migrations/test_alembic_narrative_plan.py: 2 warnings
+tests/integration/lib/db/migrations/test_alembic_generation_batches.py: 2 warnings
+tests/integration/lib/db/migrations/test_alembic_resource_type_dedupe_downgrade.py: 2 warnings
+tests/integration/lib/db/migrations/test_alembic_tasks_execution_checkpoint.py: 2 warnings
+tests/integration/lib/db/migrations/test_alembic_tasks_provider_endpoint.py: 2 warnings
+tests/integration/lib/db/migrations/test_alembic_screenplay_admission.py: 2 warnings
+tests/integration/lib/db/migrations/test_format_projections.py: 2 warnings
+tests/integration/lib/db/migrations/test_production_target_registry.py: 2 warnings
+tests/integration/lib/db/migrations/test_spatial_pair_authority.py: 2 warnings
+tests/integration/lib/db/migrations/test_spatial_frame_receipts.py: 2 warnings
+tests/integration/lib/db/migrations/test_alembic_last_provider_response.py: 1 warning
+tests/integration/lib/db/migrations/test_production_binding_authority.py: 2 warnings
+tests/integration/lib/db/migrations/test_alembic_supported_durations_backfill.py: 1 warning
+tests/integration/lib/db/migrations/test_spatial_review_custody.py: 2 warnings
+tests/integration/lib/db/migrations/test_alembic_task_dedup_user_scope.py: 1 warning
+tests/integration/lib/db/migrations/test_spatial_execution_evidence.py: 1 warning
+tests/integration/lib/db/migrations/test_learning_observations.py: 1 warning
+tests/integration/lib/db/migrations/test_alembic_drop_task_events_downgrade.py: 1 warning
+tests/integration/lib/db/migrations/test_spatial_promotion_sidecars.py: 1 warning
+tests/integration/lib/db/migrations/test_alembic_split_minimax_video_endpoints.py: 1 warning
+tests/integration/lib/db/migrations/test_spatial_pair_v2_custody.py: 1 warning
+tests/integration/lib/db/migrations/test_spatial_constraint_sets.py: 1 warning
+  /home/anhtuan/.local/share/uv/python/cpython-3.13.14-linux-x86_64-gnu/lib/python3.13/contextlib.py:148: SAWarning: Skipped unsupported reflection of expression-based index idx_tasks_dedupe_active
+    next(self.gen)
+
+tests/integration/lib/db/migrations/test_alembic_generation_batches.py::test_upgrade_adds_batches_without_changing_existing_tasks
+  /home/anhtuan/content-production-os/.worktrees/r2-m9b/tests/integration/lib/db/migrations/test_alembic_generation_batches.py:46: SAWarning: Skipped unsupported reflection of expression-based index idx_tasks_dedupe_active
+    indexes = {index["name"] for index in sa.inspect(conn).get_indexes("tasks")}
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+============================= slowest 25 durations =============================
+3.67s call     tests/integration/lib/db/migrations/test_alembic_tasks_index_preservation.py::test_full_chain_downgrade_only_drops_intentional_indexes
+2.26s call     tests/integration/lib/db/migrations/test_spatial_review_repository.py::test_postgres_long_transaction_cannot_consume_after_real_expiry
+2.09s call     tests/integration/lib/db/migrations/test_alembic_drop_task_events_downgrade.py::test_downgrade_rebuilds_task_events_with_named_fk
+1.77s call     tests/integration/lib/db/migrations/test_alembic_tasks_index_preservation.py::test_downgrade_keeps_indexes[ea2e1a477bbf]
+1.64s call     tests/integration/lib/db/migrations/test_alembic_tasks_index_preservation.py::test_downgrade_keeps_indexes[548f6ca3e91c]
+1.60s call     tests/integration/lib/db/migrations/test_alembic_tasks_index_preservation.py::test_downgrade_keeps_indexes[c4a91f7d2b18]
+1.47s call     tests/integration/lib/db/migrations/test_alembic_collapse_image_backend_buckets.py::test_downgrade_restores_default_over_emptied_bucket
+1.46s call     tests/integration/lib/db/migrations/test_alembic_m8_exploration.py::test_downgrade_removes_only_the_m8_tables
+1.38s call     tests/integration/lib/db/migrations/test_alembic_tasks_index_preservation.py::test_downgrade_keeps_indexes[26c2f9d11c8e]
+1.33s call     tests/integration/lib/db/migrations/test_spatial_pair_v2_custody.py::test_v2_custody_migration_and_scoped_foreign_keys
+1.33s call     tests/integration/lib/db/migrations/test_alembic_tasks_index_preservation.py::test_downgrade_keeps_indexes[285dbe1e9824]
+1.23s call     tests/integration/lib/db/migrations/test_alembic_collapse_image_backend_buckets.py::test_downgrade_keeps_existing_buckets
+1.23s call     tests/integration/lib/db/migrations/test_alembic_collapse_image_backend_buckets.py::test_downgrade_restores_buckets_from_default
+1.19s call     tests/integration/lib/db/migrations/test_alembic_tasks_index_preservation.py::test_downgrade_keeps_indexes[d4f8b1c73a20]
+1.16s call     tests/integration/lib/db/migrations/test_format_projections.py::test_format_genesis_previews_are_admitted_only_for_format_slots
+1.13s call     tests/integration/lib/db/migrations/test_spatial_promotion_sidecars.py::test_sidecar_tables_link_their_base_rows_and_authorities
+1.13s call     tests/integration/lib/db/migrations/test_production_binding_authority.py::test_binding_authority_revision_and_scoped_keys
+1.07s call     tests/integration/lib/db/migrations/test_spatial_pair_authority.py::test_pair_revision_scoped_keys_and_round_trip
+1.04s setup    tests/integration/lib/db/migrations/test_spatial_review_repository.py::test_review_repository_requires_two_exact_acknowledgments_and_detects_tampering
+1.03s call     tests/integration/lib/db/migrations/test_alembic_tasks_index_preservation.py::test_downgrade_keeps_indexes[a7c3e9d1f200]
+1.00s call     tests/integration/lib/db/migrations/test_alembic_collapse_image_backend_buckets.py::test_upgrade_exhausts_legacy_key_combinations[empty_buckets_with_default]
+0.97s call     tests/integration/lib/db/migrations/test_alembic_collapse_image_backend_buckets.py::test_upgrade_exhausts_legacy_key_combinations[equal_buckets_matching_default]
+0.96s call     tests/integration/lib/db/migrations/test_alembic_collapse_image_backend_buckets.py::test_upgrade_exhausts_legacy_key_combinations[bucket_without_slash_dropped]
+0.94s call     tests/integration/lib/db/migrations/test_spatial_review_custody.py::test_review_custody_revision_and_scoped_child_keys
+0.94s call     tests/integration/lib/db/migrations/test_spatial_frame_receipts.py::test_frame_receipt_migration_has_scoped_restrict_keys
+166 passed, 145 warnings in 28.81s

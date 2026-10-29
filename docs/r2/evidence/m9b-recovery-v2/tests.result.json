@@ -1,0 +1,52 @@
+{
+  "schema_version": "m9.command-result.v1",
+  "gate": "tests",
+  "tested_head": "7e6cccb457bbac6e4387371a05ca1cc6a9cbfb4a",
+  "argv": [
+    "/home/anhtuan/content-production-os/.worktrees/r2-v2-main/.venv/bin/python",
+    "-m",
+    "pytest",
+    "tests/integration/lib/db/repositories/test_opportunity_acquisition.py",
+    "tests/integration/lib/db/repositories/test_opportunity_manual_admission.py",
+    "tests/integration/r2/opportunity/test_acquisition_concurrency.py",
+    "tests/integration/r2/opportunity/test_acquisition_v2.py",
+    "tests/integration/scripts/r2/test_verify_m9b_recovery_scope.py",
+    "tests/integration/server/services/test_m9_evidence_store.py",
+    "tests/integration/server/services/test_m9_manual_custody_isolation.py",
+    "tests/integration/server/services/test_m9_manual_publication.py",
+    "tests/unit/r2/contracts/test_opportunity_acquisition_v2.py",
+    "tests/unit/r2/opportunity/test_acquisition_v2_digests.py",
+    "tests/unit/r2/opportunity/test_capabilities.py",
+    "tests/unit/r2/opportunity/test_manual_admission.py",
+    "tests/unit/r2/opportunity/test_manual_import.py",
+    "tests/unit/r2/opportunity/test_normalization.py",
+    "tests/unit/scripts/r2/test_run_m9b_recovery_gate.py",
+    "tests/unit/scripts/r2/test_verify_m9_scope.py",
+    "tests/unit/scripts/r2/test_verify_m9b_evidence.py",
+    "tests/unit/scripts/r2/test_verify_m9b_recovery_evidence.py",
+    "tests/unit/scripts/r2/test_verify_m9b_scope.py",
+    "tests/unit/server/routers/test_opportunity_acquisition_router.py",
+    "tests/unit/server/services/test_m9_manual_authenticity.py",
+    "tests/unit/server/routers/test_opportunity_router.py",
+    "tests/unit/lib/i18n/test_i18n_consistency.py",
+    "tests/unit/r2/contracts/test_opportunity.py",
+    "-n",
+    "4",
+    "--dist",
+    "loadfile",
+    "-q",
+    "--basetemp=/tmp/claude-1000/-home-anhtuan-content-production-os/d4870d56-34f2-481b-bd28-fb82e19f6306/scratchpad/m9b-t10/out/tests-temp",
+    "--junitxml=/tmp/claude-1000/-home-anhtuan-content-production-os/d4870d56-34f2-481b-bd28-fb82e19f6306/scratchpad/m9b-t10/out/docs/r2/evidence/m9b-recovery-v2/tests.junit.xml"
+  ],
+  "exit": 0,
+  "passed": 1030,
+  "skipped": 0,
+  "log": {
+    "path": "docs/r2/evidence/m9b-recovery-v2/tests.log",
+    "sha256": "ff839be78ae0955d3679df60577b131d129e2c09841b1ea4c3e64a0a06105bf5"
+  },
+  "test_report": {
+    "path": "docs/r2/evidence/m9b-recovery-v2/tests.junit.xml",
+    "sha256": "a744c4d17dd7dffaf4868fac2c9f57aadc66bc48d866cbc9af4fe7f63f65416a"
+  }
+}

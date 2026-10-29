@@ -1,0 +1,16 @@
+{
+  "schema_version": "m9.command-result.v1",
+  "gate": "imports",
+  "tested_head": "7e6cccb457bbac6e4387371a05ca1cc6a9cbfb4a",
+  "argv": [
+    "/home/anhtuan/content-production-os/.worktrees/r2-v2-main/.venv/bin/lint-imports"
+  ],
+  "exit": 0,
+  "passed": 0,
+  "skipped": 0,
+  "log": {
+    "path": "docs/r2/evidence/m9b-recovery-v2/imports.log",
+    "sha256": "add8e10fb73be2503802775c2aeee3267aabba81f0beff29d391f395c8cbe520"
+  },
+  "test_report": null
+}
