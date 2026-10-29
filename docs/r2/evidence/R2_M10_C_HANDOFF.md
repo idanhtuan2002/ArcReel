@@ -63,4 +63,7 @@ activated-host qualification + deploy (sudo), then M9-B.
 - C3 router done (`server/routers/quality.py`, registered in `server/app.py`; 5 PG route tests incl. full chain to READY,
   replay, seal tamper/other actor, agent refused, auth disabled). Next: C4 Quality page + Packaging prefill, then
   Codex implementation review.
+- C4 done `3671f2e5b` (Quality page, Packaging prefill; `pnpm check` 236 files/2650 tests). Probe route requalified
+  with host-v1 `525af5bab` (195 passed). Codex implementation review running (`m10-c-reviews/impl-codex-review.json`).
+  After acceptance: local Chrome acceptance with no scripts, then sponsor activated-host qualification + deploy, then M9-B.
 
