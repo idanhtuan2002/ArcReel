@@ -1,27 +1,34 @@
 /**
- * Quality review of an approved video (route `quality`): pick the master, publish a quality profile from the
- * template, run the two probes, record the Human review, seal the run and issue the disposition, then open the run
- * in Packaging. Each action is prepared on the server, shown for confirmation and submitted unchanged; nothing here
- * decides whether a video passes.
+ * Quality review of an approved video (route `quality`): pick the master and an exact profile revision, run the two
+ * probes, record the Human review, seal a run from chosen observations, issue the decision on a chosen run, then
+ * open that run in Packaging. Each action is prepared on the server, shown in full for confirmation and submitted
+ * unchanged; nothing here decides whether a video passes.
  */
 import "../../formats/ui/formats.css";
 import "../../packaging/ui/packaging.css";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
+import { useAuthStore } from "@/stores/auth-store";
+
 import {
+  commandOf,
   listMasters,
   listObservations,
+  listProbes,
   listProfiles,
+  listRevisions,
   listRuns,
   newCommandId,
-  pendingKey,
+  pendingPrefix,
   prepare,
   profileTemplate,
+  readRevision,
   submit,
   type Master,
   type Observation,
+  type ProbeAttempt,
   type Profile,
   type QualityAction,
   type RunEntry,
@@ -29,37 +36,46 @@ import {
 } from "../api/qualityClient";
 
 const CRITERIA = ["coherence", "on-screen-text", "audio-presence", "visible-defects"] as const;
+const REQUIREMENTS = ["technical-container", "technical-decode", "review"] as const;
 type Verdict = "PASS" | "FAIL";
+type FindingDraft = { rule_id: string; severity: "BLOCKING" | "ADVISORY"; locator: string };
 
 function errorMessage(error: unknown): string | null {
   return error instanceof Error && error.message ? error.message : null;
 }
 
-function readPending(key: string): Sealed | null {
+function storedPending(prefix: string): Sealed[] {
   try {
-    const raw = window.localStorage.getItem(key);
-    return raw ? (JSON.parse(raw) as Sealed) : null;
+    const found: Sealed[] = [];
+    for (let index = 0; index < window.localStorage.length; index += 1) {
+      const key = window.localStorage.key(index);
+      if (key?.startsWith(prefix)) found.push(JSON.parse(window.localStorage.getItem(key) ?? "null") as Sealed);
+    }
+    return found.filter(Boolean);
   } catch {
-    return null;
+    return [];
   }
 }
 
-function writePending(key: string, sealed: Sealed | null): void {
+function keep(prefix: string, sealed: Sealed, present: boolean): void {
   try {
-    if (sealed) window.localStorage.setItem(key, JSON.stringify(sealed));
+    const key = prefix + commandOf(sealed);
+    if (present) window.localStorage.setItem(key, JSON.stringify(sealed));
     else window.localStorage.removeItem(key);
   } catch {
-    // Browser storage is a convenience; the sealed request still works for this page session.
+    // Browser storage is a convenience; the sealed request still works during this page session.
   }
 }
 
 /**
- * One sealed action: prepare shows the server-built request for confirmation; confirm submits it unchanged and
- * keeps it in browser storage until a result is shown, so a lost response can be resent.
+ * One sealed action. Prepare shows the server-built request; confirm keeps it in browser storage (per project,
+ * actor, action and command), submits it unchanged and forgets it once a result is shown. Unfinished requests from an
+ * earlier visit are listed for resend or discard.
  */
-function useSealedAction(projectName: string, action: QualityAction) {
-  const key = pendingKey(projectName, action);
-  const [prepared, setPrepared] = useState<Sealed | null>(() => readPending(key));
+function useSealedAction(projectName: string, actor: string, action: QualityAction) {
+  const prefix = pendingPrefix(projectName, actor, action);
+  const [prepared, setPrepared] = useState<Sealed | null>(null);
+  const [pending, setPending] = useState<Sealed[]>(() => storedPending(prefix));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const current = useRef<AbortController | null>(null);
@@ -72,9 +88,6 @@ function useSealedAction(projectName: string, action: QualityAction) {
     setError(null);
     return current.current.signal;
   };
-  const end = (signal: AbortSignal) => {
-    if (!signal.aborted) setBusy(false);
-  };
 
   const ready = async (intent: Record<string, unknown>, fallback: string) => {
     const signal = begin();
@@ -84,57 +97,135 @@ function useSealedAction(projectName: string, action: QualityAction) {
     } catch (failure: unknown) {
       if (!signal.aborted) setError(errorMessage(failure) ?? fallback);
     } finally {
-      end(signal);
+      if (!signal.aborted) setBusy(false);
     }
   };
 
-  const confirm = async (fallback: string): Promise<Record<string, unknown> | null> => {
-    if (!prepared) return null;
-    writePending(key, prepared);
+  const send = async (sealed: Sealed, fallback: string): Promise<Record<string, unknown> | null> => {
+    keep(prefix, sealed, true);
     const signal = begin();
     try {
-      const result = await submit(projectName, action, prepared, { signal });
+      const result = await submit(projectName, action, sealed, { signal });
       if (signal.aborted) return null;
-      writePending(key, null);
+      keep(prefix, sealed, false);
       setPrepared(null);
+      setPending(storedPending(prefix));
       return result;
     } catch (failure: unknown) {
-      if (!signal.aborted) setError(errorMessage(failure) ?? fallback);
+      if (!signal.aborted) {
+        setError(errorMessage(failure) ?? fallback);
+        setPending(storedPending(prefix));
+      }
       return null;
     } finally {
-      end(signal);
+      if (!signal.aborted) setBusy(false);
     }
   };
 
-  const discard = () => {
-    writePending(key, null);
+  const discard = (sealed: Sealed | null) => {
+    if (sealed) keep(prefix, sealed, false);
     setPrepared(null);
+    setPending(storedPending(prefix));
   };
 
-  return { prepared, busy, error, ready, confirm, discard };
+  return { prepared, pending, busy, error, ready, send, discard };
 }
 
-function Summary({ sealed, labels }: { sealed: Sealed; labels: Record<string, string> }) {
-  const request = sealed.request;
+type SealedAction = ReturnType<typeof useSealedAction>;
+
+/** Every consequential field of a prepared request, read from the sealed request itself. */
+function summaryRows(action: QualityAction, request: Record<string, unknown>): [string, string][] {
   const subject = (request.subject ?? {}) as Record<string, unknown>;
-  const command = (request.command ?? {}) as Record<string, unknown>;
-  const rows: [string, unknown][] = [
-    [labels.command, command.command_id ?? request.command_id ?? request.execution_ref],
-    [labels.decision, subject.decision ?? request.status],
-    [labels.expires, subject.requested_expires_at],
-    [labels.requirement, request.requirement_id],
-  ];
+  const draft = (subject.profile_draft ?? {}) as Record<string, unknown>;
+  const profile = (request.profile ?? {}) as Record<string, unknown>;
+  const master = ((request.subject as Record<string, unknown> | undefined)?.master_binding ?? {}) as Record<string, unknown>;
+  const root = (master.root ?? {}) as Record<string, unknown>;
+  const runSubject = ((subject.subject ?? {}) as Record<string, unknown>).master_binding as Record<string, unknown> | undefined;
+  const text = (value: unknown) => (value === undefined || value === null ? "" : typeof value === "string" ? value : JSON.stringify(value));
+  switch (action) {
+    case "profiles":
+      return [
+        ["profile", `${text(draft.profile_id)} r${text(draft.revision)}`],
+        ["cohort", `${text(draft.cohort_id)} · ${text(draft.product_surface)}`],
+        ["supersession", text(draft.supersession_effect)],
+        ["policy", text(draft.policy_digest)],
+      ];
+    case "probes":
+      return [
+        ["master", text(root.artifact_key)],
+        ["profile", `${text(profile.profile_id)} r${text(profile.revision)}`],
+        ["requirement", text(request.requirement_id)],
+        ["command", text(request.execution_ref)],
+      ];
+    case "reviews":
+      return [
+        ["master", text(root.artifact_key)],
+        ["profile", `${text(profile.profile_id)} r${text(profile.revision)}`],
+        ["status", text(request.status)],
+        ["findings", String(((request.findings as unknown[]) ?? []).length)],
+        ["evidence", text(request.reviewer_evidence_digest)],
+      ];
+    case "runs":
+      return [
+        ["master", text(((runSubject?.root ?? {}) as Record<string, unknown>).artifact_key)],
+        ["profile", `${text(subject.profile_id)} r${text(subject.profile_revision)}`],
+        ["observations", ((subject.observations as { observation_id: string }[]) ?? []).map((o) => o.observation_id).join(", ")],
+      ];
+    case "dispositions":
+      return [
+        ["run", text(subject.quality_run_id)],
+        ["decision", text(subject.decision)],
+        ["reason", text(subject.reason)],
+        ["waivers", text(subject.waiver_bindings)],
+        ["expires", text(subject.requested_expires_at)],
+      ];
+  }
+}
+
+interface ConfirmProps {
+  action: QualityAction;
+  sealed: SealedAction;
+  label: string;
+  fallback: string;
+  onDone: (result: Record<string, unknown> | null) => void;
+}
+
+function Confirm({ action, sealed, label, fallback, onDone }: ConfirmProps) {
+  const { t } = useTranslation("dashboard");
+  const envelopes = sealed.prepared ? [sealed.prepared] : sealed.pending;
+  if (envelopes.length === 0) return null;
   return (
-    <dl className="qa-summary font-mono text-[11px]">
-      {rows
-        .filter(([, value]) => value !== undefined && value !== null && value !== "")
-        .map(([label, value]) => (
-          <div key={label}>
-            <dt className="text-text-3">{label}</dt>
-            <dd className="text-text">{String(value)}</dd>
+    <>
+      {envelopes.map((envelope) => (
+        <div key={commandOf(envelope)} className="qa-confirm mt-3" role="group" aria-label={t("quality_confirm_group")}>
+          <p className="text-xs text-text-2">{sealed.prepared ? t("quality_confirm_hint") : t("quality_pending_hint")}</p>
+          <dl className="qa-summary font-mono text-[11px]">
+            {summaryRows(action, envelope.request).map(([name, value]) => (
+              <div key={name}>
+                <dt className="text-text-3">{t(`quality_field_${name}`)}</dt>
+                <dd className="text-text">{value || "—"}</dd>
+              </div>
+            ))}
+          </dl>
+          <div className="pk-actions">
+            <button type="button" className="fm-btn fm-btn-accent" disabled={sealed.busy} onClick={() => void sealed.send(envelope, fallback).then(onDone)}>
+              {sealed.prepared ? label : t("quality_resend")}
+            </button>
+            <button type="button" className="fm-btn" disabled={sealed.busy} onClick={() => sealed.discard(envelope)}>
+              {t("quality_discard")}
+            </button>
           </div>
-        ))}
-    </dl>
+        </div>
+      ))}
+    </>
+  );
+}
+
+function Locked({ locked, children }: { locked: boolean; children: ReactNode }) {
+  return (
+    <fieldset disabled={locked} className="qa-fieldset">
+      {children}
+    </fieldset>
   );
 }
 
@@ -144,13 +235,18 @@ interface QualityPageProps {
 
 export default function QualityPage({ projectName }: QualityPageProps) {
   const { t } = useTranslation("dashboard");
+  const actor = useAuthStore((state) => state.username) ?? "anonymous";
   const [masters, setMasters] = useState<Master[] | null>(null);
   const [profiles, setProfiles] = useState<Profile[]>([]);
+  const [revisions, setRevisions] = useState<number[]>([]);
+  const [selected, setSelected] = useState<Profile | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [root, setRoot] = useState("");
-  const [profileKey, setProfileKey] = useState("");
   const [observations, setObservations] = useState<Observation[]>([]);
+  const [probes, setProbes] = useState<ProbeAttempt[]>([]);
   const [runs, setRuns] = useState<RunEntry[]>([]);
+  const [chosen, setChosen] = useState<Record<string, string>>({});
+  const [runId, setRunId] = useState("");
   const [template, setTemplate] = useState({
     platform_profile_id: "youtube-long",
     width: 1920,
@@ -164,18 +260,18 @@ export default function QualityPage({ projectName }: QualityPageProps) {
   const [surface, setSurface] = useState("video");
   const [supersession, setSupersession] = useState<"HISTORICAL_ONLY" | "REEVALUATE_CURRENT">("HISTORICAL_ONLY");
   const [verdicts, setVerdicts] = useState<Record<string, Verdict>>(() => Object.fromEntries(CRITERIA.map((c) => [c, "PASS"])));
+  const [findings, setFindings] = useState<FindingDraft[]>([]);
   const [notes, setNotes] = useState("");
   const [decision, setDecision] = useState<"PASS" | "REWORK" | "WAIVE">("PASS");
+  const [waived, setWaived] = useState<Record<string, boolean>>({});
   const [reason, setReason] = useState("");
   const [ttlHours, setTtlHours] = useState(24);
 
-  const publish = useSealedAction(projectName, "profiles");
-  const probe = useSealedAction(projectName, "probes");
-  const review = useSealedAction(projectName, "reviews");
-  const seal = useSealedAction(projectName, "runs");
-  const dispose = useSealedAction(projectName, "dispositions");
-
-  const selected = profiles.find((p) => `${p.profile_id}@${p.revision}` === profileKey) ?? null;
+  const publish = useSealedAction(projectName, actor, "profiles");
+  const probe = useSealedAction(projectName, actor, "probes");
+  const review = useSealedAction(projectName, actor, "reviews");
+  const seal = useSealedAction(projectName, actor, "runs");
+  const dispose = useSealedAction(projectName, actor, "dispositions");
 
   const reload = useCallback(
     (signal: AbortSignal) =>
@@ -202,19 +298,16 @@ export default function QualityPage({ projectName }: QualityPageProps) {
   const refreshSubject = useCallback(
     (signal: AbortSignal) => {
       if (!root || !selected) return Promise.resolve();
+      const scope = { profile_id: selected.profile_id, revision: selected.revision, root };
+      // Independent reads: a drifted current subject must not hide the run or probe history.
+      const failed = (failure: unknown) => {
+        if (!signal.aborted) setLoadError(errorMessage(failure) ?? t("quality_load_failed"));
+      };
       return Promise.all([
-        listObservations(projectName, { profile_id: selected.profile_id, revision: selected.revision, root }, { signal }),
-        listRuns(projectName, root, { signal }),
-      ]).then(
-        ([found, sealed]) => {
-          if (signal.aborted) return;
-          setObservations(found.observations);
-          setRuns(sealed.runs);
-        },
-        (failure: unknown) => {
-          if (!signal.aborted) setLoadError(errorMessage(failure) ?? t("quality_load_failed"));
-        },
-      );
+        listObservations(projectName, scope, { signal }).then((found) => !signal.aborted && setObservations(found.observations), failed),
+        listProbes(projectName, scope, { signal }).then((found) => !signal.aborted && setProbes(found.probes), failed),
+        listRuns(projectName, root, { signal }).then((found) => !signal.aborted && setRuns(found.runs), failed),
+      ]).then(() => undefined);
     },
     [projectName, root, selected, t],
   );
@@ -225,11 +318,45 @@ export default function QualityPage({ projectName }: QualityPageProps) {
     return () => controller.abort();
   }, [refreshSubject]);
 
+  const clearScope = () => {
+    setObservations([]);
+    setProbes([]);
+    setRuns([]);
+    setChosen({});
+    setRunId("");
+    setWaived({});
+  };
+
   const after = async (result: Record<string, unknown> | null) => {
     if (!result) return;
     const controller = new AbortController();
     await reload(controller.signal);
     await refreshSubject(controller.signal);
+  };
+
+  const chooseProfile = async (profileId: string) => {
+    clearScope();
+    setSelected(null);
+    setRevisions([]);
+    if (!profileId) return;
+    try {
+      const found = await listRevisions(projectName, profileId);
+      setRevisions(found.revisions.map((item) => item.revision));
+      const latest = found.revisions.at(-1)?.revision;
+      if (latest !== undefined) setSelected((await readRevision(projectName, profileId, latest)).profile);
+    } catch (failure: unknown) {
+      setLoadError(errorMessage(failure) ?? t("quality_load_failed"));
+    }
+  };
+
+  const chooseRevision = async (revision: number) => {
+    if (!selected) return;
+    clearScope();
+    try {
+      setSelected((await readRevision(projectName, selected.profile_id, revision)).profile);
+    } catch (failure: unknown) {
+      setLoadError(errorMessage(failure) ?? t("quality_load_failed"));
+    }
   };
 
   const loadTemplate = async () => {
@@ -242,30 +369,11 @@ export default function QualityPage({ projectName }: QualityPageProps) {
   };
 
   const scope = selected ? { profile_id: selected.profile_id, revision: selected.revision, root_artifact_key: root } : null;
-  const latest = runs[0] ?? null;
-  const labels = {
-    command: t("quality_summary_command"),
-    decision: t("quality_summary_decision"),
-    expires: t("quality_summary_expires"),
-    requirement: t("quality_summary_requirement"),
-  };
+  const ready = Boolean(root && scope);
+  const run = runs.find((entry) => entry.run.run_id === runId) ?? null;
+  const reviewFindings = observations.filter((o) => o.requirement_id === "review").flatMap((o) => o.findings.map((f) => ({ ...f, observation: o })));
   const errors = [publish.error, probe.error, review.error, seal.error, dispose.error, loadError].filter(Boolean);
-
-  const confirmBlock = (action: ReturnType<typeof useSealedAction>, label: string, fallback: string) =>
-    action.prepared ? (
-      <div className="qa-confirm mt-3" role="group" aria-label={t("quality_confirm_group")}>
-        <p className="text-xs text-text-2">{t("quality_confirm_hint")}</p>
-        <Summary sealed={action.prepared} labels={labels} />
-        <div className="pk-actions">
-          <button type="button" className="fm-btn fm-btn-accent" disabled={action.busy} onClick={() => void action.confirm(fallback).then(after)}>
-            {label}
-          </button>
-          <button type="button" className="fm-btn" disabled={action.busy} onClick={action.discard}>
-            {t("quality_discard")}
-          </button>
-        </div>
-      </div>
-    ) : null;
+  const fallback = t("quality_action_failed");
 
   return (
     <div className="flex h-full min-h-0 flex-col overflow-y-auto bg-bg">
@@ -289,11 +397,18 @@ export default function QualityPage({ projectName }: QualityPageProps) {
           {masters && masters.length > 0 ? (
             <label className="text-xs text-text-2">
               {t("quality_master")}
-              <select className="fm-input" value={root} onChange={(event) => setRoot(event.target.value)}>
+              <select
+                className="fm-input"
+                value={root}
+                onChange={(event) => {
+                  clearScope();
+                  setRoot(event.target.value);
+                }}
+              >
                 <option value="">{t("quality_choose")}</option>
                 {masters.map((master) => (
                   <option key={master.artifact_key} value={master.artifact_key} disabled={!master.resolvable}>
-                    {master.artifact_path} · {master.selected_candidate_id}
+                    {master.selected_candidate_id} · {master.approval_record}
                     {master.resolvable ? "" : ` — ${t("quality_master_stale")}`}
                   </option>
                 ))}
@@ -304,129 +419,147 @@ export default function QualityPage({ projectName }: QualityPageProps) {
 
         <section aria-labelledby="qa-profile" className="pk-card">
           <h2 id="qa-profile" className="pk-kicker font-mono">PROFILE</h2>
-          {profiles.length > 0 ? (
-            <label className="text-xs text-text-2">
-              {t("quality_profile")}
-              <select className="fm-input" value={profileKey} onChange={(event) => setProfileKey(event.target.value)}>
-                <option value="">{t("quality_choose")}</option>
-                {profiles.map((profile) => (
-                  <option key={profile.profile_id} value={`${profile.profile_id}@${profile.revision}`}>
-                    {profile.cohort_id} · {profile.product_surface} · r{profile.revision}
-                  </option>
-                ))}
-              </select>
-            </label>
-          ) : (
-            <p className="text-sm text-text-3">{t("quality_no_profiles")}</p>
-          )}
-          <div className="fm-grid mt-3">
-            <label className="text-xs text-text-2">
-              {t("quality_platform")}
-              <input className="fm-input" value={template.platform_profile_id} onChange={(event) => setTemplate({ ...template, platform_profile_id: event.target.value })} />
-            </label>
-            <label className="text-xs text-text-2">
-              {t("quality_width")}
-              <input className="fm-input" type="number" value={template.width} onChange={(event) => setTemplate({ ...template, width: Number(event.target.value) })} />
-            </label>
-            <label className="text-xs text-text-2">
-              {t("quality_height")}
-              <input className="fm-input" type="number" value={template.height} onChange={(event) => setTemplate({ ...template, height: Number(event.target.value) })} />
-            </label>
-            <label className="text-xs text-text-2">
-              {t("quality_min_duration")}
-              <input className="fm-input" type="number" value={template.min_duration_ms} onChange={(event) => setTemplate({ ...template, min_duration_ms: Number(event.target.value) })} />
-            </label>
-            <label className="text-xs text-text-2">
-              {t("quality_max_duration")}
-              <input className="fm-input" type="number" value={template.max_duration_ms} onChange={(event) => setTemplate({ ...template, max_duration_ms: Number(event.target.value) })} />
-            </label>
-            <label className="text-xs text-text-2">
-              {t("quality_locales")}
-              <input className="fm-input" value={template.locales} onChange={(event) => setTemplate({ ...template, locales: event.target.value })} />
-            </label>
-          </div>
-          <div className="pk-actions">
-            <button type="button" className="fm-btn" onClick={() => void loadTemplate()}>
-              {t("quality_load_template")}
-            </button>
-          </div>
-          {policyJson ? (
+          <Locked locked={Boolean(publish.prepared)}>
+            {profiles.length > 0 ? (
+              <div className="fm-grid">
+                <label className="text-xs text-text-2">
+                  {t("quality_profile")}
+                  <select className="fm-input" value={selected?.profile_id ?? ""} onChange={(event) => void chooseProfile(event.target.value)}>
+                    <option value="">{t("quality_choose")}</option>
+                    {profiles.map((profile) => (
+                      <option key={profile.profile_id} value={profile.profile_id}>
+                        {profile.cohort_id} · {profile.product_surface}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                {selected ? (
+                  <label className="text-xs text-text-2">
+                    {t("quality_revision")}
+                    <select className="fm-input" value={selected.revision} onChange={(event) => void chooseRevision(Number(event.target.value))}>
+                      {revisions.map((revision) => (
+                        <option key={revision} value={revision}>
+                          r{revision}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                ) : null}
+              </div>
+            ) : (
+              <p className="text-sm text-text-3">{t("quality_no_profiles")}</p>
+            )}
             <div className="fm-grid mt-3">
-              <label className="text-xs text-text-2 pk-wide">
-                {t("quality_policy")}
-                <textarea className="fm-input font-mono" rows={8} value={policyJson} onChange={(event) => setPolicyJson(event.target.value)} />
+              <label className="text-xs text-text-2">
+                {t("quality_platform")}
+                <input className="fm-input" value={template.platform_profile_id} onChange={(event) => setTemplate({ ...template, platform_profile_id: event.target.value })} />
               </label>
               <label className="text-xs text-text-2">
-                {t("quality_cohort")}
-                <input className="fm-input" value={cohort} onChange={(event) => setCohort(event.target.value)} />
+                {t("quality_width")}
+                <input className="fm-input" type="number" value={template.width} onChange={(event) => setTemplate({ ...template, width: Number(event.target.value) })} />
               </label>
               <label className="text-xs text-text-2">
-                {t("quality_surface")}
-                <input className="fm-input" value={surface} onChange={(event) => setSurface(event.target.value)} />
+                {t("quality_height")}
+                <input className="fm-input" type="number" value={template.height} onChange={(event) => setTemplate({ ...template, height: Number(event.target.value) })} />
               </label>
               <label className="text-xs text-text-2">
-                {t("quality_supersession")}
-                <select className="fm-input" value={supersession} onChange={(event) => setSupersession(event.target.value as typeof supersession)}>
-                  <option value="HISTORICAL_ONLY">{t("quality_supersession_historical")}</option>
-                  <option value="REEVALUATE_CURRENT">{t("quality_supersession_reevaluate")}</option>
-                </select>
+                {t("quality_min_duration")}
+                <input className="fm-input" type="number" value={template.min_duration_ms} onChange={(event) => setTemplate({ ...template, min_duration_ms: Number(event.target.value) })} />
+              </label>
+              <label className="text-xs text-text-2">
+                {t("quality_max_duration")}
+                <input className="fm-input" type="number" value={template.max_duration_ms} onChange={(event) => setTemplate({ ...template, max_duration_ms: Number(event.target.value) })} />
+              </label>
+              <label className="text-xs text-text-2">
+                {t("quality_locales")}
+                <input className="fm-input" value={template.locales} onChange={(event) => setTemplate({ ...template, locales: event.target.value })} />
               </label>
             </div>
-          ) : null}
-          <div className="pk-actions">
-            <button
-              type="button"
-              className="fm-btn fm-btn-accent"
-              disabled={!policyJson || publish.busy}
-              onClick={() => {
-                let policy: Record<string, unknown>;
-                try {
-                  policy = JSON.parse(policyJson) as Record<string, unknown>;
-                } catch {
-                  return;
-                }
-                void publish.ready(
-                  {
-                    command_id: newCommandId("publish"),
-                    profile_id: selected?.profile_id ?? null,
-                    expected_profile_revision: selected?.revision ?? 0,
-                    cohort_id: selected?.cohort_id ?? cohort,
-                    product_surface: selected?.product_surface ?? surface,
-                    policy,
-                    supersession_effect: supersession,
-                  },
-                  t("quality_action_failed"),
-                );
-              }}
-            >
-              {selected ? t("quality_prepare_revision") : t("quality_prepare_publish")}
-            </button>
-          </div>
-          {confirmBlock(publish, t("quality_publish"), t("quality_action_failed"))}
+            <div className="pk-actions">
+              <button type="button" className="fm-btn" onClick={() => void loadTemplate()}>
+                {t("quality_load_template")}
+              </button>
+            </div>
+            {policyJson ? (
+              <div className="fm-grid mt-3">
+                <label className="text-xs text-text-2 pk-wide">
+                  {t("quality_policy")}
+                  <textarea className="fm-input font-mono" rows={8} value={policyJson} onChange={(event) => setPolicyJson(event.target.value)} />
+                </label>
+                <label className="text-xs text-text-2">
+                  {t("quality_cohort")}
+                  <input className="fm-input" value={selected?.cohort_id ?? cohort} disabled={Boolean(selected)} onChange={(event) => setCohort(event.target.value)} />
+                </label>
+                <label className="text-xs text-text-2">
+                  {t("quality_surface")}
+                  <input className="fm-input" value={selected?.product_surface ?? surface} disabled={Boolean(selected)} onChange={(event) => setSurface(event.target.value)} />
+                </label>
+                <label className="text-xs text-text-2">
+                  {t("quality_supersession")}
+                  <select className="fm-input" value={supersession} onChange={(event) => setSupersession(event.target.value as typeof supersession)}>
+                    <option value="HISTORICAL_ONLY">{t("quality_supersession_historical")}</option>
+                    <option value="REEVALUATE_CURRENT">{t("quality_supersession_reevaluate")}</option>
+                  </select>
+                </label>
+              </div>
+            ) : null}
+            <div className="pk-actions">
+              <button
+                type="button"
+                className="fm-btn fm-btn-accent"
+                disabled={!policyJson || publish.busy}
+                onClick={() => {
+                  let policy: Record<string, unknown>;
+                  try {
+                    policy = JSON.parse(policyJson) as Record<string, unknown>;
+                  } catch {
+                    return;
+                  }
+                  void publish.ready(
+                    {
+                      command_id: newCommandId("publish"),
+                      profile_id: selected?.profile_id ?? null,
+                      expected_profile_revision: selected ? Math.max(...revisions) : 0,
+                      cohort_id: selected?.cohort_id ?? cohort,
+                      product_surface: selected?.product_surface ?? surface,
+                      policy,
+                      supersession_effect: supersession,
+                    },
+                    fallback,
+                  );
+                }}
+              >
+                {selected ? t("quality_prepare_revision") : t("quality_prepare_publish")}
+              </button>
+            </div>
+          </Locked>
+          <Confirm action="profiles" sealed={publish} label={t("quality_publish")} fallback={fallback} onDone={(r) => void after(r)} />
         </section>
 
         <section aria-labelledby="qa-probes" className="pk-card">
           <h2 id="qa-probes" className="pk-kicker font-mono">PROBES</h2>
-          {!scope ? <p className="text-sm text-text-3">{t("quality_choose_first")}</p> : null}
+          {!ready ? <p className="text-sm text-text-3">{t("quality_choose_first")}</p> : null}
           <div className="pk-actions">
             {(["technical-container", "technical-decode"] as const).map((requirement) => (
               <button
                 key={requirement}
                 type="button"
                 className="fm-btn"
-                disabled={!scope || probe.busy || Boolean(probe.prepared)}
-                onClick={() => scope && void probe.ready({ command_id: newCommandId("probe"), ...scope, requirement_id: requirement }, t("quality_action_failed"))}
+                disabled={!ready || probe.busy || Boolean(probe.prepared)}
+                onClick={() => scope && void probe.ready({ command_id: newCommandId("probe"), ...scope, requirement_id: requirement }, fallback)}
               >
                 {t(requirement === "technical-container" ? "quality_probe_container" : "quality_probe_decode")}
               </button>
             ))}
           </div>
-          {confirmBlock(probe, t("quality_run_probe"), t("quality_action_failed"))}
-          {observations.length > 0 ? (
+          <Confirm action="probes" sealed={probe} label={t("quality_run_probe")} fallback={fallback} onDone={(r) => void after(r)} />
+          {probes.length > 0 ? (
             <ul className="pk-entries font-mono text-[11px] text-text-2">
-              {observations.map((observation) => (
-                <li key={observation.observation_id} data-status={observation.status}>
-                  {observation.requirement_id} · {observation.status}
+              {probes.map((attempt) => (
+                <li key={attempt.execution_ref} data-state={attempt.attempt_state ?? "UNKNOWN"}>
+                  {attempt.requirement_id} · {attempt.attempt_state ?? "—"} · {attempt.status ?? t("quality_probe_no_result")}
+                  {attempt.failure ? ` · ${attempt.failure.error_code}` : ""}
+                  {attempt.attempt_state === "SUBMIT_OUTCOME_UNKNOWN" ? ` · ${t("quality_probe_needs_review")}` : ""}
                 </li>
               ))}
             </ul>
@@ -435,118 +568,125 @@ export default function QualityPage({ projectName }: QualityPageProps) {
 
         <section aria-labelledby="qa-review" className="pk-card">
           <h2 id="qa-review" className="pk-kicker font-mono">REVIEW</h2>
-          {CRITERIA.map((criterion) => (
-            <fieldset key={criterion} className="pk-group">
-              <legend className="text-xs text-text-2">{t(`quality_criterion_${criterion.replaceAll("-", "_")}`)}</legend>
-              {(["PASS", "FAIL"] as const).map((value) => (
-                <label key={value} className="mr-3 text-xs text-text-2">
-                  <input
-                    type="radio"
-                    name={`qa-${criterion}`}
-                    checked={verdicts[criterion] === value}
-                    onChange={() => setVerdicts((current) => ({ ...current, [criterion]: value }))}
-                  />{" "}
-                  {value === "PASS" ? t("quality_verdict_pass") : t("quality_verdict_fail")}
+          <Locked locked={Boolean(review.prepared) || !ready}>
+            {CRITERIA.map((criterion) => (
+              <fieldset key={criterion} className="pk-group">
+                <legend className="text-xs text-text-2">{t(`quality_criterion_${criterion.replaceAll("-", "_")}`)}</legend>
+                {(["PASS", "FAIL"] as const).map((value) => (
+                  <label key={value} className="mr-3 text-xs text-text-2">
+                    <input
+                      type="radio"
+                      name={`qa-${criterion}`}
+                      checked={verdicts[criterion] === value}
+                      onChange={() => setVerdicts((current) => ({ ...current, [criterion]: value }))}
+                    />{" "}
+                    {value === "PASS" ? t("quality_verdict_pass") : t("quality_verdict_fail")}
+                  </label>
+                ))}
+              </fieldset>
+            ))}
+            {findings.map((finding, index) => (
+              <div key={index} className="fm-grid mt-2" role="group" aria-label={t("quality_finding", { index: index + 1 })}>
+                <label className="text-xs text-text-2">
+                  {t("quality_finding_criterion")}
+                  <select className="fm-input" value={finding.rule_id} onChange={(event) => setFindings((rows) => rows.map((row, i) => (i === index ? { ...row, rule_id: event.target.value } : row)))}>
+                    {CRITERIA.map((criterion) => (
+                      <option key={criterion} value={criterion}>
+                        {t(`quality_criterion_${criterion.replaceAll("-", "_")}`)}
+                      </option>
+                    ))}
+                  </select>
                 </label>
-              ))}
-            </fieldset>
-          ))}
-          <label className="text-xs text-text-2">
-            {t("quality_notes")}
-            <textarea className="fm-input" rows={3} value={notes} onChange={(event) => setNotes(event.target.value)} />
-          </label>
-          <div className="pk-actions">
-            <button
-              type="button"
-              className="fm-btn"
-              disabled={!scope || review.busy || Boolean(review.prepared)}
-              onClick={() =>
-                scope &&
-                void review.ready(
-                  {
-                    command_id: newCommandId("review"),
-                    ...scope,
-                    status: Object.values(verdicts).every((v) => v === "PASS") ? "PASS" : "FAIL",
-                    criteria_verdicts: verdicts,
-                    findings: [],
-                    notes,
-                  },
-                  t("quality_action_failed"),
-                )
-              }
-            >
-              {t("quality_prepare_review")}
-            </button>
-          </div>
-          {confirmBlock(review, t("quality_record_review"), t("quality_action_failed"))}
+                <label className="text-xs text-text-2">
+                  {t("quality_finding_severity")}
+                  <select className="fm-input" value={finding.severity} onChange={(event) => setFindings((rows) => rows.map((row, i) => (i === index ? { ...row, severity: event.target.value as FindingDraft["severity"] } : row)))}>
+                    <option value="BLOCKING">{t("packaging_blocking")}</option>
+                    <option value="ADVISORY">{t("packaging_advisory")}</option>
+                  </select>
+                </label>
+                <label className="text-xs text-text-2">
+                  {t("quality_finding_locator")}
+                  <input className="fm-input" value={finding.locator} onChange={(event) => setFindings((rows) => rows.map((row, i) => (i === index ? { ...row, locator: event.target.value } : row)))} />
+                </label>
+                <button type="button" className="fm-btn" onClick={() => setFindings((rows) => rows.filter((_, i) => i !== index))}>
+                  {t("quality_finding_remove")}
+                </button>
+              </div>
+            ))}
+            <div className="pk-actions">
+              <button type="button" className="fm-btn" disabled={findings.length >= 32} onClick={() => setFindings((rows) => [...rows, { rule_id: "visible-defects", severity: "BLOCKING", locator: "whole" }])}>
+                {t("quality_finding_add")}
+              </button>
+            </div>
+            <label className="text-xs text-text-2">
+              {t("quality_notes")}
+              <textarea className="fm-input" rows={3} value={notes} onChange={(event) => setNotes(event.target.value)} />
+            </label>
+            <div className="pk-actions">
+              <button
+                type="button"
+                className="fm-btn"
+                disabled={!ready || review.busy}
+                onClick={() =>
+                  scope &&
+                  void review.ready(
+                    {
+                      command_id: newCommandId("review"),
+                      ...scope,
+                      status: Object.values(verdicts).every((v) => v === "PASS") ? "PASS" : "FAIL",
+                      criteria_verdicts: verdicts,
+                      findings,
+                      notes,
+                    },
+                    fallback,
+                  )
+                }
+              >
+                {t("quality_prepare_review")}
+              </button>
+            </div>
+          </Locked>
+          <Confirm action="reviews" sealed={review} label={t("quality_record_review")} fallback={fallback} onDone={(r) => void after(r)} />
         </section>
 
         <section aria-labelledby="qa-seal" className="pk-card">
           <h2 id="qa-seal" className="pk-kicker font-mono">SEAL</h2>
-          <div className="pk-actions">
-            <button
-              type="button"
-              className="fm-btn"
-              disabled={!scope || observations.length === 0 || seal.busy || Boolean(seal.prepared)}
-              onClick={() =>
-                scope &&
-                void seal.ready(
-                  { command_id: newCommandId("seal"), ...scope, observation_ids: observations.map((o) => o.observation_id) },
-                  t("quality_action_failed"),
-                )
-              }
-            >
-              {t("quality_prepare_seal")}
-            </button>
-          </div>
-          {confirmBlock(seal, t("quality_seal_run"), t("quality_action_failed"))}
-        </section>
-
-        <section aria-labelledby="qa-disposition" className="pk-card">
-          <h2 id="qa-disposition" className="pk-kicker font-mono">DISPOSITION</h2>
-          {!latest ? <p className="text-sm text-text-3">{t("quality_no_runs")}</p> : null}
-          <div className="fm-grid">
-            <label className="text-xs text-text-2">
-              {t("quality_decision")}
-              <select className="fm-input" value={decision} onChange={(event) => setDecision(event.target.value as typeof decision)}>
-                <option value="PASS">PASS</option>
-                <option value="REWORK">REWORK</option>
-                <option value="WAIVE">WAIVE</option>
-              </select>
-            </label>
-            <label className="text-xs text-text-2">
-              {t("quality_ttl_hours")}
-              <input className="fm-input" type="number" min={1} max={decision === "WAIVE" ? 24 : 168} value={ttlHours} onChange={(event) => setTtlHours(Number(event.target.value))} />
-            </label>
-            <label className="text-xs text-text-2 pk-wide">
-              {t("quality_reason")}
-              <input className="fm-input" value={reason} onChange={(event) => setReason(event.target.value)} />
-            </label>
-          </div>
-          <div className="pk-actions">
-            <button
-              type="button"
-              className="fm-btn"
-              disabled={!latest || !reason.trim() || dispose.busy || Boolean(dispose.prepared)}
-              onClick={() =>
-                latest &&
-                void dispose.ready(
-                  {
-                    command_id: newCommandId("dispose"),
-                    run_id: latest.run.run_id,
-                    decision,
-                    reason: reason.trim(),
-                    expected_disposition_version: latest.disposition_version,
-                    requested_ttl_seconds: ttlHours * 3600,
-                  },
-                  t("quality_action_failed"),
-                )
-              }
-            >
-              {t("quality_prepare_disposition")}
-            </button>
-          </div>
-          {confirmBlock(dispose, t("quality_issue_disposition"), t("quality_action_failed"))}
+          <Locked locked={Boolean(seal.prepared)}>
+            {REQUIREMENTS.map((requirement) => {
+              const options = observations.filter((o) => o.requirement_id === requirement);
+              return (
+                <fieldset key={requirement} className="pk-group">
+                  <legend className="text-xs text-text-2">{t("quality_choose_observation", { requirement })}</legend>
+                  {options.length === 0 ? <span className="text-xs text-text-3">{t("quality_no_observation")}</span> : null}
+                  {options.map((option) => (
+                    <label key={option.observation_id} className="mr-3 text-xs text-text-2">
+                      <input
+                        type="radio"
+                        name={`qa-seal-${requirement}`}
+                        checked={chosen[requirement] === option.observation_id}
+                        onChange={() => setChosen((current) => ({ ...current, [requirement]: option.observation_id }))}
+                      />{" "}
+                      {option.status} · {new Date(option.observed_at).toLocaleString()}
+                    </label>
+                  ))}
+                </fieldset>
+              );
+            })}
+            <div className="pk-actions">
+              <button
+                type="button"
+                className="fm-btn"
+                disabled={!ready || REQUIREMENTS.some((r) => !chosen[r]) || seal.busy}
+                onClick={() =>
+                  scope &&
+                  void seal.ready({ command_id: newCommandId("seal"), ...scope, observation_ids: REQUIREMENTS.map((r) => chosen[r]) }, fallback)
+                }
+              >
+                {t("quality_prepare_seal")}
+              </button>
+            </div>
+          </Locked>
+          <Confirm action="runs" sealed={seal} label={t("quality_seal_run")} fallback={fallback} onDone={(r) => void after(r)} />
         </section>
 
         <section aria-labelledby="qa-runs" className="pk-card">
@@ -554,19 +694,22 @@ export default function QualityPage({ projectName }: QualityPageProps) {
           {runs.length === 0 ? <p className="text-sm text-text-3">{t("quality_no_runs")}</p> : null}
           <ul className="pk-entries text-xs text-text-2">
             {runs.map((entry) => {
-              const ready = entry.readiness.state === "READY" && entry.validity.state === "CURRENT";
+              const current = entry.readiness.state === "READY" && entry.validity.state === "CURRENT";
               const href = `/app/projects/${encodeURIComponent(projectName)}/packaging?${new URLSearchParams({
                 run: entry.run.run_id,
                 digest: entry.run_digest,
                 artifact: root,
-                cohort: selected?.cohort_id ?? "",
-                surface: selected?.product_surface ?? "",
+                cohort: entry.cohort_id ?? "",
+                surface: entry.product_surface ?? "",
               }).toString()}`;
               return (
-                <li key={entry.run.run_id} data-ready={ready}>
-                  <span className="font-mono text-[11px]">{entry.run.run_id.slice(0, 8)}</span>{" "}
+                <li key={entry.run.run_id} data-ready={current}>
+                  <label className="mr-2">
+                    <input type="radio" name="qa-run" checked={runId === entry.run.run_id} onChange={() => setRunId(entry.run.run_id)} />{" "}
+                    <span className="font-mono text-[11px]">{entry.run.run_id.slice(0, 8)}</span>
+                  </label>
                   {t("quality_run_state", { validity: entry.validity.state, readiness: entry.readiness.state })}{" "}
-                  {ready ? (
+                  {current ? (
                     <a className="fm-btn inline-block" href={href}>
                       {t("quality_package_run")}
                     </a>
@@ -577,6 +720,78 @@ export default function QualityPage({ projectName }: QualityPageProps) {
               );
             })}
           </ul>
+        </section>
+
+        <section aria-labelledby="qa-disposition" className="pk-card">
+          <h2 id="qa-disposition" className="pk-kicker font-mono">DISPOSITION</h2>
+          {!run ? <p className="text-sm text-text-3">{t("quality_choose_run")}</p> : null}
+          <Locked locked={Boolean(dispose.prepared) || !run}>
+            <div className="fm-grid">
+              <label className="text-xs text-text-2">
+                {t("quality_decision")}
+                <select className="fm-input" value={decision} onChange={(event) => setDecision(event.target.value as typeof decision)}>
+                  <option value="PASS">PASS</option>
+                  <option value="REWORK">REWORK</option>
+                  <option value="WAIVE">WAIVE</option>
+                </select>
+              </label>
+              <label className="text-xs text-text-2">
+                {t("quality_ttl_hours")}
+                <input className="fm-input" type="number" min={1} max={decision === "WAIVE" ? 24 : 168} value={ttlHours} onChange={(event) => setTtlHours(Number(event.target.value))} />
+              </label>
+              <label className="text-xs text-text-2 pk-wide">
+                {t("quality_reason")}
+                <input className="fm-input" value={reason} onChange={(event) => setReason(event.target.value)} />
+              </label>
+            </div>
+            {decision === "WAIVE" ? (
+              <fieldset className="pk-group">
+                <legend className="text-xs text-text-2">{t("quality_waive_findings")}</legend>
+                {reviewFindings.length === 0 ? <span className="text-xs text-text-3">{t("quality_no_findings")}</span> : null}
+                {reviewFindings.map((finding) => (
+                  <label key={finding.finding_id} className="mr-3 text-xs text-text-2">
+                    <input type="checkbox" checked={Boolean(waived[finding.finding_id])} onChange={(event) => setWaived((current) => ({ ...current, [finding.finding_id]: event.target.checked }))} />{" "}
+                    {finding.subject_locator} · {finding.severity}
+                  </label>
+                ))}
+              </fieldset>
+            ) : null}
+            <div className="pk-actions">
+              <button
+                type="button"
+                className="fm-btn"
+                disabled={!run || !reason.trim() || dispose.busy}
+                onClick={() =>
+                  run &&
+                  void dispose.ready(
+                    {
+                      command_id: newCommandId("dispose"),
+                      run_id: run.run.run_id,
+                      decision,
+                      reason: reason.trim(),
+                      waiver_bindings:
+                        decision === "WAIVE"
+                          ? reviewFindings
+                              .filter((finding) => waived[finding.finding_id])
+                              .map((finding) => ({
+                                rule_id: finding.rule_id,
+                                finding_id: finding.finding_id,
+                                scope: `${finding.observation.requirement_id}:${finding.observation.slot_id}`,
+                                justification: reason.trim(),
+                              }))
+                          : [],
+                      expected_disposition_version: run.disposition_version,
+                      requested_ttl_seconds: ttlHours * 3600,
+                    },
+                    fallback,
+                  )
+                }
+              >
+                {t("quality_prepare_disposition")}
+              </button>
+            </div>
+          </Locked>
+          <Confirm action="dispositions" sealed={dispose} label={t("quality_issue_disposition")} fallback={fallback} onDone={(r) => void after(r)} />
         </section>
       </div>
     </div>

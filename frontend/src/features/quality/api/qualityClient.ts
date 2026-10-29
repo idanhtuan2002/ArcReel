@@ -19,8 +19,8 @@ export interface Sealed {
 
 export interface Master {
   artifact_key: string;
-  artifact_path: string;
   selected_candidate_id: string;
+  approval_record: string;
   resolvable: boolean;
 }
 
@@ -40,6 +40,7 @@ export interface Observation {
   slot_id: string;
   status: string;
   observed_at: string;
+  findings: { finding_id: string; rule_id: string; severity: string; subject_locator: string }[];
 }
 
 export interface RunEntry {
@@ -47,6 +48,8 @@ export interface RunEntry {
   run_digest: string;
   disposition_version: number;
   current_disposition_id: string | null;
+  cohort_id: string | null;
+  product_surface: string | null;
   validity: { state: string; reasons: string[] };
   readiness: { state: string; reasons: string[] };
 }
@@ -126,7 +129,53 @@ export function submit(
   });
 }
 
-/** Browser keeping of a sealed request until its result is shown, partitioned by project, action and command. */
-export function pendingKey(projectName: string, action: QualityAction): string {
-  return `arcreel.m10c.pending:${projectName}:${action}`;
+export interface ProbeAttempt {
+  execution_ref: string;
+  actor_id: string;
+  requirement_id: string;
+  subject_digest: string;
+  attempt_state: string | null;
+  observation_id: string | null;
+  status: string | null;
+  failure: { error_code: string; resources: Record<string, unknown> | null } | null;
+}
+
+export function listProbes(
+  projectName: string,
+  values: { profile_id: string; revision: number; root: string },
+  options: CallOptions = {},
+): Promise<{ probes: ProbeAttempt[] }> {
+  return API.request(`${base(projectName)}/probes?${query(values)}`, { signal: options.signal });
+}
+
+export function listRevisions(
+  projectName: string,
+  profileId: string,
+  options: CallOptions = {},
+): Promise<{ revisions: { revision: number; profile_digest: string }[] }> {
+  return API.request(`${base(projectName)}/profiles/${encodeURIComponent(profileId)}/revisions`, { signal: options.signal });
+}
+
+export function readRevision(
+  projectName: string,
+  profileId: string,
+  revision: number,
+  options: CallOptions = {},
+): Promise<{ profile: Profile }> {
+  return API.request(`${base(projectName)}/profiles/${encodeURIComponent(profileId)}/revisions/${revision}`, {
+    signal: options.signal,
+  });
+}
+
+/** Browser keeping of sealed requests until their result is shown, partitioned by project, actor, action and command. */
+export function pendingPrefix(projectName: string, actor: string, action: QualityAction): string {
+  return `arcreel.m10c.pending:${projectName}:${actor}:${action}:`;
+}
+
+export function commandOf(sealed: Sealed): string {
+  const command = sealed.request.command as { command_id?: unknown } | undefined;
+  for (const value of [command?.command_id, sealed.request.command_id, sealed.request.execution_ref]) {
+    if (typeof value === "string" && value) return value;
+  }
+  return "";
 }

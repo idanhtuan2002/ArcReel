@@ -97,3 +97,12 @@
 .qa-summary dd {
   overflow-wrap: anywhere;
 }
+.qa-fieldset {
+  border: 0;
+  margin: 0;
+  padding: 0;
+  min-width: 0;
+}
+.qa-fieldset:disabled {
+  opacity: 0.6;
+}
