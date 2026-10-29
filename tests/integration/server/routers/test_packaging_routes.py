@@ -252,10 +252,35 @@ async def test_selection_verifies_custody_against_the_configured_owner(http) -> 
     assert flow["selection"]["detail"]
 
 
+def _host_request(grants: object | None) -> Any:
+    from types import SimpleNamespace
+
+    return SimpleNamespace(app=SimpleNamespace(state=SimpleNamespace(governance_grants=grants)))
+
+
 def test_an_activated_host_expects_root_owned_custody(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.delenv("ARCREEL_GOVERNANCE_READ_DIR", raising=False)
-    deps = packaging.packaging_deps()
+    deps = packaging.packaging_deps(_host_request(None))
     assert (deps.custody_uid, deps.custody_gid) == (0, 0)
+
+
+async def test_routes_reuse_the_reader_verified_at_startup_instead_of_a_new_proof_per_request(
+    monkeypatch: pytest.MonkeyPatch, tmp_path
+) -> None:
+    monkeypatch.setenv("ARCREEL_GOVERNANCE_READ_DIR", str(tmp_path / "read"))
+    monkeypatch.setenv("ARCREEL_GOVERNANCE_ATTESTOR_DIR", str(tmp_path / "attestor"))
+    verified = object()
+    deps = packaging.packaging_deps(_host_request(verified))
+    assert deps.grant_reader is not None
+    assert [await deps.grant_reader() for _ in range(3)] == [verified] * 3
+
+
+def test_a_host_that_did_not_verify_governance_at_startup_has_no_grant_reader(
+    monkeypatch: pytest.MonkeyPatch, tmp_path
+) -> None:
+    monkeypatch.setenv("ARCREEL_GOVERNANCE_READ_DIR", str(tmp_path / "read"))
+    monkeypatch.setenv("ARCREEL_GOVERNANCE_ATTESTOR_DIR", str(tmp_path / "attestor"))
+    assert packaging.packaging_deps(_host_request(None)).grant_reader is None
 
 
 async def _replace_selection(env, flow: dict[str, Any]) -> Any:

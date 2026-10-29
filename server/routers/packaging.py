@@ -18,7 +18,7 @@ from pathlib import Path
 from typing import Annotated, Any
 
 import jwt
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -45,7 +45,6 @@ from server.auth import (
     oauth2_scheme_optional,
 )
 from server.services.governance_grants import CheckpointedShowrunnerGrantReader
-from server.services.governance_startup import verify_governance_activated_startup
 from server.services.package_export import Download, PackageExportService
 from server.services.packaging_candidates import PackagingDraft, append_packaging_revision
 from server.services.quality_package_selection import (
@@ -81,17 +80,18 @@ class PackagingDeps:
     custody_gid: int = 0
 
 
-def packaging_deps() -> PackagingDeps:
+def packaging_deps(request: Request) -> PackagingDeps:
+    """Host wiring: the grant reader is the one the app verified at activated startup (`app.state`), not a new
+    startup proof per request; the attestor serves one proof at a time."""
     read_dir = os.environ.get("ARCREEL_GOVERNANCE_READ_DIR")
     socket_dir = os.environ.get("ARCREEL_GOVERNANCE_ATTESTOR_DIR")
+    granted: CheckpointedShowrunnerGrantReader | None = getattr(request.app.state, "governance_grants", None)
     reader: Callable[[], Awaitable[CheckpointedShowrunnerGrantReader]] | None = None
-    if read_dir and socket_dir:
-        read_path, socket_path = Path(read_dir), Path(socket_dir)
+    if granted is not None and read_dir and socket_dir:
+        verified = granted
 
         async def activated() -> CheckpointedShowrunnerGrantReader:
-            return await verify_governance_activated_startup(
-                read_path, socket_path, session_factory=async_session_factory, expected_uid=0, expected_gid=0
-            )
+            return verified
 
         reader = activated
     return PackagingDeps(
