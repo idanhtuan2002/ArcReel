@@ -60,4 +60,7 @@ activated-host qualification + deploy (sudo), then M9-B.
 - Request builders done `8812d7fe1` (`server/services/quality_requests.py`); PG chain test
   `tests/integration/server/services/test_quality_operator_chain.py` reaches READY PASS through the real custodians and
   host-v1 probes. Next: `server/routers/quality.py` (prepare/submit + reads) and route tests, then the Quality page.
+- C3 router done (`server/routers/quality.py`, registered in `server/app.py`; 5 PG route tests incl. full chain to READY,
+  replay, seal tamper/other actor, agent refused, auth disabled). Next: C4 Quality page + Packaging prefill, then
+  Codex implementation review.
 
