@@ -1,0 +1,282 @@
+{
+  "schema_id": "m10.final-acceptance-codex-review-r2.v1",
+  "verdict": "ACCEPTED_WITH_CONDITIONS",
+  "head": "191759d5cc27279a3c305ec78a55b75f5e356911",
+  "branch": "design/r2-m10-b",
+  "review_date": "2026-10-29",
+  "reviewer": "Independent Codex reviewer; single-agent bounded re-review of F1, F2, C2 and the documentation/evidence delta",
+  "previous_review": {
+    "file": "docs/r2/evidence/m10-final-acceptance-codex-review.json",
+    "head": "70386a26a1a8a1275ead3b03d2843cd6040e0e21",
+    "verdict": "NOT_ACCEPTED"
+  },
+  "rationale": "The native Chinese corpus gap is repaired and the sponsor has explicitly amended the project-owned reviewer policy, with the changed identity and lack of Human judgment honestly preserved. Those former blockers no longer require NOT_ACCEPTED. Accept final M10 conditionally for the local export scope under the amended pilot policy. PG witness reproducibility/row preservation is substantially improved, while one incoming-FK witness detail and inherited operating/provenance limits remain conditions. This is not an assertion that the original preregistration passed unchanged.",
+  "severity_summary": {
+    "critical": 0,
+    "high": 0,
+    "medium": 0,
+    "low": 1,
+    "qualification": "No new Critical/High/Medium finding in this bounded delta. Low evidence clarification does not determine NOT_ACCEPTED."
+  },
+  "prior_findings": [
+    {
+      "id": "F1_NATIVE_PILOT",
+      "previous_severity": "High",
+      "status": "CLOSED",
+      "file:line": "docs/r2/evidence/R2_M10_B7_PILOT_ZH_SHUANG.json:21",
+      "evidence": [
+        "golden-b-e2e-result.json records golden-b-shuangwen source digest ed6bd13ea626aab41eaacf57ad8f7bac9e9b3fdf4ad20c6d464fb4b19a4ae563, 6282244 bytes. Available source bytes independently match.",
+        "Projection source_digest matches that source; output_digest e6aeba480f799f052ed4131ab6c349b9f30fd955dbc0f37fb1e3ce4ab8bfad05 matches the available 620585-byte projection, dossier master and exported video member.",
+        "ffprobe independently reports source 1920x1080, 96.256 s, and projection 1080x1920, 60 s, both with audio and yuvj420p video.",
+        "Inspected source/projection contact sheets contain Chinese chapter-9 narrative text. Reconstructed product format_render PAD plan produces exactly the recorded argv and adapter ffmpeg-format-projection@1; plan digest sha256:29ca70464331e1af79733f77b9546b49807e5ef0f0e697b124a8a18d8fb1cb0a.",
+        "Rerun dossier records 7/7 seeded recall, 0 emitted clean-package findings, seeded correction, 1877 ms UI export, 14782464-byte cgroup peak, download verification and amended determinism."
+      ],
+      "judgment": "This replaces the English stand-in with a native Chinese V2 pipeline acceptance product and a reproducible product-renderer projection. F1 native-corpus coverage is closed for the local pilot acceptance envelope under sponsor-delegated review.",
+      "limits": [
+        "The source is a pipeline acceptance product, not an operator-approved release final, as explicitly disclosed. Approval here accepts its use as a local pilot corpus; it does not retroactively establish original sponsor-selected/release-approved corpus provenance.",
+        "The agent planned a PAD projection capped at 60 s from a 96.256 s source; later scenes are omitted and phone-size subtitles are small. Native content coverage is demonstrated, not complete-story, editorial, market or mobile readability qualification.",
+        "Media hashes/stream facts and displayed contact sheets were independently checked. The full V2 e2e provenance, pilot browser run, audio/narrative quality and live export were not independently rerun."
+      ]
+    },
+    {
+      "id": "F2_REVIEWER_QUALIFICATION",
+      "previous_severity": "Medium",
+      "status": "CLOSED",
+      "closure_basis": "SPONSOR_POLICY_AMENDMENT; original Human qualification remains historically unmet",
+      "file:line": "docs/r2/evidence/R2_M10_B7_PILOT_SUMMARY.json:116",
+      "evidence": [
+        "sponsor_decision quotes both instructions and states that the second directly answered a report requiring the sponsor as Human reviewer. The present user request confirms that context and the sponsor authority over this policy.",
+        "The preregistration retains sponsor as HUMAN_SHOWRUNNER as frozen_text and appends a dated reviewer amendment to the agent as sponsor-delegated reviewer.",
+        "Summary and dossier retain agent authorship/review, no Human judgment and the independence limit."
+      ],
+      "judgment": "Legitimate, honestly disclosed project-policy amendment. The first broad instruction alone was ambiguous about replacing a reviewer qualification; the second instruction in the stated direct-reply context, now explicitly confirmed by the sponsor, resolves that ambiguity. The sponsor may change this project-owned requirement. Requiring the original Human reviewer again as an unavoidable completion blocker would disregard that authority.",
+      "limits": [
+        "This closes the acceptance requirement by amendment, not by discovering that a Human performed the historical work.",
+        "The implementing agent reviewed its own drafts; narrative PASS and finding verdicts remain agent judgments, without independent Human corroboration.",
+        "The independent Codex acceptance review is independent review of evidence and policy application; it does not make the pilot execution itself independent.",
+        "The amendment authorizes the specified local pilot reviewer/gate role, not unrestricted production authority or release actions."
+      ]
+    },
+    {
+      "id": "C2_B1_C3_MIGRATION_WITNESS",
+      "previous_gate": "Integrated schema evidence closure",
+      "status": "PARTIAL",
+      "file:line": "docs/r2/evidence/m10-integrated/b1-c3-witness.sh:13",
+      "closed_parts": [
+        "Runnable PG witness script and captured output now identify source 976742443864443e6fe26c1cf1c6de9864aed43a and migration SHA256 616a6f5ca00089c58f45e4cdc8ec69ef17432e0e96ec901416bda738ffd4b786; independently matched the current migration hash and source ancestry.",
+        "Output preserves FORMAT revisions 1 and 2, their logical parent/current-head values and payload digests across upgrade, allowed downgrade and re-upgrade, and shows the CHECK broaden/restoration.",
+        "With a PACKAGING row present, output reports downgrade exit 1, M10_PACKAGING_HISTORY_PRESENT, version 5d2a7c3e8b11, FORMAT count 2 and PACKAGING count 1. This is expected partial traversal: later empty B migrations downgrade before the kind-migration guard refuses. It is not rollback to the original global head.",
+        "b1-c3-sqlite.out reports focused 4 passed, 4 warnings in 4.19 s; an explicit focused count is now available."
+      ],
+      "remaining": "An incoming reference to the altered revisions table is not populated by this script. Current ORM/schema confirms m8_candidate_heads has only a user FK; current_revision is not an FK to revisions, and parent_revision has a CHECK rather than a self-FK. Revisions instead reference heads through fk_m8_candidate_revisions_candidate. Thus the witness establishes survival of a real outgoing revision-to-head relationship, not a populated referencing row such as m8_promotion_previews via fk_m8_promotion_previews_revision. Carry that narrow original witness dimension rather than asserting complete C2 closure.",
+      "judgment": "Substantially repaired supplied PG evidence, sufficient to retain conditional local acceptance with the residual explicitly bounded. No migration data-loss defect is demonstrated. Single reversible lineage is independently verified; this missing extra witness does not invalidate the observed lineage/row-preservation result.",
+      "execution_provenance": "PG witness and focused SQLite execution are supplied evidence, not fresh reviewer runs. Reviewer PG socket creation is denied; the destructive disposable-DB witness was not rerun."
+    }
+  ],
+  "new_findings": [
+    {
+      "id": "L1_FK_WITNESS_SCOPE",
+      "severity": "Low",
+      "status": "CONFIRMED",
+      "file:line": "docs/r2/evidence/R2_M10_INTEGRATED_EVIDENCE.json:50",
+      "related_locations": [
+        "docs/r2/evidence/m10-integrated/b1-c3-witness.sh:13",
+        "alembic/versions/8a8c4a0e0001_add_exploration_authority.py:97",
+        "alembic/versions/8a8c4a0e0001_add_exploration_authority.py:137"
+      ],
+      "scenario": "The result describes a referencing head row, which can be read as proving an incoming FK to the migrated revision row. The schema has the opposite FK direction: candidate revisions reference heads. No promotion-preview or other row referencing a revision is inserted. A logical current_revision=2 head pointer is not a SQL FK preservation witness.",
+      "fix": "Describe the observed revision-to-head FK direction precisely. If claiming full original incoming-FK witness closure, add a disposable PG witness row under an actual revision-referencing FK (for example a promotion preview), retain it across upgrade/allowed downgrade/re-upgrade, and capture the FK definition and row output. No product-source fix or new Low-only review round is required.",
+      "blocks_verdict": false
+    }
+  ],
+  "sponsor_policy_assessment": {
+    "legitimate_amendment": true,
+    "honestly_disclosed": true,
+    "reason": "Project review policy is sponsor-owned. The recorded direct-reply instruction and the sponsor current clarification authorize substitution of the pilot reviewer, and the evidence labels the substitution as post-run instead of falsely rewriting the original reviewer history.",
+    "determinism": "The prior post-run determinism amendment remains: byte-identical same-selection re-export plus cross-root content-member equality, excluding per-root provenance manifest.json. Frozen whole-archive cross-root comparison remains false in the rerun dossier. A local package acceptance claim may use the amended rule; an original-preregistration PASS claim may not.",
+    "three_pilots": "Conditionally sufficient under the amended local acceptance policy: Western explainer run 2, vertical factual Short run 2 and native Chinese zh_shuang run 3. Retain PASSED_WITH_DEVIATIONS; do not relabel them three independent Human-reviewed pilots."
+  },
+  "acceptance_claims": {
+    "does_claim": [
+      "Final M10 ACCEPTED_WITH_CONDITIONS at this exact parent chain for local packaging/export packages within the inherited operating envelope and sponsor-amended pilot policy.",
+      "Three recorded cohort dossiers support seeded checks, seeded correction, local export/download and amended determinism; zh coverage now uses native Chinese content.",
+      "A/B conditional review records remain applicable to identical product source; a separate C product packet is unnecessary when those records bind directly."
+    ],
+    "does_not_claim": [
+      "Unchanged original preregistration passed, or whole archives from independent roots are byte-identical.",
+      "Independent Human pilot review, Human finding judgments, operator-approved Chinese release provenance or complete production dependency closure.",
+      "Complete narrative retention after the 60 s trim, professional editorial quality, native-audience utility or broad mobile usability.",
+      "Independent reviewer execution of the PG/systemd/browser pilot or previous 2269-test regression, or complete incoming-FK witness closure.",
+      "Runtime network isolation of the entire host process; existing runtime proof covers confined workers/probes, with bounded static/source evidence for host code.",
+      "Lossless downgrade of arbitrary populated M10 history; guarded downgrades can refuse, and some inherited A downgrades drop history.",
+      "Production activation/readiness, M11, credentials, upload, publication, Production Authority writes, push, merge, tag or deployment authorization."
+    ]
+  },
+  "conditions": [
+    {
+      "id": "C1_PROVENANCE",
+      "gate": "Every downstream completion statement",
+      "requirement": "Bind acceptance to this head and the amended policy. Preserve historical failed/English-surrogate runs, delegated reviewer identity, seeded-only correction, native e2e source/projection identity and limits. This review supersedes the previous NOT_ACCEPTED verdict for this head, not the historical record."
+    },
+    {
+      "id": "C2_SCHEMA_WITNESS",
+      "gate": "Full B1 C3 incoming-FK evidence closure",
+      "requirement": "Carry the narrow incoming-FK witness gap described above; supplied source/commands/row output and focused SQLite count are now present. Do not require redundant successful PG execution in this denied sandbox or call it independently rerun."
+    },
+    {
+      "id": "C3_OPERATING_ENVELOPE",
+      "gate": "Supported local use and stronger qualification",
+      "requirement": "Retain LOCAL_REGULAR_FILE_IO, trusted project-root and single-operator limits, distinct observed-versus-reasoned serialization schedules, fsync fault-injection and abrupt-process/power-loss durability gaps. Existing acceptance does not expand storage or concurrency support."
+    },
+    {
+      "id": "C4_ACTIVATED_HOST",
+      "gate": "Before production/activated-host qualification",
+      "requirement": "Retain root-owned custody, root attestor/intended app UID, pinned key/deployment identity and stopped-app/workers restore prerequisites. User-owned pilot custody/test keys and fixture dependency binding are not production-host qualification."
+    },
+    {
+      "id": "C5_INHERITED_A_B",
+      "gate": "Interpretation of inherited acceptance",
+      "requirement": "Retain bounded A review/runtime limitations and all applicable B acceptance operating/recovery/provenance conditions. F1 failure-evidence persistence already has B0 source/migration and supplied regression evidence; do not call that feature unimplemented from a stale A note. This delta is not a full A6/A7 re-audit."
+    },
+    {
+      "id": "C6_REBIND_AND_RELEASE",
+      "gate": "Later source changes or release actions",
+      "requirement": "Refresh affected route/parity/regression evidence after product-source changes. Source heads and documentation heads differ; pure parity folds at bound source heads PASS, literal review-head folds BLOCKED. Completion allows local export only and confers none of the release/production authorities listed above."
+    }
+  ],
+  "verification": {
+    "fresh_successful": [
+      {
+        "command": "git rev-parse HEAD; git status --short; git log --oneline -5",
+        "result": "Requested 191759d5cc27279a3c305ec78a55b75f5e356911; initial clean worktree."
+      },
+      {
+        "command": "git merge-base --is-ancestor <ref> HEAD for 70386a26a, 976742443, b904bc000, 0af66db9e and 00912922e",
+        "result": "All exit 0."
+      },
+      {
+        "command": "git diff --name-only 70386a26a HEAD; git diff --quiet 00912922e HEAD -- r2 server lib alembic tests frontend",
+        "result": "Only evidence/docs delta; B8 product source/tests/frontend unchanged (quiet diff exit 0)."
+      },
+      {
+        "command": "UV_OFFLINE=1 UV_CACHE_DIR=/tmp/m10-review-uv uv run --no-sync alembic heads; UV_OFFLINE=1 UV_CACHE_DIR=/tmp/m10-review-uv uv run --no-sync alembic history -r 918c4a0e0001:head",
+        "result": "Both exit 0; single head 8a5d0f6b1e44 and expected nine-step M10 chain."
+      },
+      {
+        "command": "Independent SHA256/size of both available corpus MP4 files; ffprobe -show_entries stream=codec_type,width,height,pix_fmt,duration:format=duration; view_image of committed source/projection contact sheets",
+        "result": "Source and projection facts match recorded chain; Chinese text content present; source 96.256 s and projection 60 s."
+      },
+      {
+        "command": "Rebuild PAD plan via product format_render/formats and the same profile/overlay fixture; compare materialized argv; inspect current ORM FK metadata",
+        "result": "Exact recorded argv/adapter match; current head model has only users FK, revisions reference head; no head-to-revision or parent_revision self-FK."
+      },
+      {
+        "command": "bash -n docs/r2/evidence/m10-integrated/b1-c3-witness.sh; SHA256 of kind migration; pilot scripts.sha256 validation",
+        "result": "Syntax valid; migration hash matches witness; 12/12 script hashes match."
+      },
+      {
+        "command": "PYTHONDONTWRITEBYTECODE=1 DATABASE_URL=postgresql+asyncpg://postgres:postgres@127.0.0.1:55491/arcreel_test timeout 20s .venv/bin/python -m pytest -q -p no:cacheprovider tests/unit/r2/quality/test_quality_parity.py",
+        "result": "51 passed in 1.26 s, exit 0."
+      },
+      {
+        "command": "Validate/fold current A7/B6 DonorParityReport objects against recorded heads and current head",
+        "result": "A Kalinga, B Kalinga, B OpenMontage: recorded-head PASS; literal-current-head BLOCKED. This is report validation, not donor runtime execution."
+      }
+    ],
+    "unavailable": [
+      {
+        "command": "AF_INET socket/connect probe to 127.0.0.1:55491",
+        "result": "PermissionError [Errno 1] Operation not permitted at socket creation. No new live PG result."
+      }
+    ],
+    "supplied_not_rerun": [
+      "PG witness output at 976742443 and focused SQLite 4-pass line.",
+      "Zh pilot custodian/browser/export/resource/determinism results and original V2 e2e provenance.",
+      "Inherited B8 2269-pass regression, runtime confinement/no-network experiment and earlier A/B acceptance evidence."
+    ],
+    "graph_limit": "Tier 2 requested. list_projects listed main checkout but no index rooted at this worktree; index_status/search_graph/check_index_coverage were approval-blocked with policy never. No graph generation/completeness claim. Direct source, ORM, Git and media probes used.",
+    "not_performed": [
+      "Source/test modifications, formatting, staging or commits",
+      "Full suite",
+      "Push, merge, tag, deployment or Production Authority actions",
+      "Provider/network calls",
+      "Subagent delegation"
+    ]
+  },
+  "evidence_files": [
+    {
+      "file": "docs/r2/evidence/m10-final-acceptance-codex-review.json",
+      "sha256": "d558c30a1fac917704378fcbd2a0113d1b662ff0aca0028dd3fa3e5e49f6df6a"
+    },
+    {
+      "file": "docs/r2/evidence/R2_M10_B7_PILOT_SUMMARY.json",
+      "sha256": "5ad358f7deb7de9afaaddbf6229993dcd8fae81953c5b9d3df3f734dbc7bd748"
+    },
+    {
+      "file": "docs/r2/evidence/R2_M10_B7_PILOT_PREREGISTRATION.json",
+      "sha256": "37acbd8b0479f2f0e0e4c382806e431109e85d62ae8e8e09234db5d8171d0bb5"
+    },
+    {
+      "file": "docs/r2/evidence/R2_M10_B7_PILOT_ZH_SHUANG.json",
+      "sha256": "ca87a377417cd164914ca06cf60da0b88d64e36e6dcb79f1d885233d329f3c50"
+    },
+    {
+      "file": "docs/r2/evidence/R2_M10_INTEGRATED_EVIDENCE.json",
+      "sha256": "3e3b31ebf3c122b2a7c00713bad4b889cc949b73f379934bf957362a559ad093"
+    },
+    {
+      "file": "docs/r2/evidence/m10-integrated/b1-c3-witness.sh",
+      "sha256": "f458b1c3b8d3aadf56d1519bbf01390cd1c0c0aa9561fbe5377a704f5211791e"
+    },
+    {
+      "file": "docs/r2/evidence/m10-integrated/b1-c3-witness.out",
+      "sha256": "5fb4ee7b9457578540b08f8cfc23d09acf0144a92570a16ceeb11a74b4f38348"
+    },
+    {
+      "file": "docs/r2/evidence/m10-integrated/b1-c3-sqlite.out",
+      "sha256": "e84d95b6a86cc1638e3778fff2330cb97c34c9e7a71d06f61d97901a049816a2"
+    },
+    {
+      "file": "docs/r2/evidence/m10-b7-pilot/zh-corpus/golden-b-e2e-result.json",
+      "sha256": "d6732aea785e358d5c061dfdb955789c15e86e07f7306bf776397450775d9490"
+    },
+    {
+      "file": "docs/r2/evidence/m10-b7-pilot/zh-corpus/zh-shuang-projection.json",
+      "sha256": "3ac4885439972e9b09ef288cf5a179bcadb6d74a87af107ed9e2ce1a35951757"
+    },
+    {
+      "file": "docs/r2/evidence/m10-b7-pilot/zh-corpus/shuangwen.png",
+      "sha256": "b95916b369fe48763bd17896a0fa4289d3a80e4948e312d39a1919bd6a9b072c"
+    },
+    {
+      "file": "docs/r2/evidence/m10-b7-pilot/zh-corpus/zh916.png",
+      "sha256": "e86473302ea95537085db8f7b5651957d18002e208c838293fe0adea850ef02a"
+    },
+    {
+      "file": "docs/r2/evidence/m10-b7-pilot/narrative-zh_shuang.json",
+      "sha256": "1b6553b1107b2b42e90cd7c710610e84df404f5e3405fb242f10f396f4f8fefd"
+    },
+    {
+      "file": "docs/r2/evidence/m10-b7-pilot/scripts/project_shuangwen.py.txt",
+      "sha256": "e6420ace242db5be02d7160d3802529c218f2e9f49b1dfd6a63c84a5d7f4391c"
+    },
+    {
+      "file": "docs/r2/evidence/m10-b7-pilot/scripts.sha256",
+      "sha256": "90f565efefaf85e56090796a5004c1a813ba187fc6055fed242e7ae4a1ea330b"
+    }
+  ],
+  "source_files_read": [
+    "r2/advanced_creative/format_render.py",
+    "r2/advanced_creative/formats.py (PAD/geometry call surface)",
+    "tests/unit/r2/advanced_creative/test_formats.py (profile/overlay fixtures)",
+    "alembic/versions/8a8c4a0e0001_add_exploration_authority.py (heads, revisions and preview FKs)",
+    "lib/db/models/advanced_creative.py (imported live ORM FK metadata)",
+    "alembic/versions/5d2a7c3e8b11_m8_packaging_candidate_kind.py (current hash and prior reviewed implementation)"
+  ],
+  "workspace": {
+    "initial_status": "clean",
+    "only_repository_write": "docs/r2/evidence/m10-final-acceptance-codex-review-r2.json",
+    "source_preserved": true,
+    "reviewed_head": "191759d5cc27279a3c305ec78a55b75f5e356911"
+  }
+}

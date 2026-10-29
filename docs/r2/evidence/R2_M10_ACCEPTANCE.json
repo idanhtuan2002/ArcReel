@@ -1,0 +1,64 @@
+{
+  "schema_id": "m10.acceptance.v1",
+  "milestone": "M10 quality packaging (M10-A + M10-B)",
+  "verdict": "ACCEPTED_WITH_CONDITIONS",
+  "date": "2026-10-29",
+  "accepted_head": "191759d5c",
+  "code_head": "00912922e",
+  "review": "docs/r2/evidence/m10-final-acceptance-codex-review-r2.json",
+  "superseded_review": "docs/r2/evidence/m10-final-acceptance-codex-review.json (NOT_ACCEPTED at 70386a26a)",
+  "parts": {
+    "M10-A": "docs/r2/evidence/R2_M10_A_ACCEPTANCE.json (source b904bc000)",
+    "M10-B": "docs/r2/evidence/R2_M10_B_ACCEPTANCE.json"
+  },
+  "integrated": "docs/r2/evidence/R2_M10_INTEGRATED_EVIDENCE.json",
+  "pilots": "docs/r2/evidence/R2_M10_B7_PILOT_SUMMARY.json (v3)",
+  "claims": [
+    "local export packages of an approved master with Human-selected (sponsor-delegated) packaging, checked against a published V2 profile",
+    "exact A->B parent chain; one reversible M10 migration lineage",
+    "donor parity PASS; three pilot dossiers meet every threshold under the amended determinism definition",
+    "no network in the confined builder and probes; no Production Authority or upload surface"
+  ],
+  "does_not_claim": [
+    "independent Human review (the reviewer was the sponsor-delegated agent)",
+    "an operator-approved zh-Hans release final (pipeline e2e product, projected)",
+    "activated-host or production qualification",
+    "multi-user throughput, fsync fault or power-loss durability",
+    "M11, credentials, uploads, publication or deployment"
+  ],
+  "conditions": [
+    {
+      "id": "C1_PROVENANCE",
+      "gate": "Every downstream completion statement",
+      "requirement": "Bind acceptance to this head and the amended policy. Preserve historical failed/English-surrogate runs, delegated reviewer identity, seeded-only correction, native e2e source/projection identity and limits. This review supersedes the previous NOT_ACCEPTED verdict for this head, not the historical record."
+    },
+    {
+      "id": "C2_SCHEMA_WITNESS",
+      "gate": "Full B1 C3 incoming-FK evidence closure",
+      "requirement": "Carry the narrow incoming-FK witness gap described above; supplied source/commands/row output and focused SQLite count are now present. Do not require redundant successful PG execution in this denied sandbox or call it independently rerun."
+    },
+    {
+      "id": "C3_OPERATING_ENVELOPE",
+      "gate": "Supported local use and stronger qualification",
+      "requirement": "Retain LOCAL_REGULAR_FILE_IO, trusted project-root and single-operator limits, distinct observed-versus-reasoned serialization schedules, fsync fault-injection and abrupt-process/power-loss durability gaps. Existing acceptance does not expand storage or concurrency support."
+    },
+    {
+      "id": "C4_ACTIVATED_HOST",
+      "gate": "Before production/activated-host qualification",
+      "requirement": "Retain root-owned custody, root attestor/intended app UID, pinned key/deployment identity and stopped-app/workers restore prerequisites. User-owned pilot custody/test keys and fixture dependency binding are not production-host qualification."
+    },
+    {
+      "id": "C5_INHERITED_A_B",
+      "gate": "Interpretation of inherited acceptance",
+      "requirement": "Retain bounded A review/runtime limitations and all applicable B acceptance operating/recovery/provenance conditions. F1 failure-evidence persistence already has B0 source/migration and supplied regression evidence; do not call that feature unimplemented from a stale A note. This delta is not a full A6/A7 re-audit."
+    },
+    {
+      "id": "C6_REBIND_AND_RELEASE",
+      "gate": "Later source changes or release actions",
+      "requirement": "Refresh affected route/parity/regression evidence after product-source changes. Source heads and documentation heads differ; pure parity folds at bound source heads PASS, literal review-head folds BLOCKED. Completion allows local export only and confers none of the release/production authorities listed above."
+    }
+  ],
+  "human_gates_remaining": [
+    "push, merge, tag, deploy"
+  ]
+}

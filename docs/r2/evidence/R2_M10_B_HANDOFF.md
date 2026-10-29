@@ -180,11 +180,12 @@ Rewrite in place; this is the resume entry for M10-B.
   scan). Final M10 review **NOT_ACCEPTED** (`m10-final-acceptance-codex-review.json`): F1 High no native zh-Hans final
   for the zh_shuang pilot; F2 Medium pilots lack the preregistered Human reviewer (agent-performed gates).
 
+- zh_shuang rerun on the native 爽文 V2 final (golden-b, projected 9:16 by format_render), sponsor delegation of the
+  reviewer role recorded, B1 C3 PG witness → final M10 review r2 **ACCEPTED_WITH_CONDITIONS** →
+  `R2_M10_ACCEPTANCE.json`.
+
 ## Next step
 
-**Stop for the sponsor (Human-only work).** (1) Provide an approved native zh-Hans/zh-shuang V2 final; (2) as the
-sponsor, perform the B7 Human gates (profile publication, narrative review, disposition, package selection) and
-review the findings for the three cohorts on an activated host, using `m10-b7-pilot/scripts` as the runbook driver
-for the agent-side steps. Then rerun the dossiers at a frozen head and request final M10 acceptance again. Carried:
-B1 C3 migration witness, storage/recovery limits, activated-host qualification (review conditions C2-C7).
-Nothing pushed; merge/tag/deploy are Human gates.
+**M10 is accepted with conditions.** Remaining are Human gates only: push / merge / tag / deploy of
+`design/r2-m10-b`. Carried conditions (C1-C5 in `R2_M10_ACCEPTANCE.json`): incoming-FK witness, storage/power-loss
+and multi-user envelope, activated-host qualification. Nothing pushed.

@@ -47,6 +47,7 @@
     "script": "docs/r2/evidence/m10-integrated/b1-c3-witness.sh",
     "output": "docs/r2/evidence/m10-integrated/b1-c3-witness.out",
     "sqlite": "docs/r2/evidence/m10-integrated/b1-c3-sqlite.out",
-    "result": "predecessor FORMAT revisions and their referencing head row preserved across upgrade, allowed downgrade and re-upgrade on PG16; downgrade refuses with M10_PACKAGING_HISTORY_PRESENT when a PACKAGING row exists"
+    "result": "predecessor FORMAT revisions (each holding its FK to the candidate head row) and the head row itself preserved across upgrade, allowed downgrade and re-upgrade on PG16; downgrade refuses with M10_PACKAGING_HISTORY_PRESENT when a PACKAGING row exists",
+    "limit": "no row referencing a revision (promotion preview, spatial evidence, packaging observation) is inserted; incoming-FK preservation is not witnessed"
   }
 }
