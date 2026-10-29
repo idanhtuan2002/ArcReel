@@ -536,4 +536,13 @@ MESSAGES = {
     "m9_cohort_leakage": "Hồ sơ này không khớp với chính sách sáng tạo của dự án.",
     "m9_required_evidence_missing": "Hồ sơ cơ hội chưa sẵn sàng. Hãy nhờ quản trị viên dự án hoàn tất thiết lập.",
     "m9_profile_invalid": "Hãy kiểm tra hồ sơ cơ hội rồi thử lại.",
+    "m9_source_capability_unavailable": "Nguồn này chưa sẵn sàng trên máy chủ. Hãy nhờ quản trị dự án cấu hình.",
+    "m9_source_policy_forbidden": "Nguồn này không cho phép yêu cầu đó với dự án này.",
+    "m9_credential_reference_invalid": "Thông tin xác thực nguồn của dự án không hợp lệ. Hãy nhờ quản trị dự án cấp lại.",
+    "m9_evidence_stale": "Bằng chứng từ nguồn này đã cũ. Hãy thu thập lại trước khi dùng.",
+    "m9_acquisition_outcome_unknown": "Chưa rõ kết quả của lần thu thập này. Hãy kiểm tra lại trước khi thử lại.",
+    "m9_evidence_retention_expired": "Bằng chứng từ nguồn này đã hết hạn lưu giữ và không còn dùng được.",
+    "m9_acquisition_evidence_missing": "Việc thu thập từ nguồn chưa sẵn sàng. Hãy nhờ quản trị dự án hoàn tất cấu hình.",
+    "m9_acquisition_invalid": "Hãy kiểm tra yêu cầu thu thập rồi thử lại.",
+    "m9_query_stale_head": "Truy vấn nguồn này đã thay đổi. Hãy tải lại rồi thử lại.",
 }

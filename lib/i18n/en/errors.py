@@ -537,4 +537,13 @@ MESSAGES = {
     "m9_cohort_leakage": "This profile does not match the project's creative policy.",
     "m9_required_evidence_missing": "Opportunity profiles are not ready. Ask the project administrator to complete setup.",
     "m9_profile_invalid": "Check the opportunity profile and try again.",
+    "m9_source_capability_unavailable": "This source is not available on this host. Ask the project administrator to set it up.",
+    "m9_source_policy_forbidden": "This source does not allow that request for this project.",
+    "m9_credential_reference_invalid": "The source credentials for this project are not valid. Ask the project administrator to renew them.",
+    "m9_evidence_stale": "This source evidence is out of date. Acquire it again before using it.",
+    "m9_acquisition_outcome_unknown": "The result of this acquisition is not known yet. Check it again before retrying.",
+    "m9_evidence_retention_expired": "This source evidence is past its retention period and is no longer available.",
+    "m9_acquisition_evidence_missing": "Source acquisition is not ready. Ask the project administrator to complete setup.",
+    "m9_acquisition_invalid": "Check the source request and try again.",
+    "m9_query_stale_head": "This source query has changed. Reload it and try again.",
 }

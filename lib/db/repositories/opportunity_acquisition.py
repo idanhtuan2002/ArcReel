@@ -145,6 +145,21 @@ class CapabilityEvidenceRepository:
         )
         return None if row is None else _grant(row)
 
+    async def list_latest(self, *, after_id: str | None, limit: int) -> tuple[SourceCapabilityGrant, ...]:
+        """The newest consumed version of each scoped grant, in grant-id pages; nothing is issued or refreshed."""
+        model = M9ConsumedCapabilityGrantModel
+        statement = (
+            select(model)
+            .where(model.user_id == self.user_id, model.project_name == self.project_name)
+            .distinct(model.grant_id)
+            .order_by(model.grant_id, model.grant_version.desc())
+            .limit(limit)
+            .execution_options(populate_existing=True)
+        )
+        if after_id is not None:
+            statement = statement.where(model.grant_id > after_id)
+        return tuple(_grant(row) for row in (await self.session.scalars(statement)).all())
+
     async def get_evaluation(self, evaluation_id: str) -> EffectiveCapabilityEvaluation | None:
         row = await self.session.get(
             M9CapabilityEvaluationModel, (self.user_id, self.project_name, evaluation_id), populate_existing=True
@@ -231,6 +246,16 @@ class SourceQueryRepository:
             M9SourceQueryModel, (self.user_id, self.project_name, query_id, revision), populate_existing=True
         )
         return None if row is None else _query(row)
+
+    async def current_revision(self, query_id: str) -> int | None:
+        """The head revision without taking the writer's row lock."""
+        return await self.session.scalar(
+            select(M9SourceQueryHeadModel.current_revision).where(
+                M9SourceQueryHeadModel.user_id == self.user_id,
+                M9SourceQueryHeadModel.project_name == self.project_name,
+                M9SourceQueryHeadModel.query_id == query_id,
+            )
+        )
 
     async def get_head(self, query_id: str) -> SourceQueryHead | None:
         row = (

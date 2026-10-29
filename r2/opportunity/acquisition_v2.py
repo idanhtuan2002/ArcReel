@@ -25,6 +25,7 @@ from r2.contracts.opportunity import (
     M9ContractModel,
     NormalizedSourceObservation,
     OpportunityIdentityRead,
+    OpportunityReadPage,
     SnapshotPage,
     SnapshotReadPage,
     SourceCapabilityGrant,
@@ -307,6 +308,10 @@ class ManualAcquisitionRepositoryPort(Protocol):
         self, snapshot_id: str, revision: int = 1
     ) -> tuple[SourceSnapshot, SnapshotProvenanceV2] | None: ...
     async def list_snapshot_ids(self, query_id: str, *, after_id: str | None, limit: int) -> tuple[str, ...]: ...
+    async def get_query(self, query_id: str, revision: int | None) -> SourceQuery | None: ...
+    async def list_capability_grants(
+        self, *, after_id: str | None, limit: int
+    ) -> tuple[SourceCapabilityGrant, ...]: ...
     async def require_snapshot_read(
         self, attempt_id: str, *, expected_envelope_version: int, operational: bool
     ) -> None: ...
@@ -382,6 +387,10 @@ class ManualAcquisitionStorePort(Protocol):
 
 
 class OpportunitySnapshotNotFoundError(LookupError):
+    pass
+
+
+class OpportunityQueryNotFoundError(LookupError):
     pass
 
 
@@ -576,6 +585,30 @@ class OpportunityAcquisitionServiceV2:
                 return EvidenceValidityState.STALE, False, StopCode(retained.code)
             return EvidenceValidityState.STALE, True, StopCode(error.code)
         return EvidenceValidityState.CURRENT, True, None
+
+    def _scoped[R: OpportunityIdentityRead | OpportunityReadPage](self, request: R) -> R:
+        try:
+            request = type(request).model_validate(request.model_dump())
+        except (ValueError, TypeError):
+            raise OpportunityError(StopCode.M9_SOURCE_POLICY_FORBIDDEN) from None
+        if (request.user_id, request.project_name) != (self.user_id, self.project_name):
+            raise OpportunityError(StopCode.M9_SOURCE_POLICY_FORBIDDEN)
+        return request
+
+    async def get_query(self, request: OpportunityIdentityRead) -> SourceQuery:
+        """The exact (or head) declared query, verified against its stored digest; no port is contacted."""
+        request = self._scoped(request)
+        async with self.store.transaction() as tx:
+            query = await tx.manual.get_query(request.identity, request.revision)
+        if query is None:
+            raise OpportunityQueryNotFoundError
+        return query
+
+    async def list_capabilities(self, request: OpportunityReadPage) -> tuple[SourceCapabilityGrant, ...]:
+        """The newest consumed grant per id in this scope, exactly as recorded; none is issued or inferred."""
+        request = self._scoped(request)
+        async with self.store.transaction() as tx:
+            return await tx.manual.list_capability_grants(after_id=request.after_id, limit=request.limit)
 
     async def list_snapshots(self, request: SnapshotReadPage) -> tuple[SourceSnapshotViewV2, ...]:
         try:

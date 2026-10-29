@@ -42,6 +42,7 @@ from r2.contracts.opportunity import (
     EvidenceDataClassClock,
     M9ContractModel,
     NormalizedSourceObservation,
+    SourceCapabilityGrant,
     SourceQuery,
     SourceSnapshot,
 )
@@ -1854,6 +1855,16 @@ class ManualAdmissionRepository:
             return None
         stored = await self._snapshot_record(row)
         return stored.snapshot, stored.provenance
+
+    async def get_query(self, query_id: str, revision: int | None) -> SourceQuery | None:
+        if revision is None:
+            revision = await self.queries.current_revision(query_id)
+            if revision is None:
+                return None
+        return await self.queries.get_exact(query_id, revision)
+
+    async def list_capability_grants(self, *, after_id: str | None, limit: int) -> tuple[SourceCapabilityGrant, ...]:
+        return await self.capabilities.list_latest(after_id=after_id, limit=limit)
 
     async def list_snapshot_ids(self, query_id: str, *, after_id: str | None, limit: int) -> tuple[str, ...]:
         statement = (

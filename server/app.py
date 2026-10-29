@@ -70,6 +70,7 @@ from server.routers import (
     learning,
     onboarding,
     opportunity,
+    opportunity_acquisition,
     presentations,
     products,
     project_events,
@@ -696,6 +697,12 @@ app.include_router(
 )
 app.include_router(
     opportunity.router,
+    prefix="/api/v1",
+    dependencies=[Depends(require_project_migration_ok)],
+    tags=["M9 opportunity"],
+)
+app.include_router(
+    opportunity_acquisition.router,
     prefix="/api/v1",
     dependencies=[Depends(require_project_migration_ok)],
     tags=["M9 opportunity"],

@@ -28,12 +28,22 @@ from tests.integration.server.services.test_m9_manual_publication import prepare
 
 
 async def service_subject(
-    factory, tmp_path, *, boundary=None, refresh_seconds=60, retention_seconds=120, cleanup=False, read_boundary=None
+    factory,
+    tmp_path,
+    *,
+    boundary=None,
+    refresh_seconds=60,
+    retention_seconds=120,
+    cleanup=False,
+    read_boundary=None,
+    parts=None,
 ):
     module = importlib.import_module("r2.opportunity.acquisition_v2")
     host = importlib.import_module("server.services.opportunity_acquisition_v2")
     old, declaration, capabilities = await acquisition_service_fixture(factory, tmp_path)
     declared = await old.declare_query(declaration)
+    if parts is not None:
+        parts.update(query_service=old, declaration=declaration, declared=declared, capabilities=capabilities)
     command = AcquireSourceQueryV2(**acquire_command(declared).model_dump(), protocol_version="m9.acquisition.v2")
     root, provision, publication = await prepare_publication(tmp_path)
     provision.update(
@@ -1860,3 +1870,118 @@ async def test_v2_snapshot_waiting_for_newer_grant_commit_refuses_current_withou
         release.set()
         await asyncio.gather(writer, *([] if reader is None else [reader]), return_exceptions=True)
         service.store = trusted
+
+
+def _http(service, query_service):
+    from fastapi import FastAPI
+    from httpx import ASGITransport, AsyncClient
+
+    from server.auth import CurrentUserInfo, get_current_interactive_user, get_current_user
+    from server.error_handlers import register_error_handlers
+    from server.routers import opportunity_acquisition
+
+    user = CurrentUserInfo(id="u1", sub="human-a", role="user")
+    app = FastAPI()
+    register_error_handlers(app)
+    app.include_router(opportunity_acquisition.router, prefix="/api/v1")
+    app.dependency_overrides[get_current_user] = lambda: user
+    app.dependency_overrides[get_current_interactive_user] = lambda: user
+    app.dependency_overrides[opportunity_acquisition.acquisition_service_factory] = lambda: lambda _u, _p: service
+    app.dependency_overrides[opportunity_acquisition.query_service_factory] = lambda: lambda _u, _p: query_service
+    return AsyncClient(transport=ASGITransport(app=app), base_url="http://testserver")
+
+
+HTTP_BASE = "/api/v1/projects/show-a/m9/opportunity"
+
+
+async def test_v2_http_declares_acquires_replays_and_reads_through_the_scoped_service(session_factory, tmp_path):
+    parts: dict = {}
+    service, command, calls, _ = await service_subject(session_factory, tmp_path, parts=parts)
+    declaration, declared = parts["declaration"], parts["declared"]
+    async with _http(service, parts["query_service"]) as client:
+        replayed = await client.post(
+            HTTP_BASE + "/queries",
+            json={
+                "command_id": declaration.context.command_id,
+                "query_id": declaration.query_id,
+                "parent_revision": declaration.parent_revision,
+                "expected_head_version": declaration.expected_head_version,
+                "draft": declaration.draft.model_dump(mode="json"),
+            },
+        )
+        assert replayed.status_code == 200, replayed.text
+        assert replayed.json() == declared.model_dump(mode="json")
+        body = {
+            "protocol_version": "m9.acquisition.v2",
+            "command_id": command.context.command_id,
+            "query_id": command.query_id,
+            "query_revision": command.query_revision,
+            "query_digest": command.query_digest,
+            "expected_query_head_version": command.expected_query_head_version,
+        }
+        first = await client.post(HTTP_BASE + "/acquisitions", json=body)
+        assert first.status_code == 200, first.text
+        receipt = first.json()
+        assert receipt["protocol_version"] == "m9.acquisition.v2"
+        assert len(receipt["snapshot_ids"]) == 1
+        fetched = calls.count("fetch")
+        again = await client.post(HTTP_BASE + "/acquisitions", json=body)
+        assert again.content == first.content
+        assert calls.count("fetch") == fetched
+        conflict = await client.post(HTTP_BASE + "/acquisitions", json={**body, "expected_query_head_version": 9})
+        assert conflict.status_code == 409
+        assert conflict.json()["diagnostic"]["stop_code"] == "M9_COMMAND_REPLAY_CONFLICT"
+        snapshot_id = receipt["snapshot_ids"][0]
+        view = await client.get(HTTP_BASE + "/snapshots/" + snapshot_id)
+        assert view.status_code == 200, view.text
+        assert view.json()["protocol_version"] == "m9.acquisition.v2"
+        assert view.json()["provenance"]["snapshot_id"] == snapshot_id
+        assert view.json()["snapshot_view"]["validity"]["state"] == "CURRENT"
+        page = await client.get(HTTP_BASE + "/snapshots", params={"query_id": command.query_id})
+        assert page.json() == [view.json()]
+        query = await client.get(HTTP_BASE + "/queries/" + command.query_id)
+        exact = await client.get(HTTP_BASE + "/queries/" + command.query_id, params={"revision": 1})
+        assert query.status_code == exact.status_code == 200
+        assert query.json() == exact.json() == declared.query.model_dump(mode="json")
+        missing = await client.get(HTTP_BASE + "/queries/019a0000-0000-7000-8000-00000000dead")
+        assert missing.status_code == 404
+        assert (await client.get(HTTP_BASE + "/snapshots/019a0000-0000-7000-8000-00000000dead")).status_code == 404
+        grants = await client.get(HTTP_BASE + "/capabilities")
+        assert grants.status_code == 200
+        assert [g["grant_id"] for g in grants.json()] == [declared.query.capability_grant_id]
+        assert grants.json()[0]["grant_version"] == declared.query.capability_grant_version
+
+
+async def test_v2_http_on_an_unconfigured_host_refuses_before_source_or_custody_contact(session_factory, tmp_path):
+    from server.auth import CurrentUserInfo
+    from server.services.opportunity_acquisition_v2 import build_acquisition_service_v2
+
+    parts: dict = {}
+    service, command, calls, _ = await service_subject(session_factory, tmp_path, parts=parts)
+    bare = build_acquisition_service_v2(
+        session_factory, current_user=CurrentUserInfo(id="u1", sub="human-a", role="user"), project_name="show-a"
+    )
+    async with _http(bare, parts["query_service"]) as client:
+        response = await client.post(
+            HTTP_BASE + "/acquisitions",
+            json={
+                "protocol_version": "m9.acquisition.v2",
+                "command_id": command.context.command_id,
+                "query_id": command.query_id,
+                "query_revision": command.query_revision,
+                "query_digest": command.query_digest,
+                "expected_query_head_version": command.expected_query_head_version,
+            },
+            headers={"Accept-Language": "vi"},
+        )
+        assert response.status_code == 503
+        assert response.json()["diagnostic"]["stop_code"] == "M9_SOURCE_CAPABILITY_UNAVAILABLE"
+        assert response.json()["detail"].startswith("Nguồn này chưa sẵn sàng")
+        assert calls == []
+        receipt = await service.acquire(command)
+        reads = calls.count("read")
+        read = await client.get(HTTP_BASE + "/snapshots/" + receipt.snapshot_ids[0])
+        assert calls.count("read") == reads
+        assert read.status_code == 503
+        assert read.json()["diagnostic"]["stop_code"] == "M9_SOURCE_CAPABILITY_UNAVAILABLE"
+        assert (await client.get(HTTP_BASE + "/queries/" + command.query_id)).status_code == 200

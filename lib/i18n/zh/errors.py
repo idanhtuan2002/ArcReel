@@ -479,4 +479,13 @@ MESSAGES = {
     "m9_cohort_leakage": "此配置与项目的创作策略不匹配。",
     "m9_required_evidence_missing": "机会配置尚未就绪，请联系项目管理员完成设置。",
     "m9_profile_invalid": "请检查机会配置后重试。",
+    "m9_source_capability_unavailable": "此主机上尚未提供该来源。请联系项目管理员完成配置。",
+    "m9_source_policy_forbidden": "该来源不允许此项目发起这个请求。",
+    "m9_credential_reference_invalid": "此项目的来源凭据无效。请联系项目管理员更新。",
+    "m9_evidence_stale": "该来源证据已过期。请重新获取后再使用。",
+    "m9_acquisition_outcome_unknown": "此次获取的结果尚不确定。请先查看结果再重试。",
+    "m9_evidence_retention_expired": "该来源证据已超过保留期限，无法再使用。",
+    "m9_acquisition_evidence_missing": "来源获取尚未就绪。请联系项目管理员完成配置。",
+    "m9_acquisition_invalid": "请检查来源请求后重试。",
+    "m9_query_stale_head": "该来源查询已更改。请重新加载后重试。",
 }
