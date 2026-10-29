@@ -260,3 +260,123 @@ async def test_an_exact_revision_and_the_runs_own_profile_are_readable(http) -> 
         "runs"
     ]
     assert (listed["cohort_id"], listed["product_surface"]) == ("cohort-c", "video")
+
+
+def _video_asset(env) -> dict[str, Any]:
+    import hashlib
+    from pathlib import Path
+
+    media = Path(env["root"].object_ref)
+    return {
+        "role": "video",
+        "variant_id": None,
+        "source_ref": media.resolve().relative_to(env["project"].resolve()).as_posix(),
+        "content_digest": "sha256:" + hashlib.sha256(media.read_bytes()).hexdigest(),
+        "media_type": "video/mp4",
+        "byte_size": media.stat().st_size,
+        "constraint_rule_id": "asset-video",
+    }
+
+
+async def test_a_run_made_on_the_quality_routes_exports_through_packaging(http) -> None:
+    """The same run goes from the quality routes through the Packaging revision, check, preview, selection and export."""
+    from server.routers import packaging
+
+    env = http
+    chain = await _chain(env)
+    tree, sockets = env["governance"]
+    env["app"].include_router(packaging.router, prefix="/api/v1", dependencies=[Depends(get_current_user)])
+    env["app"].dependency_overrides[packaging.packaging_deps] = lambda: packaging.PackagingDeps(
+        sessions=env["factory"],
+        project_root=lambda _name: env["project"],
+        grant_reader=env["reader"],
+        read_directory=tree / "read",
+        socket_directory=sockets,
+        custody_uid=os.getuid(),
+        custody_gid=os.getgid(),
+    )
+    client, base = env["client"], "/api/v1/projects/project/packaging"
+    text = {
+        "title": "A history of the river",
+        "description": "How the river shaped the valley over ten thousand years.",
+    }
+    draft = text | {
+        "tags": ["river"],
+        "hashtags": [],
+        "chapters": [],
+        "localization_variants": [{"locale": "en", **text, "tags": ["river"], "hashtags": [], "chapters": []}],
+        "audience_classification": {
+            "audience_category": "general",
+            "age_restriction": None,
+            "classification_policy_digest": "sha256:" + "0" * 64,
+        },
+        "disclosure": {
+            "synthetic_media": True,
+            "paid_promotion": False,
+            "disclosure_policy_digest": "sha256:" + "0" * 64,
+        },
+        "variant_groups": [],
+        "assets": [_video_asset(env)],
+    }
+    run = chain["run"]
+    revision = await client.post(
+        f"{base}/revisions",
+        json={"command_id": "pkg-rev", "quality_run_id": run["run"]["run_id"], "draft": draft},
+        headers=_headers(),
+    )
+    assert revision.status_code == 200, revision.text
+    candidate = revision.json()["revision"]
+    check = await client.post(
+        f"{base}/checks",
+        json={
+            "command_id": "pkg-check",
+            "candidate_id": candidate["candidate_id"],
+            "candidate_revision": candidate["revision"],
+            "candidate_payload_digest": candidate["payload_digest"],
+            "quality_run_id": run["run"]["run_id"],
+            "quality_run_digest": run["run_digest"],
+        },
+        headers=_headers(),
+    )
+    assert check.status_code == 200, check.text
+    assert check.json()["status"] == "PASS", check.json()["findings"]
+    slot = {"source_artifact_key": chain["root"], "cohort_id": "cohort-c", "product_surface": "video"}
+    preview = await client.post(
+        f"{base}/previews",
+        json={
+            "command_id": "pkg-preview",
+            **slot,
+            "candidate_id": candidate["candidate_id"],
+            "candidate_revision": candidate["revision"],
+            "candidate_payload_digest": candidate["payload_digest"],
+            "packaging_observation_id": check.json()["observation_id"],
+            "selected_variant_ids": [],
+            "waivers": [],
+        },
+        headers=_headers(),
+    )
+    assert preview.status_code == 200, preview.text
+    shown = preview.json()
+    selection = await client.post(
+        f"{base}/selections",
+        json={
+            "command_id": "pkg-select",
+            "preview_id": shown["preview"]["preview_id"],
+            "preview_digest": shown["preview_digest"],
+            "expected_head_version": shown["preview"]["expected_head_version"],
+        },
+        headers=_headers(),
+    )
+    assert selection.status_code == 200, selection.text
+    exported = await client.post(
+        f"{base}/exports",
+        json={
+            "command_id": "pkg-export",
+            **slot,
+            "selection_id": selection.json()["selection_id"],
+            "selection_digest": selection.json()["selection_digest"],
+        },
+        headers=_headers(),
+    )
+    assert exported.status_code == 200, exported.text
+    assert exported.json()["status"] == "EXPORTED"
