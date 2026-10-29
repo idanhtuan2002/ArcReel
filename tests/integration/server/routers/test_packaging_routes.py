@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import io
+import os
 import zipfile
 from typing import Any
 
@@ -50,6 +51,8 @@ def _app(env) -> FastAPI:
         grant_reader=env["reader"],
         read_directory=root_dir / "read",
         socket_directory=socket_dir,
+        custody_uid=os.getuid(),
+        custody_gid=os.getgid(),
     )
     return app
 
@@ -74,7 +77,8 @@ def _draft(env) -> dict[str, Any]:
 async def http(packaging_host):
     env = packaging_host
     env["disposition"] = await issue(env, disposition_request(env["run"]))
-    transport = httpx.ASGITransport(app=_app(env))
+    env["app"] = _app(env)
+    transport = httpx.ASGITransport(app=env["app"])
     async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
         env["client"] = client
         yield env
@@ -84,7 +88,7 @@ def _headers(subject: str = ACTOR) -> dict[str, str]:
     return {"Authorization": f"Bearer {auth.create_token(subject)}"}
 
 
-async def _flow_to_selection(env) -> dict[str, Any]:
+async def _flow_to_selection(env, *, select_status: int = 200) -> dict[str, Any]:
     client = env["client"]
     run = env["run"]
     from r2.quality.runs import run_digest
@@ -142,7 +146,7 @@ async def _flow_to_selection(env) -> dict[str, Any]:
         },
         headers=_headers(),
     )
-    assert selected.status_code == 200, selected.text
+    assert selected.status_code == select_status, selected.text
     return {"revision": revision, "selection": selected.json(), "slot": slot}
 
 
@@ -230,6 +234,28 @@ async def test_selection_and_export_need_an_interactive_session(http) -> None:
         },
     )
     assert exported.status_code == 401
+
+
+async def test_selection_verifies_custody_against_the_configured_owner(http) -> None:
+    env = http
+    root_dir, socket_dir = env["governance"]
+    env["app"].dependency_overrides[packaging.packaging_deps] = lambda: packaging.PackagingDeps(
+        sessions=env["factory"],
+        project_root=lambda _name: env["project"],
+        grant_reader=env["reader"],
+        read_directory=root_dir / "read",
+        socket_directory=socket_dir,
+        custody_uid=os.getuid() + 1,
+        custody_gid=os.getgid(),
+    )
+    flow = await _flow_to_selection(env, select_status=403)
+    assert flow["selection"]["detail"]
+
+
+def test_an_activated_host_expects_root_owned_custody(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("ARCREEL_GOVERNANCE_READ_DIR", raising=False)
+    deps = packaging.packaging_deps()
+    assert (deps.custody_uid, deps.custody_gid) == (0, 0)
 
 
 async def _replace_selection(env, flow: dict[str, Any]) -> Any:

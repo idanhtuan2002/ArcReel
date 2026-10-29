@@ -76,6 +76,9 @@ class PackagingDeps:
     grant_reader: Callable[[], Awaitable[CheckpointedShowrunnerGrantReader]] | None
     read_directory: Path | None
     socket_directory: Path | None
+    # Owner of the governance archive and attestor socket; root on an activated host (ADR-0103).
+    custody_uid: int = 0
+    custody_gid: int = 0
 
 
 def packaging_deps() -> PackagingDeps:
@@ -87,7 +90,7 @@ def packaging_deps() -> PackagingDeps:
 
         async def activated() -> CheckpointedShowrunnerGrantReader:
             return await verify_governance_activated_startup(
-                read_path, socket_path, session_factory=async_session_factory
+                read_path, socket_path, session_factory=async_session_factory, expected_uid=0, expected_gid=0
             )
 
         reader = activated
@@ -309,8 +312,8 @@ async def select_package(
         interactive_token=token,
         read_directory=deps.read_directory,
         socket_directory=deps.socket_directory,
-        expected_uid=os.getuid(),
-        expected_gid=os.getgid(),
+        expected_uid=deps.custody_uid,
+        expected_gid=deps.custody_gid,
     )
     service = PackageSelectionService(
         sessions=deps.sessions, custodian=custodian, project_root=deps.project_root(project_name)
