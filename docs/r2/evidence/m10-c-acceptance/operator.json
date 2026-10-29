@@ -1,0 +1,55 @@
+[
+  {
+    "step": "profile",
+    "confirm": "The server prepared this request. Confirm to submit it exactly as shown.\n\nProfile\n01a187c0-b117-7ec6-9d3d-6d8648985e30 r1\nCohort · surface\ncohort · video\nNewer revisions\nHISTORICAL_ONLY\nPolicy digest\nsha256:0fa7dcc14fa8f6b1c1061f34a429bcabc2048419dceb188a987e956bd481c1c2\nPolicy being published\nPublish profile\nDiscard"
+  },
+  {
+    "step": "20-container",
+    "confirm": "The server prepared this request. Confirm to submit it exactly as shown.\n\nVideo\nartifact-key-v1:WyJlcGlzb2RlLXZpZGVvIiwxLCJGSU5BTCJd\nMaster candidate\nm7c:c63342a48941a6bc62edbf5d15f6525bc2c09fcc · sha256:1bcd60c2ee2765e7b5a4aef886963abc1bbb2b23c42bf0f796364a1150431aa6\nProfile\n01a187c0-b117-7ec6-9d3d-6d8648985e30 r1\nRequirement\ntechnical-container\nCommand\nprobe-190c4827-2bd8-480e-a3eb-fcf056ee3582\nRun check\nDiscard"
+  },
+  {
+    "step": "21-decode",
+    "confirm": "The server prepared this request. Confirm to submit it exactly as shown.\n\nVideo\nartifact-key-v1:WyJlcGlzb2RlLXZpZGVvIiwxLCJGSU5BTCJd\nMaster candidate\nm7c:c63342a48941a6bc62edbf5d15f6525bc2c09fcc · sha256:1bcd60c2ee2765e7b5a4aef886963abc1bbb2b23c42bf0f796364a1150431aa6\nProfile\n01a187c0-b117-7ec6-9d3d-6d8648985e30 r1\nRequirement\ntechnical-decode\nCommand\nprobe-441575d4-d1cc-4ed3-bb4a-a4d064ab7ff3\nRun check\nDiscard"
+  },
+  {
+    "step": "probes",
+    "section": "PROBES\nCheck container and streams\nCheck full decode\ntechnical-container · probe-190c4827-2bd8-480e-a3eb-fcf056ee3582 · actor · SUCCEEDED · PASS\nexecution 01a187c2-b5d4-7264-a8d2-c6cd57c4b49d · master binding sha256:fc971bd01095acee57d8503fcc746a380db641ef5b2c2800ee915750559f6d7a\ntechnical-decode · probe-441575d4-d1cc-4ed3-bb4a-a4d064ab7ff3 · actor · SUCCEEDED · PASS\nexecution 01a187c2-c515-79a1-8906-310369b9a7bf · master binding sha256:fc971bd01095acee57d8503fcc746a380db641ef5b2c2800ee915750559f6d7a"
+  },
+  {
+    "step": "review",
+    "confirm": "The server prepared this request. Confirm to submit it exactly as shown.\n\nVideo\nartifact-key-v1:WyJlcGlzb2RlLXZpZGVvIiwxLCJGSU5BTCJd\nMaster candidate\nm7c:c63342a48941a6bc62edbf5d15f6525bc2c09fcc · sha256:1bcd60c2ee2765e7b5a4aef886963abc1bbb2b23c42bf0f796364a1150431aa6\nProfile\n01a187c0-b117-7ec6-9d3d-6d8648985e30 r1\nReview result\nPASS\nFindings\n0\nReview evidence digest\nsha256:c4af28c95214bdbc6368dc51c54801b50c1e834fab4df08f83389646842332e1\nRecord review\nDiscard"
+  },
+  {
+    "step": "seal",
+    "confirm": "The server prepared this request. Confirm to submit it exactly as shown.\n\nVideo\nartifact-key-v1:WyJlcGlzb2RlLXZpZGVvIiwxLCJGSU5BTCJd\nMaster candidate\nsha256:1bcd60c2ee2765e7b5a4aef886963abc1bbb2b23c42bf0f796364a1150431aa6\nProfile\n01a187c0-b117-7ec6-9d3d-6d8648985e30 r1\nObservations\n01a187c3-2178-74c8-a69a-8ad065eaa0c2, 01a187c2-b5d4-7c26-86c9-12dee12740c4, 01a187c2-c515-7c29-8ade-cc849c60883e\nSeal run\nDiscard"
+  },
+  {
+    "step": "runs",
+    "section": "RUNS\n 01a187c3validity CURRENT, readiness NOT_READY Not ready for packaging"
+  },
+  {
+    "step": "decide",
+    "confirm": "The server prepared this request. Confirm to submit it exactly as shown.\n\nRun\n01a187c3-3929-72ed-9658-90ced484e12f\nDecision\nPASS\nReason\nBoth probes pass and the Human review found no defect.\nWaived findings\n[]\nExpires\n2026-10-30T13:04:48.480623Z\nIssue decision\nDiscard"
+  },
+  {
+    "step": "runs-after",
+    "section": "RUNS\n 01a187c3validity CURRENT, readiness READY Package this run"
+  },
+  {
+    "step": "package",
+    "href": "/app/projects/project/packaging?run=01a187c3-3929-72ed-9658-90ced484e12f&digest=sha256%3A262f6358ac70c6da273502fbba4b1df97347b33aa78e581739f93ca1d2a69ab7&artifact=artifact-key-v1%3AWyJlcGlzb2RlLXZpZGVvIiwxLCJGSU5BTCJd&cohort=cohort&surface=video"
+  },
+  {
+    "step": "packaging",
+    "url": "http://127.0.0.1:5174/app/projects/project/packaging?run=01a187c3-3929-72ed-9658-90ced484e12f&digest=sha256%3A262f6358ac70c6da273502fbba4b1df97347b33aa78e581739f93ca1d2a69ab7&artifact=artifact-key-v1%3AWyJlcGlzb2RlLXZpZGVvIiwxLCJGSU5BTCJd&cohort=cohort&surface=video",
+    "run_field": "01a187c3-3929-72ed-9658-90ced484e12f"
+  },
+  {
+    "step": "axe",
+    "violations": []
+  },
+  {
+    "step": "reload",
+    "runs": "RUNS\n 01a187c3validity CURRENT, readiness READY Package this run"
+  }
+]

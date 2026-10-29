@@ -1,0 +1,90 @@
+{
+  "schema_id": "r2.milestone-acceptance.v1",
+  "milestone": "M10-C",
+  "title": "Quality operator surface (Quality page and routes that create the profile, probes, review, run and disposition Packaging needs)",
+  "decision": "ACCEPTED_WITH_CONDITIONS",
+  "decided_at": "2026-10-29",
+  "decided_by": "agent under the sponsor delegation recorded in R2_M10_B7_PILOT_SUMMARY.json sponsor_decision (agent performs pilot Human gates and reviewer role; push, merge, tag, deploy and activated-host steps stay with the sponsor)",
+  "branch": "design/r2-m10-c-operator-surface",
+  "base": "5256a9d72",
+  "implementation_head": "020e4f56deb3b0dfe18d1efcaad0b6b64ede73c0",
+  "design": {
+    "spec": "docs/superpowers/specs/2026-10-29-r2-m10-c-operator-surface-design.md",
+    "reviews": [
+      "m10-c-reviews/design-codex-review.json (REWORK)",
+      "m10-c-reviews/design-delta1-codex-review.json (REWORK)",
+      "m10-c-reviews/design-delta2-codex-review.json (ACCEPT_WITH_CONDITIONS)"
+    ]
+  },
+  "implementation_reviews": [
+    {"file": "m10-c-reviews/impl-codex-review.json", "verdict": "CHANGES_REQUESTED"},
+    {"file": "m10-c-reviews/impl-delta1-codex-review.json", "verdict": "CHANGES_REQUESTED"},
+    {"file": "m10-c-reviews/impl-delta2-codex-review.json", "verdict": "CHANGES_REQUESTED", "reviewed_head": "39ed7b280"},
+    {
+      "file": "m10-c-reviews/impl-delta3-codex-review.json",
+      "verdict": "ACCEPTED_WITH_CONDITIONS",
+      "reviewed_head": "82c1804f3",
+      "note": "All prior findings RESOLVED; only Low N5 (duplicate probe page append) remained, fixed in 63edb3366 without a new round per the review stopping rule."
+    }
+  ],
+  "amendments_after_design": [
+    "The page reads its actor from GET /quality/session (the user.sub every seal binds) instead of the browser auth store, which does not restore the username on reload.",
+    "GET /quality/observations returns the newest 20 per requirement (SQL row_number) and names the requirements with older ones left out; the page discloses this under each requirement."
+  ],
+  "verification": {
+    "head": "020e4f56deb3b0dfe18d1efcaad0b6b64ede73c0",
+    "frontend": {"command": "(cd frontend && pnpm check)", "result": "236 files, 2663 passed, 4 skipped", "at": "63edb3366"},
+    "static": {
+      "command": "uv run ruff check . && uv run ruff format . && uv run basedpyright --warnings && uv run lint-imports && uv run deptry lib server alembic scripts tests r2 && uv run python scripts/audit_tests.py --check",
+      "result": "all green, 0 errors 0 warnings, 23 import contracts kept, audit 0 violations",
+      "at": "82c1804f3"
+    },
+    "related_pytest": {
+      "selection": [
+        "tests/integration/server/routers/test_quality_routes.py",
+        "tests/integration/server/services/test_quality_subjects.py",
+        "tests/integration/server/services/test_quality_host_catalog.py",
+        "tests/integration/server/services/test_quality_operator_chain.py",
+        "tests/unit/server/services/test_quality_template.py",
+        "tests/unit/server/services/test_quality_prepare.py",
+        "tests/unit/lib/i18n/test_i18n_consistency.py"
+      ],
+      "result": "67 passed on PostgreSQL 16 (disposable container)",
+      "at": "82c1804f3 working tree before commit (same content)"
+    },
+    "probe_route_requalification": {
+      "record": "docs/r2/evidence/m10-a4-reviews/route-qualification.json requalifications[-1]",
+      "result": "206 passed, 0 failures (A4 suite plus quality probes, host catalog, operator chain, quality routes); registry evidence and entry digests updated",
+      "registry_tests": "tests/unit/r2/host_hardening/{test_provider_capabilities,test_host_submit,test_execution_service,test_transitions}.py tests/unit/r2/contracts/test_host_hardening.py: 205 passed",
+      "commit": "020e4f56d"
+    },
+    "live_operator_acceptance": {
+      "evidence_dir": "docs/r2/evidence/m10-c-acceptance/",
+      "host": "local pilot host (pilot_host.py.txt): fresh PostgreSQL 16 database at alembic head, user-owned qualified governance tree with attestor, grant ISSUE for principal actor, the real FastAPI app on 127.0.0.1:1241 with the quality and packaging dependencies pointed at that tree, HOST_CATALOG host-v1, /usr/bin ffmpeg/ffprobe 8.0.1; Vite dev server on 127.0.0.1:5174",
+      "subject": "the real approved V2 episode du-an-01-649c62c1: FINAL (GoldenAComposite, 1920x1080, 75.16 s, h264 yuvj420p + aac) over SH01..SH03; manifest R2 bodies copied verbatim and each master promoted with its real approval record and candidate; the Quality page listed FINAL as resolvable",
+      "browser": "visible Google Chrome via Playwright channel=chrome, locale en-US; every step is a click or typed value on the page (operator.py.txt); no API call made by the script",
+      "steps": [
+        "publish a profile from the youtube-long template (confirmation showed profile r1, cohort/surface, supersession, policy digest and the policy body)",
+        "container probe and full decode probe: both SUCCEEDED PASS with real tools; attempt list shows execution id and master binding digest",
+        "Human review PASS with notes (only their digest recorded)",
+        "seal a run choosing one observation per requirement: CURRENT, NOT_READY",
+        "PASS disposition with reason: run READY, 'Package this run' link",
+        "Packaging opened with run id, run digest, artifact, cohort and surface prefilled",
+        "full page reload in the same session keeps the workspace (actor from the server session)",
+        "axe-core 4.13.0 on the live page with history and a WAIVE disposition open, colour contrast enabled: 0 violations"
+      ],
+      "alerts": "none"
+    }
+  },
+  "known_limits": [
+    "Low: the confirmation labels the master head's internal candidate (m7c:...) 'Master candidate' while the master selector shows the manifest's selected candidate (CAND-FINAL-V1); the seal confirmation shows only the content digest.",
+    "Low: test fixtures model the episode FINAL with contract type ShotSpec, unlike real data (GoldenAComposite); the masters list excludes ShotSpec, so the live acceptance used real metadata.",
+    "Observations older than the newest 20 per requirement are not selectable from the page (still addressable by id through the prepare API).",
+    "Pending sealed requests live in the operator's browser storage; a request prepared in another browser cannot be finished from this one (the page says so)."
+  ],
+  "conditions": [
+    "M10 C1-C5 remain (R2_M10_ACCEPTANCE.json): incoming-FK witness, storage/power-loss, single operator, activated host, inherited A/B.",
+    "Sponsor runs activated-host qualification on the V2 staging host (root-owned governance custody, ARCREEL_QUALITY_PROBE_CATALOG=host-v1, ARCREEL_GOVERNANCE_READ_DIR/ATTESTOR_DIR) and the deploy; those steps need sudo and are not performed by the agent.",
+    "Push, merge and tag of design/r2-m10-c-operator-surface are sponsor actions."
+  ]
+}

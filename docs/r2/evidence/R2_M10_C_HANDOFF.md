@@ -24,6 +24,16 @@ Rewrite in place; resume entry for the quality operator surface.
   (`design-delta2-codex-review.json`; implementation conditions I1 subject/template tests, I2 transport security, …).
 
 ## Next step
+- **M10-C ACCEPTED_WITH_CONDITIONS** (`R2_M10_C_ACCEPTANCE.json`, implementation head `020e4f56d`). Impl review chain
+  impl → delta1 → delta2 (CHANGES_REQUESTED) → delta3 **ACCEPTED_WITH_CONDITIONS** (`impl-delta3-codex-review.json`);
+  Low N5 fixed `63edb3366`. Probe route requalified (`020e4f56d`, 206 passed). Live Chrome operator acceptance on the
+  real V2 episode (FINAL over SH01..SH03) through to READY + Packaging prefill, reload, axe 0 violations:
+  `m10-c-acceptance/`.
+- Remaining (sponsor, Human gates): push `design/r2-m10-c-operator-surface`, merge into the release line, tag, then
+  activated-host qualification + deploy on the V2 staging host (root-owned custody, `ARCREEL_QUALITY_PROBE_CATALOG=host-v1`,
+  `ARCREEL_GOVERNANCE_READ_DIR`, `ARCREEL_GOVERNANCE_ATTESTOR_DIR`; sudo). Then step 2: M9-B.
+
+### History
 C1 done `3bdb59b03` (resolver). C2 done `fc707e802` (embedded host-v1 catalog, 9 qualification tests). Template done (server/services/quality_template.py, 6 unit tests). Next: C3
 embedded host catalog (`r2/quality/host_catalog.py`) + requalification, C3 prepare/submit seal + quality router
 (`server/routers/quality.py`), C4 Quality page + Packaging prefill; then Codex review, local Chrome acceptance, sponsor
