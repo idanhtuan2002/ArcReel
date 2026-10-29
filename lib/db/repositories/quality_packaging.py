@@ -518,6 +518,25 @@ class ExportRepository:
             raise RequiredEvidenceMissingError()
         return receipt
 
+    async def selection_receipts(
+        self, *, user_id: str, project_name: str, selection_id: str
+    ) -> tuple[p.ExportBundleReceipt, ...]:
+        """Every verified receipt of exports that named this selection, oldest first."""
+        execution_ids = (
+            await self.session.execute(
+                sa.select(ExportInvocationModel.execution_id).filter_by(
+                    user_id=user_id, project_name=project_name, selection_id=selection_id
+                )
+            )
+        ).scalars()
+        receipts = [
+            receipt
+            for execution_id in execution_ids.all()
+            if (receipt := await self.receipt(user_id=user_id, project_name=project_name, execution_id=execution_id))
+            is not None
+        ]
+        return tuple(sorted(receipts, key=lambda receipt: (receipt.exported_at, receipt.receipt_id)))
+
     async def stage_receipt(self, *, user_id: str, project_name: str, receipt: p.ExportBundleReceipt) -> None:
         self.session.add(
             ExportReceiptModel(

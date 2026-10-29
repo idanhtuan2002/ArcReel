@@ -447,3 +447,85 @@ async def test_a_retry_cannot_change_its_genesis_or_update_shape(http) -> None:
         "/api/v1/projects/project/packaging/revisions", json=reshaped, headers=_headers()
     )
     assert response.status_code == 409
+
+
+async def _slot_status(env, slot: dict[str, str], headers: dict[str, str] | None = None) -> dict[str, Any]:
+    found = await env["client"].get(
+        "/api/v1/projects/project/packaging/slot", params=slot, headers=headers or _headers()
+    )
+    assert found.status_code == 200, found.text
+    return found.json()
+
+
+async def test_an_empty_slot_reports_no_selection_and_is_not_exportable(http) -> None:
+    env = http
+    run, profile = env["run"], env["profile"]
+    slot = {
+        "source_artifact_key": run.subject.master_binding.root.artifact_key,
+        "cohort_id": profile.cohort_id,
+        "product_surface": profile.product_surface,
+    }
+    status = await _slot_status(env, slot)
+    assert status == {
+        "head_version": 0,
+        "exportable": False,
+        "refusal_code": "M10_STALE_HEAD",
+        "selection": None,
+        "exports": [],
+    }
+
+
+async def test_the_slot_reports_the_current_selection_and_its_exports_from_the_server(http) -> None:
+    env = http
+    flow = await _flow_to_selection(env)
+    before = await _slot_status(env, flow["slot"])
+    assert before["selection"]["selection_id"] == flow["selection"]["selection_id"]
+    assert before["selection"]["selection_digest"] == flow["selection"]["selection_digest"]
+    assert (before["head_version"], before["exportable"], before["refusal_code"], before["exports"]) == (
+        1,
+        True,
+        None,
+        [],
+    )
+    exported = await env["client"].post(
+        "/api/v1/projects/project/packaging/exports",
+        json={
+            "command_id": "export-1",
+            **flow["slot"],
+            "selection_id": flow["selection"]["selection_id"],
+            "selection_digest": flow["selection"]["selection_digest"],
+        },
+        headers=_headers(),
+    )
+    assert exported.status_code == 200, exported.text
+    after = await _slot_status(env, flow["slot"])
+    [listed] = after["exports"]
+    assert listed["archive_digest"] == exported.json()["archive_digest"]
+    downloaded = await env["client"].get(
+        f"/api/v1/projects/project/packaging/exports/{listed['archive_digest'].removeprefix('sha256:')}/archive",
+        params={"token": listed["download_token"]},
+    )
+    assert downloaded.status_code == 200
+    assert hashlib.sha256(downloaded.content).hexdigest() == listed["archive_digest"].removeprefix("sha256:")
+    as_agent = await _slot_status(env, flow["slot"], _agent_headers())
+    assert as_agent["exportable"] is True
+    assert [item["download_token"] for item in as_agent["exports"]] == [None]
+
+
+async def test_a_superseded_disposition_makes_the_slot_not_exportable_and_withholds_downloads(http) -> None:
+    env = http
+    receipt = await _exported(env)
+    await issue(env, disposition_request(env["run"], "REWORK", command_id="decide-2", version=1))
+    run, profile = env["run"], env["profile"]
+    status = await _slot_status(
+        env,
+        {
+            "source_artifact_key": run.subject.master_binding.root.artifact_key,
+            "cohort_id": profile.cohort_id,
+            "product_surface": profile.product_surface,
+        },
+    )
+    assert (status["exportable"], status["refusal_code"]) == (False, "M10_DISPOSITION_STALE")
+    assert [(item["archive_digest"], item["download_token"]) for item in status["exports"]] == [
+        (receipt["archive_digest"], None)
+    ]

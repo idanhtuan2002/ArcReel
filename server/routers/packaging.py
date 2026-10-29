@@ -361,6 +361,56 @@ async def export_package(
     }
 
 
+@router.get("/projects/{project_name}/packaging/slot")
+async def slot_status(
+    project_name: str,
+    source_artifact_key: str,
+    cohort_id: str,
+    product_surface: str,
+    user: CurrentUser,
+    token: Token,
+    deps: Deps,
+) -> dict[str, Any]:
+    """The slot's current selection, whether export would admit it now, and the archives exported from it."""
+    try:
+        slot = p.PackagingSlotKey(
+            user_id=user.id,
+            project_name=project_name,
+            source_artifact_key=source_artifact_key,
+            cohort_id=cohort_id,
+            product_surface=product_surface,
+        )
+    except ValueError as error:
+        raise UnprocessableError(PACKAGING_REQUEST_INVALID) from error
+    service = PackageExportService(
+        sessions=deps.sessions,
+        grant_reader=_reader(deps),
+        project_root=deps.project_root(project_name),
+        interactive_token=token,
+    )
+    status = await _run(lambda: service.slot_status(slot, user.sub))
+    downloadable = status.exportable and await _author_kind(token) == "HUMAN"
+    selection = status.selection
+    return {
+        "head_version": status.head_version,
+        "exportable": status.exportable,
+        "refusal_code": status.refusal_code,
+        "selection": None
+        if selection is None
+        else selection.model_dump(mode="json")
+        | {"selection_digest": compute_digest("m10.package-selection.v1", selection)},
+        "exports": [
+            receipt.model_dump(mode="json")
+            | {
+                "download_token": create_export_token(user.sub, project_name, receipt.archive_digest)
+                if downloadable
+                else None
+            }
+            for receipt in status.receipts
+        ],
+    }
+
+
 def create_export_token(subject: str, project_name: str, archive_digest: str) -> str:
     now = time.time()
     payload = {

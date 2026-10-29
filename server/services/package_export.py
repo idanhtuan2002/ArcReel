@@ -68,8 +68,11 @@ from r2.quality.errors import (
     ExportIntegrityFailedError,
     M10Error,
     OperationalEnvelopeExceededError,
+    ProfileStaleError,
     RequiredEvidenceMissingError,
     StaleHeadError,
+    SubjectStaleError,
+    WaiverForbiddenError,
 )
 from r2.quality.runs import run_digest
 from server.auth import get_current_interactive_user
@@ -720,6 +723,17 @@ def _snapshot_archive(
     return target, _generation(before)
 
 
+@dataclass(frozen=True)
+class SlotStatus:
+    """What a PACKAGING_SLOT holds now: its selection, whether export would admit it, and its receipts."""
+
+    head_version: int
+    selection: p.PackageSelection | None
+    exportable: bool
+    refusal_code: str | None
+    receipts: tuple[p.ExportBundleReceipt, ...]
+
+
 class PackageExportService:
     """Export the current selection of one PACKAGING_SLOT as a deterministic local archive."""
 
@@ -778,7 +792,7 @@ class PackageExportService:
         )
         reader = await self._grant_reader()
         async with self._sessions() as session:
-            selection, evidence = await self._resolve(session, request)
+            selection, evidence = await self._resolve(session, request.subject)
         builder_digest = builder_identity_digest()
         plan = plan_export(selection, evidence, builder_digest)
         store = await asyncio.to_thread(open_export_store, self._project_root)
@@ -792,6 +806,41 @@ class PackageExportService:
                 await asyncio.to_thread(work.close)
         finally:
             os.close(store)
+
+    async def slot_status(self, slot: p.PackagingSlotKey, actor_id: str) -> SlotStatus:
+        """The slot's current selection checked by the same currentness and readiness rules export applies."""
+        reader = await self._grant_reader()
+        async with self._sessions() as session, session.begin():
+            selection_id, version = await PackageSelectionRepository(session).current_head(slot)
+            if selection_id is None:
+                return SlotStatus(version, None, False, StaleHeadError().code, ())
+            selection = await PackageSelectionRepository(session).selection(
+                user_id=slot.user_id, project_name=slot.project_name, selection_id=selection_id
+            )
+            if selection is None:
+                raise RequiredEvidenceMissingError()
+            receipts = await ExportRepository(session).selection_receipts(
+                user_id=slot.user_id, project_name=slot.project_name, selection_id=selection_id
+            )
+            subject = p.ExportSubject(
+                user_id=slot.user_id,
+                project_name=slot.project_name,
+                actor_id=actor_id,
+                slot=slot,
+                selection_id=selection_id,
+                selection_digest=selection_digest(selection),
+            )
+            try:
+                await self._require_current(session, reader, subject, selection)
+            except (
+                DispositionStaleError,
+                ProfileStaleError,
+                StaleHeadError,
+                SubjectStaleError,
+                WaiverForbiddenError,
+            ) as refusal:
+                return SlotStatus(version, selection, False, refusal.code, receipts)
+            return SlotStatus(version, selection, True, None, receipts)
 
     async def open_download(self, user_id: str, project_name: str, archive_digest: str) -> Download:
         """A verified private snapshot of a receipted archive whose selection is still current and READY.
@@ -831,7 +880,7 @@ class PackageExportService:
                             )
                             if selection is None:
                                 raise RequiredEvidenceMissingError()
-                            await self._require_current(session, reader, invocation.request, selection)
+                            await self._require_current(session, reader, invocation.request.subject, selection)
                             if published_generation(store, name) != generation:
                                 raise ExportIntegrityFailedError()
                         return Download(descriptor, work, store)
@@ -847,9 +896,8 @@ class PackageExportService:
             raise
 
     async def _resolve(
-        self, session: AsyncSession, request: p.ExportRequest
+        self, session: AsyncSession, subject: p.ExportSubject
     ) -> tuple[p.PackageSelection, PackageEvidence]:
-        subject = request.subject
         selection = await PackageSelectionRepository(session).selection(
             user_id=subject.user_id, project_name=subject.project_name, selection_id=subject.selection_id
         )
@@ -878,11 +926,10 @@ class PackageExportService:
         self,
         session: AsyncSession,
         reader: CheckpointedShowrunnerGrantReader,
-        request: p.ExportRequest,
+        subject: p.ExportSubject,
         selection: p.PackageSelection,
     ) -> None:
         """Global order with FOR SHARE heads; the selection must still fill the slot and be READY."""
-        subject = request.subject
         user_id, project_name = subject.user_id, subject.project_name
         preview = selection.preview
         run = await QualityRunRepository(session).run(
@@ -913,7 +960,7 @@ class PackageExportService:
         current, _ = await PackageSelectionRepository(session).lock_head(preview.slot, for_update=False)
         if current != selection.selection_id:
             raise StaleHeadError()
-        await self._resolve(session, request)
+        await self._resolve(session, subject)
         readiness, disposition, ready_run = await readiness_in(
             session,
             reader,
@@ -960,7 +1007,7 @@ class PackageExportService:
                 await PackageSelectionRepository(session).lock_command(command)
                 if await ExportRepository(session).invocation(request) is not None:
                     raise RequiredEvidenceMissingError()
-                await self._require_current(session, reader, request, selection)
+                await self._require_current(session, reader, request.subject, selection)
                 await ExportRepository(session).stage_invocation(invocation, self._clock())
             except BaseException:
                 await session.rollback()
@@ -1155,7 +1202,7 @@ class PackageExportService:
                 )
                 if selection is None:
                     raise RequiredEvidenceMissingError()
-                await self._require_current(session, reader, request, selection)
+                await self._require_current(session, reader, request.subject, selection)
                 if published_generation(store, name) != verified.generation:
                     raise ExportIntegrityFailedError()
                 succeeded = await attempts.apply_provider_observation(
