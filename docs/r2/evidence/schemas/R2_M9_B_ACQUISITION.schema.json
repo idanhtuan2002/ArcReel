@@ -1,0 +1,326 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "M9-B acquisition candidate evidence",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "artifacts",
+    "branch",
+    "commands",
+    "created_at",
+    "fault_matrix",
+    "full_backend",
+    "graph_coverage",
+    "independent_review",
+    "limits",
+    "material_unknowns",
+    "migration_report",
+    "packet",
+    "production_activation_authorized",
+    "provider_network_executed",
+    "releases",
+    "required_skips",
+    "runtime_signing_key_dependency",
+    "schema_version",
+    "sources",
+    "status",
+    "test_report",
+    "tested_head",
+    "tested_parent"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "1"
+    },
+    "status": {
+      "const": "M9_B_CANDIDATE"
+    },
+    "packet": {
+      "const": "M9-B"
+    },
+    "tested_head": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$"
+    },
+    "tested_parent": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$"
+    },
+    "branch": {
+      "const": "impl/r2-m9b-acquisition-observations"
+    },
+    "releases": {
+      "type": "object",
+      "minProperties": 2,
+      "additionalProperties": {
+        "type": "string",
+        "pattern": "^[0-9a-f]{64}$"
+      }
+    },
+    "sources": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": {
+        "type": "string",
+        "pattern": "^[0-9a-f]{64}$"
+      }
+    },
+    "commands": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "gate",
+          "command",
+          "exit",
+          "tested_head",
+          "passed",
+          "skipped",
+          "log",
+          "result"
+        ],
+        "properties": {
+          "gate": {
+            "type": "string",
+            "minLength": 1
+          },
+          "command": {
+            "type": "string",
+            "minLength": 1
+          },
+          "exit": {
+            "type": "integer"
+          },
+          "tested_head": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{40}$"
+          },
+          "passed": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "skipped": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "log": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "path",
+              "sha256"
+            ],
+            "properties": {
+              "path": {
+                "type": "string",
+                "minLength": 1
+              },
+              "sha256": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$"
+              }
+            }
+          },
+          "result": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "path",
+              "sha256"
+            ],
+            "properties": {
+              "path": {
+                "type": "string",
+                "minLength": 1
+              },
+              "sha256": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$"
+              }
+            }
+          }
+        }
+      }
+    },
+    "test_report": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "sha256"
+      ],
+      "properties": {
+        "path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      }
+    },
+    "migration_report": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "sha256"
+      ],
+      "properties": {
+        "path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      }
+    },
+    "fault_matrix": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "test_refs"
+        ],
+        "properties": {
+          "test_refs": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        }
+      }
+    },
+    "full_backend": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "executed",
+        "reason"
+      ],
+      "properties": {
+        "executed": {
+          "type": "boolean"
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 1
+        },
+        "log": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "path",
+            "sha256"
+          ],
+          "properties": {
+            "path": {
+              "type": "string",
+              "minLength": 1
+            },
+            "sha256": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            }
+          }
+        }
+      }
+    },
+    "runtime_signing_key_dependency": {
+      "type": "boolean"
+    },
+    "production_activation_authorized": {
+      "type": "boolean"
+    },
+    "provider_network_executed": {
+      "type": "boolean"
+    },
+    "independent_review": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "budget",
+        "used"
+      ],
+      "properties": {
+        "budget": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "used": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "graph_coverage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "method",
+        "paths"
+      ],
+      "properties": {
+        "method": {
+          "type": "string",
+          "minLength": 1
+        },
+        "paths": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "required_skips": {
+      "type": "array"
+    },
+    "material_unknowns": {
+      "type": "array"
+    },
+    "artifacts": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "path",
+          "sha256"
+        ],
+        "properties": {
+          "path": {
+            "type": "string",
+            "minLength": 1
+          },
+          "sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          }
+        }
+      }
+    },
+    "limits": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time"
+    }
+  }
+}
