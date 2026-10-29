@@ -25,6 +25,7 @@ import {
   prepare,
   profileTemplate,
   readRevision,
+  readRun,
   submit,
   type Master,
   type Observation,
@@ -153,6 +154,7 @@ function summaryRows(action: QualityAction, request: Record<string, unknown>): [
     case "probes":
       return [
         ["master", text(root.artifact_key)],
+        ["candidate", `${text(root.candidate_id)} · ${text(root.content_digest)}`],
         ["profile", `${text(profile.profile_id)} r${text(profile.revision)}`],
         ["requirement", text(request.requirement_id)],
         ["command", text(request.execution_ref)],
@@ -160,6 +162,7 @@ function summaryRows(action: QualityAction, request: Record<string, unknown>): [
     case "reviews":
       return [
         ["master", text(root.artifact_key)],
+        ["candidate", `${text(root.candidate_id)} · ${text(root.content_digest)}`],
         ["profile", `${text(profile.profile_id)} r${text(profile.revision)}`],
         ["status", text(request.status)],
         ["findings", String(((request.findings as unknown[]) ?? []).length)],
@@ -168,6 +171,7 @@ function summaryRows(action: QualityAction, request: Record<string, unknown>): [
     case "runs":
       return [
         ["master", text(((runSubject?.root ?? {}) as Record<string, unknown>).artifact_key)],
+        ["candidate", text(((runSubject?.root ?? {}) as Record<string, unknown>).content_digest)],
         ["profile", `${text(subject.profile_id)} r${text(subject.profile_revision)}`],
         ["observations", ((subject.observations as { observation_id: string }[]) ?? []).map((o) => o.observation_id).join(", ")],
       ];
@@ -180,6 +184,33 @@ function summaryRows(action: QualityAction, request: Record<string, unknown>): [
         ["expires", text(subject.requested_expires_at)],
       ];
   }
+}
+
+/** The bulky sealed content a Human confirms: the policy of a publication, the findings of a review. */
+function Details({ action, request }: { action: QualityAction; request: Record<string, unknown> }) {
+  const { t } = useTranslation("dashboard");
+  if (action === "profiles") {
+    const draft = ((request.subject ?? {}) as Record<string, unknown>).profile_draft as Record<string, unknown> | undefined;
+    return (
+      <details className="mt-2 text-xs text-text-2">
+        <summary>{t("quality_field_policy_body")}</summary>
+        <pre className="qa-pre font-mono text-[11px]">{JSON.stringify(draft?.policy ?? {}, null, 2)}</pre>
+      </details>
+    );
+  }
+  if (action === "reviews") {
+    const rows = (request.findings as { subject_locator: string; severity: string }[] | undefined) ?? [];
+    return rows.length === 0 ? null : (
+      <ul className="pk-entries font-mono text-[11px] text-text-2">
+        {rows.map((row) => (
+          <li key={row.subject_locator + row.severity}>
+            {row.subject_locator} · {row.severity}
+          </li>
+        ))}
+      </ul>
+    );
+  }
+  return null;
 }
 
 interface ConfirmProps {
@@ -207,6 +238,7 @@ function Confirm({ action, sealed, label, fallback, onDone }: ConfirmProps) {
               </div>
             ))}
           </dl>
+          <Details action={action} request={envelope.request} />
           <div className="pk-actions">
             <button type="button" className="fm-btn fm-btn-accent" disabled={sealed.busy} onClick={() => void sealed.send(envelope, fallback).then(onDone)}>
               {sealed.prepared ? label : t("quality_resend")}
@@ -233,9 +265,16 @@ interface QualityPageProps {
   projectName: string;
 }
 
+/** The page binds every kept request to the signed-in actor; a change of actor remounts the workspace. */
 export default function QualityPage({ projectName }: QualityPageProps) {
   const { t } = useTranslation("dashboard");
-  const actor = useAuthStore((state) => state.username) ?? "anonymous";
+  const actor = useAuthStore((state) => state.username);
+  if (!actor) return <p className="p-4 text-sm text-text-3">{t("quality_signin_required")}</p>;
+  return <QualityWorkspace key={actor} projectName={projectName} actor={actor} />;
+}
+
+function QualityWorkspace({ projectName, actor }: QualityPageProps & { actor: string }) {
+  const { t } = useTranslation("dashboard");
   const [masters, setMasters] = useState<Master[] | null>(null);
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [revisions, setRevisions] = useState<number[]>([]);
@@ -245,6 +284,8 @@ export default function QualityPage({ projectName }: QualityPageProps) {
   const [observations, setObservations] = useState<Observation[]>([]);
   const [probes, setProbes] = useState<ProbeAttempt[]>([]);
   const [runs, setRuns] = useState<RunEntry[]>([]);
+  const [olderRuns, setOlderRuns] = useState<string | null>(null);
+  const [runDetail, setRunDetail] = useState<(RunEntry & { observations: Observation[] }) | null>(null);
   const [chosen, setChosen] = useState<Record<string, string>>({});
   const [runId, setRunId] = useState("");
   const [template, setTemplate] = useState({
@@ -295,18 +336,30 @@ export default function QualityPage({ projectName }: QualityPageProps) {
     return () => controller.abort();
   }, [reload]);
 
+  const scopeKey = root && selected ? `${root}|${selected.profile_id}|${selected.revision}` : "";
+  const activeScope = useRef(scopeKey);
+  useEffect(() => {
+    activeScope.current = scopeKey;
+  }, [scopeKey]);
+
   const refreshSubject = useCallback(
     (signal: AbortSignal) => {
       if (!root || !selected) return Promise.resolve();
+      const key = `${root}|${selected.profile_id}|${selected.revision}`;
+      const live = () => !signal.aborted && activeScope.current === key;
       const scope = { profile_id: selected.profile_id, revision: selected.revision, root };
       // Independent reads: a drifted current subject must not hide the run or probe history.
       const failed = (failure: unknown) => {
-        if (!signal.aborted) setLoadError(errorMessage(failure) ?? t("quality_load_failed"));
+        if (live()) setLoadError(errorMessage(failure) ?? t("quality_load_failed"));
       };
       return Promise.all([
-        listObservations(projectName, scope, { signal }).then((found) => !signal.aborted && setObservations(found.observations), failed),
-        listProbes(projectName, scope, { signal }).then((found) => !signal.aborted && setProbes(found.probes), failed),
-        listRuns(projectName, root, { signal }).then((found) => !signal.aborted && setRuns(found.runs), failed),
+        listObservations(projectName, scope, { signal }).then((found) => live() && setObservations(found.observations), failed),
+        listProbes(projectName, scope, { signal }).then((found) => live() && setProbes(found.probes), failed),
+        listRuns(projectName, root, null, { signal }).then((found) => {
+          if (!live()) return;
+          setRuns(found.runs);
+          setOlderRuns(found.next_before);
+        }, failed),
       ]).then(() => undefined);
     },
     [projectName, root, selected, t],
@@ -319,9 +372,12 @@ export default function QualityPage({ projectName }: QualityPageProps) {
   }, [refreshSubject]);
 
   const clearScope = () => {
+    activeScope.current = "";
     setObservations([]);
     setProbes([]);
     setRuns([]);
+    setOlderRuns(null);
+    setRunDetail(null);
     setChosen({});
     setRunId("");
     setWaived({});
@@ -359,6 +415,32 @@ export default function QualityPage({ projectName }: QualityPageProps) {
     }
   };
 
+  const chooseRun = async (id: string) => {
+    setRunId(id);
+    setRunDetail(null);
+    setWaived({});
+    const key = activeScope.current;
+    try {
+      const detail = await readRun(projectName, id);
+      if (activeScope.current === key) setRunDetail(detail);
+    } catch (failure: unknown) {
+      setLoadError(errorMessage(failure) ?? t("quality_load_failed"));
+    }
+  };
+
+  const loadOlderRuns = async () => {
+    if (!olderRuns) return;
+    const key = activeScope.current;
+    try {
+      const found = await listRuns(projectName, root, olderRuns);
+      if (activeScope.current !== key) return;
+      setRuns((current) => [...current, ...found.runs]);
+      setOlderRuns(found.next_before);
+    } catch (failure: unknown) {
+      setLoadError(errorMessage(failure) ?? t("quality_load_failed"));
+    }
+  };
+
   const loadTemplate = async () => {
     try {
       const found = await profileTemplate(projectName, template);
@@ -370,8 +452,11 @@ export default function QualityPage({ projectName }: QualityPageProps) {
 
   const scope = selected ? { profile_id: selected.profile_id, revision: selected.revision, root_artifact_key: root } : null;
   const ready = Boolean(root && scope);
-  const run = runs.find((entry) => entry.run.run_id === runId) ?? null;
-  const reviewFindings = observations.filter((o) => o.requirement_id === "review").flatMap((o) => o.findings.map((f) => ({ ...f, observation: o })));
+  const run = runDetail && runDetail.run.run_id === runId ? runDetail : null;
+  // Waivable candidates come from the chosen run's own closure: BLOCKING findings of a failed Human slot.
+  const reviewFindings = (runDetail?.observations ?? [])
+    .filter((o) => o.requirement_id === "review" && o.status === "FAIL")
+    .flatMap((o) => o.findings.filter((f) => f.severity === "BLOCKING").map((f) => ({ ...f, observation: o })));
   const errors = [publish.error, probe.error, review.error, seal.error, dispose.error, loadError].filter(Boolean);
   const fallback = t("quality_action_failed");
 
@@ -533,7 +618,17 @@ export default function QualityPage({ projectName }: QualityPageProps) {
               </button>
             </div>
           </Locked>
-          <Confirm action="profiles" sealed={publish} label={t("quality_publish")} fallback={fallback} onDone={(r) => void after(r)} />
+          <Confirm
+            action="profiles"
+            sealed={publish}
+            label={t("quality_publish")}
+            fallback={fallback}
+            onDone={(result) => {
+              void after(result);
+              const published = (result?.profile ?? null) as Profile | null;
+              if (published) void chooseProfile(published.profile_id);
+            }}
+          />
         </section>
 
         <section aria-labelledby="qa-probes" className="pk-card">
@@ -555,13 +650,26 @@ export default function QualityPage({ projectName }: QualityPageProps) {
           <Confirm action="probes" sealed={probe} label={t("quality_run_probe")} fallback={fallback} onDone={(r) => void after(r)} />
           {probes.length > 0 ? (
             <ul className="pk-entries font-mono text-[11px] text-text-2">
-              {probes.map((attempt) => (
-                <li key={attempt.execution_ref} data-state={attempt.attempt_state ?? "UNKNOWN"}>
-                  {attempt.requirement_id} · {attempt.attempt_state ?? "—"} · {attempt.status ?? t("quality_probe_no_result")}
-                  {attempt.failure ? ` · ${attempt.failure.error_code}` : ""}
-                  {attempt.attempt_state === "SUBMIT_OUTCOME_UNKNOWN" ? ` · ${t("quality_probe_needs_review")}` : ""}
-                </li>
-              ))}
+              {probes.map((attempt) => {
+                const kept = probe.pending.find((envelope) => envelope.request.execution_ref === attempt.execution_ref);
+                const unfinished = attempt.attempt_state === "PLANNED" || attempt.attempt_state === "SUBMITTING" || attempt.attempt_state === "ACCEPTED";
+                return (
+                  <li key={attempt.execution_ref} data-state={attempt.attempt_state ?? "UNKNOWN"}>
+                    {attempt.requirement_id} · {attempt.execution_ref} · {attempt.actor_id} · {attempt.attempt_state ?? "—"} ·{" "}
+                    {attempt.status ?? t("quality_probe_no_result")}
+                    {attempt.failure ? ` · ${t("quality_probe_failed", { code: attempt.failure.error_code })}` : ""}
+                    {attempt.attempt_state === "SUBMIT_OUTCOME_UNKNOWN" || attempt.attempt_state === "NEEDS_OPERATOR"
+                      ? ` · ${t("quality_probe_needs_review")}`
+                      : ""}
+                    {unfinished && kept ? (
+                      <button type="button" className="fm-btn ml-2" disabled={probe.busy} onClick={() => void probe.send(kept, fallback).then(after)}>
+                        {t("quality_probe_finish")}
+                      </button>
+                    ) : null}
+                    {unfinished && !kept ? ` · ${t("quality_probe_envelope_lost")}` : ""}
+                  </li>
+                );
+              })}
             </ul>
           ) : null}
         </section>
@@ -705,7 +813,7 @@ export default function QualityPage({ projectName }: QualityPageProps) {
               return (
                 <li key={entry.run.run_id} data-ready={current}>
                   <label className="mr-2">
-                    <input type="radio" name="qa-run" checked={runId === entry.run.run_id} onChange={() => setRunId(entry.run.run_id)} />{" "}
+                    <input type="radio" name="qa-run" checked={runId === entry.run.run_id} onChange={() => void chooseRun(entry.run.run_id)} />{" "}
                     <span className="font-mono text-[11px]">{entry.run.run_id.slice(0, 8)}</span>
                   </label>
                   {t("quality_run_state", { validity: entry.validity.state, readiness: entry.readiness.state })}{" "}
@@ -720,6 +828,13 @@ export default function QualityPage({ projectName }: QualityPageProps) {
               );
             })}
           </ul>
+          {olderRuns ? (
+            <div className="pk-actions">
+              <button type="button" className="fm-btn" onClick={() => void loadOlderRuns()}>
+                {t("quality_older_runs")}
+              </button>
+            </div>
+          ) : null}
         </section>
 
         <section aria-labelledby="qa-disposition" className="pk-card">

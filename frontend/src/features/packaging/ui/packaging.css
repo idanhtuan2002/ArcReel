@@ -106,3 +106,8 @@
 .qa-fieldset:disabled {
   opacity: 0.6;
 }
+.qa-pre {
+  max-height: 16rem;
+  overflow: auto;
+  white-space: pre-wrap;
+}

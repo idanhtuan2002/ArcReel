@@ -67,7 +67,8 @@ beforeEach(() => {
         ],
       }),
     "/quality/probes": () => json({ probes: [] }),
-    "/quality/runs": () => json({ runs: [RUN("READY")] }),
+    "/quality/runs": () => json({ runs: [RUN("READY")], next_before: null }),
+    "/quality/runs/01a1run000000000": () => json({ ...RUN("READY"), observations: [OBS("o-r1", "review", "FAIL", [FINDING])] }),
   };
   posts = {
     "/quality/profiles/prepare": () => json(SEALED_PROFILE),
@@ -131,7 +132,7 @@ describe("Quality page", () => {
     await preparePublication();
     fireEvent.click(await screen.findByRole("button", { name: /^Publish profile$|^发布配置$/ }));
     await screen.findByRole("alert");
-    expect(window.localStorage.getItem("arcreel.m10c.pending:demo:showrunner:profiles:publish-x")).not.toBeNull();
+    expect(window.localStorage.getItem("arcreel.m10c.pending/demo/showrunner/profiles/publish-x")).not.toBeNull();
     useAuthStore.setState({ username: "someone-else" });
     const { unmount } = render(<QualityPage projectName="demo" />);
     await screen.findAllByLabelText(/Approved video|Video đã duyệt|已批准的视频/);
@@ -155,7 +156,7 @@ describe("Quality page", () => {
     fireEvent.click(await screen.findByRole("radio", { name: /01a1run0/ }));
     fireEvent.change(screen.getByLabelText(/^Decision$|^Quyết định$|^决定$/), { target: { value: "WAIVE" } });
     fireEvent.change(screen.getByLabelText(/^Reason$|^Lý do$|^理由$/), { target: { value: "brand style" } });
-    fireEvent.click(screen.getByRole("checkbox", { name: /visible-defects@whole/ }));
+    fireEvent.click(await screen.findByRole("checkbox", { name: /visible-defects@whole/ }));
     fireEvent.click(screen.getByRole("button", { name: /Prepare decision|Chuẩn bị quyết định|准备决定/ }));
     await waitFor(() => expect(sent.some((item) => item.path === "/quality/dispositions/prepare")).toBe(true));
     expect(sent.find((item) => item.path === "/quality/dispositions/prepare")?.body).toMatchObject({
@@ -174,7 +175,7 @@ describe("Quality page", () => {
   });
 
   it("does not offer packaging for a run that is not ready", async () => {
-    gets["/quality/runs"] = () => json({ runs: [RUN("NOT_READY")] });
+    gets["/quality/runs"] = () => json({ runs: [RUN("NOT_READY")], next_before: null });
     await choose();
     expect(await screen.findByText(/Not ready for packaging|Chưa sẵn sàng|尚不能打包/)).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: /Package this run/ })).not.toBeInTheDocument();
@@ -184,6 +185,71 @@ describe("Quality page", () => {
     await choose();
     fireEvent.change(screen.getByLabelText(/^Revision$|^修订$/), { target: { value: "1" } });
     await waitFor(() => expect(screen.getByLabelText(/^Revision$|^修订$/)).toHaveValue("1"));
+  });
+
+  it("asks for sign-in instead of binding requests to an unknown actor", async () => {
+    useAuthStore.setState({ username: null });
+    render(<QualityPage projectName="demo" />);
+    expect(await screen.findByText(/Sign in to review quality|Hãy đăng nhập|请登录/)).toBeInTheDocument();
+    expect(screen.queryByLabelText(/Approved video|Video đã duyệt|已批准的视频/)).not.toBeInTheDocument();
+  });
+
+  it("offers only the BLOCKING findings of the chosen run's failed review for a waiver", async () => {
+    gets["/quality/runs/01a1run000000000"] = () =>
+      json({
+        ...RUN("READY"),
+        observations: [
+          OBS("o-r1", "review", "FAIL", [FINDING, { ...FINDING, finding_id: "f-2", severity: "MINOR", subject_locator: "pacing@whole" }]),
+          OBS("o-r2", "review", "PASS", [{ ...FINDING, finding_id: "f-3", subject_locator: "audio@whole" }]),
+        ],
+      });
+    await choose();
+    fireEvent.click(await screen.findByRole("radio", { name: /01a1run0/ }));
+    fireEvent.change(screen.getByLabelText(/^Decision$|^Quyết định$|^决定$/), { target: { value: "WAIVE" } });
+    await screen.findByRole("checkbox", { name: /visible-defects@whole/ });
+    expect(screen.queryByRole("checkbox", { name: /pacing@whole/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("checkbox", { name: /audio@whole/ })).not.toBeInTheDocument();
+  });
+
+  it("pages older runs with the server cursor", async () => {
+    gets["/quality/runs"] = () => json({ runs: [RUN("READY")], next_before: "cursor-1" });
+    const calls: string[] = [];
+    const original = globalThis.fetch;
+    vi.mocked(original).mockImplementation((input, init) => {
+      const url = new URL(String(input), "http://test");
+      if (url.pathname.endsWith("/quality/runs")) {
+        calls.push(url.search);
+        const older = url.searchParams.get("before") === "cursor-1";
+        return Promise.resolve(json(older ? { runs: [RUN("READY", "01a0run000000000")], next_before: null } : { runs: [RUN("READY")], next_before: "cursor-1" }));
+      }
+      const path = url.pathname.replace(/^\/api\/v1\/projects\/demo/, "");
+      return Promise.resolve(init?.method === "POST" ? json({}, 404) : (gets[path]?.() ?? json({}, 404)));
+    });
+    await choose();
+    fireEvent.click(await screen.findByRole("button", { name: /Show older runs|Xem các run cũ hơn|显示更早的运行/ }));
+    expect(await screen.findByRole("radio", { name: /01a0run0/ })).toBeInTheDocument();
+    expect(calls.some((search) => search.includes("before=cursor-1"))).toBe(true);
+    expect(screen.queryByRole("button", { name: /Show older runs/ })).not.toBeInTheDocument();
+  });
+
+  it("finishes an unfinished probe with its own kept request and discloses one whose request is gone", async () => {
+    gets["/quality/probes"] = () =>
+      json({
+        probes: [
+          { execution_ref: "probe-kept", execution_id: "e1", master_binding_digest: "m", actor_id: "showrunner", requirement_id: "technical-container", attempt_state: "ACCEPTED", observation_id: null, status: null, failure: null },
+          { execution_ref: "probe-lost", execution_id: "e2", master_binding_digest: "m", actor_id: "showrunner", requirement_id: "technical-decode", attempt_state: "PLANNED", observation_id: null, status: null, failure: null },
+        ],
+        next_after: null,
+      });
+    const kept = { action: "probe", request: { execution_ref: "probe-kept" }, seal: "s-kept" };
+    window.localStorage.setItem("arcreel.m10c.pending/demo/showrunner/probes/probe-kept", JSON.stringify(kept));
+    posts["/quality/probes"] = () => json({ observation: { observation_id: "o-new" } });
+    await choose();
+    const finish = await screen.findByRole("button", { name: /Finish this check|Hoàn tất kiểm tra này|完成此检查/ });
+    expect(screen.getAllByText(/prepared request is not in this browser|không còn trong trình duyệt|此浏览器中没有已准备的请求/)).toHaveLength(1);
+    fireEvent.click(finish);
+    await waitFor(() => expect(sent.some((item) => item.path === "/quality/probes")).toBe(true));
+    expect(sent.find((item) => item.path === "/quality/probes")?.body).toEqual({ request: kept.request, seal: kept.seal });
   });
 
   it("has no detectable accessibility violations", async () => {

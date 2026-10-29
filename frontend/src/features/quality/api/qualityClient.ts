@@ -99,8 +99,22 @@ export function listObservations(
   return API.request(`${base(projectName)}/observations?${query(values)}`, { signal: options.signal });
 }
 
-export function listRuns(projectName: string, root: string, options: CallOptions = {}): Promise<{ runs: RunEntry[] }> {
-  return API.request(`${base(projectName)}/runs?${query({ root })}`, { signal: options.signal });
+export function listRuns(
+  projectName: string,
+  root: string,
+  before: string | null,
+  options: CallOptions = {},
+): Promise<{ runs: RunEntry[]; next_before: string | null }> {
+  const values: Record<string, string> = before ? { root, before } : { root };
+  return API.request(`${base(projectName)}/runs?${query(values)}`, { signal: options.signal });
+}
+
+export function readRun(
+  projectName: string,
+  runId: string,
+  options: CallOptions = {},
+): Promise<RunEntry & { observations: Observation[] }> {
+  return API.request(`${base(projectName)}/runs/${encodeURIComponent(runId)}`, { signal: options.signal });
 }
 
 export function prepare(
@@ -131,9 +145,10 @@ export function submit(
 
 export interface ProbeAttempt {
   execution_ref: string;
+  execution_id: string;
+  master_binding_digest: string;
   actor_id: string;
   requirement_id: string;
-  subject_digest: string;
   attempt_state: string | null;
   observation_id: string | null;
   status: string | null;
@@ -144,7 +159,7 @@ export function listProbes(
   projectName: string,
   values: { profile_id: string; revision: number; root: string },
   options: CallOptions = {},
-): Promise<{ probes: ProbeAttempt[] }> {
+): Promise<{ probes: ProbeAttempt[]; next_after: string | null }> {
   return API.request(`${base(projectName)}/probes?${query(values)}`, { signal: options.signal });
 }
 
@@ -169,7 +184,7 @@ export function readRevision(
 
 /** Browser keeping of sealed requests until their result is shown, partitioned by project, actor, action and command. */
 export function pendingPrefix(projectName: string, actor: string, action: QualityAction): string {
-  return `arcreel.m10c.pending:${projectName}:${actor}:${action}:`;
+  return `arcreel.m10c.pending/${[projectName, actor, action].map(encodeURIComponent).join("/")}/`;
 }
 
 export function commandOf(sealed: Sealed): string {
