@@ -1,0 +1,19 @@
+{
+  "root_available_bytes": 35373117440,
+  "D_available_bytes": 169412329472,
+  "gain_from_start_bytes": 7719542784,
+  "model_names_digests_unchanged": true,
+  "original_model_file_count": 0,
+  "private_parent_mode": "0700",
+  "service_status": [
+    "active",
+    "active",
+    "active"
+  ],
+  "provider_services": [
+    "active",
+    "active"
+  ],
+  "ollama_version": "ollama version is 0.32.6",
+  "reboot_tested": false
+}

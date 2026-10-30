@@ -1,0 +1,15 @@
+{
+  "removed": [
+    "/usr/share/ollama/.ollama/models/blobs/sha256-0c4c9c2a325fb1cdafec606e6809cb745f1cb26a6d919994400d27372303e276",
+    "/usr/share/ollama/.ollama/models/blobs/sha256-7339fa418c9ad3e8e12e74ad0fd26a9cc4be8703f9c110728a992b193be85cb2",
+    "/usr/share/ollama/.ollama/models/blobs/sha256-871671104f57ebd12a3765ca40f743f0fd6db03b59286e10fa86e981cf17f4dd",
+    "/usr/share/ollama/.ollama/models/blobs/sha256-a406579cd136771c705c521db86ca7d60a6f3de7c9b5460e6193a2df27861bde",
+    "/usr/share/ollama/.ollama/models/blobs/sha256-daec91ffb5dd0c27411bd71f29932917c49cf529a641d0168496c3a501e3062c",
+    "/usr/share/ollama/.ollama/models/blobs/sha256-dec52a44569a2a25341c4e4d3fee25846eed4f6f0b936278e3a3c900bb99d37c",
+    "/usr/share/ollama/.ollama/models/blobs/sha256-faff3cf483bf20dcb8d4b73ebe4247c352bfa505ca31c071a4ffda35c26b26e1",
+    "/usr/share/ollama/.ollama/models/manifests/registry.ollama.ai/library/bge-m3/latest",
+    "/usr/share/ollama/.ollama/models/manifests/registry.ollama.ai/library/qwen3.5-vimax/9b"
+  ],
+  "root_available_before_bytes": 27624857600,
+  "root_available_after_bytes": 35377041408
+}

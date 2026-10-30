@@ -1,0 +1,51 @@
+{
+  "models": [
+    {
+      "name": "qwen3.5-vimax:9b",
+      "model": "qwen3.5-vimax:9b",
+      "modified_at": "2026-08-22T23:00:54.5711522+07:00",
+      "size": 6594474727,
+      "digest": "079e71a587e3dd0c00fb189521886d4b4513531ff0bf4b92708b1c21854bbca2",
+      "details": {
+        "parent_model": "qwen3.5:9b",
+        "format": "gguf",
+        "family": "qwen35",
+        "families": [
+          "qwen35"
+        ],
+        "parameter_size": "9.7B",
+        "quantization_level": "Q4_K_M",
+        "context_length": 262144,
+        "embedding_length": 4096
+      },
+      "capabilities": [
+        "vision",
+        "completion",
+        "tools",
+        "thinking"
+      ]
+    },
+    {
+      "name": "bge-m3:latest",
+      "model": "bge-m3:latest",
+      "modified_at": "2026-08-06T22:59:19.002034+07:00",
+      "size": 1157672605,
+      "digest": "7907646426070047a77226ac3e684fbbe8410524f7b4a74d02837e43f2146bab",
+      "details": {
+        "parent_model": "",
+        "format": "gguf",
+        "family": "bert",
+        "families": [
+          "bert"
+        ],
+        "parameter_size": "566.70M",
+        "quantization_level": "F16",
+        "context_length": 8192,
+        "embedding_length": 1024
+      },
+      "capabilities": [
+        "embedding"
+      ]
+    }
+  ]
+}

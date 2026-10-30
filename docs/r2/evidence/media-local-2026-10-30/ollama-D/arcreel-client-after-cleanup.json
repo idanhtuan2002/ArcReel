@@ -1,0 +1,47 @@
+{
+  "deployed_head": "0cef69a772f1d2946e452b918a8839b0f37fd2d9",
+  "client": "lib.text_backends.ollama.OllamaChatClient",
+  "request": {
+    "model": "qwen3.5-vimax:9b",
+    "stream": false,
+    "think": false,
+    "truncate": false,
+    "shift": false,
+    "messages": [
+      {
+        "role": "user",
+        "content": "Viết một câu mở đầu truyện bằng tiếng Việt về một kỹ sư tìm thấy lá thư bí ẩn. Trả JSON với khóa opening."
+      }
+    ],
+    "options": {
+      "temperature": 0,
+      "num_ctx": 8192,
+      "num_predict": 160
+    },
+    "format": {
+      "type": "object",
+      "properties": {
+        "opening": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "opening"
+      ],
+      "additionalProperties": false
+    },
+    "keep_alive": "0s"
+  },
+  "response": {
+    "model": "qwen3.5-vimax:9b",
+    "content": "{\n  \"opening\": \"Trong căn phòng làm việc lạnh lẽo của mình, anh kỹ sư trẻ đã vô tình phát hiện ra một chiếc phong bì cũ nát nằm sâu trong ngăn kéo dưới cùng, bên trong là lá thư bí ẩn không có địa chỉ và tên người gửi.\"\n}",
+    "done": true,
+    "done_reason": "stop",
+    "prompt_eval_count": 39,
+    "eval_count": 61,
+    "total_duration_ns": 6110953620,
+    "prompt_eval_duration_ns": 127444000,
+    "eval_duration_ns": 1377493000
+  },
+  "wall_seconds": 6.1534506939933635
+}

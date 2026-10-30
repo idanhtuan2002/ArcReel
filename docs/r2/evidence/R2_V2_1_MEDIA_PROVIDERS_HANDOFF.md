@@ -11,8 +11,9 @@ Resume entry for "make the deployed V2.1 usable now with free providers". Codex 
   provider `custom-2` "VieNeu TTS (local)" (placeholder key `local`), default narration
   `custom-2/vieneu-tts-v3-turbo`, voice `nova`.
 - Default image model is now `custom-3/flux2-klein-4b-gguf`, ComfyUI local, configured price 0. API comparison after Save and reload confirmed only `settings.default_image_backend` changed. Video remains **paid Gemini / Veo 3.1**; free/local video is not configured.
-- Disk `/`: about 25.76 GiB available after cleanup and verified ComfyUI storage migration; D has about 165 GiB free. Current migration/rollback evidence: `media-local-2026-10-30/storage-D/README.md`. No partition changes performed.
+- Disk `/`: about 32.94 GiB available after cleanup and verified ComfyUI/Ollama storage migration; D has about 157.78 GiB free. Current migration/rollback evidence: `media-local-2026-10-30/storage-D/README.md`. No partition changes performed.
 - ComfyUI source/venv stay at `~/comfyui`, loopback `http://127.0.0.1:8188`, user service `arcreel-comfyui.service` enabled. Models and provider media now live under `/mnt/arcreel/D/ArcReel/`, mounted by UUID with tested automount. Current unit and path configuration are in `media-local-2026-10-30/storage-D/`. ArcReel project-managed asset copies remain on ext4.
+- Ollama model store is now `/mnt/arcreel/D/ArcReel/ollama/models`, exposed only inside its system service at `/var/lib/ollama-models`; service identity and both model digests preserved. Native chat, embedding and the deployed ArcReel client passed after deleting originals/restart. Evidence/rollback: `media-local-2026-10-30/ollama-D/README.md`.
 - Image workflow endpoint `ce-1`, provider `custom-3` "ComfyUI local (RTX 2070)", model `flux2-klein-4b-gguf`, image concurrency 1. Qwen3 Q4_K_M GGUF encoder is used on Turing instead of FP4.
 - Fresh inference: 1024 x 1024 benchmark succeeded in 34.787 s client wall time (33.75 s ComfyUI); production project character sheet 1792 x 1008 succeeded in 22.22 s execution timestamps (22.27 s ComfyUI log). Both outputs visually inspected. No Human quality/release acceptance claimed.
 - Production proof: `http://127.0.0.1:1251/app/projects/local-media-proof-2026-1-f4bd3cf4/characters`, character "Linh - Local image proof". Existing story project was preserved.
@@ -34,7 +35,7 @@ Download and install for local images (≈ 12–13 GB):
 ## Next steps
 
 1. Local-image installation/integration/proof is complete. Use the ComfyUI model already selected as the global image default. A project's explicit model override takes priority; inspect it before generating from an existing project.
-2. Free video remains open. Wan 2.2 TI2V-5B needs roughly another 12 GB plus working space; current root free disk is about 25.76 GiB and the D model/media store has about 165 GiB free. Use the configured D store, verify exact artifact sizes and obtain any needed download authorization before adding it. Alternatively configure DashScope Singapore after the sponsor supplies the account/key and verifies applicable free quota.
+2. Free video remains open. Wan 2.2 TI2V-5B needs roughly another 12 GB plus working space; current root free disk is about 32.94 GiB and the D model/media store has about 157.78 GiB free. Use the configured D store, verify exact artifact sizes and obtain any needed download authorization before adding it. Alternatively configure DashScope Singapore after the sponsor supplies the account/key and verifies applicable free quota.
 3. Image editing/reference-guided image workflows are not part of the verified text-to-image workflow. They need their own workflow and project-level proof.
 4. Full story-to-video proof remains incomplete until free video is configured and a real short clip is generated. M9-C is separate roadmap work.
 

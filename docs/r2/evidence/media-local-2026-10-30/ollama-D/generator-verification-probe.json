@@ -1,0 +1,16 @@
+[
+  {
+    "flags": [],
+    "exit_code": 1,
+    "stdout": "",
+    "stderr": "arcreel-ollama-storage-verify.service: Failed to create arcreel-ollama-storage-verify.service/start: Unit mnt-arcreel-D.mount not found.\n"
+  },
+  {
+    "flags": [
+      "--generators=yes"
+    ],
+    "exit_code": 0,
+    "stdout": "",
+    "stderr": "Failed to read $SYSTEMD_GETTY_AUTO in PID 1's environment, ignoring: Permission denied\n\n** (netplan:3443159): WARNING **: 12:38:33.708: Skipping YAML file due to parsing errors. Cannot open /etc/netplan/00-installer-config.yaml: Permission denied\n\n** (netplan:3443159): WARNING **: 12:38:33.708: Skipping YAML file due to parsing errors. Cannot open /lib/netplan/00-network-manager-all.yaml: Permission denied\n\n** (netplan:3443159): WARNING **: 12:38:33.708: Skipping YAML file due to parsing errors. Cannot open /etc/netplan/01-network-manager-all.yaml: Permission denied\n\n** (netplan:3443159): WARNING **: 12:38:33.708: Skipping YAML file due to parsing errors. Cannot open /etc/netplan/90-NM-140fde2e-f802-40af-8a92-a7eacc45c64b.yaml: Permission denied\n\n** (netplan:3443159): WARNING **: 12:38:33.708: Skipping YAML file due to parsing errors. Cannot open /etc/netplan/90-NM-8582bed2-c062-42c4-8408-d769b9921bc3.yaml: Permission denied\n\n** (netplan:3443159): WARNING **: 12:38:33.708: Skipping YAML file due to parsing errors. Cannot open /etc/netplan/90-NM-aa173d18-24c3-4a9f-b853-40d48b79b755.yaml: Permission denied\n\n** (netplan:3443159): WARNING **: 12:38:33.708: Skipping YAML file due to parsing errors. Cannot open /etc/netplan/90-NM-de3a72fb-678d-4b01-aa72-f64345085179.yaml: Permission denied\n/usr/lib/systemd/system-generators/cloud-init-generator failed with exit status 2.\n"
+  }
+]

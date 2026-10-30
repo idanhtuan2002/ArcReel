@@ -1,0 +1,20 @@
+# /etc/systemd/system/ollama.service
+[Unit]
+Description=Ollama Service
+After=network-online.target
+
+[Service]
+ExecStart=/usr/local/bin/ollama serve
+User=ollama
+Group=ollama
+Restart=always
+RestartSec=3
+Environment="PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin:/snap/bin"
+
+[Install]
+WantedBy=default.target
+
+# /etc/systemd/system/ollama.service.d/context-length.conf
+[Service]
+Environment="OLLAMA_CONTEXT_LENGTH=8192"
+Environment="OLLAMA_NUM_PARALLEL=1"

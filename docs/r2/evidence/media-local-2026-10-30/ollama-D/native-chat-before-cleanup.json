@@ -1,0 +1,35 @@
+{
+  "request": {
+    "model": "qwen3.5-vimax:9b",
+    "messages": [
+      {
+        "role": "user",
+        "content": "Viết đúng hai câu mở đầu một câu chuyện nhẹ nhàng bằng tiếng Việt: một kỹ sư trẻ bước vào văn phòng buổi sáng và tìm thấy một lá thư bí ẩn. Chỉ trả lời nội dung truyện."
+      }
+    ],
+    "stream": false,
+    "think": false,
+    "keep_alive": 0,
+    "options": {
+      "num_predict": 160,
+      "temperature": 0
+    }
+  },
+  "response": {
+    "model": "qwen3.5-vimax:9b",
+    "created_at": "2026-10-30T05:41:20.922247827Z",
+    "message": {
+      "role": "assistant",
+      "content": "Sáng sớm, anh Nam – một kỹ sư trẻ đầy nhiệt huyết – khẽ đẩy cửa bước vào không gian làm việc yên tĩnh của mình. Trên chiếc bàn gỗ cũ kỹ giữa căn phòng bỗng hiện lên một phong bì mỏng manh với dòng chữ bí ẩn chưa từng thấy bao giờ."
+    },
+    "done": true,
+    "done_reason": "stop",
+    "total_duration": 18639021333,
+    "load_duration": 12920146018,
+    "prompt_eval_count": 54,
+    "prompt_eval_duration": 323550000,
+    "eval_count": 58,
+    "eval_duration": 5388854000
+  },
+  "wall_seconds": 18.64023691401235
+}
