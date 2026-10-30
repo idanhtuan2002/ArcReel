@@ -105,6 +105,9 @@ async def test_upgrade_downgrade_preserves_unrelated_user_rows(concurrent_sessio
 
         def roundtrip(sync):
             for table in (
+                "auto_authorization_decisions",
+                "auto_grant_heads",
+                "auto_grant_events",
                 "auto_production_usage_refs",
                 "auto_production_allocations",
                 "auto_production_steps",

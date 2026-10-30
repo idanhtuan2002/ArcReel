@@ -308,3 +308,77 @@ class UsageReceipt(OwnerReceipt):
     tasks: NonnegativeInt
     runtime_seconds: NonnegativeInt
     outcome: Literal["KNOWN", "UNKNOWN"]
+
+
+class AutomationOperation(StrEnum):
+    BRIEF = "BRIEF"
+    STORY = "STORY"
+    STORY_COMMIT = "STORY_COMMIT"
+    HANDOFF = "HANDOFF"
+    EPISODE_PLAN = "EPISODE_PLAN"
+    SCRIPT_PLAN = "SCRIPT_PLAN"
+    SCRIPT = "SCRIPT"
+    ASSET_ANALYSIS = "ASSET_ANALYSIS"
+    MEDIA = "MEDIA"
+    RENDER = "RENDER"
+    MASTER = "MASTER"
+    QUALITY = "QUALITY"
+    PACKAGE = "PACKAGE"
+    EXPORT = "EXPORT"
+
+
+class GrantRequest(RunScope):
+    issuer_id: ExactIdentity
+    command_id: ExactIdentity
+    expected_run_version: PositiveInt
+    input_digest: Digest
+    policy_digest: Digest
+    operations: frozenset[AutomationOperation] = Field(min_length=1)
+    expires_at: AwareDatetime
+
+
+class AutomationGrant(RunScope):
+    schema_id: Literal["r2.automation-grant.v1"] = "r2.automation-grant.v1"
+    grant_id: ExactIdentity
+    version: PositiveInt
+    state: Literal["ACTIVE", "REVOKED"]
+    principal: ExactIdentity
+    issuer_id: ExactIdentity
+    start_command_id: ExactIdentity
+    request_digest: Digest
+    parent_sequence: PositiveInt
+    parent_event_digest: Digest
+    policy_digest: Digest
+    input_digest: Digest
+    operations: frozenset[AutomationOperation] = Field(min_length=1)
+    issued_at: AwareDatetime
+    expires_at: AwareDatetime
+
+    @model_validator(mode="after")
+    def valid_window(self) -> Self:
+        if self.expires_at <= self.issued_at:
+            raise ValueError("delegation window is empty")
+        return self
+
+
+class AuthorizationSubject(RunScope):
+    grant_id: ExactIdentity
+    grant_version: PositiveInt
+    expected_run_version: PositiveInt
+    generation: PositiveInt
+    input_digest: Digest
+    policy_digest: Digest
+    operation: AutomationOperation
+    command_id: ExactIdentity
+    subject_digest: Digest
+
+
+class AutomationAuthorizationV1(AutomationContract):
+    schema_id: Literal["r2.automation-authorization.v1"] = "r2.automation-authorization.v1"
+    actor_kind: Literal["RUN_AUTOMATION"] = "RUN_AUTOMATION"
+    principal: ExactIdentity
+    subject: AuthorizationSubject
+    request_digest: Digest
+    parent_sequence: PositiveInt
+    parent_event_digest: Digest
+    admitted_at: AwareDatetime
