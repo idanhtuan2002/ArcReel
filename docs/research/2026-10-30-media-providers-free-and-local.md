@@ -71,6 +71,13 @@ not daily use. FLUX.2 klein images should take well under a minute each. These n
 - RTX 2070 time per FLUX.2 klein image and per Wan 2.2 5B clip.
 - Whether wan2.7 video models carry any free quota (not shown in the pricing excerpt).
 
+## 6. Measured on this host (2026-10-30)
+
+- VieNeu-TTS v3 Turbo (CPU/ONNX, offline, `HF_HUB_OFFLINE=1`): 20 built-in Vietnamese voices; 3.9 s of 48 kHz speech in
+  5.7 s including model load. Behind the OpenAI-compatible shim `~/arcreel-v2-staging/vieneu-tts-shim/server.py`
+  (127.0.0.1:23340), ArcReel's OpenAI SDK client lists the model and receives wav and mp3 (two sentences in 6.2 s).
+  The shim maps ArcReel's OpenAI voice ids to VieNeu voices (nova → Trúc Ly, onyx → Xuân Vĩnh, ...).
+
 ## Sources
 
 - Alibaba Cloud Model Studio pricing (official): https://www.alibabacloud.com/help/en/model-studio/model-pricing
