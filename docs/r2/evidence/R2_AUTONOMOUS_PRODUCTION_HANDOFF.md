@@ -6,9 +6,9 @@ Sponsor approved design, plan and continuous native execution: “dung dung lai,
 
 - Worktree: `/home/anhtuan/.codex/worktrees/9b89/content-production-os` (native managed creation; keep tool task cwd, pass this path explicitly).
 - Branch: `impl/autonomous-production`.
-- Code checkpoint: `e288a522c8ff25daf7d49e0fc0c5c888c2efc7d5`; base plan `127d44e544eb2dbfcfe154f0ab62791a04b453e1`, released application base `0cef69a772f1d2946e452b918a8839b0f37fd2d9`.
+- Latest committed foundation checkpoint: `9b4dcb9fe80accab4424c91d35244705fadec1d3`; base plan `127d44e544eb2dbfcfe154f0ab62791a04b453e1`, released application base `0cef69a772f1d2946e452b918a8839b0f37fd2d9`.
 - Plan: `docs/superpowers/plans/2026-10-30-autonomous-production-workflow.md`; approved spec adjacent under specs.
-- Ledger: `.superpowers/sdd/2026-10-30-autonomous-production-workflow/progress.md`. Read ledger, `git status` and task brief before resuming. Workspace contains test logs and `task-2-tests.pending`.
+- Ledger: `.superpowers/sdd/2026-10-30-autonomous-production-workflow/progress.md`. Read ledger, `git status` and task brief before resuming. Workspace contains task-start briefs, scoped task-done1/2/3 markers and exact test logs.
 - Root checkout and other worktrees are unrelated; preserve them. Release checkout has not changed; production is not activated.
 - This worktree needs escalated exec for writes because native placement is outside original writable root; user authorized work. Shared `/tmp` also hit quota, so default sandbox setup can fail. Use explicit workdir and authorized escalation; do not modify security settings or clean unrelated data.
 - `.venv` is a locally ignored symlink to existing `r2-m10-c/.venv`; use `uv run --no-sync`, do not mutate shared dependencies.
@@ -48,4 +48,14 @@ Graph `r2-v2-main` generation 2026-10-15 is older than source. Graph-first searc
 - Existing Host BudgetReservationService remains provider monetary authority. New run allocations enforce run-wide cost/call/task/runtime limits and preserve owner usage references; do not create another provider charge ledger or mutate Host Usage.
 - Existing `concurrent_session_factory` is PG-aware, `file_session_factory` is SQLite-only. Assert real PG for authority/interleaving tests.
 - All lib-level device/render seams consume pure contracts/injected ports, never import server read-model/services. Device lease expiry is not quiescence proof.
-- Task 1 is an implementation checkpoint; Tasks 2–12 remain. Full launch still requires actual authority adapters, backend controller, native renderer, qualified automatic Quality, UI, fresh product/recovery and export acceptance. Drama speech/lip-sync route research remains prerequisite.
+- Tasks1–3 have scoped implementation checkpoints; Task4 source checkpoint is described below, Tasks5–12 remain. Full launch still requires actual authority adapters, backend controller, native renderer, qualified automatic Quality, UI, fresh product/recovery and export acceptance. Drama speech/lip-sync route research remains prerequisite.
+
+## Task4 source checkpoint and next entry
+
+Task4 adds candidate launch JSON, strict model-route pins in policy, launch_profile_id/local_only, pure read-only preflight checks, owner-bound reviewer/launch qualification contracts and actual host configuration inspector. `resolve_launch_profile` returns LaunchProfile metadata, not RunPolicy (runtime caps and model/Quality pins cannot be resolved from a static ID). Both presets remain CANDIDATE; drama explicitly blocks pending audio-driven route qualification. Inspector reads real DB/ConfigResolver and capability metadata without a provider backend, exposes only digests and refuses disabled-model fallback.
+
+TDD/regression: **93 component tests**, **727 contracts/production/preflight tests**, **53 PostgreSQL scoped authority/run tests** passed; full ruff, basedpyright0/0 and test audit0. These counts overlap; do not add them as unique coverage. Actual owner-qualified corpus and launch receipts have not been produced. Positive preflight tests inject synthetic read-port data; no live production readiness inferred.
+
+Plan/ledger ruling moves real snapshot assembly to Task6's first Start/controller consumer and actual qualification record resolution to Tasks9/12. These are mandatory remaining gates; no fake qualified reader should be created. Task5 starts next: versioned automatic narrative/master authority while preserving old Human wire bytes. Initial source discovery found legacy NarrativeDecisionAuthorization/RetryAuthentication and Adaptation/Gate literals are Human-only; Canon/Plan approvals are data passed to owner UoWs, no automatic final grant fence. Need main-owned design/actual source probes before changes. Existing SqlAlchemy owner UoWs expose `.session`, while pure R2 protocol does not; any automatic final guard must operate in the owner transaction, after owner locks, and fail closed without the real server authority. Never authenticate on a separate transaction and reuse that as final grant currentness. No Task5 source edits yet.
+
+Research completed: docs/research/2026-10-30-drama-speech-route-qualification.md has pinned official VieNeu/Wan/MuseTalk/Wav2Lip sources. MuseTalk is an unqualified investigation candidate for RTX2070/8GiB, not installed/selected. All research children finished; no active implementation child. Approval review hit a usage-limit error once; after user said continue, retry through the same approval mechanism succeeded. Do not bypass review on a recurrence.

@@ -99,6 +99,8 @@ Budget methods: `reserve_budget(*, run: RunSnapshot, intent: DispatchIntent) -> 
 
 ### Task 4: Preflight and qualified launch profile registry
 
+Execution ruling: Task 4 supplies candidate preset metadata, the read-only preflight policy, owner-qualification input contracts and real ConfigResolver/DB route inspection. Runtime snapshot assembly is wired at its first Start/controller consumer in Task 6; actual qualification-receipt resolution belongs to its existing planned producer/release owners in Tasks 9/12. A typed qualification record or positive component report is not evidence that those owners exist or that a launch profile is qualified. Keep both presets CANDIDATE and drama blocked until the explicit media qualification gate closes.
+
 **Files:** create `server/production_run/preflight.py`, `r2/automation/profiles.py`, `r2/automation/launch_profiles/fiction_narration_vi_v1.json`, `fiction_drama_vi_v1.json`; tests `tests/unit/r2/automation/test_profiles.py`, `tests/integration/server/production_run/test_preflight.py`; research gate `docs/research/2026-10-30-drama-speech-route-qualification.md`.
 
 **Interfaces:** `ProductionPreflight.check(*, user_id: str, project_name: str, policy: RunPolicy) -> PreflightReport`; `resolve_launch_profile(profile_id: str) -> RunPolicy` returns immutable qualified preset metadata, never authority. Report includes qualification state and frozen route/policy/input digests, no secrets.

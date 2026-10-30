@@ -5,9 +5,19 @@ from __future__ import annotations
 from enum import StrEnum
 from typing import Annotated, Literal, Self
 
-from pydantic import AwareDatetime, BeforeValidator, ConfigDict, Field, StrictInt, StringConstraints, model_validator
+from pydantic import (
+    AwareDatetime,
+    BeforeValidator,
+    ConfigDict,
+    Field,
+    StrictBool,
+    StrictInt,
+    StringConstraints,
+    model_validator,
+)
 
 from r2.contracts.common import R2ContractModel
+from r2.contracts.quality import QualityProfileRevision
 
 
 def _exact_identity(value: object) -> str:
@@ -85,11 +95,26 @@ class RunScope(AutomationContract):
     run_id: ExactIdentity
 
 
+class ModelRoute(AutomationContract):
+    role: Literal["writer", "script", "reviewer_a", "reviewer_b", "image", "video", "audio", "lip_sync"]
+    provider_id: ExactIdentity
+    model_id: ExactIdentity
+    model_identity: ExactIdentity
+    config_digest: Digest
+    local: StrictBool
+    paid: StrictBool
+    currency: Annotated[str, StringConstraints(pattern=r"^[A-Z][A-Z0-9_]{1,31}$")]
+    max_cost_per_call: NonnegativeInt | None
+
+
 class RunPolicy(AutomationContract):
     schema_id: Literal["r2.production-policy.v1"] = "r2.production-policy.v1"
     mode: AutomationMode = AutomationMode.AUTO
     profile_id: ExactIdentity
     profile_digest: Digest
+    launch_profile_id: ExactIdentity = "fiction_narration_vi_v1"
+    local_only: StrictBool = False
+    routes: tuple[ModelRoute, ...] = ()
     checkpoints: frozenset[Checkpoint] | None = None
     currency: Annotated[str, StringConstraints(pattern=r"^[A-Z][A-Z0-9_]{1,31}$")]
     max_cost_minor_units: NonnegativeInt
@@ -382,3 +407,70 @@ class AutomationAuthorizationV1(AutomationContract):
     parent_sequence: PositiveInt
     parent_event_digest: Digest
     admitted_at: AwareDatetime
+
+
+class QualificationCase(AutomationContract):
+    split: Literal["CALIBRATION", "HOLDOUT"]
+    label: Literal["CLEAN", "CRITICAL_DEFECT"]
+    accepted: StrictBool
+    case_digest: Digest
+    receipt_ref: ExactIdentity
+    receipt_digest: Digest
+
+
+class ReviewerQualification(AutomationContract):
+    profile_digest: Digest
+    launch_profile_id: ExactIdentity
+    language: ExactIdentity
+    provider_id: ExactIdentity
+    model_id: ExactIdentity
+    model_identity: ExactIdentity
+    config_digest: Digest
+    prompt_digest: Digest
+    cases: Annotated[tuple[QualificationCase, ...], Field(max_length=1000)]
+
+
+class LaunchQualification(OwnerReceipt):
+    user_id: ExactIdentity
+    project_name: ExactIdentity
+    launch_profile_id: ExactIdentity
+    profile_digest: Digest
+    route_digests: tuple[Digest, ...]
+    required_disk_bytes: PositiveInt
+    required_gpu_bytes: PositiveInt
+
+
+class PreflightSnapshot(AutomationContract):
+    user_id: ExactIdentity
+    project_name: ExactIdentity
+    input_digest: Digest
+    content_mode: ExactIdentity
+    generation_mode: ExactIdentity
+    language: ExactIdentity
+    routes: tuple[ModelRoute, ...]
+    profile: QualityProfileRevision | None
+    qualifications: tuple[ReviewerQualification, ...]
+    launch_qualification: LaunchQualification | None = None
+    voice_available: StrictBool
+    disk_free_bytes: NonnegativeInt
+    required_disk_bytes: NonnegativeInt
+    gpu_free_bytes: NonnegativeInt
+    required_gpu_bytes: NonnegativeInt
+    checked_at: AwareDatetime
+
+
+class PreflightReport(AutomationContract):
+    user_id: ExactIdentity
+    project_name: ExactIdentity
+    input_digest: Digest
+    policy_digest: Digest
+    route_digests: tuple[Digest, ...]
+    dispatch_allowed: StrictBool
+    blocking_reasons: tuple[ExactIdentity, ...]
+    checked_at: AwareDatetime
+
+    @model_validator(mode="after")
+    def coherent(self) -> Self:
+        if self.dispatch_allowed != (not self.blocking_reasons):
+            raise ValueError("preflight outcome differs from blockers")
+        return self
