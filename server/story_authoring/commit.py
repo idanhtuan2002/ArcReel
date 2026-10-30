@@ -31,10 +31,12 @@ from lib.db.narrative_lifecycle_uow import narrative_lifecycle_uow_factory
 from lib.db.narrative_plan_uow import narrative_plan_uow_factory
 from r2.contracts import (
     CanonCommitApproval,
+    CanonCommitResult,
     CanonDelta,
     CreateCanonBranch,
     NarrativeContextPack,
     NarrativePlanApproval,
+    NarrativePlanCommitResult,
     NarrativePlanRevisionProposal,
 )
 from r2.contracts.common import ensure_json_value
@@ -48,10 +50,12 @@ from r2.narrative_lifecycle.acceptance import NarrativeAcceptanceService
 from r2.narrative_lifecycle.accepted_narrative_adapter import AcceptedNarrativeAdapter
 from r2.narrative_lifecycle.evidence import NarrativeLifecycleEvidenceService
 from r2.narrative_plan.errors import NarrativePlanError
+from r2.narrative_plan.ports import CanonVersionReader, NarrativePlanUnitOfWorkFactory
 from r2.narrative_plan.service import NarrativePlanService
 from server.story_authoring.artifacts import BlobStoreError, StoryBlobStore
 from server.story_authoring.authority import GrantNarrativeShowrunnerAuthority
 from server.story_authoring.narrative import (
+    ContextReaders,
     ProvisionalAcceptance,
     SceneBases,
     SceneRef,
@@ -222,6 +226,113 @@ def _approval_ref(digest: str, step: str) -> str:
     return f"story-approval:{digest}:{step}"
 
 
+async def compile_manifest_scene(
+    readers: ContextReaders,
+    identity: StoryIdentity,
+    manifest: ManuscriptCommitManifest,
+    step: str,
+) -> SceneEntry:
+    """Require the current committed context to equal the scene's frozen generation basis."""
+    index = next(i for i, scene in enumerate(manifest.scenes) if scene.node_id == step)
+    entry = manifest.scenes[index]
+    pack = await compile_scene_context(
+        readers,
+        identity,
+        entry.ref,
+        contract=scene_contract(manifest.plan, entry.ref),
+        canon_version_id=manifest.canon_version_id,
+        plan_version=(manifest.plan.expected_version or 0) + 1,
+        recent_decision_ids=[earlier.decision_id for earlier in manifest.scenes[:index]],
+    )
+    if binding(pack) != (entry.context_pack_id, entry.context_content_hash):
+        raise BindingMismatch(
+            f"{step}: committed context {binding(pack)} differs from the generated "
+            f"{(entry.context_pack_id, entry.context_content_hash)}"
+        )
+    return entry
+
+
+async def commit_manifest_canon(
+    identity: StoryIdentity,
+    manifest: ManuscriptCommitManifest,
+    *,
+    actor_id: str,
+    approved_at: datetime,
+    approval_ref: str,
+    canon: CanonTransactionService,
+    clock: Callable[[], datetime],
+) -> CanonCommitResult:
+    """Commit the exact manifest Canon through its existing owner."""
+    delta = manifest.canon_genesis
+    await canon.create_branch(
+        CreateCanonBranch(
+            branch_id=identity.canon_branch_id,
+            user_id=identity.user_id,
+            project_name=identity.project_name,
+            branch_type=CanonBranchType.MAIN,
+            created_at=delta.created_at,
+            created_by=delta.created_by,
+        )
+    )
+    result = await canon.commit(
+        delta=delta,
+        approval=CanonCommitApproval(
+            approval_ref=approval_ref,
+            canon_delta_id=delta.canon_delta_id,
+            payload_hash=delta.payload_hash,
+            payload_hash_algorithm=delta.payload_hash_algorithm,
+            payload_hash_version=delta.payload_hash_version,
+            content_schema_version=delta.content_schema_version,
+            project_name=identity.project_name,
+            user_id=identity.user_id,
+            approved_by=actor_id,
+            approved_at=approved_at,
+            status="APPROVED",
+        ),
+        project_name=identity.project_name,
+        user_id=identity.user_id,
+        now=clock(),
+    )
+    if result.version.canon_version_id != manifest.canon_version_id:
+        raise BindingMismatch(
+            f"Canon genesis committed as {result.version.canon_version_id}, manifest names {manifest.canon_version_id}"
+        )
+    return result
+
+
+async def commit_manifest_plan(
+    identity: StoryIdentity,
+    manifest: ManuscriptCommitManifest,
+    *,
+    actor_id: str,
+    approved_at: datetime,
+    approval_ref: str,
+    uow_factory: NarrativePlanUnitOfWorkFactory,
+    canon_reader: CanonVersionReader,
+    clock: Callable[[], datetime],
+) -> NarrativePlanCommitResult:
+    """Commit the exact manifest plan through its existing owner."""
+    plan = manifest.plan
+    service = NarrativePlanService(uow_factory, canon_reader)
+    return await service.commit_revision(
+        proposal=plan,
+        approval=NarrativePlanApproval(
+            approval_ref=approval_ref,
+            plan_revision_id=plan.plan_revision_id,
+            plan_id=plan.plan_id,
+            expected_version=plan.expected_version,
+            content_hash=plan.content_hash,
+            project_name=identity.project_name,
+            user_id=identity.user_id,
+            approved_by=actor_id,
+            approved_at=approved_at,
+        ),
+        project_name=identity.project_name,
+        user_id=identity.user_id,
+        now=clock(),
+    )
+
+
 class ManuscriptCommitter:
     def __init__(
         self,
@@ -348,82 +459,33 @@ class ManuscriptCommitter:
     ) -> None:
         identity = self._identity
         if step == STEP_CANON:
-            delta = manifest.canon_genesis
-            canon = CanonTransactionService(
-                canon_authority_uow_factory(self._session_factory), version_id_factory=lambda: manifest.canon_version_id
-            )
-            await canon.create_branch(
-                CreateCanonBranch(
-                    branch_id=identity.canon_branch_id,
-                    user_id=identity.user_id,
-                    project_name=identity.project_name,
-                    branch_type=CanonBranchType.MAIN,
-                    created_at=delta.created_at,
-                    created_by=delta.created_by,
-                )
-            )
-            result = await canon.commit(
-                delta=delta,
-                approval=CanonCommitApproval(
-                    approval_ref=_approval_ref(digest, STEP_CANON),
-                    canon_delta_id=delta.canon_delta_id,
-                    payload_hash=delta.payload_hash,
-                    payload_hash_algorithm=delta.payload_hash_algorithm,
-                    payload_hash_version=delta.payload_hash_version,
-                    content_schema_version=delta.content_schema_version,
-                    project_name=identity.project_name,
-                    user_id=identity.user_id,
-                    approved_by=approval.actor_id,
-                    approved_at=approval.approved_at,
-                    status="APPROVED",
+            await commit_manifest_canon(
+                identity,
+                manifest,
+                actor_id=approval.actor_id,
+                approved_at=approval.approved_at,
+                approval_ref=_approval_ref(digest, STEP_CANON),
+                canon=CanonTransactionService(
+                    canon_authority_uow_factory(self._session_factory),
+                    version_id_factory=lambda: manifest.canon_version_id,
                 ),
-                project_name=identity.project_name,
-                user_id=identity.user_id,
-                now=self._clock(),
+                clock=self._clock,
             )
-            if result.version.canon_version_id != manifest.canon_version_id:
-                raise BindingMismatch(
-                    f"Canon genesis committed as {result.version.canon_version_id}, manifest names {manifest.canon_version_id}"
-                )
             return
         readers = committed_readers(identity, self._bible, session_factory=self._session_factory)
         if step == STEP_PLAN:
-            plan = manifest.plan
-            service = NarrativePlanService(narrative_plan_uow_factory(self._session_factory), readers.canon_reader)
-            await service.commit_revision(
-                proposal=plan,
-                approval=NarrativePlanApproval(
-                    approval_ref=_approval_ref(digest, STEP_PLAN),
-                    plan_revision_id=plan.plan_revision_id,
-                    plan_id=plan.plan_id,
-                    expected_version=plan.expected_version,
-                    content_hash=plan.content_hash,
-                    project_name=identity.project_name,
-                    user_id=identity.user_id,
-                    approved_by=approval.actor_id,
-                    approved_at=approval.approved_at,
-                ),
-                project_name=identity.project_name,
-                user_id=identity.user_id,
-                now=self._clock(),
+            await commit_manifest_plan(
+                identity,
+                manifest,
+                actor_id=approval.actor_id,
+                approved_at=approval.approved_at,
+                approval_ref=_approval_ref(digest, STEP_PLAN),
+                uow_factory=narrative_plan_uow_factory(self._session_factory),
+                canon_reader=readers.canon_reader,
+                clock=self._clock,
             )
             return
-        index = next(i for i, scene in enumerate(manifest.scenes) if scene.node_id == step)
-        entry = manifest.scenes[index]
-        pack = await compile_scene_context(
-            readers,
-            identity,
-            entry.ref,
-            contract=scene_contract(manifest.plan, entry.ref),
-            canon_version_id=manifest.canon_version_id,
-            plan_version=1,
-            recent_decision_ids=[earlier.decision_id for earlier in manifest.scenes[:index]],
-        )
-        if binding(pack) != (entry.context_pack_id, entry.context_content_hash):
-            raise BindingMismatch(
-                f"{step}: committed context {binding(pack)} differs from the generated "
-                f"{(entry.context_pack_id, entry.context_content_hash)}"
-            )
+        entry = await compile_manifest_scene(readers, identity, manifest, step)
         await self._evidence.record_draft_candidate(entry.candidate)
         await self._evidence.record_revision(entry.revision)
         await self._acceptance.decide_revision(

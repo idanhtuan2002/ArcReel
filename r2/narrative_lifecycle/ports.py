@@ -11,6 +11,7 @@ from collections.abc import Callable
 from datetime import datetime
 from typing import Protocol, runtime_checkable
 
+from r2.contracts.common import R2ContractModel
 from r2.contracts.narrative_lifecycle import (
     ChangeSetReviewHead,
     CompilationAttempt,
@@ -23,8 +24,10 @@ from r2.contracts.narrative_lifecycle import (
     ExtractionResult,
     NarrativeChangeSet,
     NarrativeDecisionAuthorization,
+    NarrativeDecisionAuthorizationEvidence,
     NarrativeDecisionCommand,
     NarrativeDecisionRetryAuthentication,
+    NarrativeDecisionRetryAuthenticationEvidence,
     NarrativeHandoffAdmission,
     NarrativeRevision,
     NarrativeWorkScope,
@@ -109,24 +112,24 @@ class NarrativeAuthorityRepositoryPort(Protocol):
 
     async def get_decision_by_id(
         self, decision_id: str, *, user_id: str, project_name: str
-    ) -> tuple[NarrativeDecisionCommand, NarrativeDecisionAuthorization, int] | None: ...
+    ) -> tuple[NarrativeDecisionCommand, NarrativeDecisionAuthorizationEvidence, int] | None: ...
 
     async def list_revision_decisions(
         self, work_scope: NarrativeWorkScope
-    ) -> list[tuple[NarrativeDecisionCommand, NarrativeDecisionAuthorization, int]]: ...
+    ) -> list[tuple[NarrativeDecisionCommand, NarrativeDecisionAuthorizationEvidence, int]]: ...
 
     async def list_change_set_review_decisions(
         self, *, revision_acceptance_decision_id: str, change_set_lineage_id: str
-    ) -> list[tuple[NarrativeDecisionCommand, NarrativeDecisionAuthorization, int]]: ...
+    ) -> list[tuple[NarrativeDecisionCommand, NarrativeDecisionAuthorizationEvidence, int]]: ...
 
     async def list_conflict_resolution_decisions(
         self, *, revision_acceptance_decision_id: str, conflict_resolution_lineage_id: str
-    ) -> list[tuple[NarrativeDecisionCommand, NarrativeDecisionAuthorization, int]]: ...
+    ) -> list[tuple[NarrativeDecisionCommand, NarrativeDecisionAuthorizationEvidence, int]]: ...
 
     async def insert_identity_and_decision(
         self,
         command: NarrativeDecisionCommand,
-        authorization: NarrativeDecisionAuthorization,
+        authorization: NarrativeDecisionAuthorizationEvidence,
         *,
         canonical_identity_hash: str,
         decision_generation: int,
@@ -314,4 +317,28 @@ class NarrativeShowrunnerAuthorityPort(Protocol):
         request it made. Mints nothing durable and grants no decision authority; every
         production adapter denies by default, exactly like the other two methods.
         """
+        ...
+
+
+@runtime_checkable
+class NarrativeDecisionAuthorityPort(Protocol):
+    """Shared evidence surface. Automatic projections require the separate final owner guard."""
+
+    async def authorize_initial_decision(
+        self, authenticated_principal: str, canonical_command: NarrativeDecisionCommand
+    ) -> NarrativeDecisionAuthorizationEvidence: ...
+
+    async def authenticate_exact_retry(
+        self, authenticated_principal: str, decision_id: str, exact_scope: NarrativeWorkScope
+    ) -> NarrativeDecisionRetryAuthenticationEvidence: ...
+
+    async def authenticate_scoped_showrunner(
+        self, authenticated_principal: str, subject_id: str, exact_scope: NarrativeWorkScope
+    ) -> NarrativeDecisionRetryAuthenticationEvidence: ...
+
+
+@runtime_checkable
+class NarrativeAutomationAuthorityPort(NarrativeDecisionAuthorityPort, Protocol):
+    async def require_current_in_owner(self, unit_of_work: object, command: R2ContractModel) -> None:
+        """Verify actual automatic authority in this owning transaction after all owner locks."""
         ...

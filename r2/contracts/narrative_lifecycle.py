@@ -323,6 +323,66 @@ class NarrativeDecisionRetryAuthentication(R2ContractModel):
     authenticated_via: NonEmptyStr
 
 
+class NarrativeAutomationDecisionAuthorizationV1(R2ContractModel):
+    """Automatic provenance projection; only the owner's final transaction guard grants authority."""
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+    schema_id: Literal["r2.narrative-automation-authorization.v1"] = "r2.narrative-automation-authorization.v1"
+    authorization_ref: Annotated[str, Field(pattern=r"^anda:v1:[0-9a-f]{64}$")]
+    user_id: NonEmptyStr
+    project_name: NonEmptyStr
+    actor_id: NonEmptyStr
+    authority_role: Literal["RUN_AUTOMATION"]
+    decision_family: NarrativeDecisionFamily
+    action: NarrativeDecisionActionAny
+    decision_id: NonEmptyStr
+    stable_subject_fingerprint: NonEmptyStr
+    decision_command_fingerprint: NonEmptyStr
+    authenticated_at: AwareDatetime
+    authenticated_via: Annotated[str, Field(max_length=255)]
+
+    @model_validator(mode="after")
+    def exact_automatic_actor(self) -> NarrativeAutomationDecisionAuthorizationV1:
+        from r2.automation.authorization import automation_principal, parse_automation_authorization_reference
+
+        run_id, _, _, _ = parse_automation_authorization_reference(self.authenticated_via)
+        if self.actor_id != automation_principal(run_id):
+            raise ValueError("automatic actor differs from the referenced run")
+        return self
+
+
+class NarrativeAutomationRetryAuthenticationV1(R2ContractModel):
+    """Unpersisted retry provenance. A projection cannot substitute for a fresh owner guard."""
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+    schema_id: Literal["r2.narrative-automation-retry.v1"] = "r2.narrative-automation-retry.v1"
+    retry_authentication_ref: Annotated[str, Field(pattern=r"^anra:v1:[0-9a-f]{64}$")]
+    user_id: NonEmptyStr
+    project_name: NonEmptyStr
+    actor_id: NonEmptyStr
+    authority_role: Literal["RUN_AUTOMATION"]
+    decision_id: NonEmptyStr
+    authenticated_at: AwareDatetime
+    authenticated_via: Annotated[str, Field(max_length=255)]
+
+    @model_validator(mode="after")
+    def exact_automatic_actor(self) -> NarrativeAutomationRetryAuthenticationV1:
+        from r2.automation.authorization import automation_principal, parse_automation_authorization_reference
+
+        run_id, _, _, _ = parse_automation_authorization_reference(self.authenticated_via)
+        if self.actor_id != automation_principal(run_id):
+            raise ValueError("automatic actor differs from the referenced run")
+        return self
+
+
+type NarrativeDecisionAuthorizationEvidence = (
+    NarrativeDecisionAuthorization | NarrativeAutomationDecisionAuthorizationV1
+)
+type NarrativeDecisionRetryAuthenticationEvidence = (
+    NarrativeDecisionRetryAuthentication | NarrativeAutomationRetryAuthenticationV1
+)
+
+
 def _validate_decision_predecessors(
     *,
     action: str,

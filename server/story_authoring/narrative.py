@@ -534,6 +534,11 @@ class _CommittedCanonReader:
             return None
 
 
+def committed_canon_reader(session_factory: async_sessionmaker[AsyncSession]) -> CanonVersionReader:
+    """Read exact Canon versions through the existing committed projection."""
+    return _CommittedCanonReader(session_factory)
+
+
 class _CommittedPlanReader:
     def __init__(self, session_factory: async_sessionmaker[AsyncSession]) -> None:
         self._service = NarrativePlanService(

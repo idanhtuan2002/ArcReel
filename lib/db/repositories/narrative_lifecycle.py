@@ -12,7 +12,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from typing import Any
 
-from pydantic import ValidationError
+from pydantic import TypeAdapter, ValidationError
 from sqlalchemy import Select, select, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
@@ -61,7 +61,7 @@ from r2.contracts.narrative_lifecycle import (
     ExtractionAttempt,
     ExtractionResult,
     NarrativeChangeSet,
-    NarrativeDecisionAuthorization,
+    NarrativeDecisionAuthorizationEvidence,
     NarrativeDecisionCommand,
     NarrativeHandoffAdmission,
     NarrativeRevision,
@@ -561,21 +561,23 @@ def _handoff_admission_row(admission: NarrativeHandoffAdmission) -> NarrativeHan
 # --- M5C-2 decision authority: identity registry, typed decisions, lineage, heads ---
 
 
-def _authorization_from_row(row: Any) -> NarrativeDecisionAuthorization:
+def _authorization_from_row(row: Any) -> NarrativeDecisionAuthorizationEvidence:
     try:
-        return NarrativeDecisionAuthorization(
-            authorization_ref=row.authorization_ref,
-            user_id=row.user_id,
-            project_name=row.project_name,
-            actor_id=row.authorization_actor_id,
-            authority_role=row.authorization_authority_role,
-            decision_family=row.decision_family,
-            action=row.action,
-            decision_id=row.decision_id,
-            stable_subject_fingerprint=row.authorization_stable_subject_fingerprint,
-            decision_command_fingerprint=row.authorization_decision_command_fingerprint,
-            authenticated_at=_stored_aware(row.authorization_authenticated_at),
-            authenticated_via=row.authorization_authenticated_via,
+        return TypeAdapter(NarrativeDecisionAuthorizationEvidence).validate_python(
+            {
+                "authorization_ref": row.authorization_ref,
+                "user_id": row.user_id,
+                "project_name": row.project_name,
+                "actor_id": row.authorization_actor_id,
+                "authority_role": row.authorization_authority_role,
+                "decision_family": row.decision_family,
+                "action": row.action,
+                "decision_id": row.decision_id,
+                "stable_subject_fingerprint": row.authorization_stable_subject_fingerprint,
+                "decision_command_fingerprint": row.authorization_decision_command_fingerprint,
+                "authenticated_at": _stored_aware(row.authorization_authenticated_at),
+                "authenticated_via": row.authorization_authenticated_via,
+            }
         )
     except ValidationError as exc:
         raise NarrativeEvidenceIntegrityError(f"corrupt decision authorization on {row.decision_id!r}: {exc}") from exc
@@ -670,7 +672,7 @@ def _conflict_resolution_command_from_row(
 
 def _decision_row_from_command(
     command: NarrativeDecisionCommand,
-    authorization: NarrativeDecisionAuthorization,
+    authorization: NarrativeDecisionAuthorizationEvidence,
     *,
     decision_generation: int,
     stored_at: datetime,
@@ -997,7 +999,7 @@ class NarrativeLifecycleRepository:
 
     async def get_decision_by_id(
         self, decision_id: str, *, user_id: str, project_name: str
-    ) -> tuple[NarrativeDecisionCommand, NarrativeDecisionAuthorization, int] | None:
+    ) -> tuple[NarrativeDecisionCommand, NarrativeDecisionAuthorizationEvidence, int] | None:
         """A plain scoped read: no lock, no insert (the kernel calls this before any head
         write). Returns ``None`` for an absent id or one that
         resolves outside ``(user_id, project_name)`` — the two cases are indistinguishable
@@ -1057,7 +1059,7 @@ class NarrativeLifecycleRepository:
 
     async def list_revision_decisions(
         self, work_scope: NarrativeWorkScope
-    ) -> list[tuple[NarrativeDecisionCommand, NarrativeDecisionAuthorization, int]]:
+    ) -> list[tuple[NarrativeDecisionCommand, NarrativeDecisionAuthorizationEvidence, int]]:
         """Every ``REVISION_ACCEPTANCE`` decision for this exact subject, in append
         order — the authoritative chain a head is rebuilt from."""
         rows = (
@@ -1079,7 +1081,7 @@ class NarrativeLifecycleRepository:
 
     async def list_change_set_review_decisions(
         self, *, revision_acceptance_decision_id: str, change_set_lineage_id: str
-    ) -> list[tuple[NarrativeDecisionCommand, NarrativeDecisionAuthorization, int]]:
+    ) -> list[tuple[NarrativeDecisionCommand, NarrativeDecisionAuthorizationEvidence, int]]:
         rows = (
             await self.session.execute(
                 select(ChangeSetReviewDecisionModel)
@@ -1097,7 +1099,7 @@ class NarrativeLifecycleRepository:
 
     async def list_conflict_resolution_decisions(
         self, *, revision_acceptance_decision_id: str, conflict_resolution_lineage_id: str
-    ) -> list[tuple[NarrativeDecisionCommand, NarrativeDecisionAuthorization, int]]:
+    ) -> list[tuple[NarrativeDecisionCommand, NarrativeDecisionAuthorizationEvidence, int]]:
         rows = (
             await self.session.execute(
                 select(ConflictResolutionDecisionModel)
@@ -1120,7 +1122,7 @@ class NarrativeLifecycleRepository:
     async def insert_identity_and_decision(
         self,
         command: NarrativeDecisionCommand,
-        authorization: NarrativeDecisionAuthorization,
+        authorization: NarrativeDecisionAuthorizationEvidence,
         *,
         canonical_identity_hash: str,
         decision_generation: int,

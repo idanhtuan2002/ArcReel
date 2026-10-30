@@ -22,7 +22,7 @@ if TYPE_CHECKING:
         CompilationAttempt,
         ConflictSubject,
         DraftCandidate,
-        NarrativeDecisionAuthorization,
+        NarrativeDecisionAuthorizationEvidence,
         NarrativeDecisionCommand,
         NarrativeHandoffAdmission,
         NarrativeRevision,
@@ -87,7 +87,7 @@ def compute_evidence_semantic_fingerprint(artifact: DraftCandidate | NarrativeRe
 
 
 def compute_decision_canonical_identity_hash(
-    command: NarrativeDecisionCommand, authorization: NarrativeDecisionAuthorization
+    command: NarrativeDecisionCommand, authorization: NarrativeDecisionAuthorizationEvidence
 ) -> str:
     """Content-address one Human decision command together with its original
     authorization evidence. Covers decision family, action, stable subject key,

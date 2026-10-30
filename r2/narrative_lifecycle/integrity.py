@@ -43,7 +43,7 @@ from r2.contracts.narrative_lifecycle import (
     ConflictResolutionHead,
     DraftCandidate,
     ExtractionAttempt,
-    NarrativeDecisionAuthorization,
+    NarrativeDecisionAuthorizationEvidence,
     NarrativeDecisionCommand,
     NarrativeHandoffAdmission,
     NarrativeRevision,
@@ -78,7 +78,7 @@ from r2.narrative_lifecycle.hashing import (
 )
 from r2.narrative_lifecycle.ports import NarrativeLifecycleUnitOfWorkFactory
 
-_StoredDecision = tuple[NarrativeDecisionCommand, NarrativeDecisionAuthorization, int]
+_StoredDecision = tuple[NarrativeDecisionCommand, NarrativeDecisionAuthorizationEvidence, int]
 _AnyHead = RevisionAcceptanceHead | ChangeSetReviewHead | ConflictResolutionHead
 
 

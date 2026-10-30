@@ -60,9 +60,10 @@ from r2.narrative_lifecycle.hashing import (
     compute_handoff_admission_identity_hash,
 )
 from r2.narrative_lifecycle.ports import (
+    NarrativeAutomationAuthorityPort,
+    NarrativeDecisionAuthorityPort,
     NarrativeLifecycleRepositoryPort,
     NarrativeLifecycleUnitOfWorkFactory,
-    NarrativeShowrunnerAuthorityPort,
 )
 
 _AnyHead = RevisionAcceptanceHead | ChangeSetReviewHead | ConflictResolutionHead
@@ -352,7 +353,7 @@ class NarrativeAcceptanceService:
     def __init__(
         self,
         uow_factory: NarrativeLifecycleUnitOfWorkFactory,
-        authority: NarrativeShowrunnerAuthorityPort | None,
+        authority: NarrativeDecisionAuthorityPort | None,
     ) -> None:
         if authority is None:
             raise ValueError(
@@ -423,6 +424,8 @@ class NarrativeAcceptanceService:
         is observed under the locked heads and blocks admission; a supersession
         committing afterwards never retroactively invalidates the receipt.
         """
+        if isinstance(self._authority, NarrativeAutomationAuthorityPort):
+            raise NarrativeDecisionAuthorizationError("AUTOMATIC_CANON_HANDOFF_NOT_DELEGATED")
         scope = command.work_scope
         # (1) The caller's approval is copied, never aliased: nothing downstream can
         # mutate the tuple this receipt binds.

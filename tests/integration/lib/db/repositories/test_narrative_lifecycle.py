@@ -583,3 +583,46 @@ async def test_head_pointer_fk_rejects_a_decision_from_another_subject(session_f
                 new_effective_decision_id="d-b",
                 new_effective_generation=1,
             )
+
+
+async def test_automatic_authorization_storage_roundtrip_preserves_versioned_provenance(concurrent_session_factory):
+    """Repository serialization only; this fixture does not issue runtime authority."""
+    from r2.contracts.narrative_lifecycle import NarrativeAutomationDecisionAuthorizationV1
+    from r2.narrative_lifecycle.automation import automatic_authorization_fingerprints
+    from r2.narrative_lifecycle.hashing import compute_decision_canonical_identity_hash
+    from tests.unit.r2.automation.test_owner_authorization_contracts import auto_wire
+
+    scope = _scope()
+    data = auto_wire()
+    command = make_revision_acceptance_command(
+        decision_id="auto-decision", work_scope=scope, actor_id=data["actor_id"], action="ACCEPT"
+    )
+    subject_fingerprint, command_fingerprint = automatic_authorization_fingerprints(command)
+    authorization = NarrativeAutomationDecisionAuthorizationV1(
+        **{
+            **data,
+            "user_id": scope.user_id,
+            "project_name": scope.project_name,
+            "decision_id": command.decision_id,
+            "stable_subject_fingerprint": subject_fingerprint,
+            "decision_command_fingerprint": command_fingerprint,
+        }
+    )
+    canonical = compute_decision_canonical_identity_hash(command, authorization)
+    factory = concurrent_session_factory
+    async with narrative_lifecycle_uow_factory(factory)() as uow:
+        assert uow.session.get_bind().dialect.name == "postgresql"
+        await uow.repository.lock_or_insert_revision_head(scope)
+        await uow.repository.insert_identity_and_decision(
+            command, authorization, canonical_identity_hash=canonical, decision_generation=1, stored_at=_STORED_AT
+        )
+        await uow.commit()
+    async with factory() as session:
+        stored = await NarrativeLifecycleRepository(session).get_decision_by_id(
+            command.decision_id, user_id=scope.user_id, project_name=scope.project_name
+        )
+        assert stored is not None
+        restored_command, restored_authorization, _ = stored
+        assert type(restored_authorization) is NarrativeAutomationDecisionAuthorizationV1
+        assert restored_authorization.model_dump(mode="json") == authorization.model_dump(mode="json")
+        assert compute_decision_canonical_identity_hash(restored_command, restored_authorization) == canonical

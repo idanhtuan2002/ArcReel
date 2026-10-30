@@ -9,12 +9,13 @@ capability-limited repository with no authoritative writes.
 
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Awaitable, Callable
 
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from lib.db.repositories.canon_repo import CanonProjectionRepository, CanonRepository
+from r2.contracts.narrative import CanonDelta
 from r2.narrative.ports import (
     CanonAuthorityUnitOfWork,
     CanonAuthorityUnitOfWorkFactory,
@@ -88,3 +89,58 @@ def canon_authority_uow_factory(session_factory: SessionFactory) -> CanonAuthori
         return SqlAlchemyCanonAuthorityUnitOfWork(session_factory)
 
     return _make
+
+
+class CanonCommitBasisError(RuntimeError):
+    """The locked Canon head no longer represents the exact commit basis."""
+
+
+async def require_canon_commit_basis(
+    session: AsyncSession,
+    *,
+    user_id: str,
+    project_name: str,
+    delta: CanonDelta,
+    version_id: str,
+    allow_empty: bool = False,
+) -> None:
+    """Lock and verify a commit basis without exposing a repository to orchestration."""
+    repository = CanonRepository(session)
+    scope = {"user_id": user_id, "project_name": project_name}
+    branch = await repository.lock_branch(branch_id=delta.target_branch_id, **scope)
+    if branch.head_version_id is None and allow_empty:
+        return
+    accepted = await repository.get_accepted_delta(canon_delta_id=delta.canon_delta_id, **scope)
+    if (
+        branch.head_version_id != version_id
+        or accepted is None
+        or accepted.committed_version_id != version_id
+        or accepted.delta != delta
+    ):
+        raise CanonCommitBasisError("Canon commit basis moved")
+
+
+class _GuardedCanonAuthorityUnitOfWork(SqlAlchemyCanonAuthorityUnitOfWork):
+    def __init__(self, session_factory: SessionFactory, guard: Callable[[AsyncSession], Awaitable[None]]) -> None:
+        super().__init__(session_factory)
+        self._guard = guard
+
+    async def commit(self) -> None:
+        await self._guard(self.session)
+        await super().commit()
+
+    async def __aexit__(self, exc_type: object, exc: object, traceback: object) -> None:
+        try:
+            if exc_type is None and self.session.in_transaction():
+                await self._guard(self.session)
+        finally:
+            await super().__aexit__(exc_type, exc, traceback)
+
+
+def guarded_canon_authority_uow_factory(
+    session_factory: SessionFactory,
+    *,
+    guard: Callable[[AsyncSession], Awaitable[None]],
+) -> CanonAuthorityUnitOfWorkFactory:
+    """Fence owner writes and read-only exact retries in the same SQL transaction."""
+    return lambda: _GuardedCanonAuthorityUnitOfWork(session_factory, guard)

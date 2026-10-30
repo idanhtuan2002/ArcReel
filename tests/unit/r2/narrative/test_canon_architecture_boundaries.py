@@ -39,6 +39,7 @@ _AUTHORITY_ONLY_SYMBOLS = (
     "canon_authority_uow_factory",
     "CanonAuthorityUnitOfWork",
     "CanonAuthorityUnitOfWorkFactory",
+    "guarded_canon_authority_uow_factory",
 )
 
 
@@ -108,7 +109,10 @@ def test_only_the_transaction_service_calls_canon_authority_writes() -> None:
             rel = path.relative_to(_ROOT).as_posix()
             if rel in allowed:
                 continue
-            if _AUTHORITY_WRITE_ATTRS & _called_attrs(ast.parse(path.read_text(encoding="utf-8"))):
+            calls = _AUTHORITY_WRITE_ATTRS & _called_attrs(ast.parse(path.read_text(encoding="utf-8")))
+            if rel == "lib/db/canon_uow.py":
+                calls -= {"lock_branch"}
+            if calls:
                 offenders.add(rel)
     assert offenders == set()
 
@@ -170,11 +174,37 @@ def _authority_import_violations(rel: str, tree: ast.Module) -> list[str]:
         and len(owner_calls) == 1
         and owner_calls[0].args[0] is factory_calls[0]
     )
+    guarded_factory = "guarded_canon_authority_uow_factory"
+    guarded_names = [n for n in ast.walk(tree) if isinstance(n, ast.Name) and n.id == guarded_factory]
+    guarded_calls = [n for n in ast.walk(tree) if isinstance(n, ast.Call) and n.func in guarded_names]
+    guarded_imports = [
+        (n.module, alias.asname)
+        for n in ast.walk(tree)
+        if isinstance(n, ast.ImportFrom)
+        for alias in n.names
+        if alias.name == guarded_factory
+    ]
+    guarded_owner_calls = [
+        n
+        for n in ast.walk(tree)
+        if isinstance(n, ast.Call)
+        and isinstance(n.func, ast.Name)
+        and n.func.id == "CanonTransactionService"
+        and n.args
+        and n.args[0] in guarded_calls
+    ]
+    guarded_composition = (
+        rel == "server/production_run/narrative_authority.py"
+        and guarded_imports == [("lib.db.canon_uow", None)]
+        and owner_imports == [("r2.narrative.canon_transaction", None)]
+        and len(guarded_names) == len(guarded_calls) == len(guarded_owner_calls) == 1
+    )
     violations = [
         symbol
         for symbol in _AUTHORITY_ONLY_SYMBOLS
         if any(name.endswith(f".{symbol}") or name == symbol for name in _imports(tree))
         and not (composition and symbol == factory)
+        and not (guarded_composition and symbol == guarded_factory)
     ]
     for node in ast.walk(tree):
         if isinstance(node, ast.Attribute) and node.attr in _AUTHORITY_ONLY_SYMBOLS:
@@ -321,3 +351,24 @@ def test_story_composition_exception_is_not_available_to_other_downstream_files(
 @pytest.mark.parametrize("rel", ["server/other.py", "server/story_authoring/commit.py"])
 def test_downstream_module_imports_cannot_expose_the_canon_authority(rel: str, source: str) -> None:
     assert _authority_import_violations(rel, ast.parse(source))
+
+
+def test_guarded_canon_composition_exposes_no_repository_to_orchestration() -> None:
+    tree = _tree("server/production_run/narrative_authority.py")
+    calls = _called_attrs(tree)
+    assert not (_AUTHORITY_WRITE_ATTRS & calls)
+    assert not _authority_import_violations("server/production_run/narrative_authority.py", tree)
+    assert "guarded_canon_authority_uow_factory" in _imported_symbols(tree)
+    uow_calls = _AUTHORITY_WRITE_ATTRS & _called_attrs(_tree("lib/db/canon_uow.py"))
+    assert uow_calls == {"lock_branch"}
+
+
+@pytest.mark.parametrize(
+    "source",
+    [
+        "from lib.db.canon_uow import guarded_canon_authority_uow_factory\nleak = guarded_canon_authority_uow_factory",
+        "from lib.db.canon_uow import guarded_canon_authority_uow_factory as factory\nuow = factory(session, guard=guard)",
+    ],
+)
+def test_automatic_composition_exception_refuses_authority_escape(source: str) -> None:
+    assert _authority_import_violations("server/production_run/narrative_authority.py", ast.parse(source))

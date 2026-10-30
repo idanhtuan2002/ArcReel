@@ -29,14 +29,17 @@ from r2.contracts.narrative_lifecycle import (
     ChangeSetReviewHead,
     ConflictResolutionCommand,
     ConflictResolutionHead,
-    NarrativeDecisionAuthorization,
+    NarrativeAutomationDecisionAuthorizationV1,
+    NarrativeAutomationRetryAuthenticationV1,
+    NarrativeDecisionAuthorizationEvidence,
     NarrativeDecisionCommand,
     NarrativeDecisionFamily,
     NarrativeDecisionReceipt,
-    NarrativeDecisionRetryAuthentication,
+    NarrativeDecisionRetryAuthenticationEvidence,
     RevisionAcceptanceCommand,
     RevisionAcceptanceHead,
 )
+from r2.narrative_lifecycle.automation import automatic_authorization_fingerprints, require_automatic_owner_authority
 from r2.narrative_lifecycle.errors import (
     NarrativeAuthorityIntegrityError,
     NarrativeDecisionAuthorizationError,
@@ -45,9 +48,9 @@ from r2.narrative_lifecycle.errors import (
 )
 from r2.narrative_lifecycle.hashing import compute_decision_canonical_identity_hash
 from r2.narrative_lifecycle.ports import (
+    NarrativeDecisionAuthorityPort,
     NarrativeLifecycleRepositoryPort,
     NarrativeLifecycleUnitOfWorkFactory,
-    NarrativeShowrunnerAuthorityPort,
 )
 
 ApplicabilityCheck = Callable[[NarrativeLifecycleRepositoryPort, NarrativeDecisionCommand], Awaitable[None]]
@@ -92,7 +95,7 @@ def head_lock_sort_key(
 def _canonical_tuple_matches(
     command: NarrativeDecisionCommand,
     stored_command: NarrativeDecisionCommand,
-    stored_authorization: NarrativeDecisionAuthorization,
+    stored_authorization: NarrativeDecisionAuthorizationEvidence,
 ) -> bool:
     """Exact-retry comparison: the incoming command must canonically identify the same
     decision as the one already stored, judged against the *original* stored
@@ -104,9 +107,25 @@ def _canonical_tuple_matches(
 
 
 def _verify_authorization_binding(
-    command: NarrativeDecisionCommand, authorization: NarrativeDecisionAuthorization
+    command: NarrativeDecisionCommand, authorization: NarrativeDecisionAuthorizationEvidence
 ) -> None:
     scope = command.work_scope
+    if isinstance(authorization, NarrativeAutomationDecisionAuthorizationV1):
+        try:
+            authorization = NarrativeAutomationDecisionAuthorizationV1.model_validate_json(
+                authorization.model_dump_json()
+            )
+        except ValueError:
+            raise NarrativeDecisionAuthorizationError("invalid automatic authorization projection") from None
+        scope_fingerprint, command_fingerprint = automatic_authorization_fingerprints(command)
+        if (
+            authorization.actor_id != command.actor_id
+            or authorization.stable_subject_fingerprint != scope_fingerprint
+            or authorization.decision_command_fingerprint != command_fingerprint
+        ):
+            raise NarrativeDecisionAuthorizationError(
+                "automatic authorization differs from its canonical owner command"
+            )
     if (
         authorization.decision_id != command.decision_id
         or authorization.decision_family != command.decision_family
@@ -121,15 +140,22 @@ def _verify_authorization_binding(
 
 def _verify_retry_authentication_binding(
     command: NarrativeDecisionCommand,
-    stored_authorization: NarrativeDecisionAuthorization,
-    retry: NarrativeDecisionRetryAuthentication,
+    stored_authorization: NarrativeDecisionAuthorizationEvidence,
+    retry: NarrativeDecisionRetryAuthenticationEvidence,
 ) -> None:
     scope = command.work_scope
+    if isinstance(retry, NarrativeAutomationRetryAuthenticationV1):
+        try:
+            retry = NarrativeAutomationRetryAuthenticationV1.model_validate_json(retry.model_dump_json())
+        except ValueError:
+            raise NarrativeDecisionAuthorizationError("invalid automatic retry projection") from None
     if (
         retry.decision_id != command.decision_id
         or retry.user_id != scope.user_id
         or retry.project_name != scope.project_name
         or retry.actor_id != stored_authorization.actor_id
+        or isinstance(stored_authorization, NarrativeAutomationDecisionAuthorizationV1)
+        != isinstance(retry, NarrativeAutomationRetryAuthenticationV1)
     ):
         raise NarrativeDecisionAuthorizationError(
             "the authority port's retry authentication is not bound to this exact decision and actor"
@@ -146,7 +172,7 @@ class AuthorityKernel:
     def __init__(
         self,
         uow_factory: NarrativeLifecycleUnitOfWorkFactory,
-        authority: NarrativeShowrunnerAuthorityPort,
+        authority: NarrativeDecisionAuthorityPort,
     ) -> None:
         self._uow_factory = uow_factory
         self._authority = authority
@@ -180,7 +206,7 @@ class AuthorityKernel:
                 command.decision_id, user_id=scope.user_id, project_name=scope.project_name
             )
             if stored is not None:
-                receipt = await self._resolve_exact_retry(repo, command, stored, authenticated_principal)
+                receipt = await self._resolve_exact_retry(uow, repo, command, stored, authenticated_principal)
                 await uow.commit()
                 return receipt
 
@@ -197,7 +223,7 @@ class AuthorityKernel:
                 command.decision_id, user_id=scope.user_id, project_name=scope.project_name
             )
             if stored is not None:
-                receipt = await self._resolve_exact_retry(repo, command, stored, authenticated_principal)
+                receipt = await self._resolve_exact_retry(uow, repo, command, stored, authenticated_principal)
                 await uow.commit()
                 return receipt
 
@@ -250,6 +276,7 @@ class AuthorityKernel:
             )
 
             # Everything above is a flush pending in this same transaction; commit once.
+            await require_automatic_owner_authority(self._authority, uow, command, authorization)
             await uow.commit()
             return NarrativeDecisionReceipt(
                 decision_id=command.decision_id,
@@ -262,9 +289,10 @@ class AuthorityKernel:
 
     async def _resolve_exact_retry(
         self,
+        unit_of_work: object,
         repo: NarrativeLifecycleRepositoryPort,
         command: NarrativeDecisionCommand,
-        stored: tuple[NarrativeDecisionCommand, NarrativeDecisionAuthorization, int],
+        stored: tuple[NarrativeDecisionCommand, NarrativeDecisionAuthorizationEvidence, int],
         authenticated_principal: str,
     ) -> NarrativeDecisionReceipt:
         stored_command, stored_authorization, stored_generation = stored
@@ -279,6 +307,7 @@ class AuthorityKernel:
         effective_decision_id, effective_generation = await self._effective_pointer_of(
             repo, stored_command, stored_generation
         )
+        await require_automatic_owner_authority(self._authority, unit_of_work, command, retry)
         return NarrativeDecisionReceipt(
             decision_id=stored_command.decision_id,
             decision_family=stored_command.decision_family,
