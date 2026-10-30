@@ -1,0 +1,25 @@
+{
+  "timestamp": "2026-10-30T12:06:42+0700",
+  "removed": [
+    "/home/anhtuan/.codex/packages/app-server-daemon/releases/0.157.1-x86_64-unknown-linux-musl",
+    "/home/anhtuan/.codex/packages/app-server-daemon/releases/0.158.0-x86_64-unknown-linux-musl",
+    "/home/anhtuan/.codex/packages/app-server-daemon/releases/0.159.0-x86_64-unknown-linux-musl",
+    "/home/anhtuan/.codex/packages/app-server-daemon/releases/0.159.1-x86_64-unknown-linux-musl",
+    "/home/anhtuan/.codex/packages/app-server-daemon/releases/0.159.2-x86_64-unknown-linux-musl",
+    "/home/anhtuan/.codex/packages/app-server-daemon/releases/0.159.3-x86_64-unknown-linux-musl",
+    "/home/anhtuan/.codex/packages/app-server-daemon/releases/0.160.0-x86_64-unknown-linux-musl",
+    "/home/anhtuan/.codex/packages/app-server-daemon/releases/0.160.1-x86_64-unknown-linux-musl",
+    "/home/anhtuan/.codex/packages/app-server-daemon/releases/0.162.1-x86_64-unknown-linux-musl",
+    "/home/anhtuan/.codex/packages/app-server-daemon/releases/0.163.0-x86_64-unknown-linux-musl",
+    "/home/anhtuan/.codex/packages/app-server-daemon/releases/0.164.0-x86_64-unknown-linux-musl",
+    "/home/anhtuan/.cache/pip",
+    "/home/anhtuan/.npm/_cacache",
+    "/home/anhtuan/.cache/google-chrome"
+  ],
+  "kept_codex": [
+    "0.165.0-x86_64-unknown-linux-musl",
+    "0.166.0-x86_64-unknown-linux-musl"
+  ],
+  "kept_browser_cache": "coccoc-browser (browser running)",
+  "available_after_bytes": 22216740864
+}

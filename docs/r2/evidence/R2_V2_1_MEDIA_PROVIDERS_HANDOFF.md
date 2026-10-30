@@ -11,7 +11,7 @@ Resume entry for "make the deployed V2.1 usable now with free providers". Codex 
   provider `custom-2` "VieNeu TTS (local)" (placeholder key `local`), default narration
   `custom-2/vieneu-tts-v3-turbo`, voice `nova`.
 - Default image model is now `custom-3/flux2-klein-4b-gguf`, ComfyUI local, configured price 0. API comparison after Save and reload confirmed only `settings.default_image_backend` changed. Video remains **paid Gemini / Veo 3.1**; free/local video is not configured.
-- Disk `/`: 11 GB available after installing ComfyUI, its isolated Python/CUDA environment and the three model files. Do not start the deferred ~12 GB video download with this free space.
+- Disk `/`: about 20.7 GiB available after authorized cache/old-Codex cleanup (2026-10-30); D has about 170 GiB free. See `media-local-2026-10-30/storage-cleanup-and-D-assessment.md`. No partition changes or model migration performed.
 - ComfyUI at `~/comfyui`, loopback `http://127.0.0.1:8188`, user service `arcreel-comfyui.service` enabled. Unit file is in `media-local-2026-10-30/arcreel-comfyui.service`.
 - Image workflow endpoint `ce-1`, provider `custom-3` "ComfyUI local (RTX 2070)", model `flux2-klein-4b-gguf`, image concurrency 1. Qwen3 Q4_K_M GGUF encoder is used on Turing instead of FP4.
 - Fresh inference: 1024 x 1024 benchmark succeeded in 34.787 s client wall time (33.75 s ComfyUI); production project character sheet 1792 x 1008 succeeded in 22.22 s execution timestamps (22.27 s ComfyUI log). Both outputs visually inspected. No Human quality/release acceptance claimed.
@@ -34,7 +34,7 @@ Download and install for local images (≈ 12–13 GB):
 ## Next steps
 
 1. Local-image installation/integration/proof is complete. Use the ComfyUI model already selected as the global image default. A project's explicit model override takes priority; inspect it before generating from an existing project.
-2. Free video remains open. Wan 2.2 TI2V-5B needs roughly another 12 GB plus working space; current free disk is 11 GB. Research/reclaim and obtain any needed download authorization before adding it. Alternatively configure DashScope Singapore after the sponsor supplies the account/key and verifies applicable free quota.
+2. Free video remains open. Wan 2.2 TI2V-5B needs roughly another 12 GB plus working space; current root free disk is about 20.7 GiB after cleanup. Research storage placement (D has about 170 GiB free), verify the exact artifact sizes and obtain any needed download authorization before adding it. Alternatively configure DashScope Singapore after the sponsor supplies the account/key and verifies applicable free quota.
 3. Image editing/reference-guided image workflows are not part of the verified text-to-image workflow. They need their own workflow and project-level proof.
 4. Full story-to-video proof remains incomplete until free video is configured and a real short clip is generated. M9-C is separate roadmap work.
 
