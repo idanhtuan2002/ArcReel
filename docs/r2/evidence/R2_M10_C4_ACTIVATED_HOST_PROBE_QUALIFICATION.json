@@ -1,0 +1,28 @@
+{
+  "schema_version": "1",
+  "condition": "M10 C4 activated host (quality probes on the production host)",
+  "status": "QUALIFIED_AND_ENABLED",
+  "date": "2026-10-30",
+  "host": "V2 production (staging host) 127.0.0.1:1251",
+  "release": "r2-v2.1.0",
+  "commit": "0cef69a772f1d2946e452b918a8839b0f37fd2d9",
+  "run_by": "sponsor (sudo) via ~/arcreel-v2-staging/c4-enable-quality-probes.sh",
+  "runtime": "root-run activated app; probes launch under root's systemd user manager (loginctl enable-linger root; XDG_RUNTIME_DIR=/run/user/0)",
+  "qualification": {
+    "selection": [
+      "tests/integration/server/services/test_quality_host_catalog.py",
+      "tests/integration/server/services/test_quality_probe_recipes.py"
+    ],
+    "as_uid": 0,
+    "code": "deployed release worktree .worktrees/r2-v2-release-staging at r2-v2.1.0",
+    "result": "33 passed",
+    "log": "~/arcreel-v2-staging/c4-quality-probe-qualification-20261030T031609Z.log",
+    "log_sha256": "0137f18363041ec7966a50ff91abb662623cff3c45856d76c61772f9a09220de",
+    "tools": {"ffmpeg": "8.0.1", "vmaf": "f85a853 (recipe tests only; host-v1 serves container and decode)"}
+  },
+  "earlier_attempt": "20261030T031457Z: 27 passed, 6 failed — all VMAF recipe tests, whose fixture looked for the vmaf binary under the running user's home (/root); rerun pointed M10_VMAF_BINARY at the installed binary. Probes stayed disabled until the full pass.",
+  "enabled": "ARCREEL_QUALITY_PROBE_CATALOG=host-v1 plus the user-manager variables added to ~/arcreel-v2-staging/v2-release-start.sh (backup .bak-c4); app restarted",
+  "post_check": {"health": "ok", "quality_routes": "session, masters, profiles: 200", "app_log_errors": 0},
+  "limit": "No production probe was executed by the agent: a probe needs a published profile, which is a Human decision through the Quality page. The first real probe on production is the operator's.",
+  "undo": "sudo cp -p ~/arcreel-v2-staging/v2-release-start.sh.bak-c4 ~/arcreel-v2-staging/v2-release-start.sh, then restart the app"
+}
