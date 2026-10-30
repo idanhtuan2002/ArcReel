@@ -24,14 +24,15 @@ Rewrite in place; resume entry for the quality operator surface.
   (`design-delta2-codex-review.json`; implementation conditions I1 subject/template tests, I2 transport security, …).
 
 ## Next step
-- **M10-C ACCEPTED_WITH_CONDITIONS** (`R2_M10_C_ACCEPTANCE.json`, implementation head `020e4f56d`). Impl review chain
-  impl → delta1 → delta2 (CHANGES_REQUESTED) → delta3 **ACCEPTED_WITH_CONDITIONS** (`impl-delta3-codex-review.json`);
-  Low N5 fixed `63edb3366`. Probe route requalified (`020e4f56d`, 206 passed). Live Chrome operator acceptance on the
-  real V2 episode (FINAL over SH01..SH03) through to READY + Packaging prefill, reload, axe 0 violations:
-  `m10-c-acceptance/`.
-- Remaining (sponsor, Human gates): push `design/r2-m10-c-operator-surface`, merge into the release line, tag, then
-  activated-host qualification + deploy on the V2 staging host (root-owned custody, `ARCREEL_QUALITY_PROBE_CATALOG=host-v1`,
-  `ARCREEL_GOVERNANCE_READ_DIR`, `ARCREEL_GOVERNANCE_ATTESTOR_DIR`; sudo). Then step 2: M9-B.
+- **Deployed** as `r2-v2.1.0` on 2026-10-30 (`R2_V2_1_0_PRODUCTION_DEPLOYMENT.json`): migrations applied explicitly, master
+  backfill promoted 4, attestor unit moved to the release worktree; `~/arcreel-v2-staging/v2-deploy.sh` now chowns
+  root-created data before the backup, migrates after the code switch and restarts the attestor on the new code
+  (backup `v2-deploy.sh.bak-20261030`).
+- **C4 (quality probes on the activated host)**: `sudo bash ~/arcreel-v2-staging/c4-enable-quality-probes.sh` starts
+  root's user manager (enable-linger root), runs the 33-test host-catalog/recipe qualification as root on the deployed
+  code, and only if it passes adds `ARCREEL_QUALITY_PROBE_CATALOG=host-v1` + user-manager variables to
+  `v2-release-start.sh` and restarts the app. Pre-checked as the owner: 33 passed. Pending the sponsor's sudo run.
+- M9-B accepted with conditions separately (branch `impl/r2-m9b-acquisition-observations`, pushed); not released.
 
 ### History
 C1 done `3bdb59b03` (resolver). C2 done `fc707e802` (embedded host-v1 catalog, 9 qualification tests). Template done (server/services/quality_template.py, 6 unit tests). Next: C3
