@@ -1,6 +1,8 @@
 # Workflow sản xuất tự động và bán tự động
 
-Status: **PROPOSED — awaiting sponsor design approval; product code not implemented**.
+Status: **DESIGN APPROVED for implementation planning — product code not implemented**.
+
+Sponsor approval: lời nhắn “tiếp tục” ngày 30/10/2026, trả lời trực tiếp yêu cầu duyệt thiết kế ở commit `5746be25f`. Approval này chốt hướng thiết kế và cho phép lập kế hoạch triển khai; không thay thế runtime/quality acceptance hoặc production rollout gate.
 
 Yêu cầu ngày 30/10/2026: “hoàn thiện workflow mặc định chạy tự động hoàn toàn (có lựa chọn tự động/bán tự động), con người không can thiệp hoặc chỉ thao tác tối thiểu”.
 
