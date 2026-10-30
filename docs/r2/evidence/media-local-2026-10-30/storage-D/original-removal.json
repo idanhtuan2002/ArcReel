@@ -1,0 +1,48 @@
+{
+  "removed": [
+    {
+      "source": "/home/anhtuan/comfyui/models/unet/flux-2-klein-4b-Q4_K_M.gguf.migration-backup",
+      "verified_destination": "/mnt/arcreel/D/ArcReel/comfyui/models/unet/flux-2-klein-4b-Q4_K_M.gguf",
+      "logical_bytes": 2604311104,
+      "allocated_bytes": 2604318720
+    },
+    {
+      "source": "/home/anhtuan/comfyui/models/text_encoders/Qwen3-4B-Q4_K_M.gguf.migration-backup",
+      "verified_destination": "/mnt/arcreel/D/ArcReel/comfyui/models/text_encoders/Qwen3-4B-Q4_K_M.gguf",
+      "logical_bytes": 2497281312,
+      "allocated_bytes": 2497286144
+    },
+    {
+      "source": "/home/anhtuan/comfyui/models/vae/flux2-vae.safetensors.migration-backup",
+      "verified_destination": "/mnt/arcreel/D/ArcReel/comfyui/models/vae/flux2-vae.safetensors",
+      "logical_bytes": 336211292,
+      "allocated_bytes": 336216064
+    },
+    {
+      "source": "/home/anhtuan/comfyui/output/ArcReel-FLUX2-klein_00002_.png",
+      "verified_destination": "/mnt/arcreel/D/ArcReel/media/comfyui/output/ArcReel-FLUX2-klein_00002_.png",
+      "logical_bytes": 2517073,
+      "allocated_bytes": 2519040
+    },
+    {
+      "source": "/home/anhtuan/comfyui/output/_output_images_will_be_put_here",
+      "verified_destination": "/mnt/arcreel/D/ArcReel/media/comfyui/output/_output_images_will_be_put_here",
+      "logical_bytes": 0,
+      "allocated_bytes": 0
+    },
+    {
+      "source": "/home/anhtuan/comfyui/output/ArcReel-FLUX2-klein_00001_.png",
+      "verified_destination": "/mnt/arcreel/D/ArcReel/media/comfyui/output/ArcReel-FLUX2-klein_00001_.png",
+      "logical_bytes": 1501605,
+      "allocated_bytes": 1503232
+    },
+    {
+      "source": "/home/anhtuan/comfyui/input/example.png",
+      "verified_destination": "/mnt/arcreel/D/ArcReel/media/comfyui/input/example.png",
+      "logical_bytes": 8589,
+      "allocated_bytes": 12288
+    }
+  ],
+  "root_available_before_bytes": 22215671808,
+  "root_available_after_bytes": 27657523200
+}

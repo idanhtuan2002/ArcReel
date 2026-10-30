@@ -1,0 +1,200 @@
+{
+  "prompt": [
+    0,
+    "c9a1e120-637b-4d63-9c58-7f7c9a75415d",
+    {
+      "9": {
+        "class_type": "SaveImage",
+        "inputs": {
+          "images": [
+            "65",
+            0
+          ],
+          "filename_prefix": "ArcReel-FLUX2-klein"
+        }
+      },
+      "61": {
+        "class_type": "KSamplerSelect",
+        "inputs": {
+          "sampler_name": "euler"
+        }
+      },
+      "62": {
+        "class_type": "Flux2Scheduler",
+        "inputs": {
+          "steps": 4,
+          "width": 1792,
+          "height": 1008
+        }
+      },
+      "63": {
+        "class_type": "CFGGuider",
+        "inputs": {
+          "model": [
+            "70",
+            0
+          ],
+          "positive": [
+            "74",
+            0
+          ],
+          "negative": [
+            "76",
+            0
+          ],
+          "cfg": 1.0
+        }
+      },
+      "64": {
+        "class_type": "SamplerCustomAdvanced",
+        "inputs": {
+          "noise": [
+            "73",
+            0
+          ],
+          "guider": [
+            "63",
+            0
+          ],
+          "sampler": [
+            "61",
+            0
+          ],
+          "sigmas": [
+            "62",
+            0
+          ],
+          "latent_image": [
+            "66",
+            0
+          ]
+        }
+      },
+      "65": {
+        "class_type": "VAEDecode",
+        "inputs": {
+          "samples": [
+            "64",
+            0
+          ],
+          "vae": [
+            "72",
+            0
+          ]
+        }
+      },
+      "66": {
+        "class_type": "EmptyFlux2LatentImage",
+        "inputs": {
+          "width": 1792,
+          "height": 1008,
+          "batch_size": 1
+        }
+      },
+      "70": {
+        "class_type": "UnetLoaderGGUF",
+        "inputs": {
+          "unet_name": "flux-2-klein-4b-Q4_K_M.gguf"
+        }
+      },
+      "71": {
+        "class_type": "CLIPLoaderGGUF",
+        "inputs": {
+          "clip_name": "Qwen3-4B-Q4_K_M.gguf",
+          "type": "flux2"
+        }
+      },
+      "72": {
+        "class_type": "VAELoader",
+        "inputs": {
+          "vae_name": "flux2-vae.safetensors"
+        }
+      },
+      "73": {
+        "class_type": "RandomNoise",
+        "inputs": {
+          "noise_seed": 1197392070
+        }
+      },
+      "74": {
+        "class_type": "CLIPTextEncode",
+        "inputs": {
+          "clip": [
+            "71",
+            0
+          ],
+          "text": "\u98ce\u683c\uff1a\u771f\u4eba\u7535\u89c6\u5267\u98ce\u683c\uff0c\u7cbe\u54c1\u77ed\u5267\u753b\u98ce\uff0c\u5927\u5e08\u7ea7\u6784\u56fe\n\n\u89d2\u8272\u300cLinh - Local image proof\u300d\u7684\u8d44\u4ea7\u56fe\u3002\n\nPortrait of a Vietnamese woman, 28 years old, shoulder-length black hair, white blouse, confident warm expression, modern technology office in Ho Chi Minh City, natural morning sunlight, cinematic realistic photography, no text.\n\n\u6a2a\u7248 16:9 \u4e09\u89c6\u56fe\uff0c\u7eaf\u767d\u80cc\u666f\uff1a\u6b63\u9762 / \u6b63\u4fa7\uff0890\u00b0 \u4fa7\u89c6\u56fe\uff09/ \u80cc\u9762\u6c34\u5e73\u6392\u5217\u3002\n\n\u4e09\u4e2a\u9762\u677f\u4e2d\u89d2\u8272\u9762\u90e8\u3001\u53d1\u578b\u3001\u670d\u88c5\u3001\u914d\u9970\u5b8c\u5168\u4e00\u81f4\u3002"
+        }
+      },
+      "76": {
+        "class_type": "ConditioningZeroOut",
+        "inputs": {
+          "conditioning": [
+            "74",
+            0
+          ]
+        }
+      }
+    },
+    {
+      "client_id": "arcreel-dcecfab839a44707b2ed7b46ad819645",
+      "create_time": 1793337813380
+    },
+    [
+      "9"
+    ]
+  ],
+  "outputs": {
+    "9": {
+      "images": [
+        {
+          "filename": "ArcReel-FLUX2-klein_00004_.png",
+          "subfolder": "",
+          "type": "output",
+          "metadata": {
+            "kind": "image",
+            "width": 1792,
+            "height": 1008
+          }
+        }
+      ]
+    }
+  },
+  "status": {
+    "status_str": "success",
+    "completed": true,
+    "messages": [
+      [
+        "execution_start",
+        {
+          "prompt_id": "c9a1e120-637b-4d63-9c58-7f7c9a75415d",
+          "timestamp": 1793337813380
+        }
+      ],
+      [
+        "execution_cached",
+        {
+          "nodes": [],
+          "prompt_id": "c9a1e120-637b-4d63-9c58-7f7c9a75415d",
+          "timestamp": 1793337813382
+        }
+      ],
+      [
+        "execution_success",
+        {
+          "prompt_id": "c9a1e120-637b-4d63-9c58-7f7c9a75415d",
+          "timestamp": 1793337846830
+        }
+      ]
+    ]
+  },
+  "meta": {
+    "9": {
+      "node_id": "9",
+      "display_node": "9",
+      "parent_node": null,
+      "real_node_id": "9"
+    }
+  },
+  "client_wall_seconds": 34.34152794998954
+}

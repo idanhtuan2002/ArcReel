@@ -1,0 +1,20 @@
+{
+  "project_current_image_sha256": "33087de3c471df2884d122bb958fbaea6747436df588a6dba7ea7629b978b6d4",
+  "project_copy_matches": [
+    "characters/Linh - Local image proof.png",
+    "versions/characters/Linh - Local image proof_v3_20261030T122408.png"
+  ],
+  "root_available_bytes": 27654041600,
+  "D_available_bytes": 177164500992,
+  "root_fstype": "ext4",
+  "D_uuid": "F676A3B876A3784F",
+  "services": [
+    "active",
+    "active"
+  ],
+  "image_default": "custom-3/flux2-klein-4b-gguf",
+  "audio_default": "custom-2/vieneu-tts-v3-turbo",
+  "video_default": "gemini-aistudio/veo-3.1-generate-preview",
+  "original_model_weights_absent": true,
+  "real_reboot_tested": false
+}

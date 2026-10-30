@@ -1,0 +1,14 @@
+arcreel_d:
+  base_path: /mnt/arcreel/D/ArcReel/comfyui
+  is_default: true
+  diffusion_models: |
+    models/unet/
+    models/diffusion_models/
+  text_encoders: |
+    models/text_encoders/
+    models/clip/
+  vae: models/vae/
+  checkpoints: models/checkpoints/
+  loras: models/loras/
+  controlnet: models/controlnet/
+  upscale_models: models/upscale_models/

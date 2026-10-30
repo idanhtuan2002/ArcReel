@@ -1,0 +1,40 @@
+[
+  {
+    "relative_path": "unet/flux-2-klein-4b-Q4_K_M.gguf",
+    "destination_sha256": "0b25d143c8469b342bc5af3bce92b783bf6b0636d285f7b2f75e38af63af9a15",
+    "size": 2604311104,
+    "verified": true
+  },
+  {
+    "relative_path": "text_encoders/Qwen3-4B-Q4_K_M.gguf",
+    "destination_sha256": "f6f851777709861056efcdad3af01da38b31223a3ba26e61a4f8bf3a2195813a",
+    "size": 2497281312,
+    "verified": true
+  },
+  {
+    "relative_path": "vae/flux2-vae.safetensors",
+    "destination_sha256": "868fe7b343cc8f3a19dbcfcafbc3d5f888802be3f89bd81b65b3621a066ce8f3",
+    "size": 336211292,
+    "verified": true
+  },
+  {
+    "media_path": "/run/media/anhtuan/D/ArcReel/media/comfyui/output/ArcReel-FLUX2-klein_00002_.png",
+    "sha256": "185e275feaaca27c9e89a4213d624756c89fde2cfbcadbdc9e8a3d2e4ea173ee",
+    "verified": true
+  },
+  {
+    "media_path": "/run/media/anhtuan/D/ArcReel/media/comfyui/output/_output_images_will_be_put_here",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "verified": true
+  },
+  {
+    "media_path": "/run/media/anhtuan/D/ArcReel/media/comfyui/output/ArcReel-FLUX2-klein_00001_.png",
+    "sha256": "a926572dc83b4bcd5f74161ed6a2e4290a5ea2585b065c67a93abc638e97ce7c",
+    "verified": true
+  },
+  {
+    "media_path": "/run/media/anhtuan/D/ArcReel/media/comfyui/input/example.png",
+    "sha256": "a8e215ad32a0052fc4190e9c5863428d5ee35cd98b246243842ba8360511b7c4",
+    "verified": true
+  }
+]

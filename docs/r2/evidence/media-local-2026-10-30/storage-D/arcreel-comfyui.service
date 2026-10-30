@@ -1,0 +1,17 @@
+[Unit]
+Description=ArcReel local ComfyUI image provider
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/home/anhtuan/comfyui
+Environment=PYTHONUNBUFFERED=1
+ExecStartPre=/usr/bin/test -r /mnt/arcreel/D/ArcReel/comfyui/models/unet/flux-2-klein-4b-Q4_K_M.gguf
+ExecStartPre=/usr/bin/findmnt --evaluate --noheadings --mountpoint /mnt/arcreel/D --source UUID=F676A3B876A3784F --types ntfs3
+ExecStart=/home/anhtuan/comfyui/.venv/bin/python main.py --listen 127.0.0.1 --port 8188 --extra-model-paths-config /home/anhtuan/comfyui/extra_model_paths.yaml --output-directory /mnt/arcreel/D/ArcReel/media/comfyui/output --input-directory /mnt/arcreel/D/ArcReel/media/comfyui/input --temp-directory /mnt/arcreel/D/ArcReel/media/comfyui/temp --disable-dynamic-vram --disable-smart-memory --reserve-vram 1 --fp16-unet --fp16-text-enc --use-pytorch-cross-attention --offline
+Restart=on-failure
+RestartSec=10
+TimeoutStopSec=30
+
+[Install]
+WantedBy=default.target
