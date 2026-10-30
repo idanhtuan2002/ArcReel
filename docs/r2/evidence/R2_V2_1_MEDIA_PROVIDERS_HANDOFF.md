@@ -12,7 +12,7 @@ Resume entry for "make the deployed V2.1 usable now with free providers". Resear
   `custom-2/vieneu-tts-v3-turbo`, voice `nova`.
 - Default image/video models on production are still **paid Gemini** (Veo 3.1, Gemini 3.1 Flash Image, existing AI
   Studio key). Do not generate media with them without the sponsor's decision.
-- Disk `/`: 12 GB free after the user-level and sudo system cleanup.
+- Disk `/`: 25 GB free after the user-level and sudo system cleanup and removing Ollama models ornith:9b, ornith-32k:9b and gemma3:12b (sponsor request; kept qwen3.5-vimax:9b and bge-m3). The Ollama custom provider `custom-1` still lists `gemma3:12b`; remove that row in Settings or re-pull the model if a story needs it.
 - No ComfyUI server on this host (ArcReel has only the V2-03 client).
 
 ## Sponsor approvals already given (2026-10-30)
