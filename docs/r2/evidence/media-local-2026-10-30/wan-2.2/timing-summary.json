@@ -1,0 +1,25 @@
+{
+  "benchmark": {
+    "status": "error",
+    "execution_s": 91.017,
+    "peak_sampled_gpu_mib": 4654,
+    "gpu_samples": 7,
+    "execution_timestamps_ms": {
+      "execution_start": 1793340268380,
+      "execution_cached": 1793340268382,
+      "execution_error": 1793340359397
+    },
+    "note": "First run generated frames but failed SaveVideo due to nested dynamic input shape; cached retry exported those same frames in 0.338s. This is not a second inference benchmark."
+  },
+  "i2v": {
+    "status": "success",
+    "execution_s": 250.297,
+    "peak_sampled_gpu_mib": 6920,
+    "gpu_samples": 16,
+    "execution_timestamps_ms": {
+      "execution_start": 1793343596200,
+      "execution_cached": 1793343596205,
+      "execution_success": 1793343846497
+    }
+  }
+}

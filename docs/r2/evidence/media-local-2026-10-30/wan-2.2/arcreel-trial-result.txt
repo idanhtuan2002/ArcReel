@@ -1,0 +1,22 @@
+Test connection
+Uses the GPU
+
+Submit once for real and poll to a final state, then fetch the artifact. Cost is recorded as 0; execution time is recorded as usual.
+
+Submit once for real
+This one shows up in the ComfyUI queue as endpoint-test-…
+Submit
+POST /prompt
+done
+Poll
+GET /history
+done
+Result
+done
+Artifact
+GET /view
+done
+Succeeded
+prompt_id b31e373a-05c1-4810-ae90-ffb3f34372d0
+2s of video
+ce_trial_record

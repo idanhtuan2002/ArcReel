@@ -1,0 +1,32 @@
+[
+  {
+    "kind": "t2v",
+    "path": "/mnt/arcreel/D/ArcReel/media/comfyui/output/video/ArcReel-Wan22-5B_00001_.mp4",
+    "sha256": "4096beed64b8a731b4ff3b873a46b6a6da49a2d1a3050325253a478431c15899",
+    "bytes": 207664,
+    "codec": "h264",
+    "width": 288,
+    "height": 512,
+    "fps": "24/1",
+    "frames": 49,
+    "duration_s": 2.041667,
+    "audio_streams": 0,
+    "mean_adjacent_gray_MAE_0_255": 7.813887984664352,
+    "changed_frame_pairs": 48
+  },
+  {
+    "kind": "i2v",
+    "path": "/mnt/arcreel/D/ArcReel/media/comfyui/output/video/ArcReel-Wan22-5B_00002_.mp4",
+    "sha256": "4d7998cbaf0dee023d5ec51f35af266a749eca822b524e4eeeef8b72afb29e5d",
+    "bytes": 539950,
+    "codec": "h264",
+    "width": 576,
+    "height": 1024,
+    "fps": "24/1",
+    "frames": 49,
+    "duration_s": 2.041667,
+    "audio_streams": 0,
+    "mean_adjacent_gray_MAE_0_255": 1.9171165183738426,
+    "changed_frame_pairs": 48
+  }
+]

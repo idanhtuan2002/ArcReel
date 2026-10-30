@@ -1,0 +1,30 @@
+[
+  {
+    "elapsed_seconds": 0.03966027399292216,
+    "gpu_memory_mib_util_percent_temp_c": "388, 27, 47"
+  },
+  {
+    "elapsed_seconds": 15.59037854601047,
+    "gpu_memory_mib_util_percent_temp_c": "434, 8, 50"
+  },
+  {
+    "elapsed_seconds": 30.611730726988753,
+    "gpu_memory_mib_util_percent_temp_c": "1570, 13, 54"
+  },
+  {
+    "elapsed_seconds": 45.64252266200492,
+    "gpu_memory_mib_util_percent_temp_c": "4498, 99, 63"
+  },
+  {
+    "elapsed_seconds": 60.664408187993104,
+    "gpu_memory_mib_util_percent_temp_c": "4497, 99, 67"
+  },
+  {
+    "elapsed_seconds": 75.68522123500588,
+    "gpu_memory_mib_util_percent_temp_c": "4496, 99, 70"
+  },
+  {
+    "elapsed_seconds": 90.71836092299782,
+    "gpu_memory_mib_util_percent_temp_c": "4654, 100, 70"
+  }
+]

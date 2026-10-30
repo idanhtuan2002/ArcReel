@@ -1,0 +1,20 @@
+[
+  {
+    "mode": "t2v",
+    "width": 288,
+    "height": 512,
+    "frames": 49,
+    "dropped_nodes": [
+      "56"
+    ],
+    "workflow_sha256": "61b635f970fc5ff271ab81da2325fe497b50cd60a45e57cda2b61bfe1c28d4d5"
+  },
+  {
+    "mode": "i2v",
+    "width": 576,
+    "height": 1024,
+    "frames": 49,
+    "dropped_nodes": [],
+    "workflow_sha256": "57c5a9b3b303d82cfc88b5065b9252874651b7a50c0b3e164c6d0eed6f1f9646"
+  }
+]

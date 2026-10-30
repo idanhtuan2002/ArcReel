@@ -1,0 +1,232 @@
+{
+  "prompt": [
+    0,
+    "c709ca59-8e36-4cff-9d98-cb7a0e62032d",
+    {
+      "37": {
+        "class_type": "UnetLoaderGGUF",
+        "inputs": {
+          "unet_name": "Wan2.2-TI2V-5B-Q4_K_M.gguf"
+        },
+        "_meta": {
+          "title": "Wan 2.2 5B GGUF"
+        }
+      },
+      "38": {
+        "class_type": "CLIPLoaderGGUF",
+        "inputs": {
+          "clip_name": "umt5-xxl-encoder-Q4_K_M.gguf",
+          "type": "wan"
+        }
+      },
+      "39": {
+        "class_type": "VAELoader",
+        "inputs": {
+          "vae_name": "wan2.2_vae.safetensors"
+        }
+      },
+      "48": {
+        "class_type": "ModelSamplingSD3",
+        "inputs": {
+          "model": [
+            "37",
+            0
+          ],
+          "shift": 8.0
+        }
+      },
+      "6": {
+        "class_type": "CLIPTextEncode",
+        "inputs": {
+          "clip": [
+            "38",
+            0
+          ],
+          "text": "A young Vietnamese office worker pauses typing at her desk and gently looks toward the window. Warm morning sunlight, natural subtle breathing and a soft smile. Slow cinematic camera push in, realistic live action, consistent face, no text."
+        },
+        "_meta": {
+          "title": "Positive prompt"
+        }
+      },
+      "7": {
+        "class_type": "CLIPTextEncode",
+        "inputs": {
+          "clip": [
+            "38",
+            0
+          ],
+          "text": "oversaturated, overexposed, blurry, subtitles, text, watermark, low quality, deformed face, extra fingers, distorted limbs, frozen still image, static frame, chaotic background"
+        },
+        "_meta": {
+          "title": "Negative prompt"
+        }
+      },
+      "55": {
+        "class_type": "Wan22ImageToVideoLatent",
+        "inputs": {
+          "vae": [
+            "39",
+            0
+          ],
+          "width": 288,
+          "height": 512,
+          "length": 49,
+          "batch_size": 1
+        }
+      },
+      "3": {
+        "class_type": "KSampler",
+        "inputs": {
+          "model": [
+            "48",
+            0
+          ],
+          "positive": [
+            "6",
+            0
+          ],
+          "negative": [
+            "7",
+            0
+          ],
+          "latent_image": [
+            "55",
+            0
+          ],
+          "seed": 20261030,
+          "steps": 20,
+          "cfg": 5.0,
+          "sampler_name": "uni_pc",
+          "scheduler": "simple",
+          "denoise": 1.0
+        }
+      },
+      "8": {
+        "class_type": "VAEDecodeTiled",
+        "inputs": {
+          "samples": [
+            "3",
+            0
+          ],
+          "vae": [
+            "39",
+            0
+          ],
+          "tile_size": 512,
+          "overlap": 64,
+          "temporal_size": 32,
+          "temporal_overlap": 8
+        }
+      },
+      "57": {
+        "class_type": "CreateVideo",
+        "inputs": {
+          "images": [
+            "8",
+            0
+          ],
+          "fps": 24.0
+        }
+      },
+      "58": {
+        "class_type": "SaveVideo",
+        "inputs": {
+          "video": [
+            "57",
+            0
+          ],
+          "filename_prefix": "video/ArcReel-Wan22-5B",
+          "format": {
+            "format": "mp4",
+            "codec": {
+              "codec": "h264"
+            }
+          }
+        }
+      }
+    },
+    {
+      "client_id": "arcreel-wan22-t2v-benchmark-20261030",
+      "create_time": 1793340268380
+    },
+    [
+      "58"
+    ]
+  ],
+  "outputs": {},
+  "status": {
+    "status_str": "error",
+    "completed": false,
+    "messages": [
+      [
+        "execution_start",
+        {
+          "prompt_id": "c709ca59-8e36-4cff-9d98-cb7a0e62032d",
+          "timestamp": 1793340268380
+        }
+      ],
+      [
+        "execution_cached",
+        {
+          "nodes": [],
+          "prompt_id": "c709ca59-8e36-4cff-9d98-cb7a0e62032d",
+          "timestamp": 1793340268382
+        }
+      ],
+      [
+        "execution_error",
+        {
+          "prompt_id": "c709ca59-8e36-4cff-9d98-cb7a0e62032d",
+          "node_id": "58",
+          "node_type": "SaveVideo",
+          "executed": [
+            "55",
+            "8",
+            "7",
+            "37",
+            "38",
+            "6",
+            "3",
+            "48",
+            "57",
+            "39"
+          ],
+          "exception_message": "SaveVideo.execute() missing 1 required positional argument: 'format'\n",
+          "exception_type": "TypeError",
+          "traceback": [
+            "  File \"/home/anhtuan/comfyui/execution.py\", line 548, in execute\n    output_data, output_ui, has_subgraph, has_pending_tasks = await get_output_data(prompt_id, unique_id, obj, input_data_all, execution_block_cb=execution_block_cb, pre_execute_cb=pre_execute_cb, v3_data=v3_data)\n                                                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n",
+            "  File \"/home/anhtuan/comfyui/execution.py\", line 353, in get_output_data\n    return_values = await _async_map_node_over_list(prompt_id, unique_id, obj, input_data_all, obj.FUNCTION, allow_interrupt=True, execution_block_cb=execution_block_cb, pre_execute_cb=pre_execute_cb, v3_data=v3_data)\n                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n",
+            "  File \"/home/anhtuan/comfyui/execution.py\", line 327, in _async_map_node_over_list\n    await process_inputs(input_dict, i)\n",
+            "  File \"/home/anhtuan/comfyui/execution.py\", line 315, in process_inputs\n    result = f(**inputs)\n             ^^^^^^^^^^^\n",
+            "  File \"/home/anhtuan/comfyui/comfy_api/internal/__init__.py\", line 149, in wrapped_func\n    return method(locked_class, **inputs)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n",
+            "  File \"/home/anhtuan/comfyui/comfy_api/latest/_io.py\", line 2219, in EXECUTE_NORMALIZED\n    to_return = cls.execute(*args, **kwargs)\n                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n"
+          ],
+          "current_inputs": {
+            "video": [
+              "<comfy_api.latest._input_impl.video_types.VideoFromComponents object at 0x7b68129a1400>"
+            ],
+            "filename_prefix": [
+              "video/ArcReel-Wan22-5B"
+            ]
+          },
+          "current_outputs": [
+            "55",
+            "8",
+            "7",
+            "37",
+            "38",
+            "6",
+            "3",
+            "48",
+            "57",
+            "58",
+            "39"
+          ],
+          "timestamp": 1793340359397
+        }
+      ]
+    ]
+  },
+  "meta": {},
+  "client_wall_seconds": 95.71965488200658
+}

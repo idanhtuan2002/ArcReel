@@ -1,0 +1,26 @@
+{
+  "changed": {
+    "default_video_backend": {
+      "before": "gemini-aistudio/veo-3.1-generate-preview",
+      "after": "custom-3/wan2.2-ti2v-5b-gguf"
+    },
+    "video_generate_audio": {
+      "before": true,
+      "after": false
+    }
+  },
+  "selected_defaults": {
+    "default_video_backend": "custom-3/wan2.2-ti2v-5b-gguf",
+    "default_video_backend_i2v": "",
+    "default_video_backend_r2v": "",
+    "default_image_backend": "custom-3/flux2-klein-4b-gguf",
+    "default_image_backend_t2i": "",
+    "default_image_backend_i2i": "",
+    "default_text_backend": "gemini-aistudio/gemini-3.8-flash",
+    "default_audio_backend": "custom-2/vieneu-tts-v3-turbo",
+    "narration_voice": "nova",
+    "narration_speed": null,
+    "video_generate_audio": false,
+    "video_poll_timeout_seconds": 3600
+  }
+}

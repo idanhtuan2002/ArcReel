@@ -1,0 +1,62 @@
+{
+  "id": 3,
+  "display_name": "ComfyUI local (RTX 2070)",
+  "discovery_format": "comfyui",
+  "base_url": "http://127.0.0.1:8188",
+  "image_max_workers": 1,
+  "video_max_workers": 1,
+  "audio_max_workers": null,
+  "models": [
+    {
+      "id": 7,
+      "model_id": "flux2-klein-4b-gguf",
+      "display_name": "flux2-klein-4b-gguf",
+      "endpoint": "ce-1",
+      "is_default": false,
+      "is_enabled": true,
+      "price_unit": null,
+      "price_input": 0.0,
+      "price_output": null,
+      "currency": "USD",
+      "supported_durations": null,
+      "resolution": null,
+      "system_capabilities": null,
+      "capability_overrides": null,
+      "global_bucket_refs": [
+        "default_image_backend"
+      ]
+    },
+    {
+      "id": 8,
+      "model_id": "wan2.2-ti2v-5b-gguf",
+      "display_name": "wan2.2-ti2v-5b-gguf",
+      "endpoint": "ce-2",
+      "is_default": false,
+      "is_enabled": true,
+      "price_unit": null,
+      "price_input": 0.0,
+      "price_output": null,
+      "currency": "USD",
+      "supported_durations": [
+        2
+      ],
+      "resolution": "480p",
+      "system_capabilities": {
+        "text_to_video": false,
+        "first_frame": true,
+        "last_frame": false,
+        "max_reference_images": 0,
+        "reference_audio_mode": "none",
+        "max_reference_audio_count": 0,
+        "max_reference_audio_total_seconds": null,
+        "reference_audio_per_image": false,
+        "max_prompt_chars": null,
+        "first_frame_ratio_adaptive_only": false
+      },
+      "capability_overrides": null,
+      "global_bucket_refs": [
+        "default_video_backend"
+      ]
+    }
+  ]
+}
