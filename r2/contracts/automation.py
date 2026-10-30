@@ -5,14 +5,28 @@ from __future__ import annotations
 from enum import StrEnum
 from typing import Annotated, Literal, Self
 
-from pydantic import AwareDatetime, ConfigDict, Field, StrictInt, StringConstraints, model_validator
+from pydantic import AwareDatetime, BeforeValidator, ConfigDict, Field, StrictInt, StringConstraints, model_validator
 
 from r2.contracts.common import R2ContractModel
 
-type ExactIdentity = Annotated[str, StringConstraints(min_length=1, max_length=255, pattern=r"^\S(?:.*\S)?$")]
+
+def _exact_identity(value: object) -> str:
+    if (
+        not isinstance(value, str)
+        or not value
+        or value != value.strip()
+        or value == "*"
+        or len(value.encode("utf-8")) > 255
+        or any(ord(char) < 32 or 127 <= ord(char) <= 159 for char in value)
+    ):
+        raise ValueError("identity must be exact, bounded and free of control characters")
+    return value
+
+
+type ExactIdentity = Annotated[str, StringConstraints(min_length=1, max_length=255), BeforeValidator(_exact_identity)]
 type Digest = Annotated[str, StringConstraints(pattern=r"^sha256:[0-9a-f]{64}$")]
-type PositiveInt = Annotated[StrictInt, Field(ge=1)]
-type NonnegativeInt = Annotated[StrictInt, Field(ge=0)]
+type PositiveInt = Annotated[StrictInt, Field(ge=1, le=9_223_372_036_854_775_807)]
+type NonnegativeInt = Annotated[StrictInt, Field(ge=0, le=9_223_372_036_854_775_807)]
 
 
 class AutomationContract(R2ContractModel):
@@ -242,3 +256,55 @@ class RunSnapshot(RunScope):
         ):
             raise ValueError("success requires every verified current target")
         return self
+
+
+class RunCommand(AutomationContract):
+    """Internal command; the API derives user identity before constructing it."""
+
+    user_id: ExactIdentity
+    project_name: ExactIdentity
+    command_id: ExactIdentity
+    action: Literal["START", "PAUSE", "RESUME", "CANCEL", "MODE"]
+    expected_version: NonnegativeInt
+    expected_input_digest: Digest
+    policy_digest: Digest
+    mode: AutomationMode = AutomationMode.AUTO
+    run_id: ExactIdentity | None = None
+    idea: Annotated[str, StringConstraints(min_length=1, max_length=4000)] | None = None
+    targets: tuple[ExactIdentity, ...] = ("episode:1",)
+
+    @model_validator(mode="after")
+    def command_shape(self) -> Self:
+        if self.action == "START":
+            if self.idea is None or self.run_id is not None or self.expected_version != 0:
+                raise ValueError("start requires idea and genesis version")
+        elif self.run_id is None or self.expected_version < 1 or self.idea is not None:
+            raise ValueError("control requires an exact existing run")
+        if not self.targets or len(set(self.targets)) != len(self.targets):
+            raise ValueError("target selection must be nonempty and unique")
+        return self
+
+
+class BudgetReservation(AutomationContract):
+    """Run allocation, independent of the host's provider charge ledger."""
+
+    scope: RunScope
+    reservation_id: ExactIdentity
+    command_id: ExactIdentity
+    policy_digest: Digest
+    currency: ExactIdentity
+    cost_minor_units: NonnegativeInt
+    model_calls: NonnegativeInt
+    tasks: NonnegativeInt
+    runtime_seconds: NonnegativeInt
+    state: Literal["RESERVED", "UNKNOWN", "SETTLED"]
+
+
+class UsageReceipt(OwnerReceipt):
+    reservation_id: ExactIdentity
+    currency: ExactIdentity
+    cost_minor_units: NonnegativeInt
+    model_calls: NonnegativeInt
+    tasks: NonnegativeInt
+    runtime_seconds: NonnegativeInt
+    outcome: Literal["KNOWN", "UNKNOWN"]

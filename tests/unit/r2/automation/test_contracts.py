@@ -81,3 +81,18 @@ def test_succeeded_run_requires_every_verified_target(run_data: dict):
 
     with pytest.raises(ValidationError):
         RunSnapshot.model_validate({**run_data, "status": "SUCCEEDED"})
+
+
+@pytest.mark.parametrize("identity", ["project\x00name", "project\tname", "*", "ắ" * 100])
+def test_identity_must_fit_durable_scope_without_controls(policy_data: dict, identity: str):
+    from r2.contracts.automation import RunPolicy
+
+    with pytest.raises(ValidationError):
+        RunPolicy.model_validate({**policy_data, "profile_id": identity})
+
+
+def test_budget_caps_fit_the_storage_integer_domain(policy_data: dict):
+    from r2.contracts.automation import RunPolicy
+
+    with pytest.raises(ValidationError):
+        RunPolicy.model_validate({**policy_data, "max_tasks": 2**63})
