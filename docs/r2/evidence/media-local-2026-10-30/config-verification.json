@@ -1,0 +1,10 @@
+{
+  "changed_paths": [
+    ".settings.default_image_backend"
+  ],
+  "selected_defaults": {
+    ".settings.default_video_backend": "gemini-aistudio/veo-3.1-generate-preview",
+    ".settings.default_image_backend": "custom-3/flux2-klein-4b-gguf",
+    ".settings.default_audio_backend": "custom-2/vieneu-tts-v3-turbo"
+  }
+}

@@ -1,0 +1,214 @@
+{
+  "id": 1,
+  "key": "ce-1",
+  "display_name": "FLUX.2 klein 4B local (GGUF)",
+  "kind": "comfyui",
+  "schema_version": "1.0.0",
+  "media_type": "image",
+  "definition": {
+    "kind": "comfyui",
+    "schema_version": "1.0.0",
+    "meta": {
+      "name": "FLUX.2 klein 4B local (GGUF)",
+      "author": "unknown",
+      "version": "1.0.0"
+    },
+    "media_type": "image",
+    "workflow": {
+      "9": {
+        "class_type": "SaveImage",
+        "inputs": {
+          "images": [
+            "65",
+            0
+          ],
+          "filename_prefix": "ArcReel-FLUX2-klein"
+        }
+      },
+      "61": {
+        "class_type": "KSamplerSelect",
+        "inputs": {
+          "sampler_name": "euler"
+        }
+      },
+      "62": {
+        "class_type": "Flux2Scheduler",
+        "inputs": {
+          "steps": 4,
+          "width": 1024,
+          "height": 1024
+        }
+      },
+      "63": {
+        "class_type": "CFGGuider",
+        "inputs": {
+          "model": [
+            "70",
+            0
+          ],
+          "positive": [
+            "74",
+            0
+          ],
+          "negative": [
+            "76",
+            0
+          ],
+          "cfg": 1
+        }
+      },
+      "64": {
+        "class_type": "SamplerCustomAdvanced",
+        "inputs": {
+          "noise": [
+            "73",
+            0
+          ],
+          "guider": [
+            "63",
+            0
+          ],
+          "sampler": [
+            "61",
+            0
+          ],
+          "sigmas": [
+            "62",
+            0
+          ],
+          "latent_image": [
+            "66",
+            0
+          ]
+        }
+      },
+      "65": {
+        "class_type": "VAEDecode",
+        "inputs": {
+          "samples": [
+            "64",
+            0
+          ],
+          "vae": [
+            "72",
+            0
+          ]
+        }
+      },
+      "66": {
+        "class_type": "EmptyFlux2LatentImage",
+        "inputs": {
+          "width": 1024,
+          "height": 1024,
+          "batch_size": 1
+        }
+      },
+      "70": {
+        "class_type": "UnetLoaderGGUF",
+        "inputs": {
+          "unet_name": "flux-2-klein-4b-Q4_K_M.gguf"
+        }
+      },
+      "71": {
+        "class_type": "CLIPLoaderGGUF",
+        "inputs": {
+          "clip_name": "Qwen3-4B-Q4_K_M.gguf",
+          "type": "flux2"
+        }
+      },
+      "72": {
+        "class_type": "VAELoader",
+        "inputs": {
+          "vae_name": "flux2-vae.safetensors"
+        }
+      },
+      "73": {
+        "class_type": "RandomNoise",
+        "inputs": {
+          "noise_seed": 20261030
+        }
+      },
+      "74": {
+        "class_type": "CLIPTextEncode",
+        "inputs": {
+          "clip": [
+            "71",
+            0
+          ],
+          "text": "Cinematic still of a Vietnamese woman in a modern technology office in Ho Chi Minh City, warm morning sunlight, natural expression, realistic photography, no text"
+        }
+      },
+      "76": {
+        "class_type": "ConditioningZeroOut",
+        "inputs": {
+          "conditioning": [
+            "74",
+            0
+          ]
+        }
+      }
+    },
+    "bindings": {
+      "prompt": [
+        {
+          "node": "74",
+          "class_type": "CLIPTextEncode",
+          "title": "",
+          "input": "text"
+        }
+      ],
+      "seed": [
+        {
+          "node": "73",
+          "class_type": "RandomNoise",
+          "title": "",
+          "input": "noise_seed",
+          "policy": "random"
+        }
+      ],
+      "output": [
+        {
+          "node": "9",
+          "class_type": "SaveImage",
+          "title": ""
+        }
+      ],
+      "width": [
+        {
+          "node": "62",
+          "class_type": "Flux2Scheduler",
+          "title": "",
+          "input": "width",
+          "step": 16
+        },
+        {
+          "node": "66",
+          "class_type": "EmptyFlux2LatentImage",
+          "title": "",
+          "input": "width",
+          "step": 16
+        }
+      ],
+      "height": [
+        {
+          "node": "62",
+          "class_type": "Flux2Scheduler",
+          "title": "",
+          "input": "height",
+          "step": 16
+        },
+        {
+          "node": "66",
+          "class_type": "EmptyFlux2LatentImage",
+          "title": "",
+          "input": "height",
+          "step": 16
+        }
+      ],
+      "negative_prompt": [],
+      "reference_images": []
+    }
+  },
+  "created_at": "2026-10-30T04:31:14.666714+00:00",
+  "updated_at": "2026-10-30T04:31:14.666717+00:00"
+}

@@ -1,0 +1,26 @@
+[
+  {
+    "repo": "unsloth/FLUX.2-klein-4B-GGUF",
+    "revision": "a09d5bb51ac4000ccd9643d10e9db3ed14200508",
+    "source_path": "flux-2-klein-4b-Q4_K_M.gguf",
+    "local_path": "/home/anhtuan/comfyui/models/unet/flux-2-klein-4b-Q4_K_M.gguf",
+    "size": 2604311104,
+    "sha256": "0b25d143c8469b342bc5af3bce92b783bf6b0636d285f7b2f75e38af63af9a15"
+  },
+  {
+    "repo": "unsloth/Qwen3-4B-GGUF",
+    "revision": "22c9fc8a8c7700b76a1789366280a6a5a1ad1120",
+    "source_path": "Qwen3-4B-Q4_K_M.gguf",
+    "local_path": "/home/anhtuan/comfyui/models/text_encoders/Qwen3-4B-Q4_K_M.gguf",
+    "size": 2497281312,
+    "sha256": "f6f851777709861056efcdad3af01da38b31223a3ba26e61a4f8bf3a2195813a"
+  },
+  {
+    "repo": "Comfy-Org/flux2-klein",
+    "revision": "5b3abca5c0dc1ecd4eaf3340868d09063fc1c965",
+    "source_path": "split_files/vae/flux2-vae.safetensors",
+    "local_path": "/home/anhtuan/comfyui/models/vae/flux2-vae.safetensors",
+    "size": 336211292,
+    "sha256": "868fe7b343cc8f3a19dbcfcafbc3d5f888802be3f89bd81b65b3621a066ce8f3"
+  }
+]

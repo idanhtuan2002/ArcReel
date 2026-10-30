@@ -1,0 +1,313 @@
+Back
+CONTROL BOOTH — EN
+SettingsSYSTEM CONFIGURATION AND API ACCESS MANAGEMENT
+EN
+CONFIGURATION
+Providers
+Agents
+Endpoints
+Default models
+ACCESS
+Usage
+API Keys
+SYSTEM
+About
+New
+Import
+COMFYUI WORKFLOW
+FLUX.2 klein 4B local (GGUF)
+IMAGE
+BUILT-IN
+MiniMax H3
+MiniMax Hailuo V1 Fast
+MiniMax Hailuo V1
+MiniMax S2V-01
+NewAPI Video
+V2 Video Generations
+BUILT-IN · PYTHON
+OpenAI Video (Sora)
+Volcengine Ark (Seedance)
+Vidu Video
+Alibaba Model Studio (Async Video)
+Kling (Video)
+WORKFLOW ENDPOINT
+COMFYUI
+IMAGE
+ce-1
+13 nodes
+Import again
+Export definition
+Delete
+BINDINGS
+Node bindings
+
+One row per semantic: which node input in the workflow it lands on. Change anything that was recognized automatically; pick a winner where candidates tie; mark the ones this workflow does not have as unsupported.
+
+Bound 5 · To pick 0 · Not found 0 · Unsupported 2
+prompt
+Prompt
+*
+Set by you
+#74 CLIPTextEncode .text
+KEPT
+1 candidates
+negative_prompt
+Negative prompt
+Unsupported
+This workflow has no such input
+Pick manually
+reference_images
+Reference images
+Unsupported
+This workflow has no such input
+Pick manually
+width
+Width
+Set by you
+#62 Flux2Scheduler .width
+KEPT
+2 candidates
+height
+Height
+Set by you
+#62 Flux2Scheduler .height
+KEPT
+2 candidates
+seed
+Seed
+Set by you
+#73 RandomNoise .noise_seed
+KEPT
+1 candidates
+output
+Output node
+*
+Set by you
+#9 SaveImage
+KEPT
+1 candidates
+Saved
+DEFINITION
+Definition
+Media type
+Video
+Image
+
+Whether this workflow produces images or video. Changing it changes the available semantics and runs recognition again.
+
+Credential injection (auth section)
+headers:
+  Authorization: Bearer {{ api_key }}
+
+This definition has no auth section. ComfyUI itself has no authentication; behind a reverse proxy, the provider API key is injected using the template above.
+
+WORKFLOW
+The workflow itself
+
+Embedded verbatim in the definition; it is the draft that gets submitted. To change a fixed value in it (a model file name, a default negative prompt), edit it in ComfyUI, export again and import again.
+
+CFGGuider ×1
+CLIPLoaderGGUF ×1
+CLIPTextEncode ×1
+ConditioningZeroOut ×1
+EmptyFlux2LatentImage ×1
+Flux2Scheduler ×1
+KSamplerSelect ×1
+RandomNoise ×1
+SamplerCustomAdvanced ×1
+SaveImage ×1
+UnetLoaderGGUF ×1
+VAEDecode ×1
+VAELoader ×1
+TEST
+Endpoint test
+
+A ComfyUI endpoint has two tests: look at the rendered request body, or actually submit once. There is no "check response" — artifact extraction is fixed code, with no extraction paths to configure.
+
+Prompt
+Aspect ratio
+9:16
+16:9
+Resolution
+Follow the workflow
+512px
+1K
+2K
+4K
+Credentials
+A saved provider
+Enter for this test
+Base URL
+API Key
+
+Both cards share these parameters, assets and credentials. Credentials are masked in the preview, and stay as placeholders when left blank.
+
+Preview the request
+
+See what ArcReel writes into the workflow. Not a byte leaves this machine.
+
+Render the /prompt body
+How these values were derived
+Size
+9:16 · 1K
+→
+1008×1792
+Seed
+random
+→
+4277132104
+Workflow digest
+b35e2a48799a8ac2e42ca71338da52af246080ed8e4bc905b8f7adae7c219d6a
+Submit · POST /prompt
+POST http://127.0.0.1:8188/prompt
+
+
+{
+  "prompt": {
+    "9": {
+      "class_type": "SaveImage",
+      "inputs": {
+        "images": [
+          "65",
+          0
+        ],
+        "filename_prefix": "ArcReel-FLUX2-klein"
+      }
+    },
+    "61": {
+      "class_type": "KSamplerSelect",
+      "inputs": {
+        "sampler_name": "euler"
+      }
+    },
+    "62": {
+      "class_type": "Flux2Scheduler",
+      "inputs": {
+        "steps": 4,
+        "width": 1008,
+        "height": 1792
+      }
+    },
+    "63": {
+      "class_type": "CFGGuider",
+      "inputs": {
+        "model": [
+          "70",
+          0
+        ],
+        "positive": [
+          "74",
+          0
+        ],
+        "negative": [
+          "76",
+          0
+        ],
+        "cfg": 1
+      }
+    },
+    "64": {
+      "class_type": "SamplerCustomAdvanced",
+      "inputs": {
+        "noise": [
+          "73",
+          0
+        ],
+        "guider": [
+          "63",
+          0
+        ],
+        "sampler": [
+          "61",
+          0
+        ],
+        "sigmas": [
+          "62",
+          0
+        ],
+        "latent_image": [
+          "66",
+          0
+        ]
+      }
+    },
+    "65": {
+      "class_type": "VAEDecode",
+      "inputs": {
+        "samples": [
+          "64",
+          0
+        ],
+        "vae": [
+          "72",
+          0
+        ]
+      }
+    },
+    "66": {
+      "class_type": "EmptyFlux2LatentImage",
+      "inputs": {
+        "width": 1008,
+        "height": 1792,
+        "batch_size": 1
+      }
+    },
+    "70": {
+      "class_type": "UnetLoaderGGUF",
+      "inputs": {
+        "unet_name": "flux-2-klein-4b-Q4_K_M.gguf"
+      }
+    },
+    "71": {
+      "class_type": "CLIPLoaderGGUF",
+      "inputs": {
+        "clip_name": "Qwen3-4B-Q4_K_M.gguf",
+        "type": "flux2"
+      }
+    },
+    "72": {
+      "class_type": "VAELoader",
+      "inputs": {
+        "vae_name": "flux2-vae.safetensors"
+      }
+    },
+    "73": {
+      "class_type": "RandomNoise",
+      "inputs": {
+        "noise_seed": 4277132104
+      }
+    },
+    "74": {
+      "class_type": "CLIPTextEncode",
+      "inputs": {
+        "clip": [
+          "71",
+          0
+        ],
+        "text": "A cinematic still of a Vietnamese technology office in warm morning sunlight"
+      }
+    },
+    "76": {
+      "class_type": "ConditioningZeroOut",
+      "inputs": {
+        "conditioning": [
+          "74",
+          0
+        ]
+      }
+    }
+  },
+  "client_id": "arcreel-{{ prompt_id }}"
+}
+Poll · GET /history
+GET http://127.0.0.1:8188/history/{{ prompt_id }}
+
+Test connection
+Uses the GPU
+
+Submit once for real and poll to a final state, then fetch the artifact. Cost is recorded as 0; execution time is recorded as usual.
+
+Submit once for real
+This one shows up in the ComfyUI queue as endpoint-test-…
+
+Submit once to see the four stages and the artifact here.

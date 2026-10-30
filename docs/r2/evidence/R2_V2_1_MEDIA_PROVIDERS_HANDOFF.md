@@ -1,6 +1,6 @@
-# V2.1 media providers handoff (2026-10-30, paused for weekly quota)
+# V2.1 media providers handoff (2026-10-30, local image gate completed)
 
-Resume entry for "make the deployed V2.1 usable now with free providers". Research and decision:
+Resume entry for "make the deployed V2.1 usable now with free providers". Codex resumed the approved local-image work on 2026-10-30. Research and decision:
 `docs/research/2026-10-30-media-providers-free-and-local.md`.
 
 ## State (verified 2026-10-30)
@@ -10,10 +10,16 @@ Resume entry for "make the deployed V2.1 usable now with free providers". Resear
   127.0.0.1:23340), user service `vieneu-tts-shim.service` active, linger enabled for `anhtuan`. ArcReel custom
   provider `custom-2` "VieNeu TTS (local)" (placeholder key `local`), default narration
   `custom-2/vieneu-tts-v3-turbo`, voice `nova`.
-- Default image/video models on production are still **paid Gemini** (Veo 3.1, Gemini 3.1 Flash Image, existing AI
-  Studio key). Do not generate media with them without the sponsor's decision.
-- Disk `/`: 25 GB free after the user-level and sudo system cleanup and removing Ollama models ornith:9b, ornith-32k:9b and gemma3:12b (sponsor request; kept qwen3.5-vimax:9b and bge-m3). The Ollama custom provider `custom-1` still lists `gemma3:12b`; remove that row in Settings or re-pull the model if a story needs it.
-- No ComfyUI server on this host (ArcReel has only the V2-03 client).
+- Default image model is now `custom-3/flux2-klein-4b-gguf`, ComfyUI local, configured price 0. API comparison after Save and reload confirmed only `settings.default_image_backend` changed. Video remains **paid Gemini / Veo 3.1**; free/local video is not configured.
+- Disk `/`: 11 GB available after installing ComfyUI, its isolated Python/CUDA environment and the three model files. Do not start the deferred ~12 GB video download with this free space.
+- ComfyUI at `~/comfyui`, loopback `http://127.0.0.1:8188`, user service `arcreel-comfyui.service` enabled. Unit file is in `media-local-2026-10-30/arcreel-comfyui.service`.
+- Image workflow endpoint `ce-1`, provider `custom-3` "ComfyUI local (RTX 2070)", model `flux2-klein-4b-gguf`, image concurrency 1. Qwen3 Q4_K_M GGUF encoder is used on Turing instead of FP4.
+- Fresh inference: 1024 x 1024 benchmark succeeded in 34.787 s client wall time (33.75 s ComfyUI); production project character sheet 1792 x 1008 succeeded in 22.22 s execution timestamps (22.27 s ComfyUI log). Both outputs visually inspected. No Human quality/release acceptance claimed.
+- Production proof: `http://127.0.0.1:1251/app/projects/local-media-proof-2026-1-f4bd3cf4/characters`, character "Linh - Local image proof". Existing story project was preserved.
+- Evidence: `media-local-2026-10-30/` contains API workflow, saved endpoint definition, upstream model SHA256 pins, installed Python versions, histories, result image, UI screenshot, configuration verification and execution notes.
+- Ollama was unloaded (`/api/ps` empty) before image tests; GPU VRAM returned to 417 MiB after inference. Concurrent Ollama/media execution has not been tested; use the GPU serially. Workflow is text-to-image only; reference images and negative prompt are explicitly marked unsupported.
+- No application source code or database schema was changed. The app remains at deployed HEAD `0cef69a772f1d2946e452b918a8839b0f37fd2d9` (`r2-v2.1.0`).
+
 
 ## Sponsor approvals already given (2026-10-30)
 
@@ -27,15 +33,10 @@ Download and install for local images (≈ 12–13 GB):
 
 ## Next steps
 
-1. Install ComfyUI under `~/comfyui` (loopback `127.0.0.1:8188`), the GGUF node and the weights above; check free disk
-   before each download (stop at < 3 GB).
-2. Build and run a FLUX.2 klein 4B text-to-image workflow in ComfyUI; measure time per 1024² image on the RTX 2070;
-   confirm it does not run while Ollama holds the GPU (story authoring).
-3. Export the workflow in API format, add an ArcReel `comfyui` custom provider (Settings → Providers), bind
-   prompt/size/seed/output nodes, test, then set it as the default image model (sponsor sees cost = 0).
-4. Run one image through a real project on production; record evidence.
-5. Later: Wan 2.2 TI2V-5B video (≈ +12 GB, overnight only) and/or DashScope Singapore key from the sponsor
-   (`https://dashscope-intl.aliyuncs.com`; models qwen-image-2.0, wan3.0-video).
+1. Local-image installation/integration/proof is complete. Use the ComfyUI model already selected as the global image default. A project's explicit model override takes priority; inspect it before generating from an existing project.
+2. Free video remains open. Wan 2.2 TI2V-5B needs roughly another 12 GB plus working space; current free disk is 11 GB. Research/reclaim and obtain any needed download authorization before adding it. Alternatively configure DashScope Singapore after the sponsor supplies the account/key and verifies applicable free quota.
+3. Image editing/reference-guided image workflows are not part of the verified text-to-image workflow. They need their own workflow and project-level proof.
+4. Full story-to-video proof remains incomplete until free video is configured and a real short clip is generated. M9-C is separate roadmap work.
 
 ## Other open work (pointers)
 

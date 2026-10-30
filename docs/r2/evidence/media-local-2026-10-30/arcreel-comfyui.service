@@ -1,0 +1,15 @@
+[Unit]
+Description=ArcReel local ComfyUI image provider
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/home/anhtuan/comfyui
+Environment=PYTHONUNBUFFERED=1
+ExecStart=/home/anhtuan/comfyui/.venv/bin/python main.py --listen 127.0.0.1 --port 8188 --disable-dynamic-vram --disable-smart-memory --reserve-vram 1 --fp16-unet --fp16-text-enc --use-pytorch-cross-attention --offline
+Restart=on-failure
+RestartSec=10
+TimeoutStopSec=30
+
+[Install]
+WantedBy=default.target
