@@ -1,0 +1,71 @@
+{
+  "episode": 1,
+  "resource_type": "videos",
+  "script_file": "episode_1.json",
+  "transition_to_next": "cut",
+  "subtitle_artifact_path": "subtitles/episode_1/RTFTMDM.use_tts.json",
+  "presentation_artifact_path": "presentations/episode_1/RTFTMDM.use_tts.json",
+  "persisted": true,
+  "schema_version": 1,
+  "provenance": "verified",
+  "unit_id": "E1S03",
+  "variant": "use_tts",
+  "speech_mode": "narrator_voiceover",
+  "selection": "current",
+  "currency": "current",
+  "video": {
+    "artifact_path": "versions/videos/E1S03_v1_20261030T143833.mp4",
+    "version": 1,
+    "selection": "current",
+    "currency": "current",
+    "basis": {
+      "kind": "artifact-components/video",
+      "kind_version": 1,
+      "digest": "sha256-v1:3019117aa44ad4a12b50554e33e58a7350a634d75afc2026694b0e6e19773198"
+    },
+    "content_digest": "sha256-v1:41ec3fd7538ddfbe2db41149049944368d83b61211c371d06b4cd8003a28877f",
+    "actual_duration_seconds": 2.041667,
+    "start_microseconds": 0,
+    "duration_microseconds": 2041667,
+    "audio_enabled": false,
+    "gain": 0.0
+  },
+  "narration_audio": {
+    "artifact_path": "versions/audio/E1S03_v1_20261030T142424.wav",
+    "version": 1,
+    "selection": "current",
+    "currency": "current",
+    "basis": {
+      "kind": "narration-delivery/tts-audio",
+      "kind_version": 1,
+      "digest": "sha256-v1:6b2fd8ca5390aa7b0cf4a533c0a214a1956ff054d5a1df6114d7f7f62460ea26"
+    },
+    "content_digest": "sha256-v1:12e6c5b00b08a2bdf30b907d46963321dc6ffa13ef051ebf9875cf445733b1b6",
+    "actual_duration_seconds": 1.12,
+    "start_microseconds": 0,
+    "duration_microseconds": 1120000,
+    "gain": 1.0
+  },
+  "subtitles": [
+    {
+      "start_microseconds": 0,
+      "duration_microseconds": 1120000,
+      "text": "Bắt đầu thôi.",
+      "owner": "narrator",
+      "speaker": null
+    }
+  ],
+  "subtitle_basis": {
+    "kind": "artifact-speech/mechanical-subtitle",
+    "kind_version": 1,
+    "digest": "sha256-v1:8322e3f18ce4d4461a95157b7a6999b101e1d7261f9050511a03a78976c69a4e"
+  },
+  "presentation_basis": {
+    "kind": "artifact-speech/presentation",
+    "kind_version": 2,
+    "digest": "sha256-v1:0e227bb949cf62af0204589e94bdfc9254a2ba688639e7e7896f0f8f63e8f94a"
+  },
+  "timing": "mechanical",
+  "subtitles_adjustable": true,
+  "subtitles_webvtt": "WEBVTT\n\n1\n00:00:00.000 --> 00:00:01.120\nBắt đầu thôi.\n"
+}

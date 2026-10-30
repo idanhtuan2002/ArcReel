@@ -1,0 +1,11 @@
+{
+  "success": true,
+  "filename": "episode_1.txt",
+  "path": "source/episode_1.txt",
+  "url": "/api/v1/files/local-media-proof-2026-1-f4bd3cf4/source/episode_1.txt",
+  "normalized": true,
+  "original_kept": false,
+  "original_filename": "episode_1.txt",
+  "used_encoding": "utf-8",
+  "chapter_count": 0
+}

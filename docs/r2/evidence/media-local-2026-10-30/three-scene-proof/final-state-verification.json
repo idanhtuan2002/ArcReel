@@ -1,0 +1,32 @@
+{
+  "global_selected_defaults_unchanged": true,
+  "project_settings": {
+    "default_duration": 2,
+    "model_settings": {
+      "custom-3/wan2.2-ti2v-5b-gguf": {
+        "resolution": "480p"
+      },
+      "custom-3/flux2-klein-4b-gguf": {
+        "resolution": null
+      }
+    },
+    "video_generate_audio": null,
+    "video_backend": null,
+    "default_image_backend": "custom-3/flux2-klein-4b-gguf",
+    "audio_backend": null
+  },
+  "character_count": 1,
+  "episode_count": 1,
+  "comfyui_queue": {
+    "queue_running": [],
+    "queue_pending": []
+  },
+  "health": {
+    "status": "ok",
+    "message": "视频项目管理 WebUI 运行正常"
+  },
+  "free_gib": {
+    "/": 32.77,
+    "/mnt/arcreel/D": 149.84
+  }
+}

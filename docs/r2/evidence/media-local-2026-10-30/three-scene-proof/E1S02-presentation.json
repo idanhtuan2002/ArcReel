@@ -1,0 +1,71 @@
+{
+  "episode": 1,
+  "resource_type": "videos",
+  "script_file": "episode_1.json",
+  "transition_to_next": "cut",
+  "subtitle_artifact_path": "subtitles/episode_1/RTFTMDI.use_tts.json",
+  "presentation_artifact_path": "presentations/episode_1/RTFTMDI.use_tts.json",
+  "persisted": true,
+  "schema_version": 1,
+  "provenance": "verified",
+  "unit_id": "E1S02",
+  "variant": "use_tts",
+  "speech_mode": "narrator_voiceover",
+  "selection": "current",
+  "currency": "current",
+  "video": {
+    "artifact_path": "versions/videos/E1S02_v1_20261030T143401.mp4",
+    "version": 1,
+    "selection": "current",
+    "currency": "current",
+    "basis": {
+      "kind": "artifact-components/video",
+      "kind_version": 1,
+      "digest": "sha256-v1:3d07382a1fd46fb0f68236eed83de5428f0d511cfa4f8234ca997ca9cbf4174c"
+    },
+    "content_digest": "sha256-v1:eb1ce81997beb6d7959d5876ff336b5ac09725d2e63b511e59119c0263e285c5",
+    "actual_duration_seconds": 2.041667,
+    "start_microseconds": 0,
+    "duration_microseconds": 2041667,
+    "audio_enabled": false,
+    "gain": 0.0
+  },
+  "narration_audio": {
+    "artifact_path": "versions/audio/E1S02_v1_20261030T142416.wav",
+    "version": 1,
+    "selection": "current",
+    "currency": "current",
+    "basis": {
+      "kind": "narration-delivery/tts-audio",
+      "kind_version": 1,
+      "digest": "sha256-v1:e192f507eb96e91e281468d73eca197c41d2ff62c54c8631882b1238e0d688b1"
+    },
+    "content_digest": "sha256-v1:41ae7c1d1a619742a788a75cb4d75bac0d02d057998bd9adeffea398a19d3888",
+    "actual_duration_seconds": 1.52,
+    "start_microseconds": 0,
+    "duration_microseconds": 1520000,
+    "gain": 1.0
+  },
+  "subtitles": [
+    {
+      "start_microseconds": 0,
+      "duration_microseconds": 1520000,
+      "text": "Một ngày mới đến.",
+      "owner": "narrator",
+      "speaker": null
+    }
+  ],
+  "subtitle_basis": {
+    "kind": "artifact-speech/mechanical-subtitle",
+    "kind_version": 1,
+    "digest": "sha256-v1:3d79b1d1df71a3524085e47941266c9a36937c1ab07eb889f6a320210692665a"
+  },
+  "presentation_basis": {
+    "kind": "artifact-speech/presentation",
+    "kind_version": 2,
+    "digest": "sha256-v1:c3c5c62cf4b4b67ef7a17c8561af15ce76f127b41c731e62ed12076ec9d21327"
+  },
+  "timing": "mechanical",
+  "subtitles_adjustable": true,
+  "subtitles_webvtt": "WEBVTT\n\n1\n00:00:00.000 --> 00:00:01.520\nMột ngày mới đến.\n"
+}

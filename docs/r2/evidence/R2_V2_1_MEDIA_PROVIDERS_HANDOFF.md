@@ -1,4 +1,4 @@
-# V2.1 media providers handoff (2026-10-30, local image and Wan video smoke gates completed)
+# V2.1 media providers handoff (2026-10-30, local image, Wan and three-scene pipeline proofs completed)
 
 Resume entry for "make the deployed V2.1 usable now with free providers". Codex resumed the approved local-image work on 2026-10-30. Research and decision:
 `docs/research/2026-10-30-media-providers-free-and-local.md`.
@@ -19,7 +19,8 @@ Resume entry for "make the deployed V2.1 usable now with free providers". Codex 
 - Production proof: `http://127.0.0.1:1251/app/projects/local-media-proof-2026-1-f4bd3cf4/characters`, character "Linh - Local image proof". Existing story project was preserved.
 - Evidence: `media-local-2026-10-30/` contains API workflow, saved endpoint definition, upstream model SHA256 pins, installed Python versions, histories, result image, UI screenshot, configuration verification and execution notes.
 - Ollama was unloaded (`/api/ps` empty) before image tests; GPU VRAM returned to 417 MiB after inference. Concurrent Ollama/media execution has not been tested; use the GPU serially. Workflow is text-to-image only; reference images and negative prompt are explicitly marked unsupported.
-- Wan endpoint `ce-2` and model are installed on D (7.91 GiB, all SHA256 verified). Actual ArcReel UI I2V proof succeeded: 576 x 1024, 49 frames / 24 fps, 2.041667 s silent H.264 MP4, 250.297 s generation, sampled peak GPU 6920 MiB. Native T2V preview 288 x 512 also retained. Both decoded and visually inspected; UI video playback worked. Details/clip/rollback: `media-local-2026-10-30/wan-2.2/README.md`. Current runtime projects this endpoint as I2V; normal text-only app routing is not verified. Longer/higher resolution, full story/episode and narration mux remain untested.
+- Wan endpoint `ce-2` and model are installed on D (7.91 GiB, all SHA256 verified). Actual ArcReel UI I2V proof succeeded: 576 x 1024, 49 frames / 24 fps, 2.041667 s silent H.264 MP4, 250.297 s generation, sampled peak GPU 6920 MiB. Native T2V preview 288 x 512 also retained. Both decoded and visually inspected; UI video playback worked. Details/clip/rollback: `media-local-2026-10-30/wan-2.2/README.md`. Current runtime projects this endpoint as I2V; normal text-only app routing is not verified. Longer/higher resolution and automated story authoring remain untested. A later operator-authored three-scene episode proof completed normal storyboard/TTS/video jobs plus native narrated export and FFmpeg assembly; see below.
+- Three-scene episode proof now complete in the dedicated project: Episode 1 “Buổi sáng bắt đầu”, UI Done 3/3, all 9 normal app queue jobs succeeded (3 FLUX, 3 VieNeu, 3 Wan). Final MP4 576 x 1024, 24 fps, 6.125 s, Vietnamese narration/captions; native editable draft export has 3 video/audio/text segments. MP4 rendered with FFmpeg from exact app-selected native presentations; full decode, source frame/audio lineage and browser playback passed. Evidence/deliverables/limits: `media-local-2026-10-30/three-scene-proof/README.md`.
 - No application source code or database schema was changed. The app remains at deployed HEAD `0cef69a772f1d2946e452b918a8839b0f37fd2d9` (`r2-v2.1.0`).
 
 
@@ -40,7 +41,7 @@ Wan local download/install and real clip verification were separately authorized
 1. Local-image installation/integration/proof is complete. Use the ComfyUI model already selected as the global image default. A project's explicit model override takes priority; inspect it before generating from an existing project.
 2. Local video installation and the ArcReel endpoint-test proof are complete. Start with a first-frame image, 2 s, 480p, portrait; this produces 576 x 1024 at 24 fps on RTX 2070. The workflow is silent; keep native video audio off and use narration separately. Run FLUX/Wan/Ollama serially. Expand duration/resolution only with a new measured proof. See `media-local-2026-10-30/wan-2.2/`.
 3. Image editing/reference-guided image workflows are not part of the verified text-to-image workflow. They need their own workflow and project-level proof.
-4. Full story-to-video/project episode proof is still incomplete. Local video is now configured and a real short I2V clip is proven through the endpoint test; normal episode execution, narration mux and Human release acceptance remain separate. M9-C is separate roadmap work.
+4. The operator-authored three-scene media pipeline proof is complete, including normal episode jobs, narration presentation/export and watchable MP4 assembly. Automated source-to-story authoring, editor import and independent Human creative/release acceptance remain open. The current app-native export is an editable draft/bundle; the MP4 was assembled with FFmpeg. M9-C is separate roadmap work.
 
 ## Other open work (pointers)
 

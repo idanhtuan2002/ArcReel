@@ -1,0 +1,71 @@
+{
+  "episode": 1,
+  "resource_type": "videos",
+  "script_file": "episode_1.json",
+  "transition_to_next": "cut",
+  "subtitle_artifact_path": "subtitles/episode_1/RTFTMDE.use_tts.json",
+  "presentation_artifact_path": "presentations/episode_1/RTFTMDE.use_tts.json",
+  "persisted": true,
+  "schema_version": 1,
+  "provenance": "verified",
+  "unit_id": "E1S01",
+  "variant": "use_tts",
+  "speech_mode": "narrator_voiceover",
+  "selection": "current",
+  "currency": "current",
+  "video": {
+    "artifact_path": "versions/videos/E1S01_v1_20261030T142932.mp4",
+    "version": 1,
+    "selection": "current",
+    "currency": "current",
+    "basis": {
+      "kind": "artifact-components/video",
+      "kind_version": 1,
+      "digest": "sha256-v1:e9aa0b272e4393bf8d45affde80638bbc9207280935d36d0dcabdcf31eb9b06e"
+    },
+    "content_digest": "sha256-v1:ee05e4b99af0fa3331078c620beb4e5d1f666cadf9f62ee9a5bd4d0cb5c7f4f6",
+    "actual_duration_seconds": 2.041667,
+    "start_microseconds": 0,
+    "duration_microseconds": 2041667,
+    "audio_enabled": false,
+    "gain": 0.0
+  },
+  "narration_audio": {
+    "artifact_path": "versions/audio/E1S01_v1_20261030T142410.wav",
+    "version": 1,
+    "selection": "current",
+    "currency": "current",
+    "basis": {
+      "kind": "narration-delivery/tts-audio",
+      "kind_version": 1,
+      "digest": "sha256-v1:e67739ad91062440af659024890d94bb5e8d1c895f8dd8cf31ee20be11ffd690"
+    },
+    "content_digest": "sha256-v1:346970e4a9aa63944c1bc4b1ddfbff045a08370c0f97ba351bd8390f1b7a67a4",
+    "actual_duration_seconds": 1.44,
+    "start_microseconds": 0,
+    "duration_microseconds": 1440000,
+    "gain": 1.0
+  },
+  "subtitles": [
+    {
+      "start_microseconds": 0,
+      "duration_microseconds": 1440000,
+      "text": "Nắng mai khẽ lên.",
+      "owner": "narrator",
+      "speaker": null
+    }
+  ],
+  "subtitle_basis": {
+    "kind": "artifact-speech/mechanical-subtitle",
+    "kind_version": 1,
+    "digest": "sha256-v1:dbf9a35108380dec3402269e877e8de60c4aa8d245c7125c73f9fbb31c0e5c58"
+  },
+  "presentation_basis": {
+    "kind": "artifact-speech/presentation",
+    "kind_version": 2,
+    "digest": "sha256-v1:52a8118018fd7b09dd8efc226a67ca864aa54d8b367a45b5b719185ff201d433"
+  },
+  "timing": "mechanical",
+  "subtitles_adjustable": true,
+  "subtitles_webvtt": "WEBVTT\n\n1\n00:00:00.000 --> 00:00:01.440\nNắng mai khẽ lên.\n"
+}

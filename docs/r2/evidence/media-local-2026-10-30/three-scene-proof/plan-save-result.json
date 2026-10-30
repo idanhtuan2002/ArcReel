@@ -1,0 +1,42 @@
+{
+  "episode": 1,
+  "content_mode": "narration",
+  "status": "confirmed",
+  "fingerprint": "4c6a1b5cee549c54b8070fe819e2b8daee768c696f8f4e06af7e92baae8b119e",
+  "confirmed_at": null,
+  "content": {
+    "segments": [
+      {
+        "segment_id": "E1S01",
+        "novel_text": "Nắng mai khẽ lên.",
+        "duration_seconds": 2,
+        "segment_break": true,
+        "characters_in_segment": [],
+        "scenes": [],
+        "props": []
+      },
+      {
+        "segment_id": "E1S02",
+        "novel_text": "Một ngày mới đến.",
+        "duration_seconds": 2,
+        "segment_break": true,
+        "characters_in_segment": [],
+        "scenes": [],
+        "props": []
+      },
+      {
+        "segment_id": "E1S03",
+        "novel_text": "Bắt đầu thôi.",
+        "duration_seconds": 2,
+        "segment_break": true,
+        "characters_in_segment": [],
+        "scenes": [],
+        "props": []
+      }
+    ]
+  },
+  "supported_durations": null,
+  "episode_target_duration": null,
+  "duration_tiers": null,
+  "quarantine": null
+}

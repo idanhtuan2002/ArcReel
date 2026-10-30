@@ -1,0 +1,50 @@
+{
+  "path": "/mnt/arcreel/D/ArcReel/media/exports/buoi-sang-bat-dau-20261030/Buoi-sang-bat-dau.mp4",
+  "sha256": "6b28aa5bb8a97ba381564ade25f7528bbaa468d618ab1bff69fb7ef9822a10bc",
+  "bytes": 1262412,
+  "video_codec": "h264",
+  "audio_codec": "aac",
+  "width": 576,
+  "height": 1024,
+  "frames": 147,
+  "fps": 24,
+  "duration_s": 6.125,
+  "native_timeline_duration_us": 6125001,
+  "full_decode": "passed",
+  "unit_lineage_checks": [
+    {
+      "unit_id": "E1S01",
+      "native_frames": 49,
+      "changed_adjacent_frame_pairs": 48,
+      "motion_mean_gray_MAE": 1.1411178023726851,
+      "final_start_frame_MAE_without_caption_area": 0.27705439814814814,
+      "narration_correlation_with_native_wav": 0.999982013377454,
+      "timeline_start_us": 0,
+      "video_duration_us": 2041667,
+      "narration_duration_us": 1440000
+    },
+    {
+      "unit_id": "E1S02",
+      "native_frames": 49,
+      "changed_adjacent_frame_pairs": 48,
+      "motion_mean_gray_MAE": 1.7913773148148149,
+      "final_start_frame_MAE_without_caption_area": 0.2686631944444444,
+      "narration_correlation_with_native_wav": 0.9999115548424375,
+      "timeline_start_us": 2041667,
+      "video_duration_us": 2041667,
+      "narration_duration_us": 1520000
+    },
+    {
+      "unit_id": "E1S03",
+      "native_frames": 49,
+      "changed_adjacent_frame_pairs": 48,
+      "motion_mean_gray_MAE": 1.4836403175636574,
+      "final_start_frame_MAE_without_caption_area": 0.21773726851851852,
+      "narration_correlation_with_native_wav": 0.9999973701387649,
+      "timeline_start_us": 4083334,
+      "video_duration_us": 2041667,
+      "narration_duration_us": 1120000
+    }
+  ],
+  "note": "Audio correlation verifies the exact selected narration and timing, not human speech pronunciation acceptance."
+}

@@ -1,0 +1,311 @@
+{
+  "E1S01-storyboard": {
+    "submission": {
+      "success": true,
+      "task_id": "f54abc5a704a41239487763d6db340e4",
+      "deduped": false,
+      "message": "分镜「E1S01」生成任务已提交"
+    },
+    "request": {
+      "script_file": "episode_1.json",
+      "prompt": "A quiet modern office in Ho Chi Minh City at sunrise, warm golden sunlight through tall windows, a clean wooden desk with a closed silver laptop and a white ceramic coffee cup, cinematic realistic photography, soft shadows, vertical composition, no people, no letters, no text, no watermark."
+    },
+    "task": {
+      "task_id": "f54abc5a704a41239487763d6db340e4",
+      "task_type": "storyboard",
+      "resource_id": "E1S01",
+      "status": "succeeded",
+      "result": {
+        "version": 1,
+        "file_path": "storyboards/scene_E1S01.png",
+        "created_at": "2026-10-30T07:22:58Z",
+        "resource_type": "storyboards",
+        "resource_id": "E1S01"
+      },
+      "error_message": null,
+      "provider_id": "custom-3",
+      "provider_job_id": null,
+      "provider_endpoint": null,
+      "queued_at": "2026-10-30T07:22:06.805859+00:00",
+      "started_at": "2026-10-30T07:22:07.821557+00:00",
+      "finished_at": "2026-10-30T07:22:58.025228+00:00"
+    }
+  },
+  "E1S02-storyboard": {
+    "submission": {
+      "success": true,
+      "task_id": "5b47e8e3e2b7415d9457295d6e4a1475",
+      "deduped": false,
+      "message": "分镜「E1S02」生成任务已提交"
+    },
+    "request": {
+      "script_file": "episode_1.json",
+      "prompt": "Close-up of female hands opening a silver laptop on a clean wooden desk beside a white ceramic coffee cup, modern office in Ho Chi Minh City, warm golden morning sunlight through tall windows, cinematic realistic photography, vertical composition, screen blank, no letters, no text, no watermark."
+    },
+    "task": {
+      "task_id": "5b47e8e3e2b7415d9457295d6e4a1475",
+      "task_type": "storyboard",
+      "resource_id": "E1S02",
+      "status": "succeeded",
+      "result": {
+        "version": 1,
+        "file_path": "storyboards/scene_E1S02.png",
+        "created_at": "2026-10-30T07:23:33Z",
+        "resource_type": "storyboards",
+        "resource_id": "E1S02"
+      },
+      "error_message": null,
+      "provider_id": "custom-3",
+      "provider_job_id": null,
+      "provider_endpoint": null,
+      "queued_at": "2026-10-30T07:23:02.859384+00:00",
+      "started_at": "2026-10-30T07:23:03.432750+00:00",
+      "finished_at": "2026-10-30T07:23:33.514285+00:00"
+    }
+  },
+  "E1S03-storyboard": {
+    "submission": {
+      "success": true,
+      "task_id": "72b4207f2c9040388818d02bd79cbe05",
+      "deduped": false,
+      "message": "分镜「E1S03」生成任务已提交"
+    },
+    "request": {
+      "script_file": "episode_1.json",
+      "prompt": "A Vietnamese office worker seen from behind in a simple white blouse, standing beside a tall office window looking at the sunlit Ho Chi Minh City skyline, shoulder-length straight black hair, warm golden morning sunlight, cinematic realistic photography, calm hopeful atmosphere, vertical composition, no letters, no text, no watermark."
+    },
+    "task": {
+      "task_id": "72b4207f2c9040388818d02bd79cbe05",
+      "task_type": "storyboard",
+      "resource_id": "E1S03",
+      "status": "succeeded",
+      "result": {
+        "version": 1,
+        "file_path": "storyboards/scene_E1S03.png",
+        "created_at": "2026-10-30T07:24:00Z",
+        "resource_type": "storyboards",
+        "resource_id": "E1S03"
+      },
+      "error_message": null,
+      "provider_id": "custom-3",
+      "provider_job_id": null,
+      "provider_endpoint": null,
+      "queued_at": "2026-10-30T07:23:34.892132+00:00",
+      "started_at": "2026-10-30T07:23:35.817173+00:00",
+      "finished_at": "2026-10-30T07:24:00.891663+00:00"
+    }
+  },
+  "E1S01-tts": {
+    "submission": {
+      "success": true,
+      "task_id": "c79cdadb4e994c24b358a04d2703ad20",
+      "deduped": false,
+      "message": "旁白配音「E1S01」生成任务已提交"
+    },
+    "request": {
+      "script_file": "episode_1.json"
+    },
+    "task": {
+      "task_id": "c79cdadb4e994c24b358a04d2703ad20",
+      "task_type": "tts",
+      "resource_id": "E1S01",
+      "status": "succeeded",
+      "result": {
+        "version": 1,
+        "file_path": "audio/segment_E1S01.wav",
+        "created_at": "2026-10-30T07:24:10Z",
+        "resource_type": "audio",
+        "resource_id": "E1S01",
+        "duration_seconds": 1.44,
+        "tts_basis_digest": "sha256-v1:e67739ad91062440af659024890d94bb5e8d1c895f8dd8cf31ee20be11ffd690",
+        "selected_current": true
+      },
+      "error_message": null,
+      "provider_id": "custom-2",
+      "provider_job_id": null,
+      "provider_endpoint": null,
+      "queued_at": "2026-10-30T07:24:06.941805+00:00",
+      "started_at": "2026-10-30T07:24:07.191041+00:00",
+      "finished_at": "2026-10-30T07:24:10.546766+00:00"
+    }
+  },
+  "E1S02-tts": {
+    "submission": {
+      "success": true,
+      "task_id": "c07717d0ef0b48cd85878e1639ba94fc",
+      "deduped": false,
+      "message": "旁白配音「E1S02」生成任务已提交"
+    },
+    "request": {
+      "script_file": "episode_1.json"
+    },
+    "task": {
+      "task_id": "c07717d0ef0b48cd85878e1639ba94fc",
+      "task_type": "tts",
+      "resource_id": "E1S02",
+      "status": "succeeded",
+      "result": {
+        "version": 1,
+        "file_path": "audio/segment_E1S02.wav",
+        "created_at": "2026-10-30T07:24:16Z",
+        "resource_type": "audio",
+        "resource_id": "E1S02",
+        "duration_seconds": 1.52,
+        "tts_basis_digest": "sha256-v1:e192f507eb96e91e281468d73eca197c41d2ff62c54c8631882b1238e0d688b1",
+        "selected_current": true
+      },
+      "error_message": null,
+      "provider_id": "custom-2",
+      "provider_job_id": null,
+      "provider_endpoint": null,
+      "queued_at": "2026-10-30T07:24:14.964274+00:00",
+      "started_at": "2026-10-30T07:24:15.376144+00:00",
+      "finished_at": "2026-10-30T07:24:16.406322+00:00"
+    }
+  },
+  "E1S03-tts": {
+    "submission": {
+      "success": true,
+      "task_id": "b05607d2afd34e17a559a9b0afa5a4d2",
+      "deduped": false,
+      "message": "旁白配音「E1S03」生成任务已提交"
+    },
+    "request": {
+      "script_file": "episode_1.json"
+    },
+    "task": {
+      "task_id": "b05607d2afd34e17a559a9b0afa5a4d2",
+      "task_type": "tts",
+      "resource_id": "E1S03",
+      "status": "succeeded",
+      "result": {
+        "version": 1,
+        "file_path": "audio/segment_E1S03.wav",
+        "created_at": "2026-10-30T07:24:24Z",
+        "resource_type": "audio",
+        "resource_id": "E1S03",
+        "duration_seconds": 1.12,
+        "tts_basis_digest": "sha256-v1:6b2fd8ca5390aa7b0cf4a533c0a214a1956ff054d5a1df6114d7f7f62460ea26",
+        "selected_current": true
+      },
+      "error_message": null,
+      "provider_id": "custom-2",
+      "provider_job_id": null,
+      "provider_endpoint": null,
+      "queued_at": "2026-10-30T07:24:22.986404+00:00",
+      "started_at": "2026-10-30T07:24:23.522814+00:00",
+      "finished_at": "2026-10-30T07:24:24.172814+00:00"
+    }
+  },
+  "E1S01-video": {
+    "submission": {
+      "success": true,
+      "task_id": "b514a7c9dd3e42f389059fbe4473f32c",
+      "deduped": false,
+      "message": "视频「E1S01」生成任务已提交"
+    },
+    "request": {
+      "script_file": "episode_1.json",
+      "prompt": "Warm morning sunlight slowly brightens the quiet office desk, a gentle cinematic camera push in, subtle drifting dust in the sunbeam, keep the desk and objects stable, realistic, no text.",
+      "duration_seconds": 2,
+      "seed": 20261031,
+      "narration_delivery": "post_production",
+      "idempotency_key": "local-media-3scene-20261030-E1S01"
+    },
+    "task": {
+      "task_id": "b514a7c9dd3e42f389059fbe4473f32c",
+      "task_type": "video",
+      "resource_id": "E1S01",
+      "status": "succeeded",
+      "result": {
+        "version": 1,
+        "file_path": "videos/scene_E1S01.mp4",
+        "created_at": "2026-10-30T07:29:32Z",
+        "resource_type": "videos",
+        "resource_id": "E1S01",
+        "video_uri": "http://127.0.0.1:8188/view?filename=ArcReel-Wan22-5B_00003_.mp4&subfolder=video&type=output"
+      },
+      "error_message": null,
+      "provider_id": "custom-3",
+      "provider_job_id": "b530816a-4d80-44e3-8dd0-62e8993387fa",
+      "provider_endpoint": "ce-2",
+      "queued_at": "2026-10-30T07:24:31.061668+00:00",
+      "started_at": "2026-10-30T07:24:31.664818+00:00",
+      "finished_at": "2026-10-30T07:29:32.891209+00:00"
+    }
+  },
+  "E1S02-video": {
+    "submission": {
+      "success": true,
+      "task_id": "9ec58f18150147f48bb655162d365d37",
+      "deduped": false,
+      "message": "视频「E1S02」生成任务已提交"
+    },
+    "request": {
+      "script_file": "episode_1.json",
+      "prompt": "The hands gently finish opening the laptop and rest on the keyboard, tiny natural finger movement, light steam rising from the coffee cup, slow camera push in, preserve object shapes, realistic, no text.",
+      "duration_seconds": 2,
+      "seed": 20261032,
+      "narration_delivery": "post_production",
+      "idempotency_key": "local-media-3scene-20261030-E1S02"
+    },
+    "task": {
+      "task_id": "9ec58f18150147f48bb655162d365d37",
+      "task_type": "video",
+      "resource_id": "E1S02",
+      "status": "succeeded",
+      "result": {
+        "version": 1,
+        "file_path": "videos/scene_E1S02.mp4",
+        "created_at": "2026-10-30T07:34:01Z",
+        "resource_type": "videos",
+        "resource_id": "E1S02",
+        "video_uri": "http://127.0.0.1:8188/view?filename=ArcReel-Wan22-5B_00004_.mp4&subfolder=video&type=output"
+      },
+      "error_message": null,
+      "provider_id": "custom-3",
+      "provider_job_id": "31328983-2179-4861-b336-b26b1a9b8d43",
+      "provider_endpoint": "ce-2",
+      "queued_at": "2026-10-30T07:29:35.327704+00:00",
+      "started_at": "2026-10-30T07:29:36.034764+00:00",
+      "finished_at": "2026-10-30T07:34:01.546650+00:00"
+    }
+  },
+  "E1S03-video": {
+    "submission": {
+      "success": true,
+      "task_id": "2f2f2f80e64c47da9b4715a09cd26587",
+      "deduped": false,
+      "message": "视频「E1S03」生成任务已提交"
+    },
+    "request": {
+      "script_file": "episode_1.json",
+      "prompt": "The woman takes a calm breath and slightly turns her head toward the sunrise, subtle natural movement of her hair, slow cinematic camera push in, stable office skyline, realistic, no text.",
+      "duration_seconds": 2,
+      "seed": 20261033,
+      "narration_delivery": "post_production",
+      "idempotency_key": "local-media-3scene-20261030-E1S03"
+    },
+    "task": {
+      "task_id": "2f2f2f80e64c47da9b4715a09cd26587",
+      "task_type": "video",
+      "resource_id": "E1S03",
+      "status": "succeeded",
+      "result": {
+        "version": 1,
+        "file_path": "videos/scene_E1S03.mp4",
+        "created_at": "2026-10-30T07:38:33Z",
+        "resource_type": "videos",
+        "resource_id": "E1S03",
+        "video_uri": "http://127.0.0.1:8188/view?filename=ArcReel-Wan22-5B_00005_.mp4&subfolder=video&type=output"
+      },
+      "error_message": null,
+      "provider_id": "custom-3",
+      "provider_job_id": "82fa4045-4b92-4055-b9bb-fd0045086a2f",
+      "provider_endpoint": "ce-2",
+      "queued_at": "2026-10-30T07:34:07.550983+00:00",
+      "started_at": "2026-10-30T07:34:08.084280+00:00",
+      "finished_at": "2026-10-30T07:38:33.610048+00:00"
+    }
+  }
+}

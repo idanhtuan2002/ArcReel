@@ -1,0 +1,29 @@
+[
+  {
+    "file": "segment_E1S01.wav",
+    "duration_s": 1.44,
+    "sample_rate": 48000,
+    "channels": 1,
+    "peak_dbfs": -6.534927736825786,
+    "rms_dbfs": -19.018536487374305,
+    "clipped_samples": 0
+  },
+  {
+    "file": "segment_E1S02.wav",
+    "duration_s": 1.52,
+    "sample_rate": 48000,
+    "channels": 1,
+    "peak_dbfs": -5.6328373847037225,
+    "rms_dbfs": -19.280343706264343,
+    "clipped_samples": 0
+  },
+  {
+    "file": "segment_E1S03.wav",
+    "duration_s": 1.12,
+    "sample_rate": 48000,
+    "channels": 1,
+    "peak_dbfs": -6.865700428375227,
+    "rms_dbfs": -19.152763129205457,
+    "clipped_samples": 0
+  }
+]

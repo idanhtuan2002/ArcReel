@@ -1,0 +1,54 @@
+{
+  "title": "Buổi sáng bắt đầu",
+  "episode": 1,
+  "content_mode": "narration",
+  "novel": {
+    "title": "Buổi sáng bắt đầu",
+    "chapter": "Episode 1"
+  },
+  "segments": [
+    {
+      "segment_id": "E1S01",
+      "duration_seconds": 2,
+      "segment_break": true,
+      "novel_text": "Nắng mai khẽ lên.",
+      "characters_in_segment": [],
+      "scenes": [],
+      "props": [],
+      "image_prompt": "A quiet modern office in Ho Chi Minh City at sunrise, warm golden sunlight through tall windows, a clean wooden desk with a closed silver laptop and a white ceramic coffee cup, cinematic realistic photography, soft shadows, vertical composition, no people, no letters, no text, no watermark.",
+      "video_prompt": "Warm morning sunlight slowly brightens the quiet office desk, a gentle cinematic camera push in, subtle drifting dust in the sunbeam, keep the desk and objects stable, realistic, no text.",
+      "transition_to_next": "cut",
+      "generated_assets": {}
+    },
+    {
+      "segment_id": "E1S02",
+      "duration_seconds": 2,
+      "segment_break": true,
+      "novel_text": "Một ngày mới đến.",
+      "characters_in_segment": [],
+      "scenes": [],
+      "props": [],
+      "image_prompt": "Close-up of female hands opening a silver laptop on a clean wooden desk beside a white ceramic coffee cup, modern office in Ho Chi Minh City, warm golden morning sunlight through tall windows, cinematic realistic photography, vertical composition, screen blank, no letters, no text, no watermark.",
+      "video_prompt": "The hands gently finish opening the laptop and rest on the keyboard, tiny natural finger movement, light steam rising from the coffee cup, slow camera push in, preserve object shapes, realistic, no text.",
+      "transition_to_next": "cut",
+      "generated_assets": {}
+    },
+    {
+      "segment_id": "E1S03",
+      "duration_seconds": 2,
+      "segment_break": true,
+      "novel_text": "Bắt đầu thôi.",
+      "characters_in_segment": [],
+      "scenes": [],
+      "props": [],
+      "image_prompt": "A Vietnamese office worker seen from behind in a simple white blouse, standing beside a tall office window looking at the sunlit Ho Chi Minh City skyline, shoulder-length straight black hair, warm golden morning sunlight, cinematic realistic photography, calm hopeful atmosphere, vertical composition, no letters, no text, no watermark.",
+      "video_prompt": "The woman takes a calm breath and slightly turns her head toward the sunrise, subtle natural movement of her hair, slow cinematic camera push in, stable office skyline, realistic, no text.",
+      "transition_to_next": "cut",
+      "generated_assets": {}
+    }
+  ],
+  "metadata": {
+    "generator": "operator-authored local media smoke fixture",
+    "status": "draft"
+  }
+}

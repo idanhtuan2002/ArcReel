@@ -1,0 +1,9 @@
+{
+  "task_id": "b654a515492741bda4a845db291675e6",
+  "status": "failed",
+  "error_message": "episode script is not registered: scripts/episode_1.json",
+  "provider_id": "custom-3",
+  "provider_job_id": null,
+  "started_at": "2026-10-30T07:18:24.310629+00:00",
+  "finished_at": "2026-10-30T07:18:24.345077+00:00"
+}

@@ -1,0 +1,30 @@
+{
+  "path": "/mnt/arcreel/D/ArcReel/media/exports/buoi-sang-bat-dau-20261030/Buoi-sang-bat-dau-editable-draft.zip",
+  "bytes": 1549760,
+  "sha256": "e20963e94bc337860734796cc36d67fc9c5400f2ded59185e34ce15dc73726bb",
+  "entries": [
+    "Local media proof 2026-10-30_第1集/draft_info.json",
+    "Local media proof 2026-10-30_第1集/draft_meta_info.json",
+    "Local media proof 2026-10-30_第1集/assets/E1S01_v1_20261030T142932.mp4",
+    "Local media proof 2026-10-30_第1集/assets/E1S01_v1_20261030T142410.wav",
+    "Local media proof 2026-10-30_第1集/assets/E1S02_v1_20261030T143401.mp4",
+    "Local media proof 2026-10-30_第1集/assets/E1S02_v1_20261030T142416.wav",
+    "Local media proof 2026-10-30_第1集/assets/E1S03_v1_20261030T143833.mp4",
+    "Local media proof 2026-10-30_第1集/assets/E1S03_v1_20261030T142424.wav"
+  ],
+  "duration_us": 6125001,
+  "tracks": [
+    {
+      "type": "video",
+      "segments": 3
+    },
+    {
+      "type": "audio",
+      "segments": 3
+    },
+    {
+      "type": "text",
+      "segments": 3
+    }
+  ]
+}

@@ -1,0 +1,65 @@
+[
+  {
+    "key": "E1S01-storyboard",
+    "task_id": "f54abc5a704a41239487763d6db340e4",
+    "provider_id": "custom-3",
+    "status": "succeeded",
+    "worker_seconds": 50.204
+  },
+  {
+    "key": "E1S02-storyboard",
+    "task_id": "5b47e8e3e2b7415d9457295d6e4a1475",
+    "provider_id": "custom-3",
+    "status": "succeeded",
+    "worker_seconds": 30.082
+  },
+  {
+    "key": "E1S03-storyboard",
+    "task_id": "72b4207f2c9040388818d02bd79cbe05",
+    "provider_id": "custom-3",
+    "status": "succeeded",
+    "worker_seconds": 25.074
+  },
+  {
+    "key": "E1S01-tts",
+    "task_id": "c79cdadb4e994c24b358a04d2703ad20",
+    "provider_id": "custom-2",
+    "status": "succeeded",
+    "worker_seconds": 3.356
+  },
+  {
+    "key": "E1S02-tts",
+    "task_id": "c07717d0ef0b48cd85878e1639ba94fc",
+    "provider_id": "custom-2",
+    "status": "succeeded",
+    "worker_seconds": 1.03
+  },
+  {
+    "key": "E1S03-tts",
+    "task_id": "b05607d2afd34e17a559a9b0afa5a4d2",
+    "provider_id": "custom-2",
+    "status": "succeeded",
+    "worker_seconds": 0.65
+  },
+  {
+    "key": "E1S01-video",
+    "task_id": "b514a7c9dd3e42f389059fbe4473f32c",
+    "provider_id": "custom-3",
+    "status": "succeeded",
+    "worker_seconds": 301.226
+  },
+  {
+    "key": "E1S02-video",
+    "task_id": "9ec58f18150147f48bb655162d365d37",
+    "provider_id": "custom-3",
+    "status": "succeeded",
+    "worker_seconds": 265.512
+  },
+  {
+    "key": "E1S03-video",
+    "task_id": "2f2f2f80e64c47da9b4715a09cd26587",
+    "provider_id": "custom-3",
+    "status": "succeeded",
+    "worker_seconds": 265.526
+  }
+]
