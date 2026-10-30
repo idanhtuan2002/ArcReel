@@ -629,6 +629,18 @@ _Avoid_: 与公开端点混为一谈。
 
 ### V1 发布与 V2 演进
 
+**制作运行（Production run）**：
+围绕一个明确输入与目标成片集合的一次持续制作过程，关联各阶段的产物、决策与完成条件；技术任务结束不等于制作运行成功。
+_Avoid_: Agent 会话、单个生成任务、影片存在即完成。
+
+**自动化委托（Automation grant）**：
+有相应资格的项目 Showrunner 授予特定自动化主体、仅适用于某次制作运行及其政策范围的决策能力；它不把自动化主体变成人类，也不默认授予外部发布权限。
+_Avoid_: 管理员登录、API Key、Human Showrunner grant、无限审批权。
+
+**自动化决定（Automation decision）**：
+自动化主体依照有效委托与确切证据作出的决定；它保留真实主体与来源，不等于人类已查看或认可作品。
+_Avoid_: 人工审批、模型自报成功、免除质量标准。
+
 **Human Showrunner grant**：
 Governance 对某个确切项目和已认证的人类主体授予的创作决策能力；它与登录身份、Host 管理员角色及 API Key 分开。
 _Avoid_: 把已登录、管理员或单人部署直接称为拥有 Showrunner grant。
