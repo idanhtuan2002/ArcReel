@@ -43,7 +43,19 @@ RESTART_FAULTS = frozenset(
     }
 )
 _UID = {"application": 31002, "issuer": 31001}
-# The runtime sources every worker must have sealed; the full tree is bound through the runner manifest.
+# The worker export (tests/integration/r2/opportunity/test_acquisition_v2_restarts.py): tracked Python under these
+# roots plus these files; every worker seal must be exactly this inventory of the tested tree.
+WORKER_EXPORT_ROOTS = ("lib/", "r2/", "server/", "scripts/", "tests/fixtures/")
+WORKER_EXPORT_FILES = frozenset(
+    {
+        "uv.lock",
+        "pyproject.toml",
+        "tests/fixtures/r2/opportunity/manual_import.json",
+        "tests/fixtures/r2/opportunity/manual_recovery_restarts.json",
+        "tests/integration/r2/opportunity/test_acquisition_v2_restarts.py",
+    }
+)
+# Runtime sources every worker seal must name; a subset of the export inventory.
 RUNTIME_SEALED = frozenset(
     {
         "r2/opportunity/acquisition_v2.py",
@@ -58,9 +70,16 @@ def _sha(raw: bytes) -> str:
     return hashlib.sha256(raw).hexdigest()
 
 
-def _record_problems(
-    case: Mapping[str, Any], raw: Mapping[str, bytes], manifest_hashes: Mapping[str, str]
-) -> list[str]:
+def worker_export(tree: Mapping[str, str]) -> dict[str, str]:
+    """The exact source inventory the restart worker export seals, taken from the tested tree."""
+    return {
+        path: digest
+        for path, digest in tree.items()
+        if (path.endswith(".py") and path.startswith(WORKER_EXPORT_ROOTS)) or path in WORKER_EXPORT_FILES
+    }
+
+
+def _record_problems(case: Mapping[str, Any], raw: Mapping[str, bytes], export: Mapping[str, str]) -> list[str]:
     """The runner's own per-case proof, re-derived: arrival and armed markers, kernel kill, fresh PIDs, source seal."""
     identity = case.get("case_id")
     uid = _UID.get(case.get("principal"))
@@ -104,9 +123,24 @@ def _record_problems(
         }
     )
     problems = [] if proven else [f"restart record does not prove a fresh-PID parent kill: {identity}"]
-    if not RUNTIME_SEALED.issubset(seal) or any(manifest_hashes.get(path) != digest for path, digest in seal.items()):
+    if not RUNTIME_SEALED.issubset(seal) or seal != export:
         problems.append(f"restart worker source seal differs from the tested code: {identity}")
     return problems
+
+
+def runner_argv(command: Sequence[str]) -> list[str]:
+    """The exact pytest argv the pinned runner builds for a recorded runner command (`run_recovery_gate`)."""
+    options = dict(zip(command[2::2], command[3::2], strict=False))
+    artifact_dir = options.get("--artifact-dir", "")
+    return [
+        command[0],
+        "-m",
+        "pytest",
+        *RUNNER_TESTS,
+        "-q",
+        "--basetemp=" + artifact_dir + "/pytest-temp",
+        "--junitxml=" + artifact_dir + "/junit.xml",
+    ]
 
 
 def restart_problems(document: Mapping[str, Any], view: RepoView, tested_head: str) -> list[str]:
@@ -153,7 +187,7 @@ def restart_problems(document: Mapping[str, Any], view: RepoView, tested_head: s
         "source_unchanged": True,
         "errors": [],
         "restart_cases": len(ids),
-        "argv": [manifest.get("argv", [""])[0], "-m", "pytest", *RUNNER_TESTS, *manifest.get("argv", [])[5:]],
+        "argv": runner_argv(result.argv),
     }
     if any(manifest.get(key) != value for key, value in expected.items()):
         problems.append("restart manifest does not record a clean PASS of every case at the tested HEAD")
@@ -162,6 +196,7 @@ def restart_problems(document: Mapping[str, Any], view: RepoView, tested_head: s
     except (*LOAD_ERRORS, OSError):
         return [*problems, "the tested code tree cannot be hashed"]
     manifest_hashes = manifest.get("source_hashes") or {}
+    export = worker_export(tree)
     if manifest_hashes != tree:
         problems.append("restart manifest source seal differs from the tested code tree")
     if manifest.get("log_sha256") != command["log"]["sha256"]:
@@ -196,7 +231,7 @@ def restart_problems(document: Mapping[str, Any], view: RepoView, tested_head: s
         except (KeyError, ValueError, OSError, TypeError):
             problems.append(f"restart record is not retained: {case.get('case_id')}")
             continue
-        problems.extend(_record_problems(case, raw, manifest_hashes))
+        problems.extend(_record_problems(case, raw, export))
         killed.append(loads_unique_json(raw["record"]).get("killed_pid"))
     if len(set(killed)) != len(killed):
         problems.append("restart cases reuse a killed process")

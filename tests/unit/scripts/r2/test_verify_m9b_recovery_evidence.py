@@ -82,10 +82,9 @@ def recovery_candidate():
             "result": result_ref,
         }
     )
-    tail = ["-q", "--basetemp=/tmp/m9b10r/pytest-temp", "--junitxml=/tmp/m9b10r/junit.xml"]
     manifest = {
         "schema": "m9-manual-recovery-gate.v1",
-        "argv": [PY, "-m", "pytest", *recovery.RUNNER_TESTS, *tail],
+        "argv": recovery.runner_argv(argv),
         "source_hashes": "PLACEHOLDER",
         "status": "PASS",
         "exit_code": 0,
@@ -139,7 +138,7 @@ def recovery_candidate():
             },
             "marker_sha256": sha(arrival),
             "armed_sha256": sha(armed),
-            "source_hashes": {path: sha(view.blobs[path]) for path in recovery.RUNTIME_SEALED},
+            "source_hashes": recovery.worker_export(view.tree_sha256(HEAD)),
         }
         base = ART + f"restarts/restarts/{case['case_id']}"
         records[case["case_id"]] = {
@@ -181,6 +180,19 @@ def _record(view, document, case_id, kind="record", **changes):
     ref = document["restart"]["records"][case_id][kind]
     body = json.loads(view.artifacts[ref["path"]]) | changes
     document["restart"]["records"][case_id][kind] = _put(view, document, ref["path"], json.dumps(body).encode())
+
+
+def _drop_seal_entry(view, document, case_id):
+    ref = document["restart"]["records"][case_id]["record"]
+    body = json.loads(view.artifacts[ref["path"]])
+    body["source_hashes"].pop(sorted(set(body["source_hashes"]) - recovery.RUNTIME_SEALED)[0])
+    document["restart"]["records"][case_id]["record"] = _put(view, document, ref["path"], json.dumps(body).encode())
+
+
+def _manifest_argv(view, document, *extra):
+    ref = document["restart"]["manifest"]
+    body = json.loads(view.artifacts[ref["path"]])
+    _manifest(view, document, argv=[*body["argv"], *extra])
 
 
 def _manifest(view, document, **changes):
@@ -225,6 +237,9 @@ def _manifest(view, document, **changes):
         (lambda v, d: _manifest(v, d, source_hashes={}), "manifest source seal differs"),
         (lambda v, d: _manifest(v, d, argv=[PY, "-m", "pytest", recovery.RUNNER_TESTS[1]]), "clean PASS"),
         (lambda v, d: _manifest(v, d, junit={"tests": 1}), "manifest JUnit count"),
+        (lambda v, d: _drop_seal_entry(v, d, "claim-after"), "worker source seal"),
+        (lambda v, d: _manifest_argv(v, d, "--collect-only"), "clean PASS"),
+        (lambda v, d: _manifest_argv(v, d, "-k", "DOES_NOT_EXIST"), "clean PASS"),
     ],
 )
 def test_incomplete_or_forged_restart_evidence_is_refused(mutate, expected):
