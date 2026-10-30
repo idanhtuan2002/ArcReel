@@ -393,3 +393,32 @@ async def test_expired_child_cannot_reuse_previously_admitted_decision(delegated
     with pytest.raises(PermissionError):
         async with sessions() as session, session.begin():
             await issuer.authority().require_locked(session, subject=subject)
+
+
+async def test_new_worker_reuses_original_decision_after_fresh_authority_check(delegated_host):
+    from lib.db.models.automation_grant import AutomationDecisionModel
+    from lib.db.models.production_run import ProductionRunModel
+    from lib.db.repositories.production_runs import ProductionRunRepository
+
+    issuer, sessions, _, grant, run, *_ = delegated_host
+    authority = issuer.authority()
+    original_subject = subject_for(run, grant)
+    async with sessions() as session, session.begin():
+        original = await authority.require_locked(session, subject=original_subject)
+    async with sessions() as session, session.begin():
+        await session.execute(
+            sa.update(ProductionRunModel)
+            .where(ProductionRunModel.run_id == run.run_id)
+            .values(lease_until=sa.func.clock_timestamp())
+        )
+    async with sessions() as session, session.begin():
+        current = await ProductionRunRepository(session).claim_due(owner_id="replacement", lease_seconds=30)
+    assert current.version > run.version
+    assert current.fencing_epoch > run.fencing_epoch
+    with pytest.raises(PermissionError):
+        async with sessions() as session, session.begin():
+            await authority.require_locked(session, subject=original_subject)
+    async with sessions() as session, session.begin():
+        replay = await authority.require_locked(session, subject=subject_for(current, grant))
+        assert replay == original
+        assert await session.scalar(sa.select(sa.func.count()).select_from(AutomationDecisionModel)) == 1

@@ -150,9 +150,11 @@ class AutomationGrantRepository:
         row = await self.session.get(AutomationDecisionModel, key)
         if row is not None:
             stored = AutomationAuthorizationV1.model_validate_json(row.authorization_json)
+            # Claim version is fresh admission state, separate from durable command identity.
             if (
-                stored.subject != subject
-                or stored.request_digest != authorization_subject_digest(subject)
+                stored.subject.model_dump(exclude={"expected_run_version"})
+                != subject.model_dump(exclude={"expected_run_version"})
+                or stored.request_digest != authorization_subject_digest(stored.subject)
                 or (stored.principal, stored.parent_sequence, stored.parent_event_digest)
                 != (authorization.principal, authorization.parent_sequence, authorization.parent_event_digest)
                 or (row.grant_id, row.grant_version) != (subject.grant_id, subject.grant_version)
