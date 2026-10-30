@@ -1,0 +1,223 @@
+{
+  "captured_at": "2026-10-30T08:59:15.032704+00:00",
+  "deployed_head": "0cef69a772f1d2946e452b918a8839b0f37fd2d9",
+  "health": {
+    "status": "ok",
+    "message": "视频项目管理 WebUI 运行正常"
+  },
+  "selected_defaults": {
+    "default_text_backend": "gemini-aistudio/gemini-3.8-flash",
+    "default_image_backend": "custom-3/flux2-klein-4b-gguf",
+    "default_video_backend": "custom-3/wan2.2-ti2v-5b-gguf",
+    "default_audio_backend": "custom-2/vieneu-tts-v3-turbo",
+    "video_generate_audio": false
+  },
+  "api_route_families": {
+    "/opportun": [],
+    "/distribution": [],
+    "/analytics": [],
+    "/quality/": [
+      "/api/v1/projects/{project_name}/quality/template",
+      "/api/v1/projects/{project_name}/quality/profiles",
+      "/api/v1/projects/{project_name}/quality/profiles/{profile_id}/revisions",
+      "/api/v1/projects/{project_name}/quality/profiles/{profile_id}/revisions/{revision}",
+      "/api/v1/projects/{project_name}/quality/masters",
+      "/api/v1/projects/{project_name}/quality/probes",
+      "/api/v1/projects/{project_name}/quality/session",
+      "/api/v1/projects/{project_name}/quality/observations",
+      "/api/v1/projects/{project_name}/quality/runs",
+      "/api/v1/projects/{project_name}/quality/runs/{run_id}",
+      "/api/v1/projects/{project_name}/quality/profiles/prepare",
+      "/api/v1/projects/{project_name}/quality/probes/prepare",
+      "/api/v1/projects/{project_name}/quality/reviews/prepare",
+      "/api/v1/projects/{project_name}/quality/reviews",
+      "/api/v1/projects/{project_name}/quality/runs/prepare",
+      "/api/v1/projects/{project_name}/quality/dispositions/prepare",
+      "/api/v1/projects/{project_name}/quality/dispositions"
+    ],
+    "/packaging/": [
+      "/api/v1/projects/{project_name}/packaging/revisions",
+      "/api/v1/projects/{project_name}/packaging/checks",
+      "/api/v1/projects/{project_name}/packaging/previews",
+      "/api/v1/projects/{project_name}/packaging/selections",
+      "/api/v1/projects/{project_name}/packaging/exports",
+      "/api/v1/projects/{project_name}/packaging/slot",
+      "/api/v1/projects/{project_name}/packaging/exports/{archive_hex}/archive"
+    ],
+    "/m8/learning/": [
+      "/api/v1/projects/{project_name}/m8/learning/observations",
+      "/api/v1/projects/{project_name}/m8/learning/recommendations/evaluate",
+      "/api/v1/projects/{project_name}/m8/learning/recommendations",
+      "/api/v1/projects/{project_name}/m8/learning/recommendations/{recommendation_id}/decisions"
+    ]
+  },
+  "projects": {
+    "du-an-01-649c62c1": {
+      "title": "du an 01",
+      "content_mode": "narration",
+      "generation_mode": "storyboard",
+      "source_language": "vi",
+      "status": {
+        "schema_version": 1,
+        "phase": "preparation",
+        "phase_progress": 0.0,
+        "needs_repair": false,
+        "repair_reason": null,
+        "assets": {
+          "character": {
+            "total": 0,
+            "available": 0,
+            "stale": 0
+          },
+          "scene": {
+            "total": 0,
+            "available": 0,
+            "stale": 0
+          },
+          "prop": {
+            "total": 0,
+            "available": 0,
+            "stale": 0
+          },
+          "product": {
+            "total": 0,
+            "available": 0,
+            "stale": 0
+          }
+        },
+        "episodes_summary": {
+          "total": 18,
+          "scripted": 0,
+          "in_production": 0,
+          "completed": 0
+        }
+      },
+      "episode_count": 18,
+      "quality_profile_count": 0,
+      "quality_master_count": 1,
+      "story_runs": [
+        {
+          "run_id": "story-3a2677609aa637e122cc8c45",
+          "phase": "BLOCKED_QUALITY",
+          "block_reason": "OUTCOME_UNKNOWN at chapter_review[1]@r0.2.0#3: cloud request outcome or usage is unknown",
+          "usage": {
+            "count_calls": 35,
+            "generate_calls": 35,
+            "input_tokens": 146146,
+            "output_tokens": 104450,
+            "model_milliseconds": 1463309
+          },
+          "handoff": null,
+          "writer_selection": {
+            "provider_id": "gemini-aistudio",
+            "endpoint": "gemini-generate",
+            "base_url": "https://generativelanguage.googleapis.com",
+            "model_id": "gemini-3.8-flash",
+            "has_credential": true,
+            "config_digest": "sha256:d94c03145e99f9eee2ea3383ca68fc3e3c6503197462656c2b58d24280f1ca63"
+          },
+          "judge_selection": {
+            "provider_id": "gemini-aistudio",
+            "endpoint": "gemini-generate",
+            "base_url": "https://generativelanguage.googleapis.com",
+            "model_id": "gemini-3.6-flash",
+            "has_credential": true,
+            "config_digest": "sha256:3c6fe1878a126ddc81880a86dfd4eca978062a59e167d6899b22960f1b450107"
+          }
+        },
+        {
+          "run_id": "story-4deffd4b0bd4c61599322c61",
+          "phase": "COMMITTED",
+          "block_reason": null,
+          "usage": {
+            "count_calls": 133,
+            "generate_calls": 133,
+            "input_tokens": 941656,
+            "output_tokens": 90891,
+            "model_milliseconds": 18352874
+          },
+          "handoff": {
+            "command_id": "handoff-0708d42988374e9f97a7ef5116f48d10",
+            "filename": "do-cuoi-song.md",
+            "export_digest": "sha256:f947c2d722c29da230abab6ce920cfab058717e0e2d62abcc61dee41c08b51a5",
+            "done": true,
+            "path": "source/do-cuoi-song.txt",
+            "upload_claim": null,
+            "upload_claimed_at": null
+          },
+          "writer_selection": {
+            "provider_id": "custom-1",
+            "endpoint": "ollama-chat",
+            "base_url": "http://localhost:11434",
+            "model_id": "qwen3.5-vimax:9b",
+            "has_credential": false,
+            "config_digest": "sha256:888558f86340ca754b672804f3ac393c0bd1eee02fd790bba6822a3fb8bcb7cb"
+          },
+          "judge_selection": {
+            "provider_id": "custom-1",
+            "endpoint": "ollama-chat",
+            "base_url": "http://localhost:11434",
+            "model_id": "gemma3:12b",
+            "has_credential": false,
+            "config_digest": "sha256:6bd6fac879be9d74e5df9cbcea6458837e071c01bc63185a137e15d359200f29"
+          }
+        }
+      ],
+      "gate_history_shape": {
+        "greenlight": 3,
+        "script_lock": 1,
+        "publish_approval": 2
+      }
+    },
+    "local-media-proof-2026-1-f4bd3cf4": {
+      "title": "Local media proof 2026-10-30",
+      "content_mode": "narration",
+      "generation_mode": "storyboard",
+      "source_language": null,
+      "status": {
+        "schema_version": 1,
+        "phase": "preparation",
+        "phase_progress": 0.0,
+        "needs_repair": false,
+        "repair_reason": null,
+        "assets": {
+          "character": {
+            "total": 1,
+            "available": 1,
+            "stale": 0
+          },
+          "scene": {
+            "total": 0,
+            "available": 0,
+            "stale": 0
+          },
+          "prop": {
+            "total": 0,
+            "available": 0,
+            "stale": 0
+          },
+          "product": {
+            "total": 0,
+            "available": 0,
+            "stale": 0
+          }
+        },
+        "episodes_summary": {
+          "total": 1,
+          "scripted": 1,
+          "in_production": 0,
+          "completed": 1
+        }
+      },
+      "episode_count": 1,
+      "quality_profile_count": 0,
+      "quality_master_count": 0,
+      "story_runs": [],
+      "gate_history_shape": {
+        "greenlight": 0,
+        "script_lock": 0,
+        "publish_approval": 0
+      }
+    }
+  }
+}
