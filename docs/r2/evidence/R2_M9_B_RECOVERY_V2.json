@@ -2,8 +2,8 @@
   "schema_version": "1",
   "status": "M9_B_RECOVERY_V2_CANDIDATE",
   "packet": "M9-B-RECOVERY-V2",
-  "tested_head": "92081cbf83b3e07d4e062c83a5d211dcba27ed98",
-  "tested_parent": "3ab0d7112148896ac89d94cd7f93cbbcf4d0c01c",
+  "tested_head": "062f8760335d823f2d6b0bd42026234aa6468981",
+  "tested_parent": "696b41af90c893c650c5d7523b2f2e2ca45cfec0",
   "branch": "impl/r2-m9b-acquisition-observations",
   "releases": {
     "docs/r2/evidence/R2_M9_B_PACKET_RELEASE.json": "ba61ad5085fbfc4a786f4de9dae055b10a578afc0691ed9610f2b7ed00fd365e",
@@ -39,7 +39,7 @@
     "r2/opportunity/normalization.py": "d613354f237076541c1c4185f1de996c4404478c3466d3977a539be836428630",
     "scripts/r2/run_m9b_recovery_gate.py": "d629eaeca363574d511e8aed15ce7929dd81a173da690052d85c1c0190f0cb52",
     "scripts/r2/verify_m9b_evidence.py": "369bc99aa2c6f25b1e0ed166fd6d80305e0e402d5a6db43942081aca02e0ab51",
-    "scripts/r2/verify_m9b_recovery_evidence.py": "865884082320e1c5598a52da1999b547cdc5e51c2bc41c3376340fced4d88636",
+    "scripts/r2/verify_m9b_recovery_evidence.py": "251ec39c5b716f079fa374de139eec33a737936fd3340fe82d3cc1e432360412",
     "scripts/r2/verify_m9b_recovery_scope.py": "f78b2fc0a125713f3162b71aa7ce0e92a42900c108775277feac4c1210c7451d",
     "scripts/r2/verify_m9b_scope.py": "1e904b6774994f1a690294a2111309212476f7b4937fa9d1fc6960402b4ba380",
     "server/app.py": "c6b56dab688769e5fc7ae2a6c63485b0aed05b581cfd434adc964901ddf83c03",
@@ -87,7 +87,7 @@
     "tests/unit/scripts/r2/test_run_m9b_recovery_gate.py": "da27a3abe304e2edb4ffc337eb3d9529640e0ab2315ae634866b77e84d8e8c07",
     "tests/unit/scripts/r2/test_verify_m9_scope.py": "428efe19550588b719b0f36fb833883fba04e31b5a6cf05244d55036431d9dd5",
     "tests/unit/scripts/r2/test_verify_m9b_evidence.py": "c55d180e3d84fcaf9b7e70145461925cc2a25bad3fe6c320d9d7d853f1d41e4c",
-    "tests/unit/scripts/r2/test_verify_m9b_recovery_evidence.py": "2d4ba832d4e93882993dbb86a29fe83d65f033aa6d1cc21d9508f85f8c28b9d9",
+    "tests/unit/scripts/r2/test_verify_m9b_recovery_evidence.py": "604817d08cb6acac7c2abb819cb07661c605246196300f8754ae6f85668a09e8",
     "tests/unit/scripts/r2/test_verify_m9b_scope.py": "f77d66330b8652fcb83d4e4061c5d009f7ba0e0d45eafca091925c745ae5eb41",
     "tests/unit/server/routers/test_opportunity_acquisition_router.py": "63123cc689f0fa5613df1446c9545877d15db11b2b983c40e0ab5125ee1711de",
     "tests/unit/server/services/test_m9_manual_authenticity.py": "1b1df08d71a158c512293fa85b5ca0e018f2b7b71a5900260381f50ad3b6f974"
@@ -97,7 +97,7 @@
       "gate": "audit",
       "command": "/home/anhtuan/content-production-os/.worktrees/r2-v2-main/.venv/bin/python scripts/audit_tests.py --check",
       "exit": 0,
-      "tested_head": "92081cbf83b3e07d4e062c83a5d211dcba27ed98",
+      "tested_head": "062f8760335d823f2d6b0bd42026234aa6468981",
       "passed": 0,
       "skipped": 0,
       "log": {
@@ -106,14 +106,14 @@
       },
       "result": {
         "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/audit.result.json",
-        "sha256": "f85360161a27b29763f364f1201b49f62f16cd5f9c3323252ed4952b01c6872d"
+        "sha256": "c47be9c4c4cd13f0997f86faaa1aa16c5723bd338c2300534e727ec05ce51621"
       }
     },
     {
       "gate": "dependencies",
       "command": "/home/anhtuan/content-production-os/.worktrees/r2-v2-main/.venv/bin/deptry lib server alembic scripts tests r2",
       "exit": 0,
-      "tested_head": "92081cbf83b3e07d4e062c83a5d211dcba27ed98",
+      "tested_head": "062f8760335d823f2d6b0bd42026234aa6468981",
       "passed": 0,
       "skipped": 0,
       "log": {
@@ -122,14 +122,14 @@
       },
       "result": {
         "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/dependencies.result.json",
-        "sha256": "d1cdec926e14e4926550264c9a5db076832ccfd1e2c73e99a1935b9841064dfe"
+        "sha256": "6f210d14bc577b108b38148695429cee7854fb754fe3cadac637a14d8650e25f"
       }
     },
     {
       "gate": "diff",
       "command": "git diff --check",
       "exit": 0,
-      "tested_head": "92081cbf83b3e07d4e062c83a5d211dcba27ed98",
+      "tested_head": "062f8760335d823f2d6b0bd42026234aa6468981",
       "passed": 0,
       "skipped": 0,
       "log": {
@@ -138,14 +138,14 @@
       },
       "result": {
         "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/diff.result.json",
-        "sha256": "50e07d2c3c1260dab70c7031790a22cd3d0b09ff22417ba5a3c4a5151767ec9f"
+        "sha256": "43b61ea18110646142ee117d77ebe911a83b59509137731de149e5c0c31223ae"
       }
     },
     {
       "gate": "format",
       "command": "/home/anhtuan/content-production-os/.worktrees/r2-v2-main/.venv/bin/ruff format --check .",
       "exit": 0,
-      "tested_head": "92081cbf83b3e07d4e062c83a5d211dcba27ed98",
+      "tested_head": "062f8760335d823f2d6b0bd42026234aa6468981",
       "passed": 0,
       "skipped": 0,
       "log": {
@@ -154,14 +154,14 @@
       },
       "result": {
         "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/format.result.json",
-        "sha256": "a8e55f841bfe5c5c0bcc697f31203d2caf2bce14e8acc7cbe686f1c2a4885dd3"
+        "sha256": "a2c91f1f53610d4f531e59e4e1110260ec5b5b4971bcad2cb528e57c4fc44a1a"
       }
     },
     {
       "gate": "imports",
       "command": "/home/anhtuan/content-production-os/.worktrees/r2-v2-main/.venv/bin/lint-imports",
       "exit": 0,
-      "tested_head": "92081cbf83b3e07d4e062c83a5d211dcba27ed98",
+      "tested_head": "062f8760335d823f2d6b0bd42026234aa6468981",
       "passed": 0,
       "skipped": 0,
       "log": {
@@ -170,46 +170,46 @@
       },
       "result": {
         "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/imports.result.json",
-        "sha256": "7f0c60e2d90c12c37a6e5edadc45fb8f7349ec013978f69f54f4b4653402340a"
+        "sha256": "f501f6d960dbb1789e4f992318d9467365ddd53a3bd00beec7c088844a465fb9"
       }
     },
     {
       "gate": "migration",
-      "command": "/home/anhtuan/content-production-os/.worktrees/r2-v2-main/.venv/bin/python -m pytest tests/integration/lib/db/migrations -n 4 --dist loadfile -q --basetemp=/tmp/claude-1000/-home-anhtuan-content-production-os/d4870d56-34f2-481b-bd28-fb82e19f6306/scratchpad/m9b-t10/out3/migration-temp --junitxml=/tmp/claude-1000/-home-anhtuan-content-production-os/d4870d56-34f2-481b-bd28-fb82e19f6306/scratchpad/m9b-t10/out3/.superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/migration.junit.xml",
+      "command": "/home/anhtuan/content-production-os/.worktrees/r2-v2-main/.venv/bin/python -m pytest tests/integration/lib/db/migrations -n 4 --dist loadfile -q --basetemp=/tmp/claude-1000/-home-anhtuan-content-production-os/d4870d56-34f2-481b-bd28-fb82e19f6306/scratchpad/m9b-t10/out4/migration-temp --junitxml=/tmp/claude-1000/-home-anhtuan-content-production-os/d4870d56-34f2-481b-bd28-fb82e19f6306/scratchpad/m9b-t10/out4/.superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/migration.junit.xml",
       "exit": 0,
-      "tested_head": "92081cbf83b3e07d4e062c83a5d211dcba27ed98",
+      "tested_head": "062f8760335d823f2d6b0bd42026234aa6468981",
       "passed": 166,
       "skipped": 0,
       "log": {
         "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/migration.log",
-        "sha256": "641e1245e8d1daa3ee0d13a7180b518b36377d8573342f1cea04ce22662fdffc"
+        "sha256": "1f5e7db441abd79fc927cf5b8b6fa81145834f5b341ffec80f81da4d386aa593"
       },
       "result": {
         "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/migration.result.json",
-        "sha256": "f6e9a2b43be3867be6f192270526d90e96daf306ed13892b21fec721cab8ac71"
+        "sha256": "4aafc148ebfdfd25c217dbbbae36b7f0e6d0413010cff388927314f9c512d26d"
       }
     },
     {
       "gate": "restarts",
       "command": "/home/anhtuan/content-production-os/.worktrees/r2-v2-main/.venv/bin/python scripts/r2/run_m9b_recovery_gate.py --repo /home/anhtuan/content-production-os/.worktrees/r2-m9b --artifact-dir /tmp/m9b10r --basetemp /tmp/m9b10r/pytest-temp",
       "exit": 0,
-      "tested_head": "92081cbf83b3e07d4e062c83a5d211dcba27ed98",
+      "tested_head": "062f8760335d823f2d6b0bd42026234aa6468981",
       "passed": 89,
       "skipped": 0,
       "log": {
         "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/pytest.log",
-        "sha256": "accdc89dcedd4491ea78d66fb58a50fe901fb73d1047a4b9369b7bd6d953a367"
+        "sha256": "d75489c0e4063e685aa19870aabd1bff67f26eba35c802bf9f0a39c3cfe94558"
       },
       "result": {
         "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts.result.json",
-        "sha256": "58b6313b359141d30e94cd65c761fc9ffe862107c2819c11156e22dd8701d9e2"
+        "sha256": "7a67cc69cd2a5afcb877331166ebfd157454a1acc2c3d221be75a0b1ffce320c"
       }
     },
     {
       "gate": "ruff",
       "command": "/home/anhtuan/content-production-os/.worktrees/r2-v2-main/.venv/bin/ruff check .",
       "exit": 0,
-      "tested_head": "92081cbf83b3e07d4e062c83a5d211dcba27ed98",
+      "tested_head": "062f8760335d823f2d6b0bd42026234aa6468981",
       "passed": 0,
       "skipped": 0,
       "log": {
@@ -218,14 +218,14 @@
       },
       "result": {
         "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/ruff.result.json",
-        "sha256": "fa4c2bd3bd2c4370e93f8364925fa584c7d5567b76ae82f9153a4a75cd74d0bb"
+        "sha256": "f666055c8007a5e228c9bee3aa0936b7bd6a4c31028c34aa1452132e2e7cf084"
       }
     },
     {
       "gate": "scope",
       "command": "/home/anhtuan/content-production-os/.worktrees/r2-v2-main/.venv/bin/python scripts/r2/verify_m9b_recovery_scope.py docs/r2/evidence/R2_M9_B_RECOVERY_V2_RELEASE.json",
       "exit": 0,
-      "tested_head": "92081cbf83b3e07d4e062c83a5d211dcba27ed98",
+      "tested_head": "062f8760335d823f2d6b0bd42026234aa6468981",
       "passed": 0,
       "skipped": 0,
       "log": {
@@ -234,30 +234,30 @@
       },
       "result": {
         "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/scope.result.json",
-        "sha256": "6b87a51f54814fdfbf23f41d58f49322f62b95ef92645c50556ca1d6a6ce33c2"
+        "sha256": "386bd55cdf40cc25d1ce672107c5d8f49833e7012884c8d0e178b3621fad54db"
       }
     },
     {
       "gate": "tests",
-      "command": "/home/anhtuan/content-production-os/.worktrees/r2-v2-main/.venv/bin/python -m pytest tests/integration/lib/db/repositories/test_opportunity_acquisition.py tests/integration/lib/db/repositories/test_opportunity_manual_admission.py tests/integration/r2/opportunity/test_acquisition_concurrency.py tests/integration/r2/opportunity/test_acquisition_v2.py tests/integration/scripts/r2/test_verify_m9b_recovery_scope.py tests/integration/server/services/test_m9_evidence_store.py tests/integration/server/services/test_m9_manual_custody_isolation.py tests/integration/server/services/test_m9_manual_publication.py tests/unit/r2/contracts/test_opportunity_acquisition_v2.py tests/unit/r2/opportunity/test_acquisition_v2_digests.py tests/unit/r2/opportunity/test_capabilities.py tests/unit/r2/opportunity/test_manual_admission.py tests/unit/r2/opportunity/test_manual_import.py tests/unit/r2/opportunity/test_normalization.py tests/unit/scripts/r2/test_run_m9b_recovery_gate.py tests/unit/scripts/r2/test_verify_m9_scope.py tests/unit/scripts/r2/test_verify_m9b_evidence.py tests/unit/scripts/r2/test_verify_m9b_recovery_evidence.py tests/unit/scripts/r2/test_verify_m9b_scope.py tests/unit/server/routers/test_opportunity_acquisition_router.py tests/unit/server/services/test_m9_manual_authenticity.py tests/unit/server/routers/test_opportunity_router.py tests/unit/lib/i18n/test_i18n_consistency.py tests/unit/r2/contracts/test_opportunity.py tests/unit/r2/opportunity/test_digests.py tests/unit/r2/opportunity/test_profiles.py tests/unit/scripts/r2/test_verify_m9_parity.py tests/unit/scripts/r2/test_verify_m9_evidence.py tests/unit/r2/learning/test_adapters.py -n 4 --dist loadfile -q --basetemp=/tmp/claude-1000/-home-anhtuan-content-production-os/d4870d56-34f2-481b-bd28-fb82e19f6306/scratchpad/m9b-t10/out3/tests-temp --junitxml=/tmp/claude-1000/-home-anhtuan-content-production-os/d4870d56-34f2-481b-bd28-fb82e19f6306/scratchpad/m9b-t10/out3/.superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/tests.junit.xml",
+      "command": "/home/anhtuan/content-production-os/.worktrees/r2-v2-main/.venv/bin/python -m pytest tests/integration/lib/db/repositories/test_opportunity_acquisition.py tests/integration/lib/db/repositories/test_opportunity_manual_admission.py tests/integration/r2/opportunity/test_acquisition_concurrency.py tests/integration/r2/opportunity/test_acquisition_v2.py tests/integration/scripts/r2/test_verify_m9b_recovery_scope.py tests/integration/server/services/test_m9_evidence_store.py tests/integration/server/services/test_m9_manual_custody_isolation.py tests/integration/server/services/test_m9_manual_publication.py tests/unit/r2/contracts/test_opportunity_acquisition_v2.py tests/unit/r2/opportunity/test_acquisition_v2_digests.py tests/unit/r2/opportunity/test_capabilities.py tests/unit/r2/opportunity/test_manual_admission.py tests/unit/r2/opportunity/test_manual_import.py tests/unit/r2/opportunity/test_normalization.py tests/unit/scripts/r2/test_run_m9b_recovery_gate.py tests/unit/scripts/r2/test_verify_m9_scope.py tests/unit/scripts/r2/test_verify_m9b_evidence.py tests/unit/scripts/r2/test_verify_m9b_recovery_evidence.py tests/unit/scripts/r2/test_verify_m9b_scope.py tests/unit/server/routers/test_opportunity_acquisition_router.py tests/unit/server/services/test_m9_manual_authenticity.py tests/unit/server/routers/test_opportunity_router.py tests/unit/lib/i18n/test_i18n_consistency.py tests/unit/r2/contracts/test_opportunity.py tests/unit/r2/opportunity/test_digests.py tests/unit/r2/opportunity/test_profiles.py tests/unit/scripts/r2/test_verify_m9_parity.py tests/unit/scripts/r2/test_verify_m9_evidence.py tests/unit/r2/learning/test_adapters.py -n 4 --dist loadfile -q --basetemp=/tmp/claude-1000/-home-anhtuan-content-production-os/d4870d56-34f2-481b-bd28-fb82e19f6306/scratchpad/m9b-t10/out4/tests-temp --junitxml=/tmp/claude-1000/-home-anhtuan-content-production-os/d4870d56-34f2-481b-bd28-fb82e19f6306/scratchpad/m9b-t10/out4/.superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/tests.junit.xml",
       "exit": 0,
-      "tested_head": "92081cbf83b3e07d4e062c83a5d211dcba27ed98",
-      "passed": 1246,
+      "tested_head": "062f8760335d823f2d6b0bd42026234aa6468981",
+      "passed": 1249,
       "skipped": 0,
       "log": {
         "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/tests.log",
-        "sha256": "55952182f22e9074292ae36e191fb3b4c000eb347af5321bbcf5b9da9bf3f893"
+        "sha256": "19fa9a7e06f3d2b96a6986af6f94f700e56e5b1032d3365b1b3924002d0f4db5"
       },
       "result": {
         "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/tests.result.json",
-        "sha256": "04c3fc99cddac5996c81c77a920949f3f31f9b5a9a7abf32851f394c7c86c4ab"
+        "sha256": "6f6b112f71af9eb437a81fcbd0ace846f3d9d414629fff64a9edb0f8acfe5804"
       }
     },
     {
       "gate": "types",
       "command": "/home/anhtuan/content-production-os/.worktrees/r2-v2-main/.venv/bin/basedpyright --warnings",
       "exit": 0,
-      "tested_head": "92081cbf83b3e07d4e062c83a5d211dcba27ed98",
+      "tested_head": "062f8760335d823f2d6b0bd42026234aa6468981",
       "passed": 0,
       "skipped": 0,
       "log": {
@@ -266,17 +266,17 @@
       },
       "result": {
         "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/types.result.json",
-        "sha256": "c7ab8e6bd005d33d8298e1f386d1d2c24de7cee85d5eda8cdbc36ae7c5ede014"
+        "sha256": "b0b978fdb7079da1318054f54a3c378c4f027a95dea9041d74757ccf27d11298"
       }
     }
   ],
   "test_report": {
     "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/tests.junit.xml",
-    "sha256": "dfa381367eb71fb16adcae3275eaf64c028300721f3ce70179e6f83ff9642584"
+    "sha256": "9e97c0f72879d8b3b90a7d52c839f95fb26e023272af31f29dc8dd1b5fd30279"
   },
   "migration_report": {
     "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/migration.junit.xml",
-    "sha256": "6182ef6aa1382bc04037e7f99423d8c6692ce32ded1456374142b4acab504bce"
+    "sha256": "02448f82a78248c90e75bde55b48fb67212cfbb5e76d4fed7b00801f5d675433"
   },
   "fault_matrix": {
     "replay": {
@@ -478,7 +478,7 @@
     },
     {
       "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/audit.result.json",
-      "sha256": "f85360161a27b29763f364f1201b49f62f16cd5f9c3323252ed4952b01c6872d"
+      "sha256": "c47be9c4c4cd13f0997f86faaa1aa16c5723bd338c2300534e727ec05ce51621"
     },
     {
       "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/dependencies.log",
@@ -486,7 +486,7 @@
     },
     {
       "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/dependencies.result.json",
-      "sha256": "d1cdec926e14e4926550264c9a5db076832ccfd1e2c73e99a1935b9841064dfe"
+      "sha256": "6f210d14bc577b108b38148695429cee7854fb754fe3cadac637a14d8650e25f"
     },
     {
       "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/diff.log",
@@ -494,7 +494,7 @@
     },
     {
       "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/diff.result.json",
-      "sha256": "50e07d2c3c1260dab70c7031790a22cd3d0b09ff22417ba5a3c4a5151767ec9f"
+      "sha256": "43b61ea18110646142ee117d77ebe911a83b59509137731de149e5c0c31223ae"
     },
     {
       "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/format.log",
@@ -502,7 +502,7 @@
     },
     {
       "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/format.result.json",
-      "sha256": "a8e55f841bfe5c5c0bcc697f31203d2caf2bce14e8acc7cbe686f1c2a4885dd3"
+      "sha256": "a2c91f1f53610d4f531e59e4e1110260ec5b5b4971bcad2cb528e57c4fc44a1a"
     },
     {
       "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/imports.log",
@@ -510,19 +510,19 @@
     },
     {
       "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/imports.result.json",
-      "sha256": "7f0c60e2d90c12c37a6e5edadc45fb8f7349ec013978f69f54f4b4653402340a"
+      "sha256": "f501f6d960dbb1789e4f992318d9467365ddd53a3bd00beec7c088844a465fb9"
     },
     {
       "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/migration.junit.xml",
-      "sha256": "6182ef6aa1382bc04037e7f99423d8c6692ce32ded1456374142b4acab504bce"
+      "sha256": "02448f82a78248c90e75bde55b48fb67212cfbb5e76d4fed7b00801f5d675433"
     },
     {
       "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/migration.log",
-      "sha256": "641e1245e8d1daa3ee0d13a7180b518b36377d8573342f1cea04ce22662fdffc"
+      "sha256": "1f5e7db441abd79fc927cf5b8b6fa81145834f5b341ffec80f81da4d386aa593"
     },
     {
       "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/migration.result.json",
-      "sha256": "f6e9a2b43be3867be6f192270526d90e96daf306ed13892b21fec721cab8ac71"
+      "sha256": "4aafc148ebfdfd25c217dbbbae36b7f0e6d0413010cff388927314f9c512d26d"
     },
     {
       "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts.log",
@@ -530,763 +530,763 @@
     },
     {
       "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts.result.json",
-      "sha256": "58b6313b359141d30e94cd65c761fc9ffe862107c2819c11156e22dd8701d9e2"
+      "sha256": "7a67cc69cd2a5afcb877331166ebfd157454a1acc2c3d221be75a0b1ffce320c"
     },
     {
       "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/junit.xml",
-      "sha256": "67afa60912fab1c56ee5f3fc48430353679039f9ae102efec674e3d7874f225a"
+      "sha256": "27d68cb35b59e05b79acefe656baf33fd63ac1b5223a4176dae59029be2d2b0b"
     },
     {
       "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/manifest.json",
-      "sha256": "2e644d36f073fd2786cd87f7519c01f1e37c6d23c4bd0437b8ece9bb95184103"
+      "sha256": "0e66523ad83aa7e7cabb98a02c562a2990f1e734fa10642c3745043c4f26c08f"
     },
     {
       "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/pytest.log",
-      "sha256": "accdc89dcedd4491ea78d66fb58a50fe901fb73d1047a4b9369b7bd6d953a367"
+      "sha256": "d75489c0e4063e685aa19870aabd1bff67f26eba35c802bf9f0a39c3cfe94558"
     },
     {
       "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-acquire-before-source-dispatch.armed.json",
-      "sha256": "afa5738451c9728a695a99a2f43794221de40750145d56deb27ea3a7165f4a4a"
+      "sha256": "fc600124f2f4a77a906d9432e18020a0a6e05d57ff640d376df0011eefbc9f30"
     },
     {
       "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-acquire-before-source-dispatch.arrival.json",
-      "sha256": "ecad3646afd6dbe360765dcfbe1d24f82314e3591e75eb97a894fd71517ceef7"
+      "sha256": "1599b0b864ff466eeffaa42039050e98ad1d3b98a987235be90480803f38fb01"
     },
     {
       "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-acquire-before-source-dispatch.json",
-      "sha256": "6965e7f11023b0c900042d27b9a076c0e6efe87b8c32ae15233463707bd21d93"
+      "sha256": "60e14fb253969031a60ba72b6cc2129a3c13d70683be3019c13bfd473ed5033f"
     },
     {
       "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-acquire-checkpoint-before-commit.armed.json",
-      "sha256": "2a57c70a7fa30b51ac23a75257529b7e45ab6d2c0e5d550c4894c074de860209"
+      "sha256": "1be22c3d5e3007fc4c5ae8e2defb9b771bbc802696e6629661324af13bed1670"
     },
     {
       "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-acquire-checkpoint-before-commit.arrival.json",
-      "sha256": "a3a5370896e9cead98bc11490b9986ac98e042eda81731d5b710ff0e03af8287"
+      "sha256": "d5e986f3da0dd7872e59df01d62b3ea4fb432cecb0eeba228d47c695f087c876"
     },
     {
       "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-acquire-checkpoint-before-commit.json",
-      "sha256": "a1f6fd44872173ad0265e9fa0f384769de7857e72c0dbb5e26687176d55f4369"
+      "sha256": "d1676d24dc33b43161c70989db216980ce5ccdb7005f6f5b347ed13cf7f73f81"
     },
     {
       "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-acquire-checkpoint-committed.armed.json",
-      "sha256": "bf675d23329512a7ad9875e3ee3e7e43c6948b33fffa2ef73ceb592a1b752639"
+      "sha256": "d6e8c2a08125bce2b130ee9fa893092c148223184dfc624a3604048d9e7ff24a"
     },
     {
       "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-acquire-checkpoint-committed.arrival.json",
-      "sha256": "ddfef537ef39d489072686b9bbdeb6cb8de139d81b83a00ce910d9535defe840"
+      "sha256": "52a9c493fcd479c58cb000adbb86d34911e36b6fbe2f7d66db88d13490ed8a07"
     },
     {
       "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-acquire-checkpoint-committed.json",
-      "sha256": "f9bd5734de0af5e63411f7a42e5185fd0d4a397cc212e10a1b9cd06d238be86c"
+      "sha256": "c16f07e911399cf453afd8d23cf7fe20801bc8357618c16cc0f9130d6f53bdb4"
     },
     {
       "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-acquire-claim-before-commit.armed.json",
-      "sha256": "2329dfe8cc74e49c23e3e8459c88fad2d041993e2d376ee7f595e97fdce66796"
+      "sha256": "7ca563ed7da48f9fa6e356769aae13615b0c284a3c287603b2a78dbf8c63e78b"
     },
     {
       "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-acquire-claim-before-commit.arrival.json",
-      "sha256": "6a6a02a9e8d2ee8147d4b943f8ed522fc1e6b527a25d5187af871f168834a6ce"
+      "sha256": "5946cccc4e22a6701bde0f4cb8afed5ef9937f0204cb44031b080f72b940d576"
     },
     {
       "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-acquire-claim-before-commit.json",
-      "sha256": "518c75725bd5b7e5b596f169736f6f83677b94d0ac41a0cada015355f8f4a23b"
+      "sha256": "1cbd62f41f69b111e7d64e764c44d18ebcc64ecb9017ca3f14c2f48dbd2e8c53"
     },
     {
       "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-acquire-claim-committed.armed.json",
-      "sha256": "0799025c114e57b7fca42a023ca8836b687b0e3369a306f03edfed43c76fe313"
+      "sha256": "e412d01eab702f7033c1b66a4f522111be549401536460d49d187083bb623582"
     },
     {
       "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-acquire-claim-committed.arrival.json",
-      "sha256": "7202d3cbf2935a9481933695d9bf93291749c6ea0bacdeb4b5840d107c0aca7c"
+      "sha256": "6cd992773307c5da629cd9aeb8fcf30497ae6e84328a98ab7161848910fc8dc5"
     },
     {
       "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-acquire-claim-committed.json",
-      "sha256": "ff9757f975b50c4876ff1982b612621a49c8d5222651e5119362da1b5e300e12"
+      "sha256": "eb164093b97fd4b10f93622309920480a90bfc31bae61aaccf1edc15bd71bb3b"
     },
     {
       "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-acquire-finalization-before-commit.armed.json",
-      "sha256": "c00a5c8688c1d91f8e208daf2286f4ca8f1b6858c015399b91aafec50dc3040e"
+      "sha256": "b0da8746f75d8763b7861160164bf30e375897c4fbc30d45db31e733d7c7c87e"
     },
     {
       "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-acquire-finalization-before-commit.arrival.json",
-      "sha256": "a5b14ba42854da9e9f98b713670c1acbfc3f8e5cbcca173de793c3da529d5082"
+      "sha256": "b93c6a7f2097e624c01483d2c06a1c4e651c19dbea2b408e2a7720117705c97c"
     },
     {
       "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-acquire-finalization-before-commit.json",
-      "sha256": "32bfc97a1494ed75b15fcf09330707636cf9591c09ac919f0d66e7b9835da4fc"
+      "sha256": "d724e09295a91a5348525a11e06bcbbd4e541b581ad90f16434a9d7711e3c135"
     },
     {
       "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-acquire-finalization-committed.armed.json",
-      "sha256": "615cdf869efba7e7d894f2ffa7777718cabb81934824063aa020fd4ccb3b0df5"
+      "sha256": "09166a8e2787bbbf04eab5d714396a0df63c868f05e45342bd79fc67854bc3bc"
     },
     {
       "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-acquire-finalization-committed.arrival.json",
-      "sha256": "cee88908ae0c89044e014d4aa3c72815572664d5e05d9eec10db1c20e88ef599"
+      "sha256": "f9022c4b929304a1166b4fa7611daf8e4e65f011ba1154bd524bd462c134d5ea"
     },
     {
       "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-acquire-finalization-committed.json",
-      "sha256": "3f53355808488d690575936c5d4583f52bce8c1bbcd649e3cc269c2966d64173"
+      "sha256": "23399d58e6f70c08f9a2cc063383d2a013b31266bb48106d6ccecc961836ddae"
     },
     {
       "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-acquire-planned-committed.armed.json",
-      "sha256": "d4b684ac85c66b630a54077d11aac043ad08de6032d7940ccc4f64b3ff0ccc7a"
+      "sha256": "abdb71c8254bbb0be1c0143e10079c07ebf61097e5d5e6c884e5ef2924099289"
     },
     {
       "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-acquire-planned-committed.arrival.json",
-      "sha256": "200a372596d394b8af5881ac9716c11e53b0e900f2ecf93175db983db5c12eef"
+      "sha256": "cb6a975fc5106759ac7b3eb13eb9038dd4827098d066bf96f00385b078e2d70d"
     },
     {
       "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-acquire-planned-committed.json",
-      "sha256": "857191f6e357d0df36b8b5c3e12224320ba768c564915037cc30af1fe31c3b0e"
+      "sha256": "19675e8e553b8dc865e0394b52a962174bbb8e31967d99d3fb3e01a1d614e0e0"
     },
     {
       "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-acquire-publication-returned.armed.json",
-      "sha256": "46d685182e4d19018aaf1a15f507da14635fccc7cd9a584e85d5f3d7f3b856a8"
+      "sha256": "4d1c6beb836fc7c35684892b1ea56b1538dd6776027223336899041bd74af95a"
     },
     {
       "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-acquire-publication-returned.arrival.json",
-      "sha256": "bd944d1cc19887613f93520d8793e8b2a2ed1de89fec381ce8231a9d73279d53"
+      "sha256": "4e979060072cbb70ae924c37d49deb493f5be67499f8fe907c85828d6668a9db"
     },
     {
       "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-acquire-publication-returned.json",
-      "sha256": "fa791f8da84dcd40a5f0f5bb1218f3d824efd7b83b552b565d739983c7576cca"
+      "sha256": "a41e0585e9fd0e7e7db09bef537b1880d0f9eadd5b5de876d8b91f6714c1afc4"
     },
     {
       "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-acquire-ready-before-commit.armed.json",
-      "sha256": "5e3cbb31bc93729cf637b4e20579c54d15e6e5437aefd6335aab0217f89c1663"
+      "sha256": "e13be9caf4275e8b4e6ca62096b8c47bbbb06fc24c40ea3249b724f76bf263c1"
     },
     {
       "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-acquire-ready-before-commit.arrival.json",
-      "sha256": "7af0c8d03e83421ef67e603ecf0369e4a07d92cbec8baa5af901587b13670865"
+      "sha256": "be4c29f8f7414fbec09d3c8909597471bd65a36e69ac8f91be5f2f5c434034dc"
     },
     {
       "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-acquire-ready-before-commit.json",
-      "sha256": "b4d4123ac7929389cb56fbe8a855adca2cd7e6945670eadecc2f4f102c402f5e"
+      "sha256": "98d8122067fac0b68a1c4719eb9cac6e3304ddb03ea83f5b024bc6e6d8f5ba11"
     },
     {
       "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-acquire-ready-committed.armed.json",
-      "sha256": "d29aacb6e0f23f4fe55fc49fa3749f836d3deba8285059a507456b6e0dcc8aa4"
+      "sha256": "44a72235314d9c2f5f34cad17e076ed53abb68d66e7332f5cd04440edbba9455"
     },
     {
       "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-acquire-ready-committed.arrival.json",
-      "sha256": "eec4b51b47b475fc60b9723dc63b4743071992797a6f51815b9b4bc51c71606f"
+      "sha256": "fe9a5c4b8801f6aef4d87022b1b6a9e2b065d0796382138a32bfeb71383940de"
     },
     {
       "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-acquire-ready-committed.json",
-      "sha256": "a0eca87d7617d95e07491c9247ed82236f17d0441100f21f1ff6a126542ba25d"
+      "sha256": "94bffd488cacd7cefa97a39c34c783318567c6a4b3d639e29b6fe536a4359199"
     },
     {
       "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-acquire-reserved-committed.armed.json",
-      "sha256": "2885cca2124f4a4fdafcdaa8e7159ffdb74e4d52af653e32739f9d7463e5f656"
+      "sha256": "5d5e784b0e9ff4e69f807d65699fdd63b1f00001e054a1de2396f616821008a9"
     },
     {
       "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-acquire-reserved-committed.arrival.json",
-      "sha256": "f36c70821c0d1fec9a68093950e315f1eb23afef10b35cb61233ccfef9385ace"
+      "sha256": "130f23a420b0287f6480a695f1db4a43b82e3aba031b4cd1cbb9894577b630a9"
     },
     {
       "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-acquire-reserved-committed.json",
-      "sha256": "2f9bb5f54f9f2d7c1554c6286137725318d0c7d7ab519a25dd13f1000e5454b9"
+      "sha256": "e8c968af4e555beb8e2a5c9016355759839fbf15d3c33204f6830b7209713ed0"
     },
     {
       "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-acquire-source-response-returned.armed.json",
-      "sha256": "c6ea8b970c7c79ff1510256d4543d6f6afda5370c133a4def1df0f016d681dc0"
+      "sha256": "438f5e8048e0abec5f1f9ca8ea1e7ece359489b72cd7747f9c7d57d67161bc4e"
     },
     {
       "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-acquire-source-response-returned.arrival.json",
-      "sha256": "1c8681f3a4f2188704cb63231fc026a2555007cdb621b3e9e08e667a4b247a72"
+      "sha256": "62f18e5efb205a534b03e7b5c60ee86e5cd84cf220f15ff9da8063a27df29d81"
     },
     {
       "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-acquire-source-response-returned.json",
-      "sha256": "15d4f883a50cd0d718b5950d2934b7dbd2d6dd8726c025937be97cc1a99ccdc9"
+      "sha256": "f6acc2c2be7d50e0d1510db63008c17d9d410bde7955b297a773edde06478866"
     },
     {
       "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-cleanup-cleanup-authorization-before-commit.armed.json",
-      "sha256": "50723f32e5fdc08c504b07f7b2af1a8dccb0bdfde32dba61b2da1ed5d76f9f5c"
+      "sha256": "357799f251f0319645d0aa6902438af5c0fdc2a66daf053e256bcb601f02f6d0"
     },
     {
       "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-cleanup-cleanup-authorization-before-commit.arrival.json",
-      "sha256": "ac7f5772111a9a8318edb78c861a5080f07c55ca9210c1b7b1a18522c022ce2c"
+      "sha256": "63a93984ed50f540426b1386ef55409406806dd60a74d26aaf3568b85a2aee04"
     },
     {
       "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-cleanup-cleanup-authorization-before-commit.json",
-      "sha256": "978470bb144d2386712c078a03e1519cd5c423f0f1da71070be3121fc47c6919"
+      "sha256": "df1586b7f44113d2e9cb71170347de6aa5a59f7ebc6527983c476041d89cec0c"
     },
     {
       "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-cleanup-cleanup-authorized-committed.armed.json",
-      "sha256": "7d7023c7e6cba1c1ebda4739467ef3a10a6515b2465e0dd810b406844f83a976"
+      "sha256": "db9ba9d544db87cfa4b9b270a2b7e1270d25798a8fe96a3910b3539ce79e33ae"
     },
     {
       "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-cleanup-cleanup-authorized-committed.arrival.json",
-      "sha256": "02e8eed6968fd5927d79142b650c2728f293855452192fbea1b922eac58f0bb4"
+      "sha256": "61ae1962c8216a7b5863e0b0d1c1d28e59176b469f498ca52035e027e9b58707"
     },
     {
       "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-cleanup-cleanup-authorized-committed.json",
-      "sha256": "eaac11c03452013bc248de2227b2369379a8f918fb3072a9d3f389576787ac14"
+      "sha256": "6e87ec501f9d271f8dfa80037287b3cc04e961c8683e13a0a0928705cd508eba"
     },
     {
       "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-cleanup-cleanup-completion-before-commit.armed.json",
-      "sha256": "c38b86d9a4a2c145bf4493cb3e977a5d385b4683d9f5ffc24ae2f0e3621237de"
+      "sha256": "e6bbad7881829e47c723637390ebbadc46d646740ecc23cbd76f43cd07f9712d"
     },
     {
       "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-cleanup-cleanup-completion-before-commit.arrival.json",
-      "sha256": "ae7e44571ab952effe72349f5dab4660ff79d5c047a9e23bed04b89af92b7118"
+      "sha256": "f3c13d4795374c55aaf2411a71fafc010bda32e88440e4f156efc109dd5ccc9d"
     },
     {
       "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-cleanup-cleanup-completion-before-commit.json",
-      "sha256": "d13b0b612ebdcb5d05183bc4011a1f72def7b5a3dcf5945f90603989757d4704"
+      "sha256": "9e95e5b7c04628e6ba01f380447416999fa33eb46bab29f94dd4e80a9deb1466"
     },
     {
       "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-cleanup-cleanup-drain-before-commit.armed.json",
-      "sha256": "8156f6ebae34ed4d4804e76cccce225b557941a9c79bb77cabd084f7d8e4f1d7"
+      "sha256": "a02e6f4418c3802486a91e2e7a950a43e84ce5a48dc1c88408b62ac89bc5a21d"
     },
     {
       "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-cleanup-cleanup-drain-before-commit.arrival.json",
-      "sha256": "ba6fa36d43f5abf7e48c5b363cfbe2bb2073282a7f906c358d5c19b676de15a3"
+      "sha256": "fcc20f7f05b3982831d930ca6e0dd8a808040617cc452350d1ae99be070b9fb5"
     },
     {
       "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-cleanup-cleanup-drain-before-commit.json",
-      "sha256": "dcae9c20459a7e704a5e35e4a51718ff54e7ace49d5a8d0dff47a47af1ae99c1"
+      "sha256": "b4ccace7a7c0ccdbdd1cb2a96726e737457d3615028f9c402878a6aed4645be5"
     },
     {
       "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-cleanup-cleanup-drained-committed.armed.json",
-      "sha256": "df008841d4b7d847c795a907cf003c1dd552b919e3823e657d5a70a052198aa8"
+      "sha256": "be8e4857ee9aa05ec34dd57e865cb0400ede74e971e925ebca06df2bed47415d"
     },
     {
       "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-cleanup-cleanup-drained-committed.arrival.json",
-      "sha256": "df6c8d7fcf97b4c3f559777f9c477ca709be86bc5160b9fff228bed6ec467207"
+      "sha256": "c424b7588c76f2c68e8df83dacdbab86e477ba3b04dc40337fd38ab72960cb51"
     },
     {
       "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-cleanup-cleanup-drained-committed.json",
-      "sha256": "8eebbb8fc189f9f4cbedef9265c654d7f9f7e45afa5a367e3a2901cc2b4bf4f3"
+      "sha256": "e34b1b70cce836a071475860d84c17fd23afca7934d99a2d8aa850bda668b109"
     },
     {
       "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-cleanup-cleanup-erased-committed.armed.json",
-      "sha256": "2d9190c42d3f332db2bfe4f40c4b5750151b29ddf732d89fbb1343425e478db0"
+      "sha256": "06ddac587b8b5a126b64fc24b40982371c1ebbea3a6e87773f85648fffe95231"
     },
     {
       "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-cleanup-cleanup-erased-committed.arrival.json",
-      "sha256": "092746e0bf1697d76e284df67dca05e78ce5cccdfdf0af6eb32701b1308ebee6"
+      "sha256": "ec4ab55206f8139be68f66b26b4a1eed421e3cc98c2d8d9b999a871267c7214c"
     },
     {
       "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-cleanup-cleanup-erased-committed.json",
-      "sha256": "41025c3ed0599295fde6fe2eb8f47a9ef756257bdef9620cbaadc43986a6c271"
+      "sha256": "0c0d8ddca2c7c78e75a55463fb14760fba3849f30ecd9fc9a3feabe8b693c164"
     },
     {
       "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-cleanup-cleanup-fence-before-commit.armed.json",
-      "sha256": "f3b90339fcb6fb93387de52a0ca4804136f4223d7ce5fa1cae790bce7d30f28a"
+      "sha256": "50bdf538e858b113fb176c8a98bc0a7f0eb0f9caad82f8e81c373ec5a34516fb"
     },
     {
       "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-cleanup-cleanup-fence-before-commit.arrival.json",
-      "sha256": "bdf3d756c9484ac0e23eac629c8a76d84a2be87b595f16168441343dfc362b97"
+      "sha256": "9dec13cf2249f1ed0f0aa46b85924c6b15f5ec520ad7db46ee530744520fb450"
     },
     {
       "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-cleanup-cleanup-fence-before-commit.json",
-      "sha256": "93572c63c186f0c2e5de218574dfe214d887263dc76a8ee16f621ff6e2256421"
+      "sha256": "0543c506b41f7b593b9ef46adb3678793a5fb8f672b72bad12ec672a8ca0cbff"
     },
     {
       "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-cleanup-cleanup-fenced-committed.armed.json",
-      "sha256": "39fc5d551d4f300c57eadd8fff3fc263a568f1e8eed540c25b1a22ba243d2c40"
+      "sha256": "b323a917c341373f588728e56bfc8e859feee2ff4a08632d996c0ec184d8f0e3"
     },
     {
       "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-cleanup-cleanup-fenced-committed.arrival.json",
-      "sha256": "3d596301fcff519e2ca300d664e59f484a55594075ef0dbc1274f0d8f523f52a"
+      "sha256": "834b79faefe5bc7055699771c06ed1c04c7cbb0170476e126a945635a6f86354"
     },
     {
       "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-cleanup-cleanup-fenced-committed.json",
-      "sha256": "565a7b2f9b45796db0a5f177fd4d4af7971eb106cf58867e1170cc0683668269"
+      "sha256": "9fcd3d7a25dec2494123d9e980ab02d82419b331725e16fad6947e491894b83c"
     },
     {
       "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-cleanup-cleanup-private-erasure-returned.armed.json",
-      "sha256": "ba822da789fce73bb24bd75ca62f0dcedb9958d45b5a8c9a7798330237a71ffd"
+      "sha256": "ea95ef26b1f8682dcee16cb2409478dd18176773a8f602547948d91a0cd45caf"
     },
     {
       "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-cleanup-cleanup-private-erasure-returned.arrival.json",
-      "sha256": "323dfa19afce794fad5a5f1cbade355f28f3c682849845d8dd65a8e53ab279f6"
+      "sha256": "15f1a20b8717b87f6bc634a81ba76fec4fc9973098c8e9615383486c58ec5fd9"
     },
     {
       "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-cleanup-cleanup-private-erasure-returned.json",
-      "sha256": "89dece3cd046fa4d93ce05e3a23d009946711d09fa1162c3d71fc0a07ac5218e"
+      "sha256": "4b6d32b50412401d2bd478c1ab2af9622b3dc010ef23d6625a347b90a8a7fe36"
     },
     {
       "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-cleanup-cleanup-public-erasure-returned.armed.json",
-      "sha256": "2f7a56cc112a8b3af96ffbc40464b79be8102ccd5381483c2e4188f33e95fe72"
+      "sha256": "5a0e176104ab8655d2938c3013b32725e90c93ba416fd5c7e1745f86191fca4b"
     },
     {
       "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-cleanup-cleanup-public-erasure-returned.arrival.json",
-      "sha256": "c81f19a7692cb4665f8cf4fbf5f51b9e3901f450ad0e1f2a00d3f123a831cfe6"
+      "sha256": "47d24e93e927c663788472179607d07d39886a01242f98124f6dc7b82a3bf999"
     },
     {
       "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-cleanup-cleanup-public-erasure-returned.json",
-      "sha256": "ed30c56f0e652dce291978aa839c6669664ceea171b9767729efc520b9f6f7f5"
+      "sha256": "eeeba774e7e42987cded24e69ffa3c5b46b9730abbd787623398a555681e0d37"
     },
     {
       "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-cleanup-cleanup-publication-fenced.armed.json",
-      "sha256": "04f30b7b36f0f339273005e33e062b917f714ebad0eb7ca44cfd8547a42f4813"
+      "sha256": "a1577e0377c45db38c26eb7c4c847b544c8fd27994918fa2c83d6db6e796ef13"
     },
     {
       "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-cleanup-cleanup-publication-fenced.arrival.json",
-      "sha256": "fb62d4fa1c24e4bcc326c325e3d298ad96c627d38f16339a2b870bf52bbe71e1"
+      "sha256": "37c32be84e96407cb4a9d79ab990324c5da259b76816d5be3085f6944852c58b"
     },
     {
       "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-cleanup-cleanup-publication-fenced.json",
-      "sha256": "8d39e54cb743b774149d8a3a4b2c0eca25beeef708d8f3f69d4b455d844ecaa9"
+      "sha256": "12914961ec6977209cc5d15393aa227e4a5c46e5a853b099bb662c081310112c"
     },
     {
       "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-cleanup-recovery-publication-fence-durable.armed.json",
-      "sha256": "f69509c47ec1b86faaf2edb16f89db8470afcda9cf4ee6e4943bb5ab4f9a27c0"
+      "sha256": "84ba1ed77b6eb696f9a1dd08b1d113eda670648e3600a8b1490cf47ed1ecde21"
     },
     {
       "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-cleanup-recovery-publication-fence-durable.arrival.json",
-      "sha256": "f8567281aee3f9c2388ca3aee16183db3e94d2976287413f0edd43d318dc0c3d"
+      "sha256": "443d26663009d2608586e77836042ae179fcac6e0188e54e19eefcf4c5fe59ef"
     },
     {
       "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-cleanup-recovery-publication-fence-durable.json",
-      "sha256": "5ce84d3b795ca978116949df9debe548e96bf9cabe8ddf0fbe5884c563e14a86"
+      "sha256": "d16156e9c3e2479f45fcc4a1fabd86a421caa8d49906dd0d5204149ef78e85b2"
     },
     {
       "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-delete-recovery-deletion-attestations-durable.armed.json",
-      "sha256": "ad04bfbb15f1ad658846a953ea2d03f7f37d8f6faa1ec9cebe8c1ec76a20330b"
+      "sha256": "7323a184322a9c0d349988c8da5dd9a94f379521e6edba1619a406a5f6dc0866"
     },
     {
       "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-delete-recovery-deletion-attestations-durable.arrival.json",
-      "sha256": "20c20d93ab01adc8175733892c452c6548bfdf145003fdc90a0624c666b78154"
+      "sha256": "df453693cd9c16fbd83c0cadb3b5d176d862617451ad77661a7162390d7d7bb1"
     },
     {
       "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-delete-recovery-deletion-attestations-durable.json",
-      "sha256": "3d98681d544a4a12ecda69412e704daf45ba33b958c3ebb6728a4ce0b7fb0c37"
+      "sha256": "038ce8cae466cf6667ec33b1404060ae28c1a84394a34f1f0ceb46d8a7fc562b"
     },
     {
       "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-delete-recovery-deletion-fence-durable.armed.json",
-      "sha256": "5a464eefc40dc67ff8084e001ad1838043fce487eaeca162e48ba6ba03ae5383"
+      "sha256": "c4795ef3a876cbce468b406891a0fef731ce8b58f62776b5b1b16fb3aa4dab4c"
     },
     {
       "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-delete-recovery-deletion-fence-durable.arrival.json",
-      "sha256": "8fe69c531561f51179392a53f2878541f69ce43d2c1f596d530c14eaf262a4fc"
+      "sha256": "71a49d48c4a023cc92b46946f46a4976c6d049dc081ded424cf3159713e6759a"
     },
     {
       "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-delete-recovery-deletion-fence-durable.json",
-      "sha256": "e6b7e11da5f33a0fbc293191feb986bc20cbb92de355fe4d83eac51c6b584449"
+      "sha256": "b1fbd77e672914431b18eb5672a251a47b38b1c37e41b4510cc695a8c570b227"
     },
     {
       "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-delete-recovery-deletion-headers-durable.armed.json",
-      "sha256": "681b7a7232faf789374b721c71b556e90fcee835f80e591808ef63152d6a05c5"
+      "sha256": "0419e15bf042befd6df0a668d831b7587a3de0d3f729d2fb64f2a45d1b16b44f"
     },
     {
       "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-delete-recovery-deletion-headers-durable.arrival.json",
-      "sha256": "b30c571d23c2aa530e693279783984d3d9de43dadc713529a155111e0cbd70d3"
+      "sha256": "83286eb916cf6fca359b22926715606fcbee03e80b5a1c4ba6dfac50898b49a1"
     },
     {
       "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-delete-recovery-deletion-headers-durable.json",
-      "sha256": "4690c46c607b64f1402d6363a05d8148ac06c56d6b5b161c91d5c537e291a9eb"
+      "sha256": "c4bfc4aacd80e6e38f16b5e2eb59cc1dabb39fbe9b246b9e88e0958f8857e999"
     },
     {
       "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-delete-recovery-deletion-integrities-durable.armed.json",
-      "sha256": "dd15558b17b8c413de11ea8b457c08173333046834c41155c4463efffccaebb3"
+      "sha256": "1493413eacbc2544c35ceb10f0609e87c11de36cdd7a54f6f5daafe3b909e437"
     },
     {
       "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-delete-recovery-deletion-integrities-durable.arrival.json",
-      "sha256": "9498b9b9bae97c9e81f0ee528e8863e32afb06c6ee8d38bddefe69dc06b607ef"
+      "sha256": "7afefceeb7f814b51c5fb6af086d024dcd709c0f877f540006f605536a759551"
     },
     {
       "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-delete-recovery-deletion-integrities-durable.json",
-      "sha256": "e96d1126c220f15a8070228a3972c8cf2069787feda6224eff4af6d2642226ff"
+      "sha256": "b2e7001dc8781a7e7a7acc09db4ce478ba744d4d749f46c181e3789db758c643"
     },
     {
       "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-delete-recovery-deletion-payloads-durable.armed.json",
-      "sha256": "adb0bfdc0a8312b1cdb9d737408ad58cb5d86615a71b22f48ef727bf142ad70a"
+      "sha256": "e90cd828588b77fd663d9328dfd836263c3c35d4511f436f4c95b2639721b642"
     },
     {
       "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-delete-recovery-deletion-payloads-durable.arrival.json",
-      "sha256": "3655ac005a4a6a2e191436727f30cf2118d265b67b9f2f20aac78031a80bb114"
+      "sha256": "cee1da640ca9c4ea61bc685b384b568f2418bbe60714db76711f6bbcc455de26"
     },
     {
       "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-delete-recovery-deletion-payloads-durable.json",
-      "sha256": "b3e8ee7bbef572d2b8b42a2c961c11036e7674d2d19c3e97bacdfb2c9dea8ac7"
+      "sha256": "842b2cd2ac5b4e0113a97ac8ffd621b573908a23d76edf5112e673d3ed491437"
     },
     {
       "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-delete-recovery-deletion-plan-durable.armed.json",
-      "sha256": "6df978f52d56cee4f5ac4898433b770dd26a7372d641ca511ff051bab7bf3133"
+      "sha256": "d1334cab60043e2304ea7f9a324c575be2ed6aeab2b6d007e444a3015bd74143"
     },
     {
       "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-delete-recovery-deletion-plan-durable.arrival.json",
-      "sha256": "ecb91a96195f75c595016a7bdb2fc3627b5099f85429b23e614512f37efc9e9c"
+      "sha256": "826bdede2c3ea745a9e28238e349bcae661b3be067598525d8cfca1dfaacf373"
     },
     {
       "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-delete-recovery-deletion-plan-durable.json",
-      "sha256": "51b0c07f0dc59741aa04bb4042ad6e4dfb51af73ca38951b3a154ac0cf43ea8f"
+      "sha256": "211672ae013b4e8ca16d7186596a230380a1496059815f31efecf5b387a6f9e2"
     },
     {
       "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-delete-recovery-deletion-receipt-durable.armed.json",
-      "sha256": "7e3e28133bf4124006512c9be28bda42ab1d8f89ceeb07be88abe24b5a3dc1aa"
+      "sha256": "2c47c5a02c62c1baa0f7229c9d2ebb94efd6d198cc6c2d013d53492f6583c590"
     },
     {
       "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-delete-recovery-deletion-receipt-durable.arrival.json",
-      "sha256": "8ac0e3036bc1235ee7ed26fa26c4e1b643eb3515f025c791301c058c741d0f17"
+      "sha256": "612474d434791c95a47fc823e9e2882e7fd71f4b76a3bc3fc002a06771e6fea4"
     },
     {
       "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-delete-recovery-deletion-receipt-durable.json",
-      "sha256": "792728f47fa910143a93ebeea7d7526d1827740709dd94cecca7457db6dc35f3"
+      "sha256": "aca2ceb6c728e11bf22b4d64e6967c6cd480c57137515cda25c2983fec4ae284"
     },
     {
       "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-expire-expiry-committed.armed.json",
-      "sha256": "330d9093ee8ad02a8d99c338537e8c92f5bd25e05abe6531fefcb88be7f4c830"
+      "sha256": "2d38b16880548c58e04b5d493163c16f34d6fbed79c701c83c75592553cabe27"
     },
     {
       "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-expire-expiry-committed.arrival.json",
-      "sha256": "35707c03e499caaae30cbfca8914c5e3d5f84eccb3d69cf39b41091790e1a4e1"
+      "sha256": "9f867ed104c42fb76a3c1456273fee692562b8b8160c0db6a97fcb9295de28fd"
     },
     {
       "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-expire-expiry-committed.json",
-      "sha256": "4d8cc605ac049db5cf0aadf1d787ed024f09ecf149ecce551ca7384311e75b39"
+      "sha256": "4b57f439b1d7bde368b3aa7feafed4fabec655b956aa95d706760a8c65a4fe3f"
     },
     {
       "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-reconstruct-reconstruction-checkpoint-committed.armed.json",
-      "sha256": "2fde92cb5e17020d75e03ed7a4123a90a3fef7b6c137b9a492ec808d74a3cf99"
+      "sha256": "8ccfd55e24114268d5991bc96053d4a2015728a6169bc0e3c27978de07d23a3a"
     },
     {
       "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-reconstruct-reconstruction-checkpoint-committed.arrival.json",
-      "sha256": "2b6930b07f8c9c9a85779a5e04af2d17ce20295e36450159513b2016f80a592c"
+      "sha256": "42ea31807376979489f5e5c5cf509555382e61f91e3b484bdf39e2193ed3100d"
     },
     {
       "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-reconstruct-reconstruction-checkpoint-committed.json",
-      "sha256": "0dde7b76ee9bf924f556aeb24c0a00b7f513c87432a3ac9713b4d27f26efba7f"
+      "sha256": "9af85c7cb7b267de1377ac8855074a251d9f27f0de1d7004be43cd8a7ff734cd"
     },
     {
       "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-reconstruct-reconstruction-fenced.armed.json",
-      "sha256": "9b5fb1debfa808af52c51b365ca2bc39090d608cc10725f16d2ba686e0170afc"
+      "sha256": "a0c161ea8f59c9d13002d80e9dea6ad3835b9bea3b815b037498298671c4e61b"
     },
     {
       "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-reconstruct-reconstruction-fenced.arrival.json",
-      "sha256": "d92fdd72c79a361fa4c3354f4c42ada8b4316e1112e25fec31f9c8b253668e5c"
+      "sha256": "89113f69213226c76f02b7f783800a8bf1ad040e362cfce637f88bfe0d713052"
     },
     {
       "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-reconstruct-reconstruction-fenced.json",
-      "sha256": "07b1adfe887c99087e094eb286c1170fa9e3b439502cdc2b5f09456fa547ab85"
+      "sha256": "e0a648c65f900de7c72d96407dbaf0163ce13810cc13e7b024f6a3e7599ceb2d"
     },
     {
       "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-admit-custodian-claim-custody-durable.armed.json",
-      "sha256": "dcb1c8cbf494fa5f4b489956117249f2e8cbcda7953c888be274202e9fa2fbe8"
+      "sha256": "76fccbd849fba938df6c4545774c8c6a57a51d2c74429b4049b4f0ace341dc90"
     },
     {
       "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-admit-custodian-claim-custody-durable.arrival.json",
-      "sha256": "e9b94d40ac7796d472093e7d6c74af6ca9d043db49e28ccfb43cf86d45ff3fd6"
+      "sha256": "580915ba3d0f2fc4256c944de144ce9e2c415cbfe2a96e7b16741a92f22e1005"
     },
     {
       "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-admit-custodian-claim-custody-durable.json",
-      "sha256": "ef2d3bb51591668c9f37e32997c04f39a24138490adeccbf705361c15d584e8a"
+      "sha256": "97ff8300aad4dc45f285252828d9e9493ef97367698ae40f0693a58e672e856b"
     },
     {
       "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-admit-custodian-command-index-durable.armed.json",
-      "sha256": "f71665aadcad734cea001c1486e0468561a4070e4e9c4bcde1af5ce7d472e4c6"
+      "sha256": "a3568d519aeef360dda1bebfff60087a5e49b06b6c9cb8465672585d4ba8cd30"
     },
     {
       "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-admit-custodian-command-index-durable.arrival.json",
-      "sha256": "9c4a14aeb4e2a8d7b15e12bd85be6ade039576b883b7cc90b2b66ce538f4946c"
+      "sha256": "87a8fa0f14ea65a565a3b3b25ff6ad75eac178243123bda0d1b3d1bf0b34d62f"
     },
     {
       "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-admit-custodian-command-index-durable.json",
-      "sha256": "19ea8b3cc6fabd29ea2dc06cb8973849e8085d38fce9d3fb0e69039523fbdd2e"
+      "sha256": "52eab1241cb2e2624e9c73ab234060fffe5055bcdf9209c4d80ae59193ad0076"
     },
     {
       "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-admit-custodian-comparison-durable.armed.json",
-      "sha256": "55e9143b9c525349393c17b8713ad4aac9a1f068b8ef67c280d24d7857c2951d"
+      "sha256": "e475b9cde137c82a2ab30bd6a1fd31e63d2839d75f1ec173fc4a70988ea967b2"
     },
     {
       "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-admit-custodian-comparison-durable.arrival.json",
-      "sha256": "0492df2e9acb80618f24488c37622a3b76091248b5dac3c29b69e1370898ca25"
+      "sha256": "5a876e1b4203911ac71dd63f135850c5e5df1fb2b162998aa6a86d2e5b7292c1"
     },
     {
       "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-admit-custodian-comparison-durable.json",
-      "sha256": "6e86221e9a8b8ab3ae009b4b5e386912d7ce82af4c88c91080e529caf7f33f3b"
+      "sha256": "467267ba5debf21615975bb1b422f87185e5755b61cd607ab932f4539765aad4"
     },
     {
       "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-admit-custodian-original-header-durable.armed.json",
-      "sha256": "6a37683f711d46c6e2f8133750c186ecf193b4e2f42abebaff2a12f88f277acd"
+      "sha256": "d1e7e6c945c3d3582d716c57b32468b2f7e740035493d6e7af020707503b32c9"
     },
     {
       "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-admit-custodian-original-header-durable.arrival.json",
-      "sha256": "a66883cf25862e9cc9477478ef3b3b34377a2fc34d674ef2d3f128d695433023"
+      "sha256": "d9f1d0e4b5ad792a2cef05b3f889a2dff6c170a16ac724b1e3af061c7b92562b"
     },
     {
       "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-admit-custodian-original-header-durable.json",
-      "sha256": "440451c2144ba679a8d83b2e7aab83a861b071ba1b3d788e949ec959da31a23d"
+      "sha256": "02a82667cb06ed1c8971aa72905bc66fcb2035f5411be7b15cbf00f63f1665d2"
     },
     {
       "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-admit-custodian-upload-index-durable.armed.json",
-      "sha256": "b1a17c5073c597774da26885a3ce2ccbb19e5f5befc4743a733a15138c835b8d"
+      "sha256": "a52a32c54cbf39e24ac4b5dfeb5c68cea6883c211dfe9c9844167c14fb22b668"
     },
     {
       "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-admit-custodian-upload-index-durable.arrival.json",
-      "sha256": "61ed0de051f4e81d3e5b9cb76dfeaa24f490c8cef0b9085acdb8773697c86b32"
+      "sha256": "8ac92142170d3e2cfa1ff4db77c8e77129da01f175c379bee973c007c448747c"
     },
     {
       "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-admit-custodian-upload-index-durable.json",
-      "sha256": "a69dd2a0657fef2bfd5b3951bdc1877f0c996e2bd990baf4f15e4e01e0dcbd61"
+      "sha256": "08ca3ec41d933ea459f9a8a00ff0ef6dd400a7959ad77fd3e5d7b3c0823d595c"
     },
     {
       "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-admit-issuer-header-seal-durable.armed.json",
-      "sha256": "7b3e3846acdd7a4a5a9931598a6e9c8262e9e5559afd69babf79d8acdbdecd29"
+      "sha256": "f87921c6b3a8ffc44c6bd3aeaf34ace5d03b7fd4bb41c1ab4bdff57e4023afd9"
     },
     {
       "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-admit-issuer-header-seal-durable.arrival.json",
-      "sha256": "f3fd0da63930bbc8313eeef4acf58d2b06b053a92b825de4eee08846b81109dc"
+      "sha256": "fff0d1614431d3a6b295a9ae6722482c7840d43f9dcad40523ca7b1f64d70255"
     },
     {
       "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-admit-issuer-header-seal-durable.json",
-      "sha256": "1127c912a73bfcc7646feadbea20fbcfeb36d87570f50388444d846f1dc62023"
+      "sha256": "4ddd348db5d234ef33e4f5ddc5e02ab3bd1d3c4273b16d0fa71fd18be188f34c"
     },
     {
       "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-admit-issuer-material-manual-native-index-seal-durable.armed.json",
-      "sha256": "5216c2f44f43fef144654717faa6d2bb90c52f7aa7b862f0813d8aa1c09f4f21"
+      "sha256": "0264562a0db6fb5a5d3f963b3f317331d733fc029e76bd9aa07024d1b6686ba0"
     },
     {
       "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-admit-issuer-material-manual-native-index-seal-durable.arrival.json",
-      "sha256": "30ff7fb5588e1f59a56afccf7d68502f8dbab27a0f70aee16a5b6796b5334400"
+      "sha256": "92515d9d18e568143dd8fc5d0f1a7284b61a72e78bede458181784a39c5106a9"
     },
     {
       "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-admit-issuer-material-manual-native-index-seal-durable.json",
-      "sha256": "643e7e2d43066320cd2323710e771014470a23cde9fd00799330a9673e92b79c"
+      "sha256": "a5e8ff403d20455b43b0b37ee12c681a4b8a6ec3a2653f42226d9d0967bff7a9"
     },
     {
       "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-admit-issuer-material-native-field-1-seal-durable.armed.json",
-      "sha256": "804de3dc6433e50a15a2f15ec4066b7db647b84b62adf20074c73cfb2e8f762e"
+      "sha256": "7207f40677cac435e1604d898c879815a731c671cac62cb3d75b719b710de145"
     },
     {
       "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-admit-issuer-material-native-field-1-seal-durable.arrival.json",
-      "sha256": "3d066a956295e1b4aa8fb3af2c15828dc4b1ce1804c6346a76abba8e4e6d2525"
+      "sha256": "13d74f55e4b9091407fb01706bfcfe2e7428d8404b7e39b019c6a85bfd981707"
     },
     {
       "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-admit-issuer-material-native-field-1-seal-durable.json",
-      "sha256": "eb10446c8aaf8672e11a41561d36731581252ef5da5cc280be678454220a8f56"
+      "sha256": "faefb03bcc90b587065a96c634795a95ac0878aa6be2d750aacc8300d7ca2c1e"
     },
     {
       "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-admit-issuer-material-native-field-2-seal-durable.armed.json",
-      "sha256": "6e9fe1f2dd770768e1dff2e9d9cf0b1e808c1c34f4a666153b01ebaff1e42df4"
+      "sha256": "86cafa3f1dfb9cc93bf1a6f71e8af2af5bdd10a7cb645227d3eef9b499adb419"
     },
     {
       "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-admit-issuer-material-native-field-2-seal-durable.arrival.json",
-      "sha256": "2e6d93b21e0eeddfaf69530e2ec5e2f1ffccb685a3f219d59eee4c2e27590e79"
+      "sha256": "c92b4159dcb4dd72c3a6f6a044c7c231a2f216770fb4faf17ddb6947360e8b28"
     },
     {
       "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-admit-issuer-material-native-field-2-seal-durable.json",
-      "sha256": "5dd0624cfbcf5bef9bdc43c5f9e06f9ae405f1a94b9dd591e08ba1474e8fa6b7"
+      "sha256": "8da3e4912272e046634c39cdcc49300756f78238c83428d7ec0064489b6e2e6c"
     },
     {
       "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-admit-issuer-material-raw-page-seal-durable.armed.json",
-      "sha256": "df3aea14329d17e868d8ea0ae642e168579033c3b293bada38463b0a607ea79d"
+      "sha256": "299fa3107064e35d18cca88b5d223fe1a32a9a75d0fd78243622cab4516e5ad1"
     },
     {
       "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-admit-issuer-material-raw-page-seal-durable.arrival.json",
-      "sha256": "f701e9608df0f245cd0fa661ba1d9fd6a873c5b3ae82188be17375c4510ca606"
+      "sha256": "827a02acd5b7ae47010d2289f60f40dbf4673f641014118c372aaec3a62d2933"
     },
     {
       "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-admit-issuer-material-raw-page-seal-durable.json",
-      "sha256": "e8d0f6db3068dc123ca632b3f740982290648249697433827fcc777552d7334c"
+      "sha256": "74bc7b0aea4c1f1a098321d0e036616ffb8cc478e5758e3b55b82460a4a71a9b"
     },
     {
       "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-admit-issuer-material-source-identity-1-seal-durable.armed.json",
-      "sha256": "c5ee46568060772e28d45d132659c7a95cecd57074240cf2a02f03dcb61a1c3d"
+      "sha256": "042275e0c583d98e34e7c8a0c0b65f6ff9b6f0380540e062b1532aa536962512"
     },
     {
       "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-admit-issuer-material-source-identity-1-seal-durable.arrival.json",
-      "sha256": "bf5059e09dd2d1c48b791eff86bef084b5580912f973126fc6ca4105f8cfe482"
+      "sha256": "75ecb698676e144fac8a8e5b2625363c966f2d6489ec47c848bb11670b6fb57e"
     },
     {
       "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-admit-issuer-material-source-identity-1-seal-durable.json",
-      "sha256": "9d5fd8e3cce2701d2f74099792689bf4255eb7d07e29c08cebdb31efb927ad7b"
+      "sha256": "a8419ac057205adddcd7ca3fa1c60e160e7b5b736aee6f49d0c67e3da2aec8e0"
     },
     {
       "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-admit-issuer-material-source-identity-2-seal-durable.armed.json",
-      "sha256": "c171f38df5870fd20327bf8a710d02710d9416e64391e80bd417c4c9ced4058e"
+      "sha256": "c8f4aa6bbff0b497574d1d8a0871e4550bbcb1d9d93d850c2e2fa2817311cf7b"
     },
     {
       "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-admit-issuer-material-source-identity-2-seal-durable.arrival.json",
-      "sha256": "fbcfa97656e01f41edae7c363aa67bdf3bfaeed34def0ecc0c054e1537234c6c"
+      "sha256": "2552d658b8bf2c7a15225c1716ee4b5c64f189d31399f2f886ec425a165c3aa6"
     },
     {
       "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-admit-issuer-material-source-identity-2-seal-durable.json",
-      "sha256": "814da3313ad303c03654a293cd49b414176b90b49ee77f9a23e277fbeb5981ac"
+      "sha256": "ee3a09d9af682aec04ed6b89fcce281cdcc78780bbb1905a2ce4df50df314d11"
     },
     {
       "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-admit-publication-attestations-durable.armed.json",
-      "sha256": "629263c49d16a383fdd065dc0da174f424f3600f0d8ee1b218a5d0130cc04cb1"
+      "sha256": "0cf096210fa911f4c248d2827b7eb8286696494b0069cfc417faa434f4c0c2c9"
     },
     {
       "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-admit-publication-attestations-durable.arrival.json",
-      "sha256": "092054680733959e78bafe0ebf09840ccef29f65dbb567ef8360cb14b3bc2fbf"
+      "sha256": "4dee632bf7160d1b6655a3555d4abc7a28e2db3f636b3321b8ddeb665083c36c"
     },
     {
       "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-admit-publication-attestations-durable.json",
-      "sha256": "ee4a05ae7209f1530fcb2bf3c0a24fdd2671b7af0be3e78bd4775ff6969021c7"
+      "sha256": "3a44540e705dfd34b0b0aad4ca530c0290efff07b0647fde2e5c627461989949"
     },
     {
       "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-admit-publication-complete.armed.json",
-      "sha256": "653f323d4b31dc9169543ce25072732a7d6a423e87a289ba641235f47230ea96"
+      "sha256": "5187eb77012a47d448cc8cc8feadbcd368427a7ef950a4f7b36d15536dc8fe66"
     },
     {
       "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-admit-publication-complete.arrival.json",
-      "sha256": "9e66f684186450d9c9ef0ab302b1f6c6d15eab6c44f64bfb60080fccfe1b23af"
+      "sha256": "6ce2f26b1d56c4f3e6039517335b1c603418e8b92948642cd8a4ba998a2c88d4"
     },
     {
       "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-admit-publication-complete.json",
-      "sha256": "2c6602d9860e3053c0a2120d4ea7338d79b83c18a88218537176d3515dcdf2ea"
+      "sha256": "791d01cccc69dd75d440f38b6ee3a69c61f842d7b7a504f1ec5acd8ee162d768"
     },
     {
       "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-admit-publication-header-durable.armed.json",
-      "sha256": "c5d0d93cf58c7f5a48861fc6a52b7691d628626da0a01ec3b915bcc91ee6c308"
+      "sha256": "1fa2338ead293cc7b56906d56b82a148f6dc86ef29ffd6e73cb881be6b1d0da3"
     },
     {
       "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-admit-publication-header-durable.arrival.json",
-      "sha256": "9083e7de423a81a9af78373abcff8259b40e0a3ac186f43e38b2ca3598e5bd14"
+      "sha256": "ec6a7d61ace72bf34fc25c6327dd57e106a0b0faef7d1b8a71f578c044220067"
     },
     {
       "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-admit-publication-header-durable.json",
-      "sha256": "5aa16d59a73ff9014a91304dc31f52c726e0858b6bf1d022c039fe87b56f3329"
+      "sha256": "c3050cbe455611834b18d35fc7f728ef00761fefa659121930e8af584e6df677"
     },
     {
       "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-admit-publication-integrities-durable.armed.json",
-      "sha256": "4eaca7ff1db53304073cdb78efe719fa69ebfb54685438a2cbfaa8ac96aa4d85"
+      "sha256": "7b36db09b56ff46021594fe92ce668e75736e1f813c23ff8225771b7933e3a66"
     },
     {
       "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-admit-publication-integrities-durable.arrival.json",
-      "sha256": "6938eb3b0136826cc8d76137980f28183dc0f3bba5f73f9a3fc8dc1b55a6e585"
+      "sha256": "4bbdd4846ff03a3ea5e43fe36c0c35f92f4f9acb1a20df30df28ddbf8e55f323"
     },
     {
       "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-admit-publication-integrities-durable.json",
-      "sha256": "3d2f2f90ed45b6b3171fbb455b066887214578d8d134338b0689c4bb79cd75b0"
+      "sha256": "f69b067259a69453df91779248d79e03a4ec5723ae24a3608159e5136e17e8a0"
     },
     {
       "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-admit-publication-payloads-durable.armed.json",
-      "sha256": "1f9e9b5f4bcb8d205ae1914a603f6be9864bbd433af572c7e90aab54d45393b6"
+      "sha256": "bb2894e99691d25fa45230a5b9081995056679339b7df3f1945b90dbe612bbcf"
     },
     {
       "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-admit-publication-payloads-durable.arrival.json",
-      "sha256": "57c34a74ddc47cefb87ba22ba2b06da6000ff07b18f03a66a6560f1b8da5e211"
+      "sha256": "c1af2dfdeb1c3c99da15eaf5ce3c04a5405b72dda273424d9716598fad3899f4"
     },
     {
       "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-admit-publication-payloads-durable.json",
-      "sha256": "2bc5a48d50f576e49425fc99f7bdfaf4d4f692104445afd30871326be6d46ad6"
+      "sha256": "2ca0051ce3f2b3ab6a7dd47a049e55246ae8fd5191e3ef802c9964f70ea66498"
     },
     {
       "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-close-custodian-comparison-unlinked.armed.json",
-      "sha256": "6c0d8582640977da6d361df19cafa6e9cefb6ad80dc3b8db39c4477b7afd604c"
+      "sha256": "f7e7a52daa80808291ae462c0397a9d3c1c5a72f1d33604e6db750fc1679d776"
     },
     {
       "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-close-custodian-comparison-unlinked.arrival.json",
-      "sha256": "bcea711cf6940bdfa0aef2a5ca99493e5699c832daa827339f26f82281e73aa4"
+      "sha256": "0ccccf5a244b4fe8c0eec3ef2de469fdc2d0c7177610915bb2ef0a312c3e9e96"
     },
     {
       "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-close-custodian-comparison-unlinked.json",
-      "sha256": "3af08ae15720a9295ea70c37df9dfaea7f4901efdc1c0191031e41473e8351c2"
+      "sha256": "66df4d6a5d547312d1c71569364883a612d6c104376c4e50c8ea482c97ae080e"
     },
     {
       "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-close-custodian-header-unlinked.armed.json",
-      "sha256": "6ae9943acff36ee3f26da97ca0a81260ff97a90dcb20a5c35a64eed1e4aac87c"
+      "sha256": "3a051466b989da6a7ebb41fc91fabaaaef6930d03319dd0d51b8a09fa49f4ffa"
     },
     {
       "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-close-custodian-header-unlinked.arrival.json",
-      "sha256": "1bd35c53c941498d658366efa75ca50155c76c869ba9a0784b3e441d421134a3"
+      "sha256": "988afe36acfc083e22309d9d10604962a0abe9f7b0b78a36eff7956d01757bec"
     },
     {
       "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-close-custodian-header-unlinked.json",
-      "sha256": "2f20f8497bfcb1f289bddb3a2ded5f5f775a96d3984c89944431d51a69557eb9"
+      "sha256": "8984bafee7ddca16ba1c20d5f5399efaf39d10d52591f5e33f87a54cc677ca47"
     },
     {
       "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-close-custodian-material-seal-unlinked.armed.json",
-      "sha256": "46bf933a7582c7e2b7a551e91c003122de78838efe6ced332155a214e5b2166e"
+      "sha256": "f8a73d6ed71347c36ce86b1fa61ed9441fcc1104ffb241fb1bb11216fa7c7985"
     },
     {
       "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-close-custodian-material-seal-unlinked.arrival.json",
-      "sha256": "c1f1774dee6e8a6957a85a0ed2bd437e45b196bc5a6a1f6a6847684575afe903"
+      "sha256": "6365952b58ddb0e213cbaf4bff3d9acabb7f93d34334a3b59c5616e52cf7d1ab"
     },
     {
       "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-close-custodian-material-seal-unlinked.json",
-      "sha256": "640e6ed6944ed53411112897cd904217d60de44996314709b84bd1074a8b2336"
+      "sha256": "aade199465158dbfb328bb00c8ed8f9ef69f115bb5b18989cb578e76112dc43d"
     },
     {
       "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-close-custodian-original-unlinked.armed.json",
-      "sha256": "cccfe9688e6bdaf0ccfc494e61d2da6ff978c8738fca79b3a853ed6c23b6307a"
+      "sha256": "1a991483dcb86ad29b3ef67e373b01eb8d6c0e8bbcda2154a7f6e16366f79708"
     },
     {
       "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-close-custodian-original-unlinked.arrival.json",
-      "sha256": "2ba65170c38ba87590edf77bba0755c90205820d87d06ca69de5d402151e1b84"
+      "sha256": "cba177c16cae01f169b66dd1f1eaf1541b0de7849cb7a49ae1ced20fa66c849a"
     },
     {
       "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-close-custodian-original-unlinked.json",
-      "sha256": "f668ed2bb22bc5961808a11f188a3eb205cc1b9092567c1a65ef17fcbe3efa46"
+      "sha256": "4e9ff9401b8bee4c1d85e27643eb53215434bc991e85dd1f09b5a53d69ced9c8"
     },
     {
       "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-close-custodian-private-object-unlinked.armed.json",
-      "sha256": "1f7d447098638c26074ce33de6c78821057b73c9bf425bd1053409cb80e09513"
+      "sha256": "8f547d56fbfe8c72046d2bd45841c06c0734305b8478bcb6aa8cb26d3189d692"
     },
     {
       "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-close-custodian-private-object-unlinked.arrival.json",
-      "sha256": "3972023ae61656d4cdd3f5ebd94a4fffa63719ce5ef5a10f5c7fae40d1bdb0b7"
+      "sha256": "faf53d09a5fbaf451a0abc4eedf2774d94151a648f4836dd0d0f18cebefef32e"
     },
     {
       "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-close-custodian-private-object-unlinked.json",
-      "sha256": "e8eeb73157ad18814f633f5431d141f6a54158e8a7982c8aa5fd86584c4a13ab"
+      "sha256": "ed583c45f8f9ee7f4e444a67e43b6728558f5b1cbca63f915fec47fa340efba5"
     },
     {
       "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-close-custodian-spend-plan-durable.armed.json",
-      "sha256": "c9dfef8e355d93f83baa7a68d116c8014c702ba3cfd3e3b8a3f21013cfdc19fa"
+      "sha256": "636a8656ccc42f7389cd1464809e071d1fa530da932dfdb5392c6ce27814e735"
     },
     {
       "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-close-custodian-spend-plan-durable.arrival.json",
-      "sha256": "e970145ea9f1018d9cad1a31ceb453bf851f95e3fb34be996eb03da78d4ea2fa"
+      "sha256": "b97710fd9edc23db896d43e928883113c363bb034bf6cc26a57fd47c35fa0a1c"
     },
     {
       "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-close-custodian-spend-plan-durable.json",
-      "sha256": "edf46f42b0228743250aae6d12366977c4fb50177fa6d191543058bb351c858c"
+      "sha256": "39e126fd2c64543a3e88ae9c340676ffbe10d70b5374d0d2c03d11075057d714"
     },
     {
       "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-close-custodian-spend-receipt-durable.armed.json",
-      "sha256": "242fc85096be8a3852af44937804e2a5a13d3d6f23650913777a845de1734093"
+      "sha256": "35e634d2fd8d19092c0bfe68d633371b5e1199b8c6225bf02f3b90b091512417"
     },
     {
       "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-close-custodian-spend-receipt-durable.arrival.json",
-      "sha256": "f3299de98680b618d8a5632c1a9d759bd09d71c8942f8936dbabcf91e135004f"
+      "sha256": "1af4aca26c15e71ee2e25e78ed0e7f8d9a32a81d66f9bcea256377747ca39f55"
     },
     {
       "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-close-custodian-spend-receipt-durable.json",
-      "sha256": "8ee2ea1c195d8e529ec889c5a34dad383b9ab2b2f83c62145899640b4892d49a"
+      "sha256": "3569d685c3f7fb3f78e725fbea99ee0f25e25e0202ba95cb82ecfc0282ef6d70"
     },
     {
       "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-close-custodian-spent-fence-durable.armed.json",
-      "sha256": "9320fc7b5c5f7c8f826e6f38402b0a04689a46518fb419967f3c93fd2c8fe78d"
+      "sha256": "a2f3e16c7b272eedc4e1f1d214ef65f4a8767ac00f5a6c2ad04f3fbc1cb3ba4b"
     },
     {
       "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-close-custodian-spent-fence-durable.arrival.json",
-      "sha256": "b953d00b15ee0ddc69cf56efb39849d2d47a33981145f21db8176dda01ff9258"
+      "sha256": "ace25a209090084116f122aa9e8d5042647a45258aa80f0a1d526fc492e7ae98"
     },
     {
       "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-close-custodian-spent-fence-durable.json",
-      "sha256": "69da9dd44e51d7ed7f0ca18e4c21ab65a98446563b09be2b0649173a6424be84"
+      "sha256": "9ae352ce4fae848087347e9ec23eb367fc53b08ed80993809691ef3fa27ca8f6"
     },
     {
       "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-close-custodian-spent-state-durable.armed.json",
-      "sha256": "42ca1441eeedb226ab84d4700272172dd6f7cc931294932b15b5c7a2eb19d1e3"
+      "sha256": "2a1fc5e715c11202ee1ba2f98fda2ca478af8a3682c56b76b1d5d173e771042c"
     },
     {
       "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-close-custodian-spent-state-durable.arrival.json",
-      "sha256": "10e3a9a2eadc9dac5a4b866032ea246429f9f9203e34284017ceabb627d1bccd"
+      "sha256": "34ecb38e547fcfdc1b51bfd74d48e6dcfde84faef3ad4b26d6ae27624261cff7"
     },
     {
       "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-close-custodian-spent-state-durable.json",
-      "sha256": "3d05fadc11e6f1bdf0bf7d7727f9a0195ed601d5d93273807b863be55a70c915"
+      "sha256": "bcfed53291a3eb3a563953ad168d193bea5b978d0f48ff4489705d757bfdbf3a"
     },
     {
       "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-close-custodian-temporary-unlinked.armed.json",
-      "sha256": "3a9039304b26e02a8b77ad1ea39215469a8eff91cc05c98947a243525edf1a71"
+      "sha256": "678a5eb04bd44d182726c3992103584332691413f8a13d1d5f2c1176da3d7136"
     },
     {
       "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-close-custodian-temporary-unlinked.arrival.json",
-      "sha256": "a6903e357354bb5261d1e03cdf15d2d994d851b8cb3e3297e0465ce53711a20e"
+      "sha256": "9f27a7462971968ff2def2fa0a6a4426700952d8349a3f2e93cb50a5230c9b75"
     },
     {
       "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-close-custodian-temporary-unlinked.json",
-      "sha256": "ed925a05bf4be4c7d8a8ba825579442335eb6d0bab248323fb86575ce6fddcc2"
+      "sha256": "32387b198849467e01dee1770d650812dfb3e049ba0403205bbd24b8f13548d9"
     },
     {
       "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/ruff.log",
@@ -1294,7 +1294,7 @@
     },
     {
       "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/ruff.result.json",
-      "sha256": "fa4c2bd3bd2c4370e93f8364925fa584c7d5567b76ae82f9153a4a75cd74d0bb"
+      "sha256": "f666055c8007a5e228c9bee3aa0936b7bd6a4c31028c34aa1452132e2e7cf084"
     },
     {
       "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/scope.log",
@@ -1302,19 +1302,19 @@
     },
     {
       "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/scope.result.json",
-      "sha256": "6b87a51f54814fdfbf23f41d58f49322f62b95ef92645c50556ca1d6a6ce33c2"
+      "sha256": "386bd55cdf40cc25d1ce672107c5d8f49833e7012884c8d0e178b3621fad54db"
     },
     {
       "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/tests.junit.xml",
-      "sha256": "dfa381367eb71fb16adcae3275eaf64c028300721f3ce70179e6f83ff9642584"
+      "sha256": "9e97c0f72879d8b3b90a7d52c839f95fb26e023272af31f29dc8dd1b5fd30279"
     },
     {
       "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/tests.log",
-      "sha256": "55952182f22e9074292ae36e191fb3b4c000eb347af5321bbcf5b9da9bf3f893"
+      "sha256": "19fa9a7e06f3d2b96a6986af6f94f700e56e5b1032d3365b1b3924002d0f4db5"
     },
     {
       "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/tests.result.json",
-      "sha256": "04c3fc99cddac5996c81c77a920949f3f31f9b5a9a7abf32851f394c7c86c4ab"
+      "sha256": "6f6b112f71af9eb437a81fcbd0ace846f3d9d414629fff64a9edb0f8acfe5804"
     },
     {
       "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/types.log",
@@ -1322,7 +1322,7 @@
     },
     {
       "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/types.result.json",
-      "sha256": "c7ab8e6bd005d33d8298e1f386d1d2c24de7cee85d5eda8cdbc36ae7c5ede014"
+      "sha256": "b0b978fdb7079da1318054f54a3c378c4f027a95dea9041d74757ccf27d11298"
     }
   ],
   "limits": [
@@ -1331,10 +1331,11 @@
     "Graph coverage: the codebase-memory index does not cover this worktree; changed paths were read directly.",
     "No independent acceptance, E global closure, production activation, push or merge is claimed.",
     "The original B owned path tests/unit/r2/opportunity/test_acquisition.py was never created; the acquisition service is exercised by tests/integration/lib/db/repositories/test_opportunity_acquisition.py and tests/integration/r2/opportunity/test_acquisition_concurrency.py in the tests gate.",
-    "Tests gate first attempt at this HEAD: 1244 passed, 2 failed on load-sensitive test budgets (a 6 s refresh window exceeded under -n 4 in test_v2_expiry_uses_original_deadline_without_any_content_or_port_call[False]; an asyncio.timeout(10) observer in test_v2_closure_native_fence_and_lease_interleavings_preserve_one_authority[attach]); runtime code was unchanged from the run where all 1246 passed. The same command was rerun once; the failed log is retained in the execution workspace (failed-attempt-92081cbf8).",
+    "Earlier candidate 92081cbf8 needed one disclosed rerun of the tests gate after 2 load-sensitive budget failures; at this HEAD every gate passed on its first run.",
+    "Second repair after the sponsor-authorized delta pass (H1 partial: worker seal may omit entries; M2: manifest argv tail trusted): worker seals must equal the export inventory of the tested tree and the manifest argv must equal the pinned runner argv.",
     "Repair after the single independent acceptance pass (CHANGES_REQUESTED H1/H2/M1): restart source seals, boundary markers and kernel proof re-derived; executed cases must equal the pytest-collected inventory; original B6 regressions required by name."
   ],
-  "created_at": "2026-10-29T18:55:41Z",
+  "created_at": "2026-10-30T03:04:08Z",
   "e_global_closure_accepted": false,
   "restart": {
     "schema": "m9-manual-recovery-restarts.v1",
@@ -1342,879 +1343,879 @@
     "mandatory_cases": 62,
     "manifest": {
       "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/manifest.json",
-      "sha256": "2e644d36f073fd2786cd87f7519c01f1e37c6d23c4bd0437b8ece9bb95184103"
+      "sha256": "0e66523ad83aa7e7cabb98a02c562a2990f1e734fa10642c3745043c4f26c08f"
     },
     "report": {
       "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/junit.xml",
-      "sha256": "67afa60912fab1c56ee5f3fc48430353679039f9ae102efec674e3d7874f225a"
+      "sha256": "27d68cb35b59e05b79acefe656baf33fd63ac1b5223a4176dae59029be2d2b0b"
     },
     "records": {
       "application-acquire-planned-committed": {
         "record": {
           "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-acquire-planned-committed.json",
-          "sha256": "857191f6e357d0df36b8b5c3e12224320ba768c564915037cc30af1fe31c3b0e"
+          "sha256": "19675e8e553b8dc865e0394b52a962174bbb8e31967d99d3fb3e01a1d614e0e0"
         },
         "arrival": {
           "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-acquire-planned-committed.arrival.json",
-          "sha256": "200a372596d394b8af5881ac9716c11e53b0e900f2ecf93175db983db5c12eef"
+          "sha256": "cb6a975fc5106759ac7b3eb13eb9038dd4827098d066bf96f00385b078e2d70d"
         },
         "armed": {
           "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-acquire-planned-committed.armed.json",
-          "sha256": "d4b684ac85c66b630a54077d11aac043ad08de6032d7940ccc4f64b3ff0ccc7a"
+          "sha256": "abdb71c8254bbb0be1c0143e10079c07ebf61097e5d5e6c884e5ef2924099289"
         }
       },
       "application-acquire-reserved-committed": {
         "record": {
           "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-acquire-reserved-committed.json",
-          "sha256": "2f9bb5f54f9f2d7c1554c6286137725318d0c7d7ab519a25dd13f1000e5454b9"
+          "sha256": "e8c968af4e555beb8e2a5c9016355759839fbf15d3c33204f6830b7209713ed0"
         },
         "arrival": {
           "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-acquire-reserved-committed.arrival.json",
-          "sha256": "f36c70821c0d1fec9a68093950e315f1eb23afef10b35cb61233ccfef9385ace"
+          "sha256": "130f23a420b0287f6480a695f1db4a43b82e3aba031b4cd1cbb9894577b630a9"
         },
         "armed": {
           "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-acquire-reserved-committed.armed.json",
-          "sha256": "2885cca2124f4a4fdafcdaa8e7159ffdb74e4d52af653e32739f9d7463e5f656"
+          "sha256": "5d5e784b0e9ff4e69f807d65699fdd63b1f00001e054a1de2396f616821008a9"
         }
       },
       "application-acquire-publication-returned": {
         "record": {
           "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-acquire-publication-returned.json",
-          "sha256": "fa791f8da84dcd40a5f0f5bb1218f3d824efd7b83b552b565d739983c7576cca"
+          "sha256": "a41e0585e9fd0e7e7db09bef537b1880d0f9eadd5b5de876d8b91f6714c1afc4"
         },
         "arrival": {
           "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-acquire-publication-returned.arrival.json",
-          "sha256": "bd944d1cc19887613f93520d8793e8b2a2ed1de89fec381ce8231a9d73279d53"
+          "sha256": "4e979060072cbb70ae924c37d49deb493f5be67499f8fe907c85828d6668a9db"
         },
         "armed": {
           "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-acquire-publication-returned.armed.json",
-          "sha256": "46d685182e4d19018aaf1a15f507da14635fccc7cd9a584e85d5f3d7f3b856a8"
+          "sha256": "4d1c6beb836fc7c35684892b1ea56b1538dd6776027223336899041bd74af95a"
         }
       },
       "application-acquire-ready-before-commit": {
         "record": {
           "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-acquire-ready-before-commit.json",
-          "sha256": "b4d4123ac7929389cb56fbe8a855adca2cd7e6945670eadecc2f4f102c402f5e"
+          "sha256": "98d8122067fac0b68a1c4719eb9cac6e3304ddb03ea83f5b024bc6e6d8f5ba11"
         },
         "arrival": {
           "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-acquire-ready-before-commit.arrival.json",
-          "sha256": "7af0c8d03e83421ef67e603ecf0369e4a07d92cbec8baa5af901587b13670865"
+          "sha256": "be4c29f8f7414fbec09d3c8909597471bd65a36e69ac8f91be5f2f5c434034dc"
         },
         "armed": {
           "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-acquire-ready-before-commit.armed.json",
-          "sha256": "5e3cbb31bc93729cf637b4e20579c54d15e6e5437aefd6335aab0217f89c1663"
+          "sha256": "e13be9caf4275e8b4e6ca62096b8c47bbbb06fc24c40ea3249b724f76bf263c1"
         }
       },
       "application-acquire-ready-committed": {
         "record": {
           "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-acquire-ready-committed.json",
-          "sha256": "a0eca87d7617d95e07491c9247ed82236f17d0441100f21f1ff6a126542ba25d"
+          "sha256": "94bffd488cacd7cefa97a39c34c783318567c6a4b3d639e29b6fe536a4359199"
         },
         "arrival": {
           "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-acquire-ready-committed.arrival.json",
-          "sha256": "eec4b51b47b475fc60b9723dc63b4743071992797a6f51815b9b4bc51c71606f"
+          "sha256": "fe9a5c4b8801f6aef4d87022b1b6a9e2b065d0796382138a32bfeb71383940de"
         },
         "armed": {
           "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-acquire-ready-committed.armed.json",
-          "sha256": "d29aacb6e0f23f4fe55fc49fa3749f836d3deba8285059a507456b6e0dcc8aa4"
+          "sha256": "44a72235314d9c2f5f34cad17e076ed53abb68d66e7332f5cd04440edbba9455"
         }
       },
       "application-acquire-claim-before-commit": {
         "record": {
           "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-acquire-claim-before-commit.json",
-          "sha256": "518c75725bd5b7e5b596f169736f6f83677b94d0ac41a0cada015355f8f4a23b"
+          "sha256": "1cbd62f41f69b111e7d64e764c44d18ebcc64ecb9017ca3f14c2f48dbd2e8c53"
         },
         "arrival": {
           "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-acquire-claim-before-commit.arrival.json",
-          "sha256": "6a6a02a9e8d2ee8147d4b943f8ed522fc1e6b527a25d5187af871f168834a6ce"
+          "sha256": "5946cccc4e22a6701bde0f4cb8afed5ef9937f0204cb44031b080f72b940d576"
         },
         "armed": {
           "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-acquire-claim-before-commit.armed.json",
-          "sha256": "2329dfe8cc74e49c23e3e8459c88fad2d041993e2d376ee7f595e97fdce66796"
+          "sha256": "7ca563ed7da48f9fa6e356769aae13615b0c284a3c287603b2a78dbf8c63e78b"
         }
       },
       "application-acquire-claim-committed": {
         "record": {
           "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-acquire-claim-committed.json",
-          "sha256": "ff9757f975b50c4876ff1982b612621a49c8d5222651e5119362da1b5e300e12"
+          "sha256": "eb164093b97fd4b10f93622309920480a90bfc31bae61aaccf1edc15bd71bb3b"
         },
         "arrival": {
           "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-acquire-claim-committed.arrival.json",
-          "sha256": "7202d3cbf2935a9481933695d9bf93291749c6ea0bacdeb4b5840d107c0aca7c"
+          "sha256": "6cd992773307c5da629cd9aeb8fcf30497ae6e84328a98ab7161848910fc8dc5"
         },
         "armed": {
           "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-acquire-claim-committed.armed.json",
-          "sha256": "0799025c114e57b7fca42a023ca8836b687b0e3369a306f03edfed43c76fe313"
+          "sha256": "e412d01eab702f7033c1b66a4f522111be549401536460d49d187083bb623582"
         }
       },
       "application-acquire-before-source-dispatch": {
         "record": {
           "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-acquire-before-source-dispatch.json",
-          "sha256": "6965e7f11023b0c900042d27b9a076c0e6efe87b8c32ae15233463707bd21d93"
+          "sha256": "60e14fb253969031a60ba72b6cc2129a3c13d70683be3019c13bfd473ed5033f"
         },
         "arrival": {
           "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-acquire-before-source-dispatch.arrival.json",
-          "sha256": "ecad3646afd6dbe360765dcfbe1d24f82314e3591e75eb97a894fd71517ceef7"
+          "sha256": "1599b0b864ff466eeffaa42039050e98ad1d3b98a987235be90480803f38fb01"
         },
         "armed": {
           "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-acquire-before-source-dispatch.armed.json",
-          "sha256": "afa5738451c9728a695a99a2f43794221de40750145d56deb27ea3a7165f4a4a"
+          "sha256": "fc600124f2f4a77a906d9432e18020a0a6e05d57ff640d376df0011eefbc9f30"
         }
       },
       "application-acquire-source-response-returned": {
         "record": {
           "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-acquire-source-response-returned.json",
-          "sha256": "15d4f883a50cd0d718b5950d2934b7dbd2d6dd8726c025937be97cc1a99ccdc9"
+          "sha256": "f6acc2c2be7d50e0d1510db63008c17d9d410bde7955b297a773edde06478866"
         },
         "arrival": {
           "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-acquire-source-response-returned.arrival.json",
-          "sha256": "1c8681f3a4f2188704cb63231fc026a2555007cdb621b3e9e08e667a4b247a72"
+          "sha256": "62f18e5efb205a534b03e7b5c60ee86e5cd84cf220f15ff9da8063a27df29d81"
         },
         "armed": {
           "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-acquire-source-response-returned.armed.json",
-          "sha256": "c6ea8b970c7c79ff1510256d4543d6f6afda5370c133a4def1df0f016d681dc0"
+          "sha256": "438f5e8048e0abec5f1f9ca8ea1e7ece359489b72cd7747f9c7d57d67161bc4e"
         }
       },
       "application-acquire-checkpoint-before-commit": {
         "record": {
           "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-acquire-checkpoint-before-commit.json",
-          "sha256": "a1f6fd44872173ad0265e9fa0f384769de7857e72c0dbb5e26687176d55f4369"
+          "sha256": "d1676d24dc33b43161c70989db216980ce5ccdb7005f6f5b347ed13cf7f73f81"
         },
         "arrival": {
           "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-acquire-checkpoint-before-commit.arrival.json",
-          "sha256": "a3a5370896e9cead98bc11490b9986ac98e042eda81731d5b710ff0e03af8287"
+          "sha256": "d5e986f3da0dd7872e59df01d62b3ea4fb432cecb0eeba228d47c695f087c876"
         },
         "armed": {
           "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-acquire-checkpoint-before-commit.armed.json",
-          "sha256": "2a57c70a7fa30b51ac23a75257529b7e45ab6d2c0e5d550c4894c074de860209"
+          "sha256": "1be22c3d5e3007fc4c5ae8e2defb9b771bbc802696e6629661324af13bed1670"
         }
       },
       "application-acquire-checkpoint-committed": {
         "record": {
           "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-acquire-checkpoint-committed.json",
-          "sha256": "f9bd5734de0af5e63411f7a42e5185fd0d4a397cc212e10a1b9cd06d238be86c"
+          "sha256": "c16f07e911399cf453afd8d23cf7fe20801bc8357618c16cc0f9130d6f53bdb4"
         },
         "arrival": {
           "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-acquire-checkpoint-committed.arrival.json",
-          "sha256": "ddfef537ef39d489072686b9bbdeb6cb8de139d81b83a00ce910d9535defe840"
+          "sha256": "52a9c493fcd479c58cb000adbb86d34911e36b6fbe2f7d66db88d13490ed8a07"
         },
         "armed": {
           "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-acquire-checkpoint-committed.armed.json",
-          "sha256": "bf675d23329512a7ad9875e3ee3e7e43c6948b33fffa2ef73ceb592a1b752639"
+          "sha256": "d6e8c2a08125bce2b130ee9fa893092c148223184dfc624a3604048d9e7ff24a"
         }
       },
       "application-acquire-finalization-before-commit": {
         "record": {
           "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-acquire-finalization-before-commit.json",
-          "sha256": "32bfc97a1494ed75b15fcf09330707636cf9591c09ac919f0d66e7b9835da4fc"
+          "sha256": "d724e09295a91a5348525a11e06bcbbd4e541b581ad90f16434a9d7711e3c135"
         },
         "arrival": {
           "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-acquire-finalization-before-commit.arrival.json",
-          "sha256": "a5b14ba42854da9e9f98b713670c1acbfc3f8e5cbcca173de793c3da529d5082"
+          "sha256": "b93c6a7f2097e624c01483d2c06a1c4e651c19dbea2b408e2a7720117705c97c"
         },
         "armed": {
           "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-acquire-finalization-before-commit.armed.json",
-          "sha256": "c00a5c8688c1d91f8e208daf2286f4ca8f1b6858c015399b91aafec50dc3040e"
+          "sha256": "b0da8746f75d8763b7861160164bf30e375897c4fbc30d45db31e733d7c7c87e"
         }
       },
       "application-acquire-finalization-committed": {
         "record": {
           "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-acquire-finalization-committed.json",
-          "sha256": "3f53355808488d690575936c5d4583f52bce8c1bbcd649e3cc269c2966d64173"
+          "sha256": "23399d58e6f70c08f9a2cc063383d2a013b31266bb48106d6ccecc961836ddae"
         },
         "arrival": {
           "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-acquire-finalization-committed.arrival.json",
-          "sha256": "cee88908ae0c89044e014d4aa3c72815572664d5e05d9eec10db1c20e88ef599"
+          "sha256": "f9022c4b929304a1166b4fa7611daf8e4e65f011ba1154bd524bd462c134d5ea"
         },
         "armed": {
           "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-acquire-finalization-committed.armed.json",
-          "sha256": "615cdf869efba7e7d894f2ffa7777718cabb81934824063aa020fd4ccb3b0df5"
+          "sha256": "09166a8e2787bbbf04eab5d714396a0df63c868f05e45342bd79fc67854bc3bc"
         }
       },
       "application-reconstruct-reconstruction-fenced": {
         "record": {
           "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-reconstruct-reconstruction-fenced.json",
-          "sha256": "07b1adfe887c99087e094eb286c1170fa9e3b439502cdc2b5f09456fa547ab85"
+          "sha256": "e0a648c65f900de7c72d96407dbaf0163ce13810cc13e7b024f6a3e7599ceb2d"
         },
         "arrival": {
           "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-reconstruct-reconstruction-fenced.arrival.json",
-          "sha256": "d92fdd72c79a361fa4c3354f4c42ada8b4316e1112e25fec31f9c8b253668e5c"
+          "sha256": "89113f69213226c76f02b7f783800a8bf1ad040e362cfce637f88bfe0d713052"
         },
         "armed": {
           "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-reconstruct-reconstruction-fenced.armed.json",
-          "sha256": "9b5fb1debfa808af52c51b365ca2bc39090d608cc10725f16d2ba686e0170afc"
+          "sha256": "a0c161ea8f59c9d13002d80e9dea6ad3835b9bea3b815b037498298671c4e61b"
         }
       },
       "application-reconstruct-reconstruction-checkpoint-committed": {
         "record": {
           "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-reconstruct-reconstruction-checkpoint-committed.json",
-          "sha256": "0dde7b76ee9bf924f556aeb24c0a00b7f513c87432a3ac9713b4d27f26efba7f"
+          "sha256": "9af85c7cb7b267de1377ac8855074a251d9f27f0de1d7004be43cd8a7ff734cd"
         },
         "arrival": {
           "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-reconstruct-reconstruction-checkpoint-committed.arrival.json",
-          "sha256": "2b6930b07f8c9c9a85779a5e04af2d17ce20295e36450159513b2016f80a592c"
+          "sha256": "42ea31807376979489f5e5c5cf509555382e61f91e3b484bdf39e2193ed3100d"
         },
         "armed": {
           "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-reconstruct-reconstruction-checkpoint-committed.armed.json",
-          "sha256": "2fde92cb5e17020d75e03ed7a4123a90a3fef7b6c137b9a492ec808d74a3cf99"
+          "sha256": "8ccfd55e24114268d5991bc96053d4a2015728a6169bc0e3c27978de07d23a3a"
         }
       },
       "application-expire-expiry-committed": {
         "record": {
           "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-expire-expiry-committed.json",
-          "sha256": "4d8cc605ac049db5cf0aadf1d787ed024f09ecf149ecce551ca7384311e75b39"
+          "sha256": "4b57f439b1d7bde368b3aa7feafed4fabec655b956aa95d706760a8c65a4fe3f"
         },
         "arrival": {
           "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-expire-expiry-committed.arrival.json",
-          "sha256": "35707c03e499caaae30cbfca8914c5e3d5f84eccb3d69cf39b41091790e1a4e1"
+          "sha256": "9f867ed104c42fb76a3c1456273fee692562b8b8160c0db6a97fcb9295de28fd"
         },
         "armed": {
           "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-expire-expiry-committed.armed.json",
-          "sha256": "330d9093ee8ad02a8d99c338537e8c92f5bd25e05abe6531fefcb88be7f4c830"
+          "sha256": "2d38b16880548c58e04b5d493163c16f34d6fbed79c701c83c75592553cabe27"
         }
       },
       "application-cleanup-cleanup-fence-before-commit": {
         "record": {
           "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-cleanup-cleanup-fence-before-commit.json",
-          "sha256": "93572c63c186f0c2e5de218574dfe214d887263dc76a8ee16f621ff6e2256421"
+          "sha256": "0543c506b41f7b593b9ef46adb3678793a5fb8f672b72bad12ec672a8ca0cbff"
         },
         "arrival": {
           "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-cleanup-cleanup-fence-before-commit.arrival.json",
-          "sha256": "bdf3d756c9484ac0e23eac629c8a76d84a2be87b595f16168441343dfc362b97"
+          "sha256": "9dec13cf2249f1ed0f0aa46b85924c6b15f5ec520ad7db46ee530744520fb450"
         },
         "armed": {
           "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-cleanup-cleanup-fence-before-commit.armed.json",
-          "sha256": "f3b90339fcb6fb93387de52a0ca4804136f4223d7ce5fa1cae790bce7d30f28a"
+          "sha256": "50bdf538e858b113fb176c8a98bc0a7f0eb0f9caad82f8e81c373ec5a34516fb"
         }
       },
       "application-cleanup-cleanup-fenced-committed": {
         "record": {
           "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-cleanup-cleanup-fenced-committed.json",
-          "sha256": "565a7b2f9b45796db0a5f177fd4d4af7971eb106cf58867e1170cc0683668269"
+          "sha256": "9fcd3d7a25dec2494123d9e980ab02d82419b331725e16fad6947e491894b83c"
         },
         "arrival": {
           "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-cleanup-cleanup-fenced-committed.arrival.json",
-          "sha256": "3d596301fcff519e2ca300d664e59f484a55594075ef0dbc1274f0d8f523f52a"
+          "sha256": "834b79faefe5bc7055699771c06ed1c04c7cbb0170476e126a945635a6f86354"
         },
         "armed": {
           "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-cleanup-cleanup-fenced-committed.armed.json",
-          "sha256": "39fc5d551d4f300c57eadd8fff3fc263a568f1e8eed540c25b1a22ba243d2c40"
+          "sha256": "b323a917c341373f588728e56bfc8e859feee2ff4a08632d996c0ec184d8f0e3"
         }
       },
       "application-cleanup-cleanup-publication-fenced": {
         "record": {
           "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-cleanup-cleanup-publication-fenced.json",
-          "sha256": "8d39e54cb743b774149d8a3a4b2c0eca25beeef708d8f3f69d4b455d844ecaa9"
+          "sha256": "12914961ec6977209cc5d15393aa227e4a5c46e5a853b099bb662c081310112c"
         },
         "arrival": {
           "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-cleanup-cleanup-publication-fenced.arrival.json",
-          "sha256": "fb62d4fa1c24e4bcc326c325e3d298ad96c627d38f16339a2b870bf52bbe71e1"
+          "sha256": "37c32be84e96407cb4a9d79ab990324c5da259b76816d5be3085f6944852c58b"
         },
         "armed": {
           "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-cleanup-cleanup-publication-fenced.armed.json",
-          "sha256": "04f30b7b36f0f339273005e33e062b917f714ebad0eb7ca44cfd8547a42f4813"
+          "sha256": "a1577e0377c45db38c26eb7c4c847b544c8fd27994918fa2c83d6db6e796ef13"
         }
       },
       "application-cleanup-cleanup-drain-before-commit": {
         "record": {
           "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-cleanup-cleanup-drain-before-commit.json",
-          "sha256": "dcae9c20459a7e704a5e35e4a51718ff54e7ace49d5a8d0dff47a47af1ae99c1"
+          "sha256": "b4ccace7a7c0ccdbdd1cb2a96726e737457d3615028f9c402878a6aed4645be5"
         },
         "arrival": {
           "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-cleanup-cleanup-drain-before-commit.arrival.json",
-          "sha256": "ba6fa36d43f5abf7e48c5b363cfbe2bb2073282a7f906c358d5c19b676de15a3"
+          "sha256": "fcc20f7f05b3982831d930ca6e0dd8a808040617cc452350d1ae99be070b9fb5"
         },
         "armed": {
           "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-cleanup-cleanup-drain-before-commit.armed.json",
-          "sha256": "8156f6ebae34ed4d4804e76cccce225b557941a9c79bb77cabd084f7d8e4f1d7"
+          "sha256": "a02e6f4418c3802486a91e2e7a950a43e84ce5a48dc1c88408b62ac89bc5a21d"
         }
       },
       "application-cleanup-cleanup-drained-committed": {
         "record": {
           "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-cleanup-cleanup-drained-committed.json",
-          "sha256": "8eebbb8fc189f9f4cbedef9265c654d7f9f7e45afa5a367e3a2901cc2b4bf4f3"
+          "sha256": "e34b1b70cce836a071475860d84c17fd23afca7934d99a2d8aa850bda668b109"
         },
         "arrival": {
           "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-cleanup-cleanup-drained-committed.arrival.json",
-          "sha256": "df6c8d7fcf97b4c3f559777f9c477ca709be86bc5160b9fff228bed6ec467207"
+          "sha256": "c424b7588c76f2c68e8df83dacdbab86e477ba3b04dc40337fd38ab72960cb51"
         },
         "armed": {
           "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-cleanup-cleanup-drained-committed.armed.json",
-          "sha256": "df008841d4b7d847c795a907cf003c1dd552b919e3823e657d5a70a052198aa8"
+          "sha256": "be8e4857ee9aa05ec34dd57e865cb0400ede74e971e925ebca06df2bed47415d"
         }
       },
       "application-cleanup-cleanup-private-erasure-returned": {
         "record": {
           "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-cleanup-cleanup-private-erasure-returned.json",
-          "sha256": "89dece3cd046fa4d93ce05e3a23d009946711d09fa1162c3d71fc0a07ac5218e"
+          "sha256": "4b6d32b50412401d2bd478c1ab2af9622b3dc010ef23d6625a347b90a8a7fe36"
         },
         "arrival": {
           "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-cleanup-cleanup-private-erasure-returned.arrival.json",
-          "sha256": "323dfa19afce794fad5a5f1cbade355f28f3c682849845d8dd65a8e53ab279f6"
+          "sha256": "15f1a20b8717b87f6bc634a81ba76fec4fc9973098c8e9615383486c58ec5fd9"
         },
         "armed": {
           "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-cleanup-cleanup-private-erasure-returned.armed.json",
-          "sha256": "ba822da789fce73bb24bd75ca62f0dcedb9958d45b5a8c9a7798330237a71ffd"
+          "sha256": "ea95ef26b1f8682dcee16cb2409478dd18176773a8f602547948d91a0cd45caf"
         }
       },
       "application-cleanup-cleanup-authorization-before-commit": {
         "record": {
           "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-cleanup-cleanup-authorization-before-commit.json",
-          "sha256": "978470bb144d2386712c078a03e1519cd5c423f0f1da71070be3121fc47c6919"
+          "sha256": "df1586b7f44113d2e9cb71170347de6aa5a59f7ebc6527983c476041d89cec0c"
         },
         "arrival": {
           "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-cleanup-cleanup-authorization-before-commit.arrival.json",
-          "sha256": "ac7f5772111a9a8318edb78c861a5080f07c55ca9210c1b7b1a18522c022ce2c"
+          "sha256": "63a93984ed50f540426b1386ef55409406806dd60a74d26aaf3568b85a2aee04"
         },
         "armed": {
           "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-cleanup-cleanup-authorization-before-commit.armed.json",
-          "sha256": "50723f32e5fdc08c504b07f7b2af1a8dccb0bdfde32dba61b2da1ed5d76f9f5c"
+          "sha256": "357799f251f0319645d0aa6902438af5c0fdc2a66daf053e256bcb601f02f6d0"
         }
       },
       "application-cleanup-cleanup-authorized-committed": {
         "record": {
           "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-cleanup-cleanup-authorized-committed.json",
-          "sha256": "eaac11c03452013bc248de2227b2369379a8f918fb3072a9d3f389576787ac14"
+          "sha256": "6e87ec501f9d271f8dfa80037287b3cc04e961c8683e13a0a0928705cd508eba"
         },
         "arrival": {
           "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-cleanup-cleanup-authorized-committed.arrival.json",
-          "sha256": "02e8eed6968fd5927d79142b650c2728f293855452192fbea1b922eac58f0bb4"
+          "sha256": "61ae1962c8216a7b5863e0b0d1c1d28e59176b469f498ca52035e027e9b58707"
         },
         "armed": {
           "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-cleanup-cleanup-authorized-committed.armed.json",
-          "sha256": "7d7023c7e6cba1c1ebda4739467ef3a10a6515b2465e0dd810b406844f83a976"
+          "sha256": "db9ba9d544db87cfa4b9b270a2b7e1270d25798a8fe96a3910b3539ce79e33ae"
         }
       },
       "application-cleanup-cleanup-public-erasure-returned": {
         "record": {
           "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-cleanup-cleanup-public-erasure-returned.json",
-          "sha256": "ed30c56f0e652dce291978aa839c6669664ceea171b9767729efc520b9f6f7f5"
+          "sha256": "eeeba774e7e42987cded24e69ffa3c5b46b9730abbd787623398a555681e0d37"
         },
         "arrival": {
           "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-cleanup-cleanup-public-erasure-returned.arrival.json",
-          "sha256": "c81f19a7692cb4665f8cf4fbf5f51b9e3901f450ad0e1f2a00d3f123a831cfe6"
+          "sha256": "47d24e93e927c663788472179607d07d39886a01242f98124f6dc7b82a3bf999"
         },
         "armed": {
           "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-cleanup-cleanup-public-erasure-returned.armed.json",
-          "sha256": "2f7a56cc112a8b3af96ffbc40464b79be8102ccd5381483c2e4188f33e95fe72"
+          "sha256": "5a0e176104ab8655d2938c3013b32725e90c93ba416fd5c7e1745f86191fca4b"
         }
       },
       "application-cleanup-cleanup-completion-before-commit": {
         "record": {
           "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-cleanup-cleanup-completion-before-commit.json",
-          "sha256": "d13b0b612ebdcb5d05183bc4011a1f72def7b5a3dcf5945f90603989757d4704"
+          "sha256": "9e95e5b7c04628e6ba01f380447416999fa33eb46bab29f94dd4e80a9deb1466"
         },
         "arrival": {
           "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-cleanup-cleanup-completion-before-commit.arrival.json",
-          "sha256": "ae7e44571ab952effe72349f5dab4660ff79d5c047a9e23bed04b89af92b7118"
+          "sha256": "f3c13d4795374c55aaf2411a71fafc010bda32e88440e4f156efc109dd5ccc9d"
         },
         "armed": {
           "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-cleanup-cleanup-completion-before-commit.armed.json",
-          "sha256": "c38b86d9a4a2c145bf4493cb3e977a5d385b4683d9f5ffc24ae2f0e3621237de"
+          "sha256": "e6bbad7881829e47c723637390ebbadc46d646740ecc23cbd76f43cd07f9712d"
         }
       },
       "application-cleanup-cleanup-erased-committed": {
         "record": {
           "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-cleanup-cleanup-erased-committed.json",
-          "sha256": "41025c3ed0599295fde6fe2eb8f47a9ef756257bdef9620cbaadc43986a6c271"
+          "sha256": "0c0d8ddca2c7c78e75a55463fb14760fba3849f30ecd9fc9a3feabe8b693c164"
         },
         "arrival": {
           "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-cleanup-cleanup-erased-committed.arrival.json",
-          "sha256": "092746e0bf1697d76e284df67dca05e78ce5cccdfdf0af6eb32701b1308ebee6"
+          "sha256": "ec4ab55206f8139be68f66b26b4a1eed421e3cc98c2d8d9b999a871267c7214c"
         },
         "armed": {
           "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-cleanup-cleanup-erased-committed.armed.json",
-          "sha256": "2d9190c42d3f332db2bfe4f40c4b5750151b29ddf732d89fbb1343425e478db0"
+          "sha256": "06ddac587b8b5a126b64fc24b40982371c1ebbea3a6e87773f85648fffe95231"
         }
       },
       "issuer-admit-issuer-header-seal-durable": {
         "record": {
           "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-admit-issuer-header-seal-durable.json",
-          "sha256": "1127c912a73bfcc7646feadbea20fbcfeb36d87570f50388444d846f1dc62023"
+          "sha256": "4ddd348db5d234ef33e4f5ddc5e02ab3bd1d3c4273b16d0fa71fd18be188f34c"
         },
         "arrival": {
           "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-admit-issuer-header-seal-durable.arrival.json",
-          "sha256": "f3fd0da63930bbc8313eeef4acf58d2b06b053a92b825de4eee08846b81109dc"
+          "sha256": "fff0d1614431d3a6b295a9ae6722482c7840d43f9dcad40523ca7b1f64d70255"
         },
         "armed": {
           "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-admit-issuer-header-seal-durable.armed.json",
-          "sha256": "7b3e3846acdd7a4a5a9931598a6e9c8262e9e5559afd69babf79d8acdbdecd29"
+          "sha256": "f87921c6b3a8ffc44c6bd3aeaf34ace5d03b7fd4bb41c1ab4bdff57e4023afd9"
         }
       },
       "issuer-admit-custodian-original-header-durable": {
         "record": {
           "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-admit-custodian-original-header-durable.json",
-          "sha256": "440451c2144ba679a8d83b2e7aab83a861b071ba1b3d788e949ec959da31a23d"
+          "sha256": "02a82667cb06ed1c8971aa72905bc66fcb2035f5411be7b15cbf00f63f1665d2"
         },
         "arrival": {
           "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-admit-custodian-original-header-durable.arrival.json",
-          "sha256": "a66883cf25862e9cc9477478ef3b3b34377a2fc34d674ef2d3f128d695433023"
+          "sha256": "d9f1d0e4b5ad792a2cef05b3f889a2dff6c170a16ac724b1e3af061c7b92562b"
         },
         "armed": {
           "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-admit-custodian-original-header-durable.armed.json",
-          "sha256": "6a37683f711d46c6e2f8133750c186ecf193b4e2f42abebaff2a12f88f277acd"
+          "sha256": "d1e7e6c945c3d3582d716c57b32468b2f7e740035493d6e7af020707503b32c9"
         }
       },
       "issuer-admit-publication-header-durable": {
         "record": {
           "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-admit-publication-header-durable.json",
-          "sha256": "5aa16d59a73ff9014a91304dc31f52c726e0858b6bf1d022c039fe87b56f3329"
+          "sha256": "c3050cbe455611834b18d35fc7f728ef00761fefa659121930e8af584e6df677"
         },
         "arrival": {
           "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-admit-publication-header-durable.arrival.json",
-          "sha256": "9083e7de423a81a9af78373abcff8259b40e0a3ac186f43e38b2ca3598e5bd14"
+          "sha256": "ec6a7d61ace72bf34fc25c6327dd57e106a0b0faef7d1b8a71f578c044220067"
         },
         "armed": {
           "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-admit-publication-header-durable.armed.json",
-          "sha256": "c5d0d93cf58c7f5a48861fc6a52b7691d628626da0a01ec3b915bcc91ee6c308"
+          "sha256": "1fa2338ead293cc7b56906d56b82a148f6dc86ef29ffd6e73cb881be6b1d0da3"
         }
       },
       "issuer-admit-publication-payloads-durable": {
         "record": {
           "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-admit-publication-payloads-durable.json",
-          "sha256": "2bc5a48d50f576e49425fc99f7bdfaf4d4f692104445afd30871326be6d46ad6"
+          "sha256": "2ca0051ce3f2b3ab6a7dd47a049e55246ae8fd5191e3ef802c9964f70ea66498"
         },
         "arrival": {
           "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-admit-publication-payloads-durable.arrival.json",
-          "sha256": "57c34a74ddc47cefb87ba22ba2b06da6000ff07b18f03a66a6560f1b8da5e211"
+          "sha256": "c1af2dfdeb1c3c99da15eaf5ce3c04a5405b72dda273424d9716598fad3899f4"
         },
         "armed": {
           "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-admit-publication-payloads-durable.armed.json",
-          "sha256": "1f9e9b5f4bcb8d205ae1914a603f6be9864bbd433af572c7e90aab54d45393b6"
+          "sha256": "bb2894e99691d25fa45230a5b9081995056679339b7df3f1945b90dbe612bbcf"
         }
       },
       "issuer-admit-publication-integrities-durable": {
         "record": {
           "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-admit-publication-integrities-durable.json",
-          "sha256": "3d2f2f90ed45b6b3171fbb455b066887214578d8d134338b0689c4bb79cd75b0"
+          "sha256": "f69b067259a69453df91779248d79e03a4ec5723ae24a3608159e5136e17e8a0"
         },
         "arrival": {
           "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-admit-publication-integrities-durable.arrival.json",
-          "sha256": "6938eb3b0136826cc8d76137980f28183dc0f3bba5f73f9a3fc8dc1b55a6e585"
+          "sha256": "4bbdd4846ff03a3ea5e43fe36c0c35f92f4f9acb1a20df30df28ddbf8e55f323"
         },
         "armed": {
           "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-admit-publication-integrities-durable.armed.json",
-          "sha256": "4eaca7ff1db53304073cdb78efe719fa69ebfb54685438a2cbfaa8ac96aa4d85"
+          "sha256": "7b36db09b56ff46021594fe92ce668e75736e1f813c23ff8225771b7933e3a66"
         }
       },
       "issuer-admit-publication-attestations-durable": {
         "record": {
           "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-admit-publication-attestations-durable.json",
-          "sha256": "ee4a05ae7209f1530fcb2bf3c0a24fdd2671b7af0be3e78bd4775ff6969021c7"
+          "sha256": "3a44540e705dfd34b0b0aad4ca530c0290efff07b0647fde2e5c627461989949"
         },
         "arrival": {
           "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-admit-publication-attestations-durable.arrival.json",
-          "sha256": "092054680733959e78bafe0ebf09840ccef29f65dbb567ef8360cb14b3bc2fbf"
+          "sha256": "4dee632bf7160d1b6655a3555d4abc7a28e2db3f636b3321b8ddeb665083c36c"
         },
         "armed": {
           "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-admit-publication-attestations-durable.armed.json",
-          "sha256": "629263c49d16a383fdd065dc0da174f424f3600f0d8ee1b218a5d0130cc04cb1"
+          "sha256": "0cf096210fa911f4c248d2827b7eb8286696494b0069cfc417faa434f4c0c2c9"
         }
       },
       "issuer-admit-publication-complete": {
         "record": {
           "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-admit-publication-complete.json",
-          "sha256": "2c6602d9860e3053c0a2120d4ea7338d79b83c18a88218537176d3515dcdf2ea"
+          "sha256": "791d01cccc69dd75d440f38b6ee3a69c61f842d7b7a504f1ec5acd8ee162d768"
         },
         "arrival": {
           "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-admit-publication-complete.arrival.json",
-          "sha256": "9e66f684186450d9c9ef0ab302b1f6c6d15eab6c44f64bfb60080fccfe1b23af"
+          "sha256": "6ce2f26b1d56c4f3e6039517335b1c603418e8b92948642cd8a4ba998a2c88d4"
         },
         "armed": {
           "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-admit-publication-complete.armed.json",
-          "sha256": "653f323d4b31dc9169543ce25072732a7d6a423e87a289ba641235f47230ea96"
+          "sha256": "5187eb77012a47d448cc8cc8feadbcd368427a7ef950a4f7b36d15536dc8fe66"
         }
       },
       "issuer-close-custodian-spend-plan-durable": {
         "record": {
           "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-close-custodian-spend-plan-durable.json",
-          "sha256": "edf46f42b0228743250aae6d12366977c4fb50177fa6d191543058bb351c858c"
+          "sha256": "39e126fd2c64543a3e88ae9c340676ffbe10d70b5374d0d2c03d11075057d714"
         },
         "arrival": {
           "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-close-custodian-spend-plan-durable.arrival.json",
-          "sha256": "e970145ea9f1018d9cad1a31ceb453bf851f95e3fb34be996eb03da78d4ea2fa"
+          "sha256": "b97710fd9edc23db896d43e928883113c363bb034bf6cc26a57fd47c35fa0a1c"
         },
         "armed": {
           "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-close-custodian-spend-plan-durable.armed.json",
-          "sha256": "c9dfef8e355d93f83baa7a68d116c8014c702ba3cfd3e3b8a3f21013cfdc19fa"
+          "sha256": "636a8656ccc42f7389cd1464809e071d1fa530da932dfdb5392c6ce27814e735"
         }
       },
       "issuer-close-custodian-spent-fence-durable": {
         "record": {
           "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-close-custodian-spent-fence-durable.json",
-          "sha256": "69da9dd44e51d7ed7f0ca18e4c21ab65a98446563b09be2b0649173a6424be84"
+          "sha256": "9ae352ce4fae848087347e9ec23eb367fc53b08ed80993809691ef3fa27ca8f6"
         },
         "arrival": {
           "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-close-custodian-spent-fence-durable.arrival.json",
-          "sha256": "b953d00b15ee0ddc69cf56efb39849d2d47a33981145f21db8176dda01ff9258"
+          "sha256": "ace25a209090084116f122aa9e8d5042647a45258aa80f0a1d526fc492e7ae98"
         },
         "armed": {
           "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-close-custodian-spent-fence-durable.armed.json",
-          "sha256": "9320fc7b5c5f7c8f826e6f38402b0a04689a46518fb419967f3c93fd2c8fe78d"
+          "sha256": "a2f3e16c7b272eedc4e1f1d214ef65f4a8767ac00f5a6c2ad04f3fbc1cb3ba4b"
         }
       },
       "issuer-close-custodian-private-object-unlinked": {
         "record": {
           "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-close-custodian-private-object-unlinked.json",
-          "sha256": "e8eeb73157ad18814f633f5431d141f6a54158e8a7982c8aa5fd86584c4a13ab"
+          "sha256": "ed583c45f8f9ee7f4e444a67e43b6728558f5b1cbca63f915fec47fa340efba5"
         },
         "arrival": {
           "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-close-custodian-private-object-unlinked.arrival.json",
-          "sha256": "3972023ae61656d4cdd3f5ebd94a4fffa63719ce5ef5a10f5c7fae40d1bdb0b7"
+          "sha256": "faf53d09a5fbaf451a0abc4eedf2774d94151a648f4836dd0d0f18cebefef32e"
         },
         "armed": {
           "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-close-custodian-private-object-unlinked.armed.json",
-          "sha256": "1f7d447098638c26074ce33de6c78821057b73c9bf425bd1053409cb80e09513"
+          "sha256": "8f547d56fbfe8c72046d2bd45841c06c0734305b8478bcb6aa8cb26d3189d692"
         }
       },
       "issuer-close-custodian-original-unlinked": {
         "record": {
           "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-close-custodian-original-unlinked.json",
-          "sha256": "f668ed2bb22bc5961808a11f188a3eb205cc1b9092567c1a65ef17fcbe3efa46"
+          "sha256": "4e9ff9401b8bee4c1d85e27643eb53215434bc991e85dd1f09b5a53d69ced9c8"
         },
         "arrival": {
           "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-close-custodian-original-unlinked.arrival.json",
-          "sha256": "2ba65170c38ba87590edf77bba0755c90205820d87d06ca69de5d402151e1b84"
+          "sha256": "cba177c16cae01f169b66dd1f1eaf1541b0de7849cb7a49ae1ced20fa66c849a"
         },
         "armed": {
           "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-close-custodian-original-unlinked.armed.json",
-          "sha256": "cccfe9688e6bdaf0ccfc494e61d2da6ff978c8738fca79b3a853ed6c23b6307a"
+          "sha256": "1a991483dcb86ad29b3ef67e373b01eb8d6c0e8bbcda2154a7f6e16366f79708"
         }
       },
       "issuer-close-custodian-comparison-unlinked": {
         "record": {
           "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-close-custodian-comparison-unlinked.json",
-          "sha256": "3af08ae15720a9295ea70c37df9dfaea7f4901efdc1c0191031e41473e8351c2"
+          "sha256": "66df4d6a5d547312d1c71569364883a612d6c104376c4e50c8ea482c97ae080e"
         },
         "arrival": {
           "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-close-custodian-comparison-unlinked.arrival.json",
-          "sha256": "bcea711cf6940bdfa0aef2a5ca99493e5699c832daa827339f26f82281e73aa4"
+          "sha256": "0ccccf5a244b4fe8c0eec3ef2de469fdc2d0c7177610915bb2ef0a312c3e9e96"
         },
         "armed": {
           "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-close-custodian-comparison-unlinked.armed.json",
-          "sha256": "6c0d8582640977da6d361df19cafa6e9cefb6ad80dc3b8db39c4477b7afd604c"
+          "sha256": "f7e7a52daa80808291ae462c0397a9d3c1c5a72f1d33604e6db750fc1679d776"
         }
       },
       "issuer-close-custodian-spend-receipt-durable": {
         "record": {
           "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-close-custodian-spend-receipt-durable.json",
-          "sha256": "8ee2ea1c195d8e529ec889c5a34dad383b9ab2b2f83c62145899640b4892d49a"
+          "sha256": "3569d685c3f7fb3f78e725fbea99ee0f25e25e0202ba95cb82ecfc0282ef6d70"
         },
         "arrival": {
           "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-close-custodian-spend-receipt-durable.arrival.json",
-          "sha256": "f3299de98680b618d8a5632c1a9d759bd09d71c8942f8936dbabcf91e135004f"
+          "sha256": "1af4aca26c15e71ee2e25e78ed0e7f8d9a32a81d66f9bcea256377747ca39f55"
         },
         "armed": {
           "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-close-custodian-spend-receipt-durable.armed.json",
-          "sha256": "242fc85096be8a3852af44937804e2a5a13d3d6f23650913777a845de1734093"
+          "sha256": "35e634d2fd8d19092c0bfe68d633371b5e1199b8c6225bf02f3b90b091512417"
         }
       },
       "application-cleanup-recovery-publication-fence-durable": {
         "record": {
           "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-cleanup-recovery-publication-fence-durable.json",
-          "sha256": "5ce84d3b795ca978116949df9debe548e96bf9cabe8ddf0fbe5884c563e14a86"
+          "sha256": "d16156e9c3e2479f45fcc4a1fabd86a421caa8d49906dd0d5204149ef78e85b2"
         },
         "arrival": {
           "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-cleanup-recovery-publication-fence-durable.arrival.json",
-          "sha256": "f8567281aee3f9c2388ca3aee16183db3e94d2976287413f0edd43d318dc0c3d"
+          "sha256": "443d26663009d2608586e77836042ae179fcac6e0188e54e19eefcf4c5fe59ef"
         },
         "armed": {
           "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-cleanup-recovery-publication-fence-durable.armed.json",
-          "sha256": "f69509c47ec1b86faaf2edb16f89db8470afcda9cf4ee6e4943bb5ab4f9a27c0"
+          "sha256": "84ba1ed77b6eb696f9a1dd08b1d113eda670648e3600a8b1490cf47ed1ecde21"
         }
       },
       "application-delete-recovery-deletion-plan-durable": {
         "record": {
           "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-delete-recovery-deletion-plan-durable.json",
-          "sha256": "51b0c07f0dc59741aa04bb4042ad6e4dfb51af73ca38951b3a154ac0cf43ea8f"
+          "sha256": "211672ae013b4e8ca16d7186596a230380a1496059815f31efecf5b387a6f9e2"
         },
         "arrival": {
           "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-delete-recovery-deletion-plan-durable.arrival.json",
-          "sha256": "ecb91a96195f75c595016a7bdb2fc3627b5099f85429b23e614512f37efc9e9c"
+          "sha256": "826bdede2c3ea745a9e28238e349bcae661b3be067598525d8cfca1dfaacf373"
         },
         "armed": {
           "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-delete-recovery-deletion-plan-durable.armed.json",
-          "sha256": "6df978f52d56cee4f5ac4898433b770dd26a7372d641ca511ff051bab7bf3133"
+          "sha256": "d1334cab60043e2304ea7f9a324c575be2ed6aeab2b6d007e444a3015bd74143"
         }
       },
       "application-delete-recovery-deletion-fence-durable": {
         "record": {
           "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-delete-recovery-deletion-fence-durable.json",
-          "sha256": "e6b7e11da5f33a0fbc293191feb986bc20cbb92de355fe4d83eac51c6b584449"
+          "sha256": "b1fbd77e672914431b18eb5672a251a47b38b1c37e41b4510cc695a8c570b227"
         },
         "arrival": {
           "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-delete-recovery-deletion-fence-durable.arrival.json",
-          "sha256": "8fe69c531561f51179392a53f2878541f69ce43d2c1f596d530c14eaf262a4fc"
+          "sha256": "71a49d48c4a023cc92b46946f46a4976c6d049dc081ded424cf3159713e6759a"
         },
         "armed": {
           "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-delete-recovery-deletion-fence-durable.armed.json",
-          "sha256": "5a464eefc40dc67ff8084e001ad1838043fce487eaeca162e48ba6ba03ae5383"
+          "sha256": "c4795ef3a876cbce468b406891a0fef731ce8b58f62776b5b1b16fb3aa4dab4c"
         }
       },
       "application-delete-recovery-deletion-attestations-durable": {
         "record": {
           "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-delete-recovery-deletion-attestations-durable.json",
-          "sha256": "3d98681d544a4a12ecda69412e704daf45ba33b958c3ebb6728a4ce0b7fb0c37"
+          "sha256": "038ce8cae466cf6667ec33b1404060ae28c1a84394a34f1f0ceb46d8a7fc562b"
         },
         "arrival": {
           "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-delete-recovery-deletion-attestations-durable.arrival.json",
-          "sha256": "20c20d93ab01adc8175733892c452c6548bfdf145003fdc90a0624c666b78154"
+          "sha256": "df453693cd9c16fbd83c0cadb3b5d176d862617451ad77661a7162390d7d7bb1"
         },
         "armed": {
           "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-delete-recovery-deletion-attestations-durable.armed.json",
-          "sha256": "ad04bfbb15f1ad658846a953ea2d03f7f37d8f6faa1ec9cebe8c1ec76a20330b"
+          "sha256": "7323a184322a9c0d349988c8da5dd9a94f379521e6edba1619a406a5f6dc0866"
         }
       },
       "application-delete-recovery-deletion-headers-durable": {
         "record": {
           "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-delete-recovery-deletion-headers-durable.json",
-          "sha256": "4690c46c607b64f1402d6363a05d8148ac06c56d6b5b161c91d5c537e291a9eb"
+          "sha256": "c4bfc4aacd80e6e38f16b5e2eb59cc1dabb39fbe9b246b9e88e0958f8857e999"
         },
         "arrival": {
           "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-delete-recovery-deletion-headers-durable.arrival.json",
-          "sha256": "b30c571d23c2aa530e693279783984d3d9de43dadc713529a155111e0cbd70d3"
+          "sha256": "83286eb916cf6fca359b22926715606fcbee03e80b5a1c4ba6dfac50898b49a1"
         },
         "armed": {
           "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-delete-recovery-deletion-headers-durable.armed.json",
-          "sha256": "681b7a7232faf789374b721c71b556e90fcee835f80e591808ef63152d6a05c5"
+          "sha256": "0419e15bf042befd6df0a668d831b7587a3de0d3f729d2fb64f2a45d1b16b44f"
         }
       },
       "application-delete-recovery-deletion-integrities-durable": {
         "record": {
           "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-delete-recovery-deletion-integrities-durable.json",
-          "sha256": "e96d1126c220f15a8070228a3972c8cf2069787feda6224eff4af6d2642226ff"
+          "sha256": "b2e7001dc8781a7e7a7acc09db4ce478ba744d4d749f46c181e3789db758c643"
         },
         "arrival": {
           "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-delete-recovery-deletion-integrities-durable.arrival.json",
-          "sha256": "9498b9b9bae97c9e81f0ee528e8863e32afb06c6ee8d38bddefe69dc06b607ef"
+          "sha256": "7afefceeb7f814b51c5fb6af086d024dcd709c0f877f540006f605536a759551"
         },
         "armed": {
           "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-delete-recovery-deletion-integrities-durable.armed.json",
-          "sha256": "dd15558b17b8c413de11ea8b457c08173333046834c41155c4463efffccaebb3"
+          "sha256": "1493413eacbc2544c35ceb10f0609e87c11de36cdd7a54f6f5daafe3b909e437"
         }
       },
       "application-delete-recovery-deletion-payloads-durable": {
         "record": {
           "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-delete-recovery-deletion-payloads-durable.json",
-          "sha256": "b3e8ee7bbef572d2b8b42a2c961c11036e7674d2d19c3e97bacdfb2c9dea8ac7"
+          "sha256": "842b2cd2ac5b4e0113a97ac8ffd621b573908a23d76edf5112e673d3ed491437"
         },
         "arrival": {
           "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-delete-recovery-deletion-payloads-durable.arrival.json",
-          "sha256": "3655ac005a4a6a2e191436727f30cf2118d265b67b9f2f20aac78031a80bb114"
+          "sha256": "cee1da640ca9c4ea61bc685b384b568f2418bbe60714db76711f6bbcc455de26"
         },
         "armed": {
           "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-delete-recovery-deletion-payloads-durable.armed.json",
-          "sha256": "adb0bfdc0a8312b1cdb9d737408ad58cb5d86615a71b22f48ef727bf142ad70a"
+          "sha256": "e90cd828588b77fd663d9328dfd836263c3c35d4511f436f4c95b2639721b642"
         }
       },
       "application-delete-recovery-deletion-receipt-durable": {
         "record": {
           "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-delete-recovery-deletion-receipt-durable.json",
-          "sha256": "792728f47fa910143a93ebeea7d7526d1827740709dd94cecca7457db6dc35f3"
+          "sha256": "aca2ceb6c728e11bf22b4d64e6967c6cd480c57137515cda25c2983fec4ae284"
         },
         "arrival": {
           "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-delete-recovery-deletion-receipt-durable.arrival.json",
-          "sha256": "8ac0e3036bc1235ee7ed26fa26c4e1b643eb3515f025c791301c058c741d0f17"
+          "sha256": "612474d434791c95a47fc823e9e2882e7fd71f4b76a3bc3fc002a06771e6fea4"
         },
         "armed": {
           "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/application-delete-recovery-deletion-receipt-durable.armed.json",
-          "sha256": "7e3e28133bf4124006512c9be28bda42ab1d8f89ceeb07be88abe24b5a3dc1aa"
+          "sha256": "2c47c5a02c62c1baa0f7229c9d2ebb94efd6d198cc6c2d013d53492f6583c590"
         }
       },
       "issuer-close-custodian-header-unlinked": {
         "record": {
           "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-close-custodian-header-unlinked.json",
-          "sha256": "2f20f8497bfcb1f289bddb3a2ded5f5f775a96d3984c89944431d51a69557eb9"
+          "sha256": "8984bafee7ddca16ba1c20d5f5399efaf39d10d52591f5e33f87a54cc677ca47"
         },
         "arrival": {
           "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-close-custodian-header-unlinked.arrival.json",
-          "sha256": "1bd35c53c941498d658366efa75ca50155c76c869ba9a0784b3e441d421134a3"
+          "sha256": "988afe36acfc083e22309d9d10604962a0abe9f7b0b78a36eff7956d01757bec"
         },
         "armed": {
           "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-close-custodian-header-unlinked.armed.json",
-          "sha256": "6ae9943acff36ee3f26da97ca0a81260ff97a90dcb20a5c35a64eed1e4aac87c"
+          "sha256": "3a051466b989da6a7ebb41fc91fabaaaef6930d03319dd0d51b8a09fa49f4ffa"
         }
       },
       "issuer-close-custodian-material-seal-unlinked": {
         "record": {
           "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-close-custodian-material-seal-unlinked.json",
-          "sha256": "640e6ed6944ed53411112897cd904217d60de44996314709b84bd1074a8b2336"
+          "sha256": "aade199465158dbfb328bb00c8ed8f9ef69f115bb5b18989cb578e76112dc43d"
         },
         "arrival": {
           "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-close-custodian-material-seal-unlinked.arrival.json",
-          "sha256": "c1f1774dee6e8a6957a85a0ed2bd437e45b196bc5a6a1f6a6847684575afe903"
+          "sha256": "6365952b58ddb0e213cbaf4bff3d9acabb7f93d34334a3b59c5616e52cf7d1ab"
         },
         "armed": {
           "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-close-custodian-material-seal-unlinked.armed.json",
-          "sha256": "46bf933a7582c7e2b7a551e91c003122de78838efe6ced332155a214e5b2166e"
+          "sha256": "f8a73d6ed71347c36ce86b1fa61ed9441fcc1104ffb241fb1bb11216fa7c7985"
         }
       },
       "issuer-close-custodian-temporary-unlinked": {
         "record": {
           "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-close-custodian-temporary-unlinked.json",
-          "sha256": "ed925a05bf4be4c7d8a8ba825579442335eb6d0bab248323fb86575ce6fddcc2"
+          "sha256": "32387b198849467e01dee1770d650812dfb3e049ba0403205bbd24b8f13548d9"
         },
         "arrival": {
           "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-close-custodian-temporary-unlinked.arrival.json",
-          "sha256": "a6903e357354bb5261d1e03cdf15d2d994d851b8cb3e3297e0465ce53711a20e"
+          "sha256": "9f27a7462971968ff2def2fa0a6a4426700952d8349a3f2e93cb50a5230c9b75"
         },
         "armed": {
           "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-close-custodian-temporary-unlinked.armed.json",
-          "sha256": "3a9039304b26e02a8b77ad1ea39215469a8eff91cc05c98947a243525edf1a71"
+          "sha256": "678a5eb04bd44d182726c3992103584332691413f8a13d1d5f2c1176da3d7136"
         }
       },
       "issuer-admit-issuer-material-raw-page-seal-durable": {
         "record": {
           "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-admit-issuer-material-raw-page-seal-durable.json",
-          "sha256": "e8d0f6db3068dc123ca632b3f740982290648249697433827fcc777552d7334c"
+          "sha256": "74bc7b0aea4c1f1a098321d0e036616ffb8cc478e5758e3b55b82460a4a71a9b"
         },
         "arrival": {
           "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-admit-issuer-material-raw-page-seal-durable.arrival.json",
-          "sha256": "f701e9608df0f245cd0fa661ba1d9fd6a873c5b3ae82188be17375c4510ca606"
+          "sha256": "827a02acd5b7ae47010d2289f60f40dbf4673f641014118c372aaec3a62d2933"
         },
         "armed": {
           "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-admit-issuer-material-raw-page-seal-durable.armed.json",
-          "sha256": "df3aea14329d17e868d8ea0ae642e168579033c3b293bada38463b0a607ea79d"
+          "sha256": "299fa3107064e35d18cca88b5d223fe1a32a9a75d0fd78243622cab4516e5ad1"
         }
       },
       "issuer-admit-issuer-material-source-identity-1-seal-durable": {
         "record": {
           "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-admit-issuer-material-source-identity-1-seal-durable.json",
-          "sha256": "9d5fd8e3cce2701d2f74099792689bf4255eb7d07e29c08cebdb31efb927ad7b"
+          "sha256": "a8419ac057205adddcd7ca3fa1c60e160e7b5b736aee6f49d0c67e3da2aec8e0"
         },
         "arrival": {
           "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-admit-issuer-material-source-identity-1-seal-durable.arrival.json",
-          "sha256": "bf5059e09dd2d1c48b791eff86bef084b5580912f973126fc6ca4105f8cfe482"
+          "sha256": "75ecb698676e144fac8a8e5b2625363c966f2d6489ec47c848bb11670b6fb57e"
         },
         "armed": {
           "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-admit-issuer-material-source-identity-1-seal-durable.armed.json",
-          "sha256": "c5ee46568060772e28d45d132659c7a95cecd57074240cf2a02f03dcb61a1c3d"
+          "sha256": "042275e0c583d98e34e7c8a0c0b65f6ff9b6f0380540e062b1532aa536962512"
         }
       },
       "issuer-admit-issuer-material-source-identity-2-seal-durable": {
         "record": {
           "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-admit-issuer-material-source-identity-2-seal-durable.json",
-          "sha256": "814da3313ad303c03654a293cd49b414176b90b49ee77f9a23e277fbeb5981ac"
+          "sha256": "ee3a09d9af682aec04ed6b89fcce281cdcc78780bbb1905a2ce4df50df314d11"
         },
         "arrival": {
           "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-admit-issuer-material-source-identity-2-seal-durable.arrival.json",
-          "sha256": "fbcfa97656e01f41edae7c363aa67bdf3bfaeed34def0ecc0c054e1537234c6c"
+          "sha256": "2552d658b8bf2c7a15225c1716ee4b5c64f189d31399f2f886ec425a165c3aa6"
         },
         "armed": {
           "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-admit-issuer-material-source-identity-2-seal-durable.armed.json",
-          "sha256": "c171f38df5870fd20327bf8a710d02710d9416e64391e80bd417c4c9ced4058e"
+          "sha256": "c8f4aa6bbff0b497574d1d8a0871e4550bbcb1d9d93d850c2e2fa2817311cf7b"
         }
       },
       "issuer-admit-issuer-material-native-field-1-seal-durable": {
         "record": {
           "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-admit-issuer-material-native-field-1-seal-durable.json",
-          "sha256": "eb10446c8aaf8672e11a41561d36731581252ef5da5cc280be678454220a8f56"
+          "sha256": "faefb03bcc90b587065a96c634795a95ac0878aa6be2d750aacc8300d7ca2c1e"
         },
         "arrival": {
           "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-admit-issuer-material-native-field-1-seal-durable.arrival.json",
-          "sha256": "3d066a956295e1b4aa8fb3af2c15828dc4b1ce1804c6346a76abba8e4e6d2525"
+          "sha256": "13d74f55e4b9091407fb01706bfcfe2e7428d8404b7e39b019c6a85bfd981707"
         },
         "armed": {
           "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-admit-issuer-material-native-field-1-seal-durable.armed.json",
-          "sha256": "804de3dc6433e50a15a2f15ec4066b7db647b84b62adf20074c73cfb2e8f762e"
+          "sha256": "7207f40677cac435e1604d898c879815a731c671cac62cb3d75b719b710de145"
         }
       },
       "issuer-admit-issuer-material-native-field-2-seal-durable": {
         "record": {
           "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-admit-issuer-material-native-field-2-seal-durable.json",
-          "sha256": "5dd0624cfbcf5bef9bdc43c5f9e06f9ae405f1a94b9dd591e08ba1474e8fa6b7"
+          "sha256": "8da3e4912272e046634c39cdcc49300756f78238c83428d7ec0064489b6e2e6c"
         },
         "arrival": {
           "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-admit-issuer-material-native-field-2-seal-durable.arrival.json",
-          "sha256": "2e6d93b21e0eeddfaf69530e2ec5e2f1ffccb685a3f219d59eee4c2e27590e79"
+          "sha256": "c92b4159dcb4dd72c3a6f6a044c7c231a2f216770fb4faf17ddb6947360e8b28"
         },
         "armed": {
           "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-admit-issuer-material-native-field-2-seal-durable.armed.json",
-          "sha256": "6e9fe1f2dd770768e1dff2e9d9cf0b1e808c1c34f4a666153b01ebaff1e42df4"
+          "sha256": "86cafa3f1dfb9cc93bf1a6f71e8af2af5bdd10a7cb645227d3eef9b499adb419"
         }
       },
       "issuer-admit-issuer-material-manual-native-index-seal-durable": {
         "record": {
           "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-admit-issuer-material-manual-native-index-seal-durable.json",
-          "sha256": "643e7e2d43066320cd2323710e771014470a23cde9fd00799330a9673e92b79c"
+          "sha256": "a5e8ff403d20455b43b0b37ee12c681a4b8a6ec3a2653f42226d9d0967bff7a9"
         },
         "arrival": {
           "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-admit-issuer-material-manual-native-index-seal-durable.arrival.json",
-          "sha256": "30ff7fb5588e1f59a56afccf7d68502f8dbab27a0f70aee16a5b6796b5334400"
+          "sha256": "92515d9d18e568143dd8fc5d0f1a7284b61a72e78bede458181784a39c5106a9"
         },
         "armed": {
           "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-admit-issuer-material-manual-native-index-seal-durable.armed.json",
-          "sha256": "5216c2f44f43fef144654717faa6d2bb90c52f7aa7b862f0813d8aa1c09f4f21"
+          "sha256": "0264562a0db6fb5a5d3f963b3f317331d733fc029e76bd9aa07024d1b6686ba0"
         }
       },
       "issuer-admit-custodian-claim-custody-durable": {
         "record": {
           "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-admit-custodian-claim-custody-durable.json",
-          "sha256": "ef2d3bb51591668c9f37e32997c04f39a24138490adeccbf705361c15d584e8a"
+          "sha256": "97ff8300aad4dc45f285252828d9e9493ef97367698ae40f0693a58e672e856b"
         },
         "arrival": {
           "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-admit-custodian-claim-custody-durable.arrival.json",
-          "sha256": "e9b94d40ac7796d472093e7d6c74af6ca9d043db49e28ccfb43cf86d45ff3fd6"
+          "sha256": "580915ba3d0f2fc4256c944de144ce9e2c415cbfe2a96e7b16741a92f22e1005"
         },
         "armed": {
           "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-admit-custodian-claim-custody-durable.armed.json",
-          "sha256": "dcb1c8cbf494fa5f4b489956117249f2e8cbcda7953c888be274202e9fa2fbe8"
+          "sha256": "76fccbd849fba938df6c4545774c8c6a57a51d2c74429b4049b4f0ace341dc90"
         }
       },
       "issuer-admit-custodian-comparison-durable": {
         "record": {
           "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-admit-custodian-comparison-durable.json",
-          "sha256": "6e86221e9a8b8ab3ae009b4b5e386912d7ce82af4c88c91080e529caf7f33f3b"
+          "sha256": "467267ba5debf21615975bb1b422f87185e5755b61cd607ab932f4539765aad4"
         },
         "arrival": {
           "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-admit-custodian-comparison-durable.arrival.json",
-          "sha256": "0492df2e9acb80618f24488c37622a3b76091248b5dac3c29b69e1370898ca25"
+          "sha256": "5a876e1b4203911ac71dd63f135850c5e5df1fb2b162998aa6a86d2e5b7292c1"
         },
         "armed": {
           "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-admit-custodian-comparison-durable.armed.json",
-          "sha256": "55e9143b9c525349393c17b8713ad4aac9a1f068b8ef67c280d24d7857c2951d"
+          "sha256": "e475b9cde137c82a2ab30bd6a1fd31e63d2839d75f1ec173fc4a70988ea967b2"
         }
       },
       "issuer-admit-custodian-upload-index-durable": {
         "record": {
           "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-admit-custodian-upload-index-durable.json",
-          "sha256": "a69dd2a0657fef2bfd5b3951bdc1877f0c996e2bd990baf4f15e4e01e0dcbd61"
+          "sha256": "08ca3ec41d933ea459f9a8a00ff0ef6dd400a7959ad77fd3e5d7b3c0823d595c"
         },
         "arrival": {
           "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-admit-custodian-upload-index-durable.arrival.json",
-          "sha256": "61ed0de051f4e81d3e5b9cb76dfeaa24f490c8cef0b9085acdb8773697c86b32"
+          "sha256": "8ac92142170d3e2cfa1ff4db77c8e77129da01f175c379bee973c007c448747c"
         },
         "armed": {
           "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-admit-custodian-upload-index-durable.armed.json",
-          "sha256": "b1a17c5073c597774da26885a3ce2ccbb19e5f5befc4743a733a15138c835b8d"
+          "sha256": "a52a32c54cbf39e24ac4b5dfeb5c68cea6883c211dfe9c9844167c14fb22b668"
         }
       },
       "issuer-admit-custodian-command-index-durable": {
         "record": {
           "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-admit-custodian-command-index-durable.json",
-          "sha256": "19ea8b3cc6fabd29ea2dc06cb8973849e8085d38fce9d3fb0e69039523fbdd2e"
+          "sha256": "52eab1241cb2e2624e9c73ab234060fffe5055bcdf9209c4d80ae59193ad0076"
         },
         "arrival": {
           "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-admit-custodian-command-index-durable.arrival.json",
-          "sha256": "9c4a14aeb4e2a8d7b15e12bd85be6ade039576b883b7cc90b2b66ce538f4946c"
+          "sha256": "87a8fa0f14ea65a565a3b3b25ff6ad75eac178243123bda0d1b3d1bf0b34d62f"
         },
         "armed": {
           "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-admit-custodian-command-index-durable.armed.json",
-          "sha256": "f71665aadcad734cea001c1486e0468561a4070e4e9c4bcde1af5ce7d472e4c6"
+          "sha256": "a3568d519aeef360dda1bebfff60087a5e49b06b6c9cb8465672585d4ba8cd30"
         }
       },
       "issuer-close-custodian-spent-state-durable": {
         "record": {
           "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-close-custodian-spent-state-durable.json",
-          "sha256": "3d05fadc11e6f1bdf0bf7d7727f9a0195ed601d5d93273807b863be55a70c915"
+          "sha256": "bcfed53291a3eb3a563953ad168d193bea5b978d0f48ff4489705d757bfdbf3a"
         },
         "arrival": {
           "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-close-custodian-spent-state-durable.arrival.json",
-          "sha256": "10e3a9a2eadc9dac5a4b866032ea246429f9f9203e34284017ceabb627d1bccd"
+          "sha256": "34ecb38e547fcfdc1b51bfd74d48e6dcfde84faef3ad4b26d6ae27624261cff7"
         },
         "armed": {
           "path": ".superpowers/sdd/2026-10-20-r2-m9b-manual-recovery-v2/t10-artifacts/restarts/restarts/issuer-close-custodian-spent-state-durable.armed.json",
-          "sha256": "42ca1441eeedb226ab84d4700272172dd6f7cc931294932b15b5c7a2eb19d1e3"
+          "sha256": "2a1fc5e715c11202ee1ba2f98fda2ca478af8a3682c56b76b1d5d173e771042c"
         }
       }
     }
