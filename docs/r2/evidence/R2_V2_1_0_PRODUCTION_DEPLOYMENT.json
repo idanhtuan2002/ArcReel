@@ -1,0 +1,24 @@
+{
+  "verified_at": "2026-10-30T02:13:16+00:00",
+  "release": "r2-v2.1.0",
+  "commit": "0cef69a772f1d2946e452b918a8839b0f37fd2d9",
+  "previous_release": "r2-v2.0.8",
+  "pre_deploy_backup": "bs-20261030T020717Z",
+  "production_checkout_clean": true,
+  "rehearsal": "Fresh read-only dump of production restored into a disposable PostgreSQL 16 container: 9 M10 migrations 918c4a0e0001 -> 8a5d0f6b1e44 applied cleanly; app smoke on the copy returned 200 for project and quality routes; master backfill promoted 4 masters, 0 diverged.",
+  "migrations": "918c4a0e0001 -> 8a5d0f6b1e44, applied explicitly before the activated start (activated start requires the exact head and never upgrades).",
+  "host_changes": [
+    "12 data entries the root-run app created under data/du-an-01-649c62c1/story_authoring/blobs were given to the owner (modes unchanged) so the owner-run backup can read them.",
+    "arcreel-attestor.service now runs from .worktrees/r2-v2-release-staging instead of .worktrees/r2-v2-main (backup /etc/systemd/system/arcreel-attestor.service.bak-20261030); the attestor's archive preflight checks the schema head of its own code, so it must run the deployed release."
+  ],
+  "master_backfill": {"project": "du-an-01-649c62c1", "promoted": 4, "diverged": 0},
+  "post_check": {
+    "health": "ok",
+    "quality_routes": "session, masters, profiles, template: 200",
+    "final_master_resolvable": true,
+    "spa_quality_page": 200,
+    "app_log_errors": 0
+  },
+  "limit": "Technical quality probes stay disabled on this host (ARCREEL_QUALITY_PROBE_CATALOG unset): they run under systemd-run --user, which the root-run app has no manager for, and need the activated-host qualification (M10 condition C4) first. Until then a new quality run cannot reach READY. No generation, publication or decision was performed.",
+  "status": "PRODUCTION_VERIFIED"
+}
