@@ -12,10 +12,11 @@ import math
 import uuid
 from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 
 from lib.db.models.api_call import ApiCall
 from lib.db.models.host_hardening import CommandReceiptModel
+from lib.db.models.production_run import ProductionOwnerAttemptModel
 from lib.db.models.task import Task
 from lib.db.repositories.task_repo import TaskRepository
 from r2.automation.identity import digest_value
@@ -129,7 +130,40 @@ async def step_usage(
     sessions: Sessions, intent: DispatchIntent, receipt: OwnerReceipt, reservation: BudgetReservation
 ) -> UsageReceipt:
     """Measured usage of the step's tasks; an unfinished task, open call or foreign-currency charge is UNKNOWN."""
-    tasks = await step_tasks(sessions, intent)
+    return await tasks_usage(sessions, await step_tasks(sessions, intent), receipt, reservation)
+
+
+async def attempt_window_tasks(sessions: Sessions, intent: DispatchIntent) -> list[Task]:
+    """The project's tasks queued since the step's first write-ahead owner attempt; a run owns its project, so
+    these are the tasks the step's owner actions submitted."""
+    scope = intent.scope
+    async with sessions() as session:
+        started = await session.scalar(
+            select(func.min(ProductionOwnerAttemptModel.created_at)).where(
+                ProductionOwnerAttemptModel.user_id == scope.user_id,
+                ProductionOwnerAttemptModel.project_name == scope.project_name,
+                ProductionOwnerAttemptModel.run_id == scope.run_id,
+                ProductionOwnerAttemptModel.command_id == intent.identity.command_id,
+            )
+        )
+        if started is None:
+            return []
+        return list(
+            (
+                await session.execute(
+                    select(Task).where(
+                        Task.user_id == scope.user_id,
+                        Task.project_name == scope.project_name,
+                        Task.queued_at >= started,
+                    )
+                )
+            ).scalars()
+        )
+
+
+async def tasks_usage(
+    sessions: Sessions, tasks: list[Task], receipt: OwnerReceipt, reservation: BudgetReservation
+) -> UsageReceipt:
     known = all(task.status in FINISHED for task in tasks)
     runtime = 0
     for task in tasks:
@@ -163,4 +197,13 @@ async def step_usage(
     )
 
 
-__all__ = ["ACTIVE", "FINISHED", "find_task", "step_tasks", "step_usage", "submit_task"]
+__all__ = [
+    "ACTIVE",
+    "FINISHED",
+    "attempt_window_tasks",
+    "find_task",
+    "step_tasks",
+    "step_usage",
+    "submit_task",
+    "tasks_usage",
+]

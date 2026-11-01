@@ -14,6 +14,7 @@ from lib.audio_backends.base import (
     AudioSynthesisResult,
     VoiceOption,
 )
+from lib.generation_resources import DeviceJob, device_job
 from lib.image_backends.base import ImageBackend, ImageCapability, ImageGenerationRequest, ImageGenerationResult
 from lib.text_backends.base import TextBackend, TextCapability, TextGenerationRequest, TextGenerationResult
 from lib.video_backends.base import (
@@ -27,10 +28,19 @@ from lib.video_backends.base import (
 class CustomTextBackend:
     """自定义供应商文本生成后端包装类。"""
 
-    def __init__(self, *, provider_id: str, delegate: TextBackend, model: str) -> None:
+    def __init__(
+        self, *, provider_id: str, delegate: TextBackend, model: str, admission: DeviceJob | None = None
+    ) -> None:
         self._provider_id = provider_id
         self._delegate = delegate
         self._model = model
+        self._admission = admission
+
+    def with_admission(self, admission: DeviceJob | None) -> CustomTextBackend:
+        """返回在受管设备上准入执行的新实例；None 表示远程供应商，不经准入。"""
+        return CustomTextBackend(
+            provider_id=self._provider_id, delegate=self._delegate, model=self._model, admission=admission
+        )
 
     @property
     def name(self) -> str:
@@ -45,16 +55,26 @@ class CustomTextBackend:
         return self._delegate.capabilities
 
     async def generate(self, request: TextGenerationRequest) -> TextGenerationResult:
-        return await self._delegate.generate(request)
+        async with device_job(self._admission):
+            return await self._delegate.generate(request)
 
 
 class CustomImageBackend:
     """自定义供应商图片生成后端包装类。"""
 
-    def __init__(self, *, provider_id: str, delegate: ImageBackend, model: str) -> None:
+    def __init__(
+        self, *, provider_id: str, delegate: ImageBackend, model: str, admission: DeviceJob | None = None
+    ) -> None:
         self._provider_id = provider_id
         self._delegate = delegate
         self._model = model
+        self._admission = admission
+
+    def with_admission(self, admission: DeviceJob | None) -> CustomImageBackend:
+        """返回在受管设备上准入执行的新实例；None 表示远程供应商，不经准入。"""
+        return CustomImageBackend(
+            provider_id=self._provider_id, delegate=self._delegate, model=self._model, admission=admission
+        )
 
     @property
     def name(self) -> str:
@@ -69,16 +89,26 @@ class CustomImageBackend:
         return self._delegate.capabilities
 
     async def generate(self, request: ImageGenerationRequest) -> ImageGenerationResult:
-        return await self._delegate.generate(request)
+        async with device_job(self._admission):
+            return await self._delegate.generate(request)
 
 
 class CustomAudioBackend:
     """自定义供应商语音合成后端包装类。"""
 
-    def __init__(self, *, provider_id: str, delegate: AudioBackend, model: str) -> None:
+    def __init__(
+        self, *, provider_id: str, delegate: AudioBackend, model: str, admission: DeviceJob | None = None
+    ) -> None:
         self._provider_id = provider_id
         self._delegate = delegate
         self._model = model
+        self._admission = admission
+
+    def with_admission(self, admission: DeviceJob | None) -> CustomAudioBackend:
+        """返回在受管设备上准入执行的新实例；None 表示远程供应商，不经准入。"""
+        return CustomAudioBackend(
+            provider_id=self._provider_id, delegate=self._delegate, model=self._model, admission=admission
+        )
 
     @property
     def name(self) -> str:
@@ -96,7 +126,8 @@ class CustomAudioBackend:
         return self._delegate.list_voices()
 
     async def synthesize(self, request: AudioSynthesisRequest) -> AudioSynthesisResult:
-        return await self._delegate.synthesize(request)
+        async with device_job(self._admission):
+            return await self._delegate.synthesize(request)
 
 
 class CustomVideoBackend:
@@ -116,6 +147,7 @@ class CustomVideoBackend:
         video_capabilities: VideoCapabilities | None = None,
         capability_overrides: dict[str, object] | None = None,
         endpoint: str | None = None,
+        admission: DeviceJob | None = None,
     ) -> None:
         self._provider_id = provider_id
         self._delegate = delegate
@@ -123,6 +155,7 @@ class CustomVideoBackend:
         self._video_capabilities = video_capabilities
         self._capability_overrides = capability_overrides or {}
         self._endpoint = endpoint
+        self._admission = admission
 
     @property
     def endpoint(self) -> str | None:
@@ -151,6 +184,7 @@ class CustomVideoBackend:
             video_capabilities=capabilities,
             capability_overrides=overrides,
             endpoint=self._endpoint,
+            admission=self._admission,
         )
 
     def with_endpoint(self, endpoint: str) -> CustomVideoBackend:
@@ -162,6 +196,19 @@ class CustomVideoBackend:
             video_capabilities=self._video_capabilities,
             capability_overrides=self._capability_overrides,
             endpoint=endpoint,
+            admission=self._admission,
+        )
+
+    def with_admission(self, admission: DeviceJob | None) -> CustomVideoBackend:
+        """返回在受管设备上准入执行的新实例；None 表示远程供应商，不经准入。"""
+        return CustomVideoBackend(
+            provider_id=self._provider_id,
+            delegate=self._delegate,
+            model=self._model,
+            video_capabilities=self._video_capabilities,
+            capability_overrides=self._capability_overrides,
+            endpoint=self._endpoint,
+            admission=admission,
         )
 
     @property
@@ -213,11 +260,13 @@ class CustomVideoBackend:
         delegated_request = (
             replace(request, execution_endpoint=self._endpoint) if self._endpoint is not None else request
         )
-        result = await self._delegate.generate(delegated_request)
+        async with device_job(self._admission):
+            result = await self._delegate.generate(delegated_request)
         request.execution_id = delegated_request.execution_id
         return result
 
     async def resume_video(self, job_id: str, request: VideoGenerationRequest) -> VideoGenerationResult:
         # 透传到下游 backend；下游不支持 resume 时抛 NotImplementedError，
         # 由 orphan handler 标 [resume_unsupported]
-        return await self._delegate.resume_video(job_id, request)
+        async with device_job(self._admission):
+            return await self._delegate.resume_video(job_id, request)

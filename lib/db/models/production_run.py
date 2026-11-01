@@ -196,3 +196,56 @@ class ProductionUsageModel(Base):
         ),
         *_ceiling("usage_json"),
     )
+
+
+class ProductionOwnerAttemptModel(Base):
+    """One write-ahead attempt of a step's owner action that has no command identity of its own."""
+
+    __tablename__ = "auto_owner_attempts"
+    user_id: Mapped[str] = mapped_column(String, primary_key=True)
+    project_name: Mapped[str] = mapped_column(String(255), primary_key=True)
+    run_id: Mapped[str] = mapped_column(String(255), primary_key=True)
+    command_id: Mapped[str] = mapped_column(String(255), primary_key=True)
+    sub_key: Mapped[str] = mapped_column(String(255), primary_key=True)
+    attempt: Mapped[int] = mapped_column(Integer, primary_key=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["user_id", "project_name", "run_id"],
+            ["auto_production_runs.user_id", "auto_production_runs.project_name", "auto_production_runs.run_id"],
+            name="fk_auto_attempt_run",
+            ondelete="RESTRICT",
+        ),
+        CheckConstraint("attempt >= 0", name="ck_auto_attempt_index"),
+    )
+
+
+class ProductionStepOutcomeModel(Base):
+    """The passing outcome of one step command, with the owner evidence later stages read."""
+
+    __tablename__ = "auto_step_outcomes"
+    command_id: Mapped[str] = mapped_column(String(255), primary_key=True)
+    user_id: Mapped[str] = mapped_column(String, nullable=False)
+    project_name: Mapped[str] = mapped_column(String(255), nullable=False)
+    run_id: Mapped[str] = mapped_column(String(255), nullable=False)
+    stage: Mapped[str] = mapped_column(String(32), nullable=False)
+    generation: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    input_digest: Mapped[str] = mapped_column(String(71), nullable=False)
+    outcome_digest: Mapped[str] = mapped_column(String(71), nullable=False)
+    outcome_json: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["user_id", "project_name", "run_id", "command_id"],
+            [
+                "auto_production_steps.user_id",
+                "auto_production_steps.project_name",
+                "auto_production_steps.run_id",
+                "auto_production_steps.command_id",
+            ],
+            name="fk_auto_outcome_step",
+            ondelete="RESTRICT",
+        ),
+        Index("ix_auto_step_outcomes_stage", "user_id", "project_name", "run_id", "stage"),
+        *_ceiling("outcome_json"),
+    )

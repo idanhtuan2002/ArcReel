@@ -35,6 +35,7 @@ from server.production_run.owner_support import OwnerBlocked
 from server.production_run.ports import InputWitness, OwnerAdapter, StepPlan
 
 _ADVANCING = {RunStatus.RUNNING, RunStatus.WAITING_TASK}
+_PASSED = {RunStatus.RUNNING, RunStatus.WAITING_REVIEW, RunStatus.SUCCEEDED}
 _BLOCK_STATUS = {
     "EXTERNAL_INPUT_CHANGED": RunStatus.BLOCKED_INPUT_CHANGED,
     "OUTCOME_UNKNOWN": RunStatus.BLOCKED_UNKNOWN,
@@ -117,7 +118,10 @@ class ProductionController:
         updated = advance(run=run, outcome=outcome)
         delay = self._poll_seconds if updated.status is RunStatus.WAITING_TASK else 0
         async with self._sessions() as session, session.begin():
-            return await ProductionRunRepository(session).transition(
+            repository = ProductionRunRepository(session)
+            if outcome.kind == "PASS" and updated.status in _PASSED:
+                await repository.record_outcome(intent=intent, outcome=outcome)
+            return await repository.transition(
                 expected=run, updated=updated, fencing_epoch=run.fencing_epoch, due_in_seconds=delay
             )
 

@@ -90,6 +90,15 @@ async def stage_receipt(sessions: Sessions, run: RunSnapshot, stage: RunStage) -
         return await ProductionRunRepository(session).stage_receipt(run=run, stage=stage)
 
 
+async def required_outcome(sessions: Sessions, run: RunSnapshot, stage: RunStage) -> StageOutcome:
+    """The passing outcome of an upstream stage in the run's current lineage."""
+    async with sessions() as session:
+        passed = await ProductionRunRepository(session).stage_outcome(run=run, stage=stage)
+    if passed is None or not passed.receipts:
+        raise OwnerBlocked("UPSTREAM_RECEIPT_MISSING")
+    return passed
+
+
 async def required_receipt(sessions: Sessions, run: RunSnapshot, stage: RunStage) -> OwnerReceipt:
     receipt = await stage_receipt(sessions, run, stage)
     if receipt is None:
@@ -159,6 +168,7 @@ __all__ = [
     "current_run",
     "current_subject",
     "outcome",
+    "required_outcome",
     "required_receipt",
     "route_for",
     "same_policy",

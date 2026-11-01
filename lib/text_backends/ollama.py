@@ -18,6 +18,7 @@ from typing import Any
 import httpx
 from pydantic import BaseModel, ValidationError
 
+from lib.generation_resources import device_job, local_job
 from lib.retry import NonRetryableError
 from lib.text_backends.base import (
     StructuredOutputExhaustedError,
@@ -128,7 +129,8 @@ class OllamaChatClient:
         timeout: httpx.Timeout = DEFAULT_TIMEOUT,
         transport: httpx.AsyncBaseTransport | None = None,
     ) -> None:
-        self._url = normalize_ollama_base_url(base_url) + OLLAMA_CHAT_PATH
+        self._base_url = normalize_ollama_base_url(base_url)
+        self._url = self._base_url + OLLAMA_CHAT_PATH
         self._headers = {"Content-Type": "application/json"}
         if api_key:
             self._headers["Authorization"] = f"Bearer {api_key}"
@@ -136,6 +138,10 @@ class OllamaChatClient:
         self._transport = transport
 
     async def chat(self, request: OllamaChatRequest) -> OllamaChatResponse:
+        async with device_job(local_job(self._base_url, request.model)):
+            return await self._chat(request)
+
+    async def _chat(self, request: OllamaChatRequest) -> OllamaChatResponse:
         async with httpx.AsyncClient(timeout=self._timeout, transport=self._transport) as client:
             try:
                 response = await client.post(self._url, json=request.payload(), headers=self._headers)

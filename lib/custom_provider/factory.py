@@ -12,6 +12,7 @@ from lib.custom_provider.backends import (
 )
 from lib.custom_provider.capabilities import synthesize_video_capabilities_with_overrides
 from lib.custom_provider.endpoints import EndpointSpec, get_endpoint_spec
+from lib.generation_resources import local_job
 
 if TYPE_CHECKING:
     from lib.db.models.custom_provider import CustomProvider
@@ -40,7 +41,7 @@ def create_custom_backend(
         ValueError: endpoint 不在 ENDPOINT_REGISTRY 中
     """
     spec = endpoint_spec or get_endpoint_spec(endpoint)
-    backend = spec.build_backend(provider, model_id)
+    backend = spec.build_backend(provider, model_id).with_admission(local_job(provider.base_url, model_id))
     if isinstance(backend, CustomVideoBackend):
         merged, applied = synthesize_video_capabilities_with_overrides(
             endpoint=endpoint,

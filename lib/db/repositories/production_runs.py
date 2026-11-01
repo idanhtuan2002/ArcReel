@@ -11,9 +11,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from lib.db.models.production_run import (
     ProductionBudgetModel,
+    ProductionOwnerAttemptModel,
     ProductionPolicyModel,
     ProductionRunModel,
     ProductionStepModel,
+    ProductionStepOutcomeModel,
     ProductionUsageModel,
 )
 from r2.automation.identity import derive_step_identity, digest_value, policy_digest
@@ -27,6 +29,7 @@ from r2.contracts.automation import (
     RunSnapshot,
     RunStage,
     RunStatus,
+    StageOutcome,
     UsageReceipt,
 )
 from r2.contracts.common import ensure_json_value
@@ -321,6 +324,112 @@ class ProductionRunRepository:
         if row.intent_digest != _wire_digest("r2.production-intent.v1", intent.model_dump(mode="json")):
             raise ProductionRunConflict("RUN_STATE_INTEGRITY_FAILED")
         return intent
+
+    async def owner_attempts(self, *, intent: DispatchIntent, sub_key: str) -> int:
+        """How many write-ahead attempts the step recorded for one owner action."""
+        scope = intent.scope
+        return int(
+            await self.session.scalar(
+                select(func.count())
+                .select_from(ProductionOwnerAttemptModel)
+                .where(
+                    ProductionOwnerAttemptModel.user_id == scope.user_id,
+                    ProductionOwnerAttemptModel.project_name == scope.project_name,
+                    ProductionOwnerAttemptModel.run_id == scope.run_id,
+                    ProductionOwnerAttemptModel.command_id == intent.identity.command_id,
+                    ProductionOwnerAttemptModel.sub_key == sub_key,
+                )
+            )
+            or 0
+        )
+
+    async def record_owner_attempt(self, *, intent: DispatchIntent, sub_key: str) -> int:
+        """Record the next attempt before the owner action is sent; only a live controller lease may."""
+        intent = DispatchIntent.model_validate(intent)
+        row = await self._locked(intent.scope)
+        now = await self._now()
+        current = _snapshot(row)
+        if (
+            row.lease_owner is None
+            or row.lease_until is None
+            or row.lease_until <= now
+            or current.status in _TERMINAL
+            or intent.identity.generation != current.generation
+            or intent.identity.policy_digest != policy_digest(current.policy)
+            or await self.session.get(ProductionStepModel, intent.identity.command_id) is None
+        ):
+            raise StaleProductionRunError("STALE_PRODUCTION_RUN")
+        attempt = await self.owner_attempts(intent=intent, sub_key=sub_key)
+        self.session.add(
+            ProductionOwnerAttemptModel(
+                user_id=intent.scope.user_id,
+                project_name=intent.scope.project_name,
+                run_id=intent.scope.run_id,
+                command_id=intent.identity.command_id,
+                sub_key=sub_key,
+                attempt=attempt,
+                created_at=now,
+            )
+        )
+        await self.session.flush()
+        return attempt
+
+    async def record_outcome(self, *, intent: DispatchIntent, outcome: StageOutcome) -> None:
+        """Keep a step's passing outcome; a replay must carry the same outcome."""
+        intent, outcome = DispatchIntent.model_validate(intent), StageOutcome.model_validate(outcome)
+        identity = intent.identity
+        if outcome.kind != "PASS" or (outcome.stage, outcome.generation, outcome.input_digest) != (
+            identity.stage,
+            identity.generation,
+            identity.input_digest,
+        ):
+            raise ProductionRunConflict("SCOPE_MISMATCH")
+        digest = _wire_digest("r2.production-step-outcome.v1", outcome.model_dump(mode="json"))
+        prior = await self.session.get(ProductionStepOutcomeModel, identity.command_id)
+        if prior is not None:
+            if prior.outcome_digest != digest:
+                raise ProductionRunConflict("COMMAND_REPLAY_CONFLICT")
+            return
+        self.session.add(
+            ProductionStepOutcomeModel(
+                command_id=identity.command_id,
+                user_id=intent.scope.user_id,
+                project_name=intent.scope.project_name,
+                run_id=intent.scope.run_id,
+                stage=identity.stage.value,
+                generation=identity.generation,
+                input_digest=identity.input_digest,
+                outcome_digest=digest,
+                outcome_json=outcome.model_dump_json(),
+                created_at=await self._now(),
+            )
+        )
+        await self.session.flush()
+
+    async def stage_outcome(self, *, run: RunSnapshot, stage: RunStage) -> StageOutcome | None:
+        """The newest passing outcome of ``stage`` at or below the run's generation for its current input."""
+        run = RunSnapshot.model_validate(run)
+        row = (
+            await self.session.execute(
+                select(ProductionStepOutcomeModel)
+                .where(
+                    ProductionStepOutcomeModel.user_id == run.user_id,
+                    ProductionStepOutcomeModel.project_name == run.project_name,
+                    ProductionStepOutcomeModel.run_id == run.run_id,
+                    ProductionStepOutcomeModel.stage == stage.value,
+                    ProductionStepOutcomeModel.generation <= run.generation,
+                    ProductionStepOutcomeModel.input_digest == run.input_digest,
+                )
+                .order_by(ProductionStepOutcomeModel.generation.desc(), ProductionStepOutcomeModel.created_at.desc())
+                .limit(1)
+            )
+        ).scalar_one_or_none()
+        if row is None:
+            return None
+        outcome = StageOutcome.model_validate_json(row.outcome_json)
+        if row.outcome_digest != _wire_digest("r2.production-step-outcome.v1", outcome.model_dump(mode="json")):
+            raise ProductionRunConflict("RUN_STATE_INTEGRITY_FAILED")
+        return outcome
 
     async def stage_receipt(self, *, run: RunSnapshot, stage: RunStage) -> OwnerReceipt | None:
         """The receipt of ``stage``'s newest step at or below the run's generation for its current input."""
