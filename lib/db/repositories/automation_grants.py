@@ -16,6 +16,17 @@ from r2.contracts.automation import (
 )
 
 
+def _renews(previous: AutomationGrant, grant: AutomationGrant) -> bool:
+    """A renewal rebinds an active delegation to a new policy/input/parent, never to more operations."""
+    keep = ("user_id", "project_name", "run_id", "grant_id", "principal", "start_command_id")
+    return (
+        previous.state == grant.state == "ACTIVE"
+        and all(getattr(previous, field) == getattr(grant, field) for field in keep)
+        and grant.operations <= previous.operations
+        and grant.request_digest != previous.request_digest
+    )
+
+
 class AutomationGrantRepository:
     def __init__(self, session: AsyncSession) -> None:
         self.session = session
@@ -60,7 +71,10 @@ class AutomationGrantRepository:
             head is None
             or head.version != previous.version
             or grant.version != previous.version + 1
-            or grant != previous.model_copy(update={"version": grant.version, "state": "REVOKED"})
+            or (
+                grant != previous.model_copy(update={"version": grant.version, "state": "REVOKED"})
+                and not _renews(previous, grant)
+            )
         ):
             raise PermissionError("AUTOMATION_GRANT_CONFLICT")
         self.session.add(

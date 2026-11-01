@@ -310,6 +310,19 @@ class RunCommand(AutomationContract):
         return self
 
 
+class ReviewCommand(AutomationContract):
+    """Internal Human checkpoint decision; the API derives user identity before constructing it."""
+
+    user_id: ExactIdentity
+    project_name: ExactIdentity
+    run_id: ExactIdentity
+    command_id: ExactIdentity
+    expected_version: PositiveInt
+    checkpoint: Checkpoint
+    binding_digest: Digest
+    decision: Literal["APPROVE", "REJECT"]
+
+
 class BudgetReservation(AutomationContract):
     """Run allocation, independent of the host's provider charge ledger."""
 

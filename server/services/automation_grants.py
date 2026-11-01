@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from datetime import datetime
 from pathlib import Path
 from uuid import NAMESPACE_URL, uuid5
@@ -154,19 +155,26 @@ class AutomationGrantCustodian:
         self._read_directory, self._socket_directory = read_directory, socket_directory
         self._expected_uid, self._expected_gid = expected_uid, expected_gid
         self._reader: CheckpointedShowrunnerGrantReader | None = None
+        self._activation = asyncio.Lock()
 
     async def activate(self) -> None:
-        self._reader = None
-        reader = await verify_governance_activated_startup(
-            self._read_directory,
-            self._socket_directory,
-            session_factory=self._sessions,
-            expected_uid=self._expected_uid,
-            expected_gid=self._expected_gid,
-        )
-        if type(reader) is not CheckpointedShowrunnerGrantReader:
-            raise PermissionError("AUTOMATION_GOVERNANCE_NOT_ACTIVATED")
-        self._reader = reader
+        """Re-verify custody; concurrent commands share one verification and keep the last verified reader."""
+        async with self._activation:
+            try:
+                reader = await verify_governance_activated_startup(
+                    self._read_directory,
+                    self._socket_directory,
+                    session_factory=self._sessions,
+                    expected_uid=self._expected_uid,
+                    expected_gid=self._expected_gid,
+                )
+            except BaseException:
+                self._reader = None
+                raise
+            if type(reader) is not CheckpointedShowrunnerGrantReader:
+                self._reader = None
+                raise PermissionError("AUTOMATION_GOVERNANCE_NOT_ACTIVATED")
+            self._reader = reader
 
     def authority(self) -> RunAutomationAuthority:
         if self._reader is None:
@@ -246,6 +254,73 @@ class AutomationGrantCustodian:
         )
         await repository.append(grant, previous=None)
         return grant
+
+    async def require_issuer_locked(
+        self, session: AsyncSession, *, interactive_token: str | None, user_id: str, project_name: str
+    ) -> tuple[str, datetime]:
+        """Lock the interactive actor's current Showrunner grant; returns the issuer and its expiry."""
+        try:
+            actor = await get_current_interactive_user(interactive_token)
+        except HTTPException:
+            raise PermissionError("AUTOMATION_INTERACTIVE_SHOWRUNNER_REQUIRED") from None
+        if actor.id != user_id:
+            raise PermissionError("AUTOMATION_INTERACTIVE_SHOWRUNNER_REQUIRED")
+        if self._reader is None:
+            raise PermissionError("AUTOMATION_GOVERNANCE_NOT_ACTIVATED")
+        await _now(session)
+        parent = await self._reader.require_current_locked(
+            session, scope=GrantScopeV1(user_id, project_name, actor.sub)
+        )
+        if parent.body.expires_at is None:
+            raise PermissionError("AUTOMATION_DELEGATION_SCOPE_MISMATCH")
+        return actor.sub, datetime.fromisoformat(parent.body.expires_at)
+
+    async def renew_locked(
+        self, session: AsyncSession, *, interactive_token: str | None, request: GrantRequest
+    ) -> AutomationGrant:
+        """Rebind the run's active delegation to its current policy and input after a user command."""
+        request = GrantRequest.model_validate(request)
+        await self._actor(interactive_token, request.user_id, request.issuer_id)
+        if self._reader is None:
+            raise PermissionError("AUTOMATION_GOVERNANCE_NOT_ACTIVATED")
+        await _now(session)
+        parent = await self._reader.require_current_locked(
+            session, scope=GrantScopeV1(request.user_id, request.project_name, request.issuer_id)
+        )
+        scope = RunScope(user_id=request.user_id, project_name=request.project_name, run_id=request.run_id)
+        repository = AutomationGrantRepository(session)
+        previous = await repository.head(scope, lock=True)
+        _row, run = await _run_locked(session, scope)
+        now = await _now(session)
+        if previous is None or previous.state != "ACTIVE":
+            raise PermissionError("AUTOMATION_GRANT_UNAVAILABLE")
+        digest = grant_request_digest(request)
+        if previous.request_digest == digest:
+            return previous
+        if (
+            parent.body.expires_at is None
+            or not now < request.expires_at <= datetime.fromisoformat(parent.body.expires_at)
+            or (request.input_digest, request.policy_digest) != (run.input_digest, policy_digest(run.policy))
+            or request.expected_run_version != run.version
+            or not request.operations <= previous.operations
+        ):
+            raise PermissionError("AUTOMATION_DELEGATION_SCOPE_MISMATCH")
+        renewed = previous.model_copy(
+            update={
+                "version": previous.version + 1,
+                "issuer_id": request.issuer_id,
+                "request_digest": digest,
+                "parent_sequence": parent.body.sequence,
+                "parent_event_digest": parent.event_digest,
+                "policy_digest": request.policy_digest,
+                "input_digest": request.input_digest,
+                "operations": request.operations,
+                "issued_at": now,
+                "expires_at": request.expires_at,
+            }
+        )
+        await repository.append(AutomationGrant.model_validate(renewed.model_dump()), previous=previous)
+        return renewed
 
     async def revoke(self, *, interactive_token: str | None, run_id: str, expected_version: int) -> AutomationGrant:
         try:

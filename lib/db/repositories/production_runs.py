@@ -121,23 +121,16 @@ class ProductionRunRepository:
     async def create(self, *, command: RunCommand, policy: RunPolicy) -> RunSnapshot:
         command, policy = RunCommand.model_validate(command), RunPolicy.model_validate(policy)
         now = await self._now()
-        if command.action != "START" or command.policy_digest != policy_digest(policy) or command.mode != policy.mode:
+        if command.action != "START":
             raise ProductionRunConflict("POLICY_MISMATCH")
         await self._project_lock(command.user_id, command.project_name)
         request_digest = _wire_digest("r2.production-start-command.v1", command.model_dump(mode="json"))
-        prior = (
-            await self.session.execute(
-                select(ProductionRunModel).where(
-                    ProductionRunModel.user_id == command.user_id,
-                    ProductionRunModel.project_name == command.project_name,
-                    ProductionRunModel.start_command_id == command.command_id,
-                )
-            )
-        ).scalar_one_or_none()
+        # An identical Start returns its run even after a later mode change moved the run's policy.
+        prior = await self.start_replay(command=command)
         if prior is not None:
-            if prior.start_command_digest != request_digest:
-                raise ProductionRunConflict("COMMAND_REPLAY_CONFLICT")
-            return _snapshot(prior)
+            return prior
+        if command.policy_digest != policy_digest(policy) or command.mode != policy.mode:
+            raise ProductionRunConflict("POLICY_MISMATCH")
         active = await self.session.scalar(
             select(ProductionRunModel.run_id)
             .where(
@@ -207,6 +200,26 @@ class ProductionRunRepository:
         await self.session.flush()
         return snapshot
 
+    async def start_replay(self, *, command: RunCommand) -> RunSnapshot | None:
+        """The run an identical Start already created; a changed command under the same ID conflicts."""
+        command = RunCommand.model_validate(command)
+        prior = (
+            await self.session.execute(
+                select(ProductionRunModel).where(
+                    ProductionRunModel.user_id == command.user_id,
+                    ProductionRunModel.project_name == command.project_name,
+                    ProductionRunModel.start_command_id == command.command_id,
+                )
+            )
+        ).scalar_one_or_none()
+        if prior is None:
+            return None
+        if prior.start_command_digest != _wire_digest(
+            "r2.production-start-command.v1", command.model_dump(mode="json")
+        ):
+            raise ProductionRunConflict("COMMAND_REPLAY_CONFLICT")
+        return _snapshot(prior)
+
     async def get(self, *, user_id: str, project_name: str, run_id: str) -> RunSnapshot | None:
         row = (
             await self.session.execute(
@@ -218,6 +231,114 @@ class ProductionRunRepository:
             )
         ).scalar_one_or_none()
         return _snapshot(row) if row is not None else None
+
+    async def list_for_project(self, *, user_id: str, project_name: str) -> list[RunSnapshot]:
+        rows = (
+            await self.session.execute(
+                select(ProductionRunModel)
+                .where(ProductionRunModel.user_id == user_id, ProductionRunModel.project_name == project_name)
+                .order_by(ProductionRunModel.created_at.desc(), ProductionRunModel.run_id)
+            )
+        ).scalars()
+        return [_snapshot(row) for row in rows]
+
+    async def locked(self, scope: RunScope) -> RunSnapshot:
+        """The current run under its row lock, for commands applied in the caller's transaction."""
+        await self._now()
+        return _snapshot(await self._locked(RunScope.model_validate(scope)))
+
+    async def leased(self, *, run_id: str, owner_id: str) -> RunSnapshot:
+        """The run only while ``owner_id`` holds its unexpired controller lease."""
+        now = await self._now()
+        row = (
+            await self.session.execute(
+                select(ProductionRunModel).where(ProductionRunModel.run_id == run_id).with_for_update()
+            )
+        ).scalar_one_or_none()
+        if row is None:
+            raise ProductionRunConflict("RUN_NOT_FOUND")
+        if row.lease_owner != owner_id or row.lease_until is None or row.lease_until <= now:
+            raise StaleProductionRunError("STALE_PRODUCTION_RUN")
+        snapshot = _snapshot(row)
+        if snapshot.status in _TERMINAL:
+            raise StaleProductionRunError("STALE_PRODUCTION_RUN")
+        return snapshot
+
+    async def current_step(self, *, run: RunSnapshot) -> tuple[DispatchIntent, OwnerReceipt | None] | None:
+        """The staged command of the run's current stage, generation, input and policy, if any."""
+        run = RunSnapshot.model_validate(run)
+        rows = list(
+            (
+                await self.session.execute(
+                    select(ProductionStepModel)
+                    .where(
+                        ProductionStepModel.user_id == run.user_id,
+                        ProductionStepModel.project_name == run.project_name,
+                        ProductionStepModel.run_id == run.run_id,
+                        ProductionStepModel.stage == run.stage.value,
+                        ProductionStepModel.generation == run.generation,
+                        ProductionStepModel.input_digest == run.input_digest,
+                        ProductionStepModel.policy_digest == policy_digest(run.policy),
+                    )
+                    .execution_options(populate_existing=True)
+                )
+            ).scalars()
+        )
+        if not rows:
+            return None
+        if len(rows) > 1:
+            raise ProductionRunConflict("AMBIGUOUS_CURRENT_STEP")
+        [row] = rows
+        intent = DispatchIntent.model_validate_json(row.intent_json)
+        if row.intent_digest != _wire_digest("r2.production-intent.v1", intent.model_dump(mode="json")):
+            raise ProductionRunConflict("RUN_STATE_INTEGRITY_FAILED")
+        receipt = OwnerReceipt.model_validate_json(row.receipt_json) if row.receipt_json is not None else None
+        return intent, receipt
+
+    async def apply_command(
+        self, *, expected: RunSnapshot, updated: RunSnapshot, policy: RunPolicy | None = None
+    ) -> RunSnapshot:
+        """Write a user command result; it fences any controller lease and makes the run due now."""
+        expected, updated = RunSnapshot.model_validate(expected), RunSnapshot.model_validate(updated)
+        row = await self._locked(
+            RunScope(user_id=expected.user_id, project_name=expected.project_name, run_id=expected.run_id)
+        )
+        now = await self._now()
+        if _snapshot(row) != expected:
+            raise StaleProductionRunError("STALE_PRODUCTION_RUN")
+        if (
+            (updated.user_id, updated.project_name, updated.run_id, updated.created_at)
+            != (expected.user_id, expected.project_name, expected.run_id, expected.created_at)
+            or updated.version != expected.version + 1
+            or updated.fencing_epoch != expected.fencing_epoch + 1
+            or updated.generation < expected.generation
+            or expected.status in _TERMINAL
+            or (updated.policy != expected.policy and (policy is None or updated.policy != policy))
+        ):
+            raise ProductionRunConflict("INVALID_RUN_COMMAND")
+        if updated.policy != expected.policy:
+            digest = policy_digest(updated.policy)
+            stored = await self.session.get(
+                ProductionPolicyModel, (updated.user_id, updated.project_name, updated.run_id, digest)
+            )
+            if stored is None:
+                self.session.add(
+                    ProductionPolicyModel(
+                        user_id=updated.user_id,
+                        project_name=updated.project_name,
+                        run_id=updated.run_id,
+                        policy_digest=digest,
+                        policy_json=updated.policy.model_dump_json(),
+                        created_at=now,
+                    )
+                )
+                await self.session.flush()
+            elif RunPolicy.model_validate_json(stored.policy_json) != updated.policy:
+                raise ProductionRunConflict("RUN_STATE_INTEGRITY_FAILED")
+        _write(row, updated)
+        row.lease_owner, row.lease_until, row.due_at = None, None, now
+        await self.session.flush()
+        return updated
 
     async def claim_due(self, *, owner_id: str, lease_seconds: int) -> RunSnapshot | None:
         now = await self._now()
@@ -252,7 +373,9 @@ class ProductionRunRepository:
         await self.session.flush()
         return updated
 
-    async def transition(self, *, expected: RunSnapshot, updated: RunSnapshot, fencing_epoch: int) -> RunSnapshot:
+    async def transition(
+        self, *, expected: RunSnapshot, updated: RunSnapshot, fencing_epoch: int, due_in_seconds: int = 0
+    ) -> RunSnapshot:
         expected, updated = RunSnapshot.model_validate(expected), RunSnapshot.model_validate(updated)
         row = await self._live(expected, fencing_epoch)
         if (
@@ -265,9 +388,11 @@ class ProductionRunRepository:
             or updated.generation < expected.generation
         ):
             raise ProductionRunConflict("INVALID_RUN_TRANSITION")
+        if not 0 <= due_in_seconds <= 3600:
+            raise ValueError("invalid controller poll delay")
         _write(row, updated)
         row.lease_owner, row.lease_until = None, None
-        row.due_at = await self._now()
+        row.due_at = await self._now() + timedelta(seconds=due_in_seconds)
         await self.session.flush()
         return updated
 

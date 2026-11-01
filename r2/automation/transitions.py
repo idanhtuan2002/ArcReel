@@ -41,6 +41,7 @@ def advance(*, run: RunSnapshot, outcome: StageOutcome) -> RunSnapshot:
         reason = outcome.reason or "REQUIRED_EVIDENCE_MISSING"
         status = {
             "OUTCOME_UNKNOWN": RunStatus.BLOCKED_UNKNOWN,
+            "USAGE_UNKNOWN": RunStatus.BLOCKED_UNKNOWN,
             "BUDGET_EXHAUSTED": RunStatus.BLOCKED_BUDGET,
             "RESOURCE_UNAVAILABLE": RunStatus.BLOCKED_RESOURCE,
         }.get(reason, RunStatus.BLOCKED_CONFIGURATION)

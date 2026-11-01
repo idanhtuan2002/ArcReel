@@ -71,6 +71,7 @@ from server.routers import (
     onboarding,
     packaging,
     presentations,
+    production_runs,
     products,
     project_events,
     projects,
@@ -495,6 +496,11 @@ async def lifespan(app: FastAPI):
     # background task to manage.
     app.state.execution_event_stream_service = DurableEventStreamService()
 
+    # Automatic production stays unwired until its release gate qualifies owner adapters: run reads still work,
+    # commands answer AUTOMATIC_PRODUCTION_NOT_ACTIVATED and no production scheduler is started.
+    app.state.production_run_service = None
+    app.state.production_scheduler = None
+
     logger.info("启动 ExecutionRecoveryScheduler...")
     execution_recovery_scheduler = ExecutionRecoveryScheduler()
     app.state.execution_recovery_scheduler = execution_recovery_scheduler
@@ -505,6 +511,10 @@ async def lifespan(app: FastAPI):
         yield
 
     # Shutdown
+    production_scheduler = getattr(app.state, "production_scheduler", None)
+    if production_scheduler:
+        # Stopping the scan leaves every logical run durable; leases expire and are reclaimed on restart.
+        await production_scheduler.stop()
     execution_recovery_scheduler = getattr(app.state, "execution_recovery_scheduler", None)
     if execution_recovery_scheduler:
         logger.info("正在停止 ExecutionRecoveryScheduler...")
@@ -740,6 +750,9 @@ app.include_router(
     prefix="/api/v1",
     dependencies=[Depends(get_current_user), Depends(require_project_migration_ok)],
     tags=["分镜尾帧"],
+)
+app.include_router(
+    production_runs.router, prefix="/api/v1", dependencies=[Depends(get_current_user)], tags=["Production runs"]
 )
 app.include_router(versions.router, prefix="/api/v1", dependencies=[Depends(get_current_user)], tags=["版本管理"])
 app.include_router(gates.router, prefix="/api/v1", dependencies=[Depends(get_current_user)], tags=["V1 人工 Gate"])
