@@ -7,7 +7,7 @@ from lib.db.models.host_hardening import MasterHeadVersionModel, PromotionReceip
 from r2.automation.authorization import automation_principal
 from r2.contracts.automation import AutomationOperation
 from server.services.r2_shot_approval import R2ShotApprovalRefused, R2ShotCut
-from tests.integration.server.production_run.test_master_authority import master_owner_run as master_owner_run
+from tests.integration.server.production_run.test_master_approval_authority import master_owner_run as master_owner_run
 from tests.integration.server.services.test_automation_grants import delegated_host as delegated_host
 from tests.integration.server.services.test_automation_grants import interactive_env as interactive_env
 from tests.integration.server.services.test_automation_grants import subject_for

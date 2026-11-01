@@ -35,6 +35,8 @@ _PLAN_WRITE_ALLOWED = {
     "lib/db/repositories/narrative_plan.py",
     "lib/db/narrative_plan_uow.py",
 }
+# Files that only row-lock a plan head (``lock_plan``) as a commit fence and never write a plan.
+_PLAN_LOCK_ONLY_ALLOWED = {"server/production_run/narrative_authority.py"}
 _CANON_AUTHORITY_SYMBOLS = ("CanonWriteRepositoryPort", "CanonRepository", "CanonAuthorityUnitOfWork")
 _CANON_WRITE_IMPORT_NEEDLES = (
     "canon_transaction",
@@ -119,7 +121,10 @@ def test_only_the_plan_service_calls_plan_authoritative_writes() -> None:
             rel = path.relative_to(_ROOT).as_posix()
             if rel in allowed:
                 continue
-            if _PLAN_WRITE_ATTRS & _called_attrs(ast.parse(path.read_text(encoding="utf-8"))):
+            called = _PLAN_WRITE_ATTRS & _called_attrs(ast.parse(path.read_text(encoding="utf-8")))
+            if rel in _PLAN_LOCK_ONLY_ALLOWED:
+                called -= {"lock_plan"}
+            if called:
                 offenders.add(rel)
     assert offenders == set()
 

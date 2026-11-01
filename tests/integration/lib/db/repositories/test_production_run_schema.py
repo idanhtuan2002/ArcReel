@@ -13,9 +13,9 @@ from alembic.operations import Operations
 from tests.integration.lib.db.repositories.test_production_runs import claim, create_run, intent_for
 
 
-def migration():
-    path = Path(__file__).resolve().parents[5] / "alembic/versions/b7a310300001_autonomous_production.py"
-    spec = importlib.util.spec_from_file_location("autonomous_production_migration_fixture", path)
+def migration(name: str = "b7a310300001_autonomous_production"):
+    path = Path(__file__).resolve().parents[5] / f"alembic/versions/{name}.py"
+    spec = importlib.util.spec_from_file_location(f"{name}_migration_fixture", path)
     assert spec is not None
     assert spec.loader is not None
     module = importlib.util.module_from_spec(spec)
@@ -99,11 +99,14 @@ async def test_raw_step_insert_cannot_cross_parent_scope(concurrent_session_fact
 async def test_upgrade_downgrade_preserves_unrelated_user_rows(concurrent_session_factory):
     factory = concurrent_session_factory
     module = migration()
+    dependent = migration("b7a310300003_owner_attempts")
     async with factory() as session, session.begin():
         connection = await session.connection()
         before = await session.scalar(sa.text("SELECT count(*) FROM users"))
 
         def roundtrip(sync):
+            with Operations.context(MigrationContext.configure(sync)):
+                dependent.downgrade()
             for table in (
                 "auto_authorization_decisions",
                 "auto_grant_heads",
@@ -121,6 +124,7 @@ async def test_upgrade_downgrade_preserves_unrelated_user_rows(concurrent_sessio
                 assert "auto_production_runs" not in sa.inspect(sync).get_table_names()
                 module.upgrade()
                 assert "auto_production_runs" in sa.inspect(sync).get_table_names()
+                dependent.upgrade()
 
         await connection.run_sync(roundtrip)
         assert await session.scalar(sa.text("SELECT count(*) FROM users")) == before
