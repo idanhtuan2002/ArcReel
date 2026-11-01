@@ -103,3 +103,35 @@ async def test_a_single_accepted_defect_fails_qualification(tmp_path: Path):
     record = await _run(tmp_path, Reviewer(miss_defects=1))
 
     assert not reviewer_is_qualified(record)
+
+
+class SubtitleReviewer(Reviewer):
+    """Rejects a final whose subtitles are marked defective; the final bytes alone cannot tell the cases apart."""
+
+    async def assess(self, *, route, evidence):
+        review = await super().assess(route=route, evidence=evidence)
+        defect = "defect" in evidence.subtitle_path.read_text(encoding="utf-8")
+        return review.model_copy(update={"scores": {**GOOD, "audio": 2} if defect else GOOD})
+
+
+async def test_a_subtitle_only_defect_of_a_clean_final_is_its_own_case(tmp_path: Path):
+    manifest = _corpus(tmp_path)
+    data = json.loads(manifest.read_text(encoding="utf-8"))
+    for case in data["cases"]:
+        if case["label"] == "CRITICAL_DEFECT":
+            case["final"] = case["final"].replace("CRITICAL_DEFECT", "CLEAN")
+            (tmp_path / case["subtitles"]).write_text("1\n00:00:00,000 --> 00:00:01,000\ndefect\n", encoding="utf-8")
+    manifest.write_text(json.dumps(data), encoding="utf-8")
+
+    record = await qualify(
+        corpus=manifest,
+        route=ROUTE,
+        evaluator=SubtitleReviewer(),
+        output=tmp_path / "receipts",
+        profile_digest="sha256:" + "a" * 64,
+        launch_profile_id="fiction_narration_vi_v1",
+        language="vi",
+    )
+
+    assert len({case.case_digest for case in record.cases}) == 40
+    assert reviewer_is_qualified(record)

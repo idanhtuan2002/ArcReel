@@ -7,7 +7,9 @@ the final. Each review is written as a receipt beside the output and named by it
 ``ReviewerQualification`` is printed, and recorded only with ``--record``. With ``--project`` and ``--role`` the route,
 its provider base URL and the profile digest are read from the project's automation settings exactly as a run would
 resolve them; ``--route``/``--base-url``/``--profile-digest`` give them explicitly instead. The rule (``reviewer_is_qualified``)
-needs at least 10 clean and 10 critical-defect cases per split, no accepted defect and ≥80 % accepted clean.
+needs at least 10 clean and 10 critical-defect cases per split, no accepted defect and ≥80 % accepted clean. A
+case is identified by its whole evidence (final, subtitles and narration), so a defect that changes only the
+subtitles of a clean final is a distinct case.
 """
 
 from __future__ import annotations
@@ -29,6 +31,7 @@ from server.production_run.evaluators import (
     FinalEvidence,
     OllamaReviewer,
     QualifiedEvaluator,
+    evidence_digest,
     prompt_digest,
     provider_base_url,
     review_method,
@@ -88,7 +91,7 @@ async def qualify(
                 split=case["split"],
                 label=case["label"],
                 accepted=review.outcome == "COMPLETED" and review.accepts(),
-                case_digest=evidence.subject_digest,
+                case_digest=evidence_digest(evidence),
                 receipt_ref=name,
                 receipt_digest=digest,
             )
