@@ -31,6 +31,7 @@ from r2.contracts.automation import ModelRoute, RunStage
 from r2.contracts.common import ensure_json_value
 
 FRAME_COUNT = 8
+CONTEXT_TOKENS = 16384
 
 PROMPT = """Bạn là người duyệt chất lượng phim ngắn tiếng Việt dạng kể chuyện (9:16, 30–60 giây).
 Bạn nhận các khung hình lấy đều từ phim, phụ đề và lời kể. Hãy chấm độc lập, khắt khe.
@@ -137,9 +138,16 @@ def sample_frames(final: Path, *, count: int = FRAME_COUNT, ffmpeg: str = "ffmpe
 class OllamaReviewer:
     """A reviewer route served by an Ollama chat endpoint that accepts images."""
 
-    def __init__(self, *, base_url_for: Callable[[str], Awaitable[str]], timeout_seconds: float = 600) -> None:
+    def __init__(
+        self,
+        *,
+        base_url_for: Callable[[str], Awaitable[str]],
+        timeout_seconds: float = 600,
+        transport: httpx.AsyncBaseTransport | None = None,
+    ) -> None:
         self._base_url_for = base_url_for
         self._timeout = timeout_seconds
+        self._transport = transport
 
     async def assess(self, *, route: ModelRoute, evidence: FinalEvidence) -> ModelAssessment:
         base = {
@@ -155,6 +163,8 @@ class OllamaReviewer:
             body = {
                 "model": route.model_id,
                 "stream": False,
+                "truncate": False,
+                "shift": False,
                 "format": SCHEMA,
                 "messages": [
                     {
@@ -166,9 +176,12 @@ class OllamaReviewer:
                         "images": [base64.b64encode(frame).decode("ascii") for frame in frames],
                     }
                 ],
-                "options": {"temperature": 0},
+                "options": {"temperature": 0, "num_ctx": CONTEXT_TOKENS},
             }
-            async with device_job(local_job(url, route.model_id)), httpx.AsyncClient(timeout=self._timeout) as client:
+            async with (
+                device_job(local_job(url, route.model_id)),
+                httpx.AsyncClient(timeout=self._timeout, transport=self._transport) as client,
+            ):
                 response = await client.post(url + "/api/chat", json=body)
             response.raise_for_status()
             answer = json.loads(response.json()["message"]["content"])
