@@ -6,15 +6,19 @@ run's user and its automation grant, and never accepts identity or authority fro
 
 from __future__ import annotations
 
+import asyncio
 from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi.responses import FileResponse
 from pydantic import BaseModel, ConfigDict, Field
 
 from lib.db import async_session_factory
 from lib.db.repositories.production_runs import ProductionRunConflict, ProductionRunRepository
+from lib.presentation_renderer import sha256_file
+from lib.project_manager import get_project_manager
 from r2.automation.identity import policy_digest
-from r2.contracts.automation import AutomationMode, Checkpoint, ReviewCommand, RunCommand, RunSnapshot
+from r2.contracts.automation import AutomationMode, Checkpoint, ReviewCommand, RunCommand, RunSnapshot, RunStatus
 from server.auth import CurrentUser, InteractiveUser, oauth2_scheme_optional
 from server.production_run.service import (
     ProductionRunRefused,
@@ -240,3 +244,36 @@ async def review_run(
         return _view(await active.review(interactive_token=token, command=command))
     except _REFUSALS as error:
         raise _http(error) from error
+
+
+@router.get("/projects/{project_name}/production-runs/{run_id}/outputs/{episode}")
+async def download_output(
+    project_name: str, run_id: str, episode: int, user: CurrentUser, service: Service
+) -> FileResponse:
+    """The verified archive of one target of the user's succeeded run; its bytes are re-hashed before sending."""
+    run: RunSnapshot | None
+    if service is None:
+        async with async_session_factory() as session:
+            run = await ProductionRunRepository(session).get(user_id=user.id, project_name=project_name, run_id=run_id)
+    else:
+        try:
+            run = await service.get(user_id=user.id, project_name=project_name, run_id=run_id)
+        except _REFUSALS:
+            run = None
+    output = (
+        next((o for o in run.completed_targets if o.target == f"episode:{episode}"), None)
+        if run is not None and run.status is RunStatus.SUCCEEDED
+        else None
+    )
+    if output is None:
+        raise HTTPException(status_code=404, detail={"code": "OUTPUT_NOT_FOUND", "reasons": []})
+    project_dir = get_project_manager().get_project_path(project_name)
+    archive = (project_dir / output.export.receipt_ref.partition("@")[2]).resolve()
+    if (project_dir / "production").resolve() not in archive.parents or not archive.is_file():
+        raise HTTPException(status_code=409, detail={"code": "ARCHIVE_CHANGED", "reasons": []})
+    if (
+        archive.stat().st_size != output.archive_size
+        or "sha256:" + await asyncio.to_thread(sha256_file, archive) != output.archive_digest
+    ):
+        raise HTTPException(status_code=409, detail={"code": "ARCHIVE_CHANGED", "reasons": []})
+    return FileResponse(archive, media_type="application/zip", filename=f"{project_name}-episode-{episode}.zip")

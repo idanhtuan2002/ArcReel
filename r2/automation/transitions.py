@@ -117,6 +117,9 @@ def advance(*, run: RunSnapshot, outcome: StageOutcome) -> RunSnapshot:
                 pending_review=PendingReview(checkpoint=checkpoint, binding_digest=binding),
             )
     if run.stage is RunStage.EXPORT:
+        produced = {output.target: output for output in run.completed_targets}
+        produced.update({output.target: output for output in outcome.outputs if output.target in run.targets})
+        run = run.model_copy(update={"completed_targets": tuple(produced[t] for t in run.targets if t in produced)})
         targets = {
             output.target
             for output in run.completed_targets

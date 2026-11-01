@@ -183,6 +183,21 @@ class DispatchIntent(AutomationContract):
         return self
 
 
+class TargetOutput(AutomationContract):
+    target: ExactIdentity
+    generation: PositiveInt
+    input_digest: Digest
+    policy_digest: Digest
+    master_digest: Digest
+    quality_run: OwnerReceipt
+    quality_decision: Literal["PASS"]
+    export: OwnerReceipt
+    final_digest: Digest
+    archive_digest: Digest
+    archive_size: PositiveInt
+    verified: Literal[True]
+
+
 class StageOutcome(AutomationContract):
     stage: RunStage
     generation: PositiveInt
@@ -194,6 +209,7 @@ class StageOutcome(AutomationContract):
     reason: ExactIdentity | None = None
     unit_key: ExactIdentity | None = None
     repair_stage: RunStage | None = None
+    outputs: tuple[TargetOutput, ...] = ()
 
     @model_validator(mode="after")
     def complete_outcome(self) -> Self:
@@ -220,21 +236,6 @@ class ReviewApproval(AutomationContract):
     binding_digest: Digest
     actor_id: ExactIdentity
     receipt: OwnerReceipt
-
-
-class TargetOutput(AutomationContract):
-    target: ExactIdentity
-    generation: PositiveInt
-    input_digest: Digest
-    policy_digest: Digest
-    master_digest: Digest
-    quality_run: OwnerReceipt
-    quality_decision: Literal["PASS"]
-    export: OwnerReceipt
-    final_digest: Digest
-    archive_digest: Digest
-    archive_size: PositiveInt
-    verified: Literal[True]
 
 
 class RunSnapshot(RunScope):

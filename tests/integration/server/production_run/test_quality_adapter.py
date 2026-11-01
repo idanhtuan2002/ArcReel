@@ -12,6 +12,7 @@ from r2.automation.assessment import AssessmentFinding, ModelAssessment
 from r2.contracts.automation import QualificationCase, ReviewerQualification, RunStage, RunStatus
 from server.production_run.controller import ProductionController
 from server.production_run.final_master_adapter import FinalMasterAdapter
+from server.production_run.packaging_adapter import ExportAdapter, PackagingAdapter
 from server.production_run.quality_adapter import QualityAdapter
 from server.production_run.render_adapter import RenderAdapter
 from server.services.presentation_read_model import PresentationReadModelService
@@ -103,6 +104,8 @@ async def quality_host(story_host: Host):
             RunStage.RENDER: render,
             RunStage.MASTER: FinalMasterAdapter(host.sessions, authority=host.authority, projects=host.projects),
             RunStage.QUALITY: quality,
+            RunStage.PACKAGE: PackagingAdapter(host.sessions, authority=host.authority, projects=host.projects),
+            RunStage.EXPORT: ExportAdapter(host.sessions, authority=host.authority, projects=host.projects),
         },
         witness=RunInput(host.run.input_digest),
         poll_seconds=0,
@@ -185,3 +188,49 @@ async def test_both_rejecting_rework_exactly_the_named_stage(quality_host):
 
     assert (reworked.stage, reworked.status, reworked.generation) == (RunStage.MEDIA, RunStatus.RUNNING, 2)
     assert [(r.stage, r.unit_key, r.count) for r in reworked.repair_counts] == [(RunStage.MEDIA, "episode:1", 1)]
+
+
+async def test_a_passed_final_is_packaged_exported_and_the_run_succeeds(quality_host):
+    host, controller, render, quality, _reviewer = quality_host
+    await _qualify(host)
+    await _to_quality(host, controller, render)
+    await _review(host, controller, quality)
+
+    packaged = await _tick(host, controller)
+    succeeded = await _tick(host, controller)
+
+    assert packaged.stage is RunStage.EXPORT
+    assert succeeded.status is RunStatus.SUCCEEDED
+    [output] = succeeded.completed_targets
+    archive = host.projects.get_project_path("project") / output.export.receipt_ref.partition("@")[2]
+    import hashlib
+    import zipfile
+
+    assert "sha256:" + hashlib.sha256(archive.read_bytes()).hexdigest() == output.archive_digest
+    with zipfile.ZipFile(archive) as opened:
+        assert sorted(opened.namelist()) == [
+            "episode_1.mp4",
+            "episode_1.srt",
+            "lineage.json",
+            "quality.json",
+            "render_manifest.json",
+        ]
+        assert "sha256:" + hashlib.sha256(opened.read("episode_1.mp4")).hexdigest() == output.final_digest
+
+
+async def test_a_substituted_archive_prevents_run_success(quality_host):
+    host, controller, render, quality, _reviewer = quality_host
+    await _qualify(host)
+    await _to_quality(host, controller, render)
+    await _review(host, controller, quality)
+    packaged = await _tick(host, controller)
+    async with host.sessions() as session:
+        outcome = await ProductionRunRepository(session).stage_outcome(run=packaged, stage=RunStage.PACKAGE)
+    assert outcome is not None
+    archive = host.projects.get_project_path("project") / outcome.receipts[0].receipt_ref.partition("@")[2]
+    archive.write_bytes(archive.read_bytes() + b"x")
+
+    blocked = await _tick(host, controller)
+
+    assert blocked.status is not RunStatus.SUCCEEDED
+    assert (blocked.stage, blocked.reason) == (RunStage.EXPORT, "ARCHIVE_CHANGED")

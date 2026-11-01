@@ -387,3 +387,60 @@ async def test_start_retry_after_a_mode_change_returns_the_same_run(host):
 
     assert retry.status_code == 200, retry.text
     assert (retry.json()["run_id"], retry.json()["policy"]["mode"]) == (run["run_id"], "semi")
+
+
+async def test_a_succeeded_runs_archive_downloads_only_verified_and_only_in_its_project(host, tmp_path, monkeypatch):
+    import hashlib
+
+    from lib.db.models.production_run import ProductionRunModel
+    from lib.project_manager import ProjectManager
+    from r2.contracts.automation import OwnerReceipt, RunSnapshot, RunStatus, TargetOutput
+    from server.routers import production_runs as routes
+
+    run = (await host.start()).json()
+    projects = ProjectManager(tmp_path / "projects")
+    archive = tmp_path / "projects" / run["project_name"] / "production" / "automation" / "episode_1.zip"
+    archive.parent.mkdir(parents=True)
+    archive.write_bytes(b"verified-archive")
+    digest = "sha256:" + hashlib.sha256(b"verified-archive").hexdigest()
+    monkeypatch.setattr(routes, "get_project_manager", lambda: projects)
+    receipt = OwnerReceipt(
+        owner="export", receipt_ref="episode:1:archive@production/automation/episode_1.zip", digest=digest
+    )
+    async with host.sessions() as session, session.begin():
+        row = await session.get(ProductionRunModel, run["run_id"])
+        snapshot = RunSnapshot.model_validate_json(row.snapshot_json)
+        succeeded = snapshot.model_copy(
+            update={
+                "status": RunStatus.SUCCEEDED,
+                "completed_targets": (
+                    TargetOutput(
+                        target="episode:1",
+                        generation=snapshot.generation,
+                        input_digest=snapshot.input_digest,
+                        policy_digest=run["policy_digest"],
+                        master_digest=digest,
+                        quality_run=receipt,
+                        quality_decision="PASS",
+                        export=receipt,
+                        final_digest=digest,
+                        archive_digest=digest,
+                        archive_size=len(b"verified-archive"),
+                        verified=True,
+                    ),
+                ),
+            }
+        )
+        row.snapshot_json, row.status = succeeded.model_dump_json(), "SUCCEEDED"
+    url = f"{BASE}/{run['run_id']}/outputs/1"
+
+    ok = await host.http.get(url, headers=host.headers)
+    other = await host.http.get(url.replace(run["project_name"], "another-project"), headers=host.headers)
+    anonymous = await host.http.get(url)
+    archive.write_bytes(b"substituted-archive")
+    changed = await host.http.get(url, headers=host.headers)
+
+    assert (ok.status_code, ok.content) == (200, b"verified-archive")
+    assert other.status_code == 404
+    assert anonymous.status_code == 401
+    assert changed.status_code == 409
