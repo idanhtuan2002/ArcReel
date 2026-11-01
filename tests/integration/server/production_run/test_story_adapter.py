@@ -82,7 +82,12 @@ def _policy(provider_id: str) -> RunPolicy:
     return RunPolicy(
         profile_id="fiction_narration_vi_v1",
         profile_digest="sha256:" + "a" * 64,
-        routes=(writer, writer.model_copy(update={"role": "script"})),
+        routes=(
+            writer,
+            writer.model_copy(update={"role": "script"}),
+            writer.model_copy(update={"role": "reviewer_a", "model_identity": "reviewer-a", "model_id": "rev-a"}),
+            writer.model_copy(update={"role": "reviewer_b", "model_identity": "reviewer-b", "model_id": "rev-b"}),
+        ),
         currency="USD",
         max_cost_minor_units=100,
         max_model_calls=1200,

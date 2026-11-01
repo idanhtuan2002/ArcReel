@@ -8,7 +8,7 @@ from alembic import command
 
 REVISION = "b7a310300003"
 PREDECESSOR = "b7a310300002"
-TABLES = {"auto_owner_attempts", "auto_step_outcomes"}
+TABLES = {"auto_owner_attempts", "auto_step_outcomes", "auto_reviewer_qualifications"}
 
 
 def test_real_alembic_upgrade_downgrade_preserves_predecessor(alembic_cfg):

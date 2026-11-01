@@ -1,6 +1,6 @@
 """Owner adapters from a run's idea to a committed manuscript handed to the video flow.
 
-- ``BRIEF``: draft the brief from the run's idea and frozen writer/reviewer routes, store its exact bytes and
+- ``BRIEF``: draft the brief from the run's idea and frozen writer route, store its exact bytes and
   greenlight that digest at Gate A under the run's automation grant.
 - ``STORY``: start the greenlit story run; it passes only when the story owner offers a manifest
   (``READY_FOR_APPROVAL``). A succeeded queue task never stands in for the story phase.
@@ -123,7 +123,8 @@ class BriefAdapter:
     async def dispatch(self, intent: DispatchIntent) -> OwnerReceipt:
         run = await current_run(self._sessions, intent)
         command = await start_command(self._sessions, intent)
-        writer, judge = route_for(run, "writer"), route_for(run, "reviewer_a")
+        # Quality reviewers never take part in writing, so the story's own reviews use the writer route.
+        writer = route_for(run, "writer")
         if writer is None or command.idea is None:
             raise OwnerBlocked("MISSING_MODEL_ROLE")
         try:
@@ -132,8 +133,6 @@ class BriefAdapter:
                 genre=STORY_GENRE,
                 provider_id=writer[0],
                 model_id=writer[1],
-                judge_provider_id=judge[0] if judge else None,
-                judge_model_id=judge[1] if judge else None,
                 max_cost_minor_units=max(1, min(10_000, run.policy.max_cost_minor_units)),
             )
         except StoryActionRefused as refused:

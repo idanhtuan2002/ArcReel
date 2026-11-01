@@ -249,3 +249,21 @@ class ProductionStepOutcomeModel(Base):
         Index("ix_auto_step_outcomes_stage", "user_id", "project_name", "run_id", "stage"),
         *_ceiling("outcome_json"),
     )
+
+
+class ReviewerQualificationModel(Base):
+    """One reviewer route's qualification against a profile's calibration and hold-out corpus."""
+
+    __tablename__ = "auto_reviewer_qualifications"
+    qualification_digest: Mapped[str] = mapped_column(String(71), primary_key=True)
+    profile_digest: Mapped[str] = mapped_column(String(71), nullable=False)
+    launch_profile_id: Mapped[str] = mapped_column(String(255), nullable=False)
+    language: Mapped[str] = mapped_column(String(32), nullable=False)
+    model_identity: Mapped[str] = mapped_column(String(255), nullable=False)
+    config_digest: Mapped[str] = mapped_column(String(71), nullable=False)
+    record_json: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    __table_args__ = (
+        Index("ix_auto_reviewer_qualification_scope", "profile_digest", "launch_profile_id", "language"),
+        *_ceiling("record_json"),
+    )

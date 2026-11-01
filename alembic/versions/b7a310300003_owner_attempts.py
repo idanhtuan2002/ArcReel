@@ -65,9 +65,35 @@ def upgrade() -> None:
         ceiling,
     )
     op.create_index("ix_auto_step_outcomes_stage", "auto_step_outcomes", ["user_id", "project_name", "run_id", "stage"])
+    if op.get_bind().dialect.name == "postgresql":
+        record_ceiling = sa.CheckConstraint("octet_length(record_json) <= 1048576", name="ck_auto_record_json_bytes_pg")
+    else:
+        record_ceiling = sa.CheckConstraint(
+            "length(CAST(record_json AS BLOB)) <= 1048576", name="ck_auto_record_json_bytes_sqlite"
+        )
+    op.create_table(
+        "auto_reviewer_qualifications",
+        sa.Column("qualification_digest", sa.String(length=71), nullable=False),
+        sa.Column("profile_digest", sa.String(length=71), nullable=False),
+        sa.Column("launch_profile_id", sa.String(length=255), nullable=False),
+        sa.Column("language", sa.String(length=32), nullable=False),
+        sa.Column("model_identity", sa.String(length=255), nullable=False),
+        sa.Column("config_digest", sa.String(length=71), nullable=False),
+        sa.Column("record_json", sa.Text(), nullable=False),
+        sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
+        sa.PrimaryKeyConstraint("qualification_digest"),
+        record_ceiling,
+    )
+    op.create_index(
+        "ix_auto_reviewer_qualification_scope",
+        "auto_reviewer_qualifications",
+        ["profile_digest", "launch_profile_id", "language"],
+    )
 
 
 def downgrade() -> None:
+    op.drop_index("ix_auto_reviewer_qualification_scope", table_name="auto_reviewer_qualifications")
+    op.drop_table("auto_reviewer_qualifications")
     op.drop_index("ix_auto_step_outcomes_stage", table_name="auto_step_outcomes")
     op.drop_table("auto_step_outcomes")
     op.drop_table("auto_owner_attempts")
