@@ -54,7 +54,9 @@ def test_the_record_reports_exactly_what_the_server_reports():
     )
 
     assert record["status"] == "SUCCEEDED"
-    assert [h["stage"] for h in record["history"]] == ["BRIEF", "STORY", "EXPORT"]
+    history = record["history"]
+    assert isinstance(history, list)
+    assert [h["stage"] for h in history] == ["BRIEF", "STORY", "EXPORT"]
     assert posted[0]["policy_digest"] == "sha256:p"
 
 
