@@ -64,7 +64,7 @@ def test_auto_script_checkpoint_needs_no_user_action(run_data: dict):
 
     run = RunSnapshot.model_validate({**run_data, "stage": "SCRIPT"})
     updated = advance(run=run, outcome=outcome_for(run))
-    assert updated.stage is RunStage.ASSET_ANALYSIS
+    assert updated.stage is RunStage.MEDIA
     assert updated.status is RunStatus.RUNNING
     assert updated.pending_review is None
 

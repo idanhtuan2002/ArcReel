@@ -1,0 +1,433 @@
+"""Owner adapters for the text stages, driven by the workflow status owner.
+
+``WorkflowStateService`` decides each target's next action from the project's real artifacts; a stage passes only
+when every target's next action has moved past the stage, never because a queue task succeeded. While a target
+still needs the stage's action, the step submits that action's owner task under an exact sub-command and waits.
+A task that succeeded while the status still asks for its action is missing output and blocks the run; so does
+a status that moved backwards, a planning reset, a project blocker or an action this stage does not own.
+
+- ``ASSET_ANALYSIS`` (``AssetsAdapter`` in ``assets_adapter``): schema-bound inventory of the whole source.
+- ``EPISODE_PLAN``: planner windows until every target episode exists in the ledger.
+- ``SCRIPT_PLAN``: each target's formal script plan, then its content confirmation under the run's grant.
+- ``SCRIPT``: each target's final script.
+
+Every stage after ``ASSET_ANALYSIS`` pins the source revision that inventory completed against; a different
+current revision is an external input change.
+"""
+
+from __future__ import annotations
+
+import asyncio
+from collections.abc import Awaitable, Callable
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Any
+
+from lib.config.resolver import ConfigResolver
+from lib.project_manager import ProjectManager
+from lib.script_review import content_fingerprint, script_plan_path
+from lib.text_backends.base import TextTaskType
+from lib.workflow_state import WorkflowActionType, WorkflowStateService, WorkflowStatus
+from r2.automation.identity import digest_value
+from r2.contracts.automation import (
+    BudgetReservation,
+    DispatchIntent,
+    OwnerReceipt,
+    RunSnapshot,
+    RunStage,
+    StageOutcome,
+    UsageReceipt,
+)
+from r2.contracts.common import ensure_json_value
+from server.production_run.owner_support import (
+    OwnerBlocked,
+    Sessions,
+    current_run,
+    current_subject,
+    outcome,
+    required_receipt,
+    route_for,
+    step_intent,
+)
+from server.production_run.owner_tasks import ACTIVE, find_task, step_usage, submit_task
+from server.production_run.ports import StepPlan
+from server.services.automation_grants import RunAutomationAuthority
+from server.text_generation import TextGenerationRequest
+
+type StatusReader = Callable[[str, int | None], WorkflowStatus]
+
+A = WorkflowActionType
+# Position of each orchestration action in the episode pipeline; actions absent here are not stage work.
+RANK: dict[WorkflowActionType, int] = {
+    A.COLLECT_PROJECT_INPUT: 0,
+    A.ANALYZE_ASSETS: 1,
+    A.PLAN_EPISODES: 2,
+    A.RESET_EPISODE_PLANNING: 2,
+    A.PREPARE_SCRIPT_PLAN: 3,
+    A.CONFIRM_SCRIPT_PLAN: 4,
+    A.GENERATE_SCRIPT: 5,
+    A.GENERATE_ASSET_SHEETS: 6,
+    A.GENERATE_STORYBOARDS: 6,
+    A.GENERATE_GRID: 6,
+    A.GENERATE_TTS: 6,
+    A.REGENERATE_TTS: 6,
+    A.GENERATE_VIDEOS: 6,
+    A.REPAIR_VIDEO_UNITS: 6,
+    A.EXPORT: 6,
+}
+_SCRIPT_PLAN_TASKS = {
+    "narration": "text_narration_script_plan",
+    "drama": "text_drama_script_plan",
+}
+
+
+def revision_receipt(owner: str, ref: str, revision: str) -> OwnerReceipt:
+    """Evidence of one owner revision; the owner's own revision string stays readable after ``@``."""
+    return OwnerReceipt(
+        owner=owner,
+        receipt_ref=f"{ref}@{revision}",
+        digest=digest_value("r2.production-owner-revision.v1", {"ref": ref, "revision": revision}),
+    )
+
+
+def receipt_revision(receipt: OwnerReceipt) -> str:
+    return receipt.receipt_ref.rpartition("@")[2]
+
+
+def episode_number(target: str) -> int:
+    prefix, _, number = target.partition(":")
+    if prefix != "episode" or not number.isdigit() or int(number) < 1:
+        raise OwnerBlocked("UNSUPPORTED_TARGET")
+    return int(number)
+
+
+@dataclass(frozen=True)
+class Progress:
+    """What one target still needs: ``None`` when it is past this stage."""
+
+    evidence: OwnerReceipt | None
+
+
+class WorkflowStageAdapter:
+    """One text stage over every target; subclasses name the stage's actions and submit their owner tasks."""
+
+    owner: str
+    stage: RunStage
+    first_rank: int
+    done_rank: int
+    per_target: bool = True
+    calls_per_unit = 8
+    seconds_per_unit = 900
+
+    def __init__(
+        self,
+        sessions: Sessions,
+        *,
+        authority: RunAutomationAuthority,
+        projects: ProjectManager,
+        resolver: ConfigResolver,
+        status: StatusReader | None = None,
+    ) -> None:
+        self._sessions, self._authority, self._projects, self._resolver = sessions, authority, projects, resolver
+        self._status = status or WorkflowStateService(projects).get_status
+
+    # --- port ----------------------------------------------------------------------------------------
+
+    async def plan(self, *, run: RunSnapshot) -> StepPlan:
+        await self._require_script_route(run)
+        units = len(run.targets) if self.per_target else 1
+        refs = (await self._inventory(run),) if self._pins_source else ()
+        return StepPlan(
+            unit_key=self.stage.value.lower().replace("_", "-"),
+            input_refs=refs,
+            estimated_cost_minor_units=0,
+            estimated_model_calls=self.calls_per_unit * units,
+            estimated_tasks=units + (1 if self.stage is RunStage.EPISODE_PLAN else 0),
+            estimated_runtime_seconds=self.seconds_per_unit * units,
+        )
+
+    async def dispatch(self, intent: DispatchIntent) -> OwnerReceipt:
+        """Authorize the step's scope; owner tasks are submitted while inspecting, one exact command each."""
+        digest = digest_value(
+            "r2.production-text-stage.v1",
+            ensure_json_value(
+                {
+                    "stage": self.stage.value,
+                    "targets": list(await self._targets(intent)),
+                    "input_refs": [ref.model_dump(mode="json") for ref in intent.input_refs],
+                }
+            ),
+        )
+        subject = await current_subject(self._sessions, intent, subject_digest=digest)
+        async with self._sessions() as session, session.begin():
+            await self._authority.require_locked(session, subject=subject)
+        return OwnerReceipt(owner=self.owner, receipt_ref=intent.identity.command_id, digest=digest)
+
+    async def inspect(self, *, intent: DispatchIntent, receipt: OwnerReceipt) -> StageOutcome:
+        evidence: list[OwnerReceipt] = []
+        units: tuple[int | None, ...] = tuple(await self._targets(intent)) if self.per_target else (None,)
+        for episode in units:
+            progress = await self._advance(intent, receipt, episode)
+            if progress is None:
+                return outcome(intent, "WAIT", owner_state="OWNER_TASK_ACTIVE")
+            assert progress.evidence is not None
+            evidence.append(progress.evidence)
+        return outcome(intent, "PASS", receipts=tuple(evidence), owner_state="CURRENT")
+
+    async def usage(self, *, receipt: OwnerReceipt, reservation: BudgetReservation) -> UsageReceipt | None:
+        return await step_usage(self._sessions, await step_intent(self._sessions, reservation), receipt, reservation)
+
+    # --- the stage loop ------------------------------------------------------------------------------
+
+    async def _advance(self, intent: DispatchIntent, receipt: OwnerReceipt, episode: int | None) -> Progress | None:
+        """Drive one target until it is past this stage (``Progress``) or waits on an owner task (``None``)."""
+        for _ in range(4):
+            status = await asyncio.to_thread(self._status, intent.scope.project_name, episode)
+            self._check_source(intent, status)
+            action = status.next_action
+            rank = RANK.get(action.type)
+            if rank is None:
+                if action.type is A.WAIT_FOR_TASK:
+                    return None
+                if status.blockers:
+                    raise OwnerBlocked("WORKFLOW_" + status.blockers[0].code.upper())
+                raise OwnerBlocked("WORKFLOW_" + action.type.value.upper())
+            if rank > self.done_rank:
+                return Progress(await asyncio.to_thread(self._evidence, intent, status, episode))
+            if rank < self.first_rank or action.type is A.RESET_EPISODE_PLANNING:
+                raise OwnerBlocked("EXTERNAL_INPUT_CHANGED")
+            if not await self._act(intent, receipt.digest, status, episode):
+                return None
+        raise OwnerBlocked("OWNER_OUTPUT_MISSING")
+
+    async def _submit_once(
+        self,
+        intent: DispatchIntent,
+        subject: str,
+        *,
+        sub_key: str,
+        task_type: str,
+        resource_id: str,
+        payload: dict[str, Any],
+    ) -> bool:
+        """Submit the sub-command's task once; ``False`` while it runs. A finished task the status still asks
+        for again failed or produced nothing."""
+        task = await find_task(self._sessions, intent, sub_key)
+        if task is None:
+            await submit_task(
+                self._sessions,
+                self._authority,
+                intent,
+                sub_key=sub_key,
+                task_type=task_type,
+                resource_id=resource_id,
+                payload={**payload, "projects_root": str(self._projects.projects_root)},
+                subject_digest=subject,
+            )
+            return False
+        if task["status"] in ACTIVE:
+            return False
+        if task["status"] == "succeeded":
+            raise OwnerBlocked("OWNER_OUTPUT_MISSING")
+        raise OwnerBlocked("OWNER_TASK_FAILED")
+
+    async def _act(self, intent: DispatchIntent, subject: str, status: WorkflowStatus, episode: int | None) -> bool:
+        """Do the stage's next action; ``True`` when it completed synchronously and the status is re-read."""
+        raise NotImplementedError
+
+    def _evidence(self, intent: DispatchIntent, status: WorkflowStatus, episode: int | None) -> OwnerReceipt:
+        raise NotImplementedError
+
+    # --- helpers -------------------------------------------------------------------------------------
+
+    @property
+    def _pins_source(self) -> bool:
+        return self.stage is not RunStage.ASSET_ANALYSIS
+
+    async def _inventory(self, run: RunSnapshot) -> OwnerReceipt:
+        """The completed inventory's source revision, read when the stage is planned. The run's inventory stage
+        passed in this lineage, and the input witness has held since, so this is the revision it completed."""
+        await required_receipt(self._sessions, run, RunStage.ASSET_ANALYSIS)
+        project = await asyncio.to_thread(self._project, run.project_name)
+        workflow = project.get("workflow")
+        marker = workflow.get("asset_inventory") if isinstance(workflow, dict) else None
+        revision = marker.get("source_revision") if isinstance(marker, dict) else None
+        if not isinstance(revision, str):
+            raise OwnerBlocked("UPSTREAM_RECEIPT_MISSING")
+        return revision_receipt("asset-inventory", "asset-inventory", revision)
+
+    def _check_source(self, intent: DispatchIntent, status: WorkflowStatus) -> None:
+        if not self._pins_source:
+            return
+        [inventory] = intent.input_refs
+        if status.source_revision is not None and status.source_revision != receipt_revision(inventory):
+            raise OwnerBlocked("EXTERNAL_INPUT_CHANGED")
+
+    async def _targets(self, intent: DispatchIntent) -> tuple[int, ...]:
+        run = await current_run(self._sessions, intent)
+        return tuple(episode_number(target) for target in run.targets)
+
+    async def _require_script_route(self, run: RunSnapshot) -> None:
+        """The project's script text route must still be the one the policy froze."""
+        frozen = route_for(run, "script")
+        if frozen is None:
+            raise OwnerBlocked("MISSING_MODEL_ROLE")
+        current = await self._resolver.text_backend_for_task(TextTaskType.SCRIPT, run.project_name)
+        if tuple(current) != frozen:
+            raise OwnerBlocked("MODEL_CONFIG_CHANGED")
+
+    def _project(self, project_name: str) -> dict[str, Any]:
+        return self._projects.load_project(project_name)
+
+
+class EpisodePlanAdapter(WorkflowStageAdapter):
+    owner = "episode-planner"
+    stage = RunStage.EPISODE_PLAN
+    first_rank = 2
+    done_rank = 2
+    calls_per_unit = 6
+    seconds_per_unit = 600
+
+    async def _act(self, intent: DispatchIntent, subject: str, status: WorkflowStatus, episode: int | None) -> bool:
+        episodes = self._project(intent.scope.project_name).get("episodes")
+        planned = len(episodes) if isinstance(episodes, list) else 0
+        return await self._submit_once(
+            intent,
+            subject,
+            sub_key=f"plan:{planned}",
+            task_type="text_episode_plan",
+            resource_id="episode-planning",
+            payload={"instructions": None},
+        )
+
+    def _evidence(self, intent: DispatchIntent, status: WorkflowStatus, episode: int | None) -> OwnerReceipt:
+        if status.target is None:
+            raise OwnerBlocked("OWNER_OUTPUT_MISSING")
+        project = self._project(intent.scope.project_name)
+        entry = next(
+            (e for e in project.get("episodes") or [] if isinstance(e, dict) and e.get("episode") == episode), None
+        )
+        if entry is None:
+            raise OwnerBlocked("OWNER_OUTPUT_MISSING")
+        return OwnerReceipt(
+            owner=self.owner,
+            receipt_ref=f"episode:{episode}:plan",
+            digest=digest_value("r2.production-episode-plan.v1", ensure_json_value(entry)),
+        )
+
+
+class ScriptPlanAdapter(WorkflowStageAdapter):
+    owner = "script-planner"
+    stage = RunStage.SCRIPT_PLAN
+    first_rank = 3
+    done_rank = 4
+
+    def __init__(
+        self,
+        sessions: Sessions,
+        *,
+        authority: RunAutomationAuthority,
+        projects: ProjectManager,
+        resolver: ConfigResolver,
+        status: StatusReader | None = None,
+        confirm: Callable[[str, int], Awaitable[object]] | None = None,
+    ) -> None:
+        super().__init__(sessions, authority=authority, projects=projects, resolver=resolver, status=status)
+        self._confirm_plan = confirm or self._review_confirm
+
+    async def _review_confirm(self, project_name: str, episode: int) -> object:
+        from server.services.script_review import ScriptReviewError, ScriptReviewService
+
+        try:
+            return await ScriptReviewService(self._projects, config_resolver=self._resolver).confirm(
+                project_name, episode
+            )
+        except ScriptReviewError:
+            raise OwnerBlocked("SCRIPT_PLAN_NOT_CONFIRMABLE") from None
+
+    async def _act(self, intent: DispatchIntent, subject: str, status: WorkflowStatus, episode: int | None) -> bool:
+        assert episode is not None
+        action = status.next_action
+        if action.type is A.CONFIRM_SCRIPT_PLAN:
+            await self._confirm(intent, subject, status, episode)
+            return True
+        if action.args.get("expected_stale_script_plan_revision") is not None:
+            raise OwnerBlocked("SCRIPT_PLAN_REBUILD_REQUIRED")
+        mode = str(self._project(intent.scope.project_name).get("content_mode", "narration"))
+        task_type = _SCRIPT_PLAN_TASKS.get(mode)
+        if task_type is None:
+            raise OwnerBlocked("UNSUPPORTED_CONTENT_MODE")
+        return await self._submit_once(
+            intent,
+            subject,
+            sub_key=f"script-plan:{episode}",
+            task_type=task_type,
+            resource_id=f"episode-{episode}",
+            payload=TextGenerationRequest(episode=episode).to_payload(),
+        )
+
+    async def _confirm(self, intent: DispatchIntent, subject: str, status: WorkflowStatus, episode: int) -> None:
+        """Confirm the exact script plan revision the status shows, under the run's current grant."""
+        plan = status.artifacts.get("script_plan") or {}
+        revision = plan.get("revision")
+        if not isinstance(revision, str):
+            raise OwnerBlocked("OWNER_OUTPUT_MISSING")
+        current_proof = await current_subject(self._sessions, intent, subject_digest=subject)
+        async with self._sessions() as session, session.begin():
+            await self._authority.require_locked(session, subject=current_proof)
+        project_path = self._projects.get_project_path(intent.scope.project_name)
+        if (current := self._plan_revision(project_path, intent.scope.project_name, episode)) != revision:
+            raise OwnerBlocked("EXTERNAL_INPUT_CHANGED" if current is not None else "OWNER_OUTPUT_MISSING")
+        await self._confirm_plan(intent.scope.project_name, episode)
+
+    def _plan_revision(self, project_path: Path, project_name: str, episode: int) -> str | None:
+        path = script_plan_path(project_path, self._project(project_name), episode)
+        return content_fingerprint(path) if path is not None else None
+
+    def _evidence(self, intent: DispatchIntent, status: WorkflowStatus, episode: int | None) -> OwnerReceipt:
+        revision = (status.artifacts.get("script_plan") or {}).get("revision")
+        if not isinstance(revision, str):
+            raise OwnerBlocked("OWNER_OUTPUT_MISSING")
+        return revision_receipt(self.owner, f"episode:{episode}:script-plan", revision)
+
+
+class ScriptAdapter(WorkflowStageAdapter):
+    owner = "script-writer"
+    stage = RunStage.SCRIPT
+    first_rank = 5
+    done_rank = 5
+    calls_per_unit = 12
+    seconds_per_unit = 1200
+
+    async def _act(self, intent: DispatchIntent, subject: str, status: WorkflowStatus, episode: int | None) -> bool:
+        assert episode is not None
+        revision = (status.artifacts.get("script_plan") or {}).get("revision")
+        return await self._submit_once(
+            intent,
+            subject,
+            sub_key=f"script:{episode}:{revision}",
+            task_type="text_episode_script",
+            resource_id=f"episode-{episode}",
+            payload=TextGenerationRequest(episode=episode).to_payload(),
+        )
+
+    def _evidence(self, intent: DispatchIntent, status: WorkflowStatus, episode: int | None) -> OwnerReceipt:
+        if status.target is None:
+            raise OwnerBlocked("OWNER_OUTPUT_MISSING")
+        project_path = self._projects.get_project_path(intent.scope.project_name)
+        revision = content_fingerprint(project_path / status.target.script)
+        if revision is None:
+            raise OwnerBlocked("OWNER_OUTPUT_MISSING")
+        return revision_receipt(self.owner, f"episode:{episode}:script", revision)
+
+
+__all__ = [
+    "RANK",
+    "EpisodePlanAdapter",
+    "ScriptAdapter",
+    "ScriptPlanAdapter",
+    "WorkflowStageAdapter",
+    "episode_number",
+    "receipt_revision",
+    "revision_receipt",
+]

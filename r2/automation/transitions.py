@@ -44,6 +44,8 @@ def advance(*, run: RunSnapshot, outcome: StageOutcome) -> RunSnapshot:
             "USAGE_UNKNOWN": RunStatus.BLOCKED_UNKNOWN,
             "BUDGET_EXHAUSTED": RunStatus.BLOCKED_BUDGET,
             "RESOURCE_UNAVAILABLE": RunStatus.BLOCKED_RESOURCE,
+            "EXTERNAL_INPUT_CHANGED": RunStatus.BLOCKED_INPUT_CHANGED,
+            "FAILED_QUALITY": RunStatus.FAILED_QUALITY,
         }.get(reason, RunStatus.BLOCKED_CONFIGURATION)
         return _blocked(run, status, reason)
     if not outcome.receipts:

@@ -27,6 +27,21 @@ def _renews(previous: AutomationGrant, grant: AutomationGrant) -> bool:
     )
 
 
+def _renewed_replay(
+    stored: AutomationAuthorizationV1, authorization: AutomationAuthorizationV1, grant_id: str, grant_version: int
+) -> bool:
+    """A replay of the same command, subject and principal under a newer version of the same grant."""
+    subject = authorization.subject
+    volatile = {"expected_run_version", "grant_version"}
+    return (
+        subject.grant_id == grant_id
+        and subject.grant_version > grant_version
+        and stored.principal == authorization.principal
+        and stored.request_digest == authorization_subject_digest(stored.subject)
+        and stored.subject.model_dump(exclude=volatile) == subject.model_dump(exclude=volatile)
+    )
+
+
 class AutomationGrantRepository:
     def __init__(self, session: AsyncSession) -> None:
         self.session = session
@@ -164,6 +179,10 @@ class AutomationGrantRepository:
         row = await self.session.get(AutomationDecisionModel, key)
         if row is not None:
             stored = AutomationAuthorizationV1.model_validate_json(row.authorization_json)
+            if _renewed_replay(stored, authorization, row.grant_id, row.grant_version):
+                # The caller re-proved currency under a renewal of the same grant; the command keeps its
+                # original admission record.
+                return stored
             # Claim version is fresh admission state, separate from durable command identity.
             if (
                 stored.subject.model_dump(exclude={"expected_run_version"})

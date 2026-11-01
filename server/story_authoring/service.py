@@ -204,6 +204,15 @@ class StoryAuthoringService:
         self, *, user_id: str, project_name: str, principal: str, brief: StoryBrief, gate_a_decision_id: str
     ) -> StoryRunRef:
         await self._require_grant(principal, user_id=user_id, project_name=project_name)
+        return await self.start_greenlit(
+            user_id=user_id, project_name=project_name, brief=brief, gate_a_decision_id=gate_a_decision_id
+        )
+
+    async def start_greenlit(
+        self, *, user_id: str, project_name: str, brief: StoryBrief, gate_a_decision_id: str
+    ) -> StoryRunRef:
+        """Start once the caller's own authority is proven; the Gate A, route and replay checks are the same for
+        every actor."""
         draft = brief.model_copy(update={"gate_a_decision_id": None})
         await self._require_greenlight(user_id, project_name, draft.digest(), gate_a_decision_id)
         try:
@@ -329,6 +338,10 @@ class StoryAuthoringService:
 
     async def abort(self, *, user_id: str, project_name: str, run_id: str, principal: str) -> RunState:
         return await (await self._committer(user_id, project_name, run_id)).abort(principal=principal)
+
+    async def committer(self, *, user_id: str, project_name: str, run_id: str) -> ManuscriptCommitter:
+        """The run's commit owner; each of its actions proves its own actor's authority."""
+        return await self._committer(user_id, project_name, run_id)
 
     async def _committer(self, user_id: str, project_name: str, run_id: str) -> ManuscriptCommitter:
         ref, state = await self.get(user_id=user_id, project_name=project_name, run_id=run_id)

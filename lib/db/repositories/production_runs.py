@@ -25,6 +25,7 @@ from r2.contracts.automation import (
     RunPolicy,
     RunScope,
     RunSnapshot,
+    RunStage,
     RunStatus,
     UsageReceipt,
 )
@@ -294,6 +295,59 @@ class ProductionRunRepository:
             raise ProductionRunConflict("RUN_STATE_INTEGRITY_FAILED")
         receipt = OwnerReceipt.model_validate_json(row.receipt_json) if row.receipt_json is not None else None
         return intent, receipt
+
+    async def start_command(self, scope: RunScope) -> RunCommand:
+        """The Start command the run was created from; its idea and targets are run inputs."""
+        scope = RunScope.model_validate(scope)
+        row = await self.session.get(ProductionRunModel, scope.run_id)
+        if row is None or (row.user_id, row.project_name) != (scope.user_id, scope.project_name):
+            raise ProductionRunConflict("RUN_NOT_FOUND")
+        command = RunCommand.model_validate_json(row.start_command_json)
+        if row.start_command_digest != _wire_digest("r2.production-start-command.v1", command.model_dump(mode="json")):
+            raise ProductionRunConflict("RUN_STATE_INTEGRITY_FAILED")
+        return command
+
+    async def intent(self, *, scope: RunScope, command_id: str) -> DispatchIntent | None:
+        """The staged intent of one step command of the run."""
+        scope = RunScope.model_validate(scope)
+        row = await self.session.get(ProductionStepModel, command_id)
+        if row is None or (row.user_id, row.project_name, row.run_id) != (
+            scope.user_id,
+            scope.project_name,
+            scope.run_id,
+        ):
+            return None
+        intent = DispatchIntent.model_validate_json(row.intent_json)
+        if row.intent_digest != _wire_digest("r2.production-intent.v1", intent.model_dump(mode="json")):
+            raise ProductionRunConflict("RUN_STATE_INTEGRITY_FAILED")
+        return intent
+
+    async def stage_receipt(self, *, run: RunSnapshot, stage: RunStage) -> OwnerReceipt | None:
+        """The receipt of ``stage``'s newest step at or below the run's generation for its current input."""
+        run = RunSnapshot.model_validate(run)
+        row = (
+            await self.session.execute(
+                select(ProductionStepModel)
+                .where(
+                    ProductionStepModel.user_id == run.user_id,
+                    ProductionStepModel.project_name == run.project_name,
+                    ProductionStepModel.run_id == run.run_id,
+                    ProductionStepModel.stage == stage.value,
+                    ProductionStepModel.generation <= run.generation,
+                    ProductionStepModel.input_digest == run.input_digest,
+                    ProductionStepModel.receipt_json.is_not(None),
+                )
+                .order_by(ProductionStepModel.generation.desc(), ProductionStepModel.repair_index.desc())
+                .limit(1)
+                .execution_options(populate_existing=True)
+            )
+        ).scalar_one_or_none()
+        if row is None or row.receipt_json is None:
+            return None
+        intent = DispatchIntent.model_validate_json(row.intent_json)
+        if row.intent_digest != _wire_digest("r2.production-intent.v1", intent.model_dump(mode="json")):
+            raise ProductionRunConflict("RUN_STATE_INTEGRITY_FAILED")
+        return OwnerReceipt.model_validate_json(row.receipt_json)
 
     async def apply_command(
         self, *, expected: RunSnapshot, updated: RunSnapshot, policy: RunPolicy | None = None

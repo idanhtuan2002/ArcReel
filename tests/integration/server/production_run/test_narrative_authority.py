@@ -79,6 +79,46 @@ async def test_unresolved_story_findings_cannot_be_accepted_automatically(manusc
         assert await session.scalar(sa.select(sa.func.count()).select_from(AutomationDecisionModel)) == 0
 
 
+def _quality(severity: str) -> tuple[bytes, str]:
+    import hashlib
+    import json
+
+    record = json.dumps({"findings": [{"id": "F001", "severity": severity}], "packaging": None}).encode()
+    return record, "sha256:" + hashlib.sha256(record).hexdigest()
+
+
+async def test_only_stylistic_open_findings_bind_and_only_with_their_exact_record(manuscript_bound_run):
+    from server.production_run.narrative_authority import AutomaticNarrativeAuthority
+
+    issuer, sessions, _, _, manifest, subject, _ = manuscript_bound_run
+    stylistic, stylistic_digest = _quality("STYLISTIC")
+    critical, critical_digest = _quality("NARRATIVE_CRITICAL")
+
+    def bound(digest: str):
+        changed = manifest.model_copy(update={"findings_open": ("F001",), "quality_record_digest": digest})
+        return changed, subject.model_copy(update={"subject_digest": changed.digest()})
+
+    for record, digest in ((critical, critical_digest), (critical, stylistic_digest), (None, stylistic_digest)):
+        refused_manifest, refused_subject = bound(digest)
+        with pytest.raises(NarrativeDecisionAuthorizationError, match="UNRESOLVED_STORY_FINDINGS"):
+            await AutomaticNarrativeAuthority.bind(
+                sessions=sessions,
+                authority=issuer.authority(),
+                subject=refused_subject,
+                manifest=refused_manifest,
+                quality_record=record,
+            )
+    accepted_manifest, accepted_subject = bound(stylistic_digest)
+    narrative = await AutomaticNarrativeAuthority.bind(
+        sessions=sessions,
+        authority=issuer.authority(),
+        subject=accepted_subject,
+        manifest=accepted_manifest,
+        quality_record=stylistic,
+    )
+    assert narrative.actor_id.startswith("automation:")
+
+
 async def test_manifest_subject_digest_cannot_be_substituted(manuscript_bound_run):
     from server.production_run.narrative_authority import AutomaticNarrativeAuthority
 

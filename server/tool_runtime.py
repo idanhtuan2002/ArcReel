@@ -19,6 +19,7 @@ from typing import Annotated, Any, Literal
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from lib.artifact_activation import ArtifactCurrencyResolver, active_artifact_currency_resolver
+from lib.asset_extraction import extract_asset_inventory
 from lib.asset_inventory import (
     AssetInventoryError,
     AssetInventoryInvalidRequest,
@@ -34,6 +35,7 @@ from lib.character_voice import VALID_CHARACTER_VOICE_BINDINGS
 from lib.config.resolver import ConfigResolver
 from lib.content_digest import prefixed, prefixed_canonical_json_digest
 from lib.db import async_session_factory
+from lib.db.base import DEFAULT_USER_ID
 from lib.episode_paths import (
     DRAMA_SCRIPT_PLAN_QUARANTINE_FILENAME,
     NARRATION_SCRIPT_PLAN_QUARANTINE_FILENAME,
@@ -133,6 +135,10 @@ from lib.source_loader import (
     UnsupportedFormatError,
 )
 from lib.source_revision import SourceScope
+from lib.text_backends.base import TextGenerationRequest as BackendTextGenerationRequest
+from lib.text_backends.base import TextGenerationResult as BackendTextGenerationResult
+from lib.text_backends.base import TextTaskType
+from lib.text_generator import TextGenerator
 from lib.workflow_plan import WorkflowPlan, WorkflowPlanRequest
 from lib.workflow_state import WorkflowRequestError
 from server.draft_workflow import (
@@ -405,6 +411,7 @@ _TEXT_DRAMA_SCRIPT_PLAN = "text_drama_script_plan"
 _TEXT_NARRATION_SCRIPT_PLAN = "text_narration_script_plan"
 _TEXT_REFERENCE_SCRIPT_PLAN = "text_reference_script_plan"
 _TEXT_EPISODE_PLAN = "text_episode_plan"
+TEXT_ASSET_INVENTORY = "text_asset_inventory"
 _TEXT_TASK_SERVICES: dict[str, Services] = {}
 
 
@@ -1885,6 +1892,8 @@ async def execute_queued_text_task(
             capabilities=ConfigResolver(async_session_factory),
         )
     task_type = task["task_type"]
+    if task_type == TEXT_ASSET_INVENTORY:
+        return await _execute_asset_inventory(task, scope, services)
     if task_type == _TEXT_EPISODE_PLAN:
         cancellation_receipts: list[FormalWriteReceipt] = []
         outcome = await _execute_plan_episodes(
@@ -1927,6 +1936,36 @@ async def execute_queued_text_task(
     if is_dataclass(value) and not isinstance(value, type):
         return asdict(value)
     raise RuntimeError("text task returned no result")
+
+
+async def _execute_asset_inventory(task: dict[str, Any], scope: ProjectScope, services: Services) -> dict[str, Any]:
+    """Extract and complete one inventory scope through the bounded schema executor."""
+    payload = task.get("payload") or {}
+    if problem := await migration_gate(scope, services):
+        raise RuntimeError(encode_generation_problem(_queued_generation_problem(problem)))
+    generator = await TextGenerator.create(TextTaskType.SCRIPT, scope.project_name)
+    user_id = str(task.get("user_id") or DEFAULT_USER_ID)
+
+    async def generate(request: BackendTextGenerationRequest) -> BackendTextGenerationResult:
+        return await generator.generate(request, scope.project_name, user_id=user_id)
+
+    try:
+        completed = await extract_asset_inventory(
+            services.projects,
+            scope.project_name,
+            scope=SourceScope.model_validate(payload["scope"]),
+            expected_source_revision=str(payload["expected_source_revision"]),
+            generate=generate,
+        )
+    except AssetInventoryRevisionConflict as exc:
+        problem = ToolProblem("source_revision_conflict", str(exc), action=GenerationAction.FIX_INPUT.value)
+        raise RuntimeError(encode_generation_problem(_queued_generation_problem(problem))) from exc
+    except AssetInventoryError as exc:
+        problem = ToolProblem("inventory_unavailable", str(exc), action=GenerationAction.FIX_INPUT.value)
+        raise RuntimeError(encode_generation_problem(_queued_generation_problem(problem))) from exc
+    return CompleteAssetInventoryResult(
+        scope=completed.scope, source_revision=completed.source_revision, counts=completed.counts
+    ).model_dump(mode="json")
 
 
 async def reset_episode_planning(

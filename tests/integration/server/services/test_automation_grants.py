@@ -422,3 +422,43 @@ async def test_new_worker_reuses_original_decision_after_fresh_authority_check(d
         replay = await authority.require_locked(session, subject=subject_for(current, grant))
         assert replay == original
         assert await session.scalar(sa.select(sa.func.count()).select_from(AutomationDecisionModel)) == 1
+
+
+async def test_a_renewed_grant_replays_the_commands_admission_and_nothing_else(delegated_host):
+    from lib.db.repositories.production_runs import ProductionRunRepository
+    from r2.contracts.automation import GrantRequest
+
+    issuer, sessions, request, grant, run, *_ = delegated_host
+    authority = issuer.authority()
+    async with sessions() as session, session.begin():
+        first = await authority.require_locked(session, subject=subject_for(run, grant))
+    async with sessions() as session, session.begin():
+        current = await ProductionRunRepository(session).get(
+            user_id=run.user_id, project_name=run.project_name, run_id=run.run_id
+        )
+        renewed = await issuer.renew_locked(
+            session,
+            interactive_token=auth.create_token("actor"),
+            request=GrantRequest.model_validate(
+                {
+                    **request.model_dump(),
+                    "command_id": "resume-1",
+                    "expected_run_version": current.version,
+                    "expires_at": datetime.now(UTC) + timedelta(seconds=1200),
+                }
+            ),
+        )
+    assert renewed.version == grant.version + 1
+
+    async with sessions() as session, session.begin():
+        replay = await authority.require_locked(session, subject=subject_for(run, renewed))
+    assert replay == first
+    with pytest.raises(PermissionError, match="AUTOMATION_AUTHORITY_NOT_CURRENT"):
+        async with sessions() as session, session.begin():
+            await authority.require_locked(session, subject=subject_for(run, grant))
+    with pytest.raises(PermissionError, match="AUTOMATION_COMMAND_REPLAY_CONFLICT"):
+        async with sessions() as session, session.begin():
+            await authority.require_locked(
+                session,
+                subject=subject_for(run, renewed).model_copy(update={"subject_digest": "sha256:" + "e" * 64}),
+            )

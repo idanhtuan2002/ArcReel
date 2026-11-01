@@ -31,9 +31,15 @@ from r2.contracts.automation import (
     StageOutcome,
     UsageReceipt,
 )
+from server.production_run.owner_support import OwnerBlocked
 from server.production_run.ports import InputWitness, OwnerAdapter, StepPlan
 
 _ADVANCING = {RunStatus.RUNNING, RunStatus.WAITING_TASK}
+_BLOCK_STATUS = {
+    "EXTERNAL_INPUT_CHANGED": RunStatus.BLOCKED_INPUT_CHANGED,
+    "OUTCOME_UNKNOWN": RunStatus.BLOCKED_UNKNOWN,
+    "RESOURCE_UNAVAILABLE": RunStatus.BLOCKED_RESOURCE,
+}
 
 
 class ProductionController:
@@ -63,6 +69,16 @@ class ProductionController:
         if adapter is None:
             return await self._block(run, RunStatus.BLOCKED_CONFIGURATION, "STAGE_CAPABILITY_INCOMPLETE")
 
+        try:
+            return await self._step(run, adapter)
+        except OwnerBlocked as blocked:
+            return await self._block(
+                run, _BLOCK_STATUS.get(blocked.reason, RunStatus.BLOCKED_CONFIGURATION), blocked.reason
+            )
+        except PermissionError:
+            return await self._block(run, RunStatus.BLOCKED_CONFIGURATION, "AUTOMATION_GRANT_NOT_CURRENT")
+
+    async def _step(self, run: RunSnapshot, adapter: OwnerAdapter) -> RunSnapshot:
         async with self._sessions() as session, session.begin():
             step = await ProductionRunRepository(session).current_step(run=run)
         if step is None:

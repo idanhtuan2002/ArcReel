@@ -404,6 +404,49 @@ class ManuscriptCommitter:
             raise CommitRefused(CommitRefusal.ALREADY_APPROVING, "another approval of this run is in progress")
         return await self._execute(manifest, record)
 
+    async def approve_automatically(self, *, narrative: object, manifest_digest_seen: str) -> RunState:
+        """Approve and commit under a production run's bound automatic authority, or continue its interrupted
+        sequence. A manifest with offered exceptions or open findings never binds, so it never reaches here."""
+        from server.production_run.narrative_authority import AutomaticNarrativeAuthority
+
+        if type(narrative) is not AutomaticNarrativeAuthority:
+            raise CommitRefused(CommitRefusal.NOT_READY, "automatic approval needs a bound run authority")
+        state = await self._store.load()
+        commit = state.commit
+        if commit is None or commit.offered_manifest_digest != manifest_digest_seen:
+            raise CommitRefused(CommitRefusal.STALE_MANIFEST, "the offered manifest changed")
+        manifest = self._load_offered(state)
+        if state.phase is RunPhase.COMMITTED:
+            return state
+        if state.phase in EXECUTING_PHASES and commit.approval is not None:
+            if commit.approval.actor_id != narrative.actor_id:
+                raise CommitRefused(CommitRefusal.NOT_THE_APPROVER, "another actor approved this manifest")
+            return await self._execute(manifest, commit.approval, narrative=narrative)
+        if state.phase not in APPROVABLE_PHASES:
+            raise CommitRefused(CommitRefusal.NOT_READY, f"run is {state.phase.value}")
+        record = ApprovalRecord(
+            manifest_digest=manifest_digest_seen,
+            actor_id=narrative.actor_id,
+            grant_event_digest=narrative.parent_event_digest,
+            approved_at=narrative.admitted_at,
+        )
+
+        def change(current: RunState) -> tuple[RunState, bool]:
+            progress = current.commit
+            if (
+                current.phase not in APPROVABLE_PHASES
+                or progress is None
+                or progress.offered_manifest_digest != manifest_digest_seen
+            ):
+                return current, False
+            approved = progress.model_copy(update={"approval": record, "blocked_step": None})
+            return set_phase(current, RunPhase.APPROVING).model_copy(update={"commit": approved}), True
+
+        _, won = await self._store.apply(change)
+        if not won:
+            raise CommitRefused(CommitRefusal.ALREADY_APPROVING, "another approval of this run is in progress")
+        return await self._execute(manifest, record, narrative=narrative)
+
     async def resume(self, *, principal: str) -> RunState:
         """Continue an interrupted sequence under the recorded approval; only its approver may resume."""
         state = await self._store.load()
@@ -432,7 +475,9 @@ class ManuscriptCommitter:
             raise CommitRefused(CommitRefusal.NOT_ABORTABLE, f"run is {state.phase.value}")
         return state
 
-    async def _execute(self, manifest: ManuscriptCommitManifest, approval: ApprovalRecord) -> RunState:
+    async def _execute(
+        self, manifest: ManuscriptCommitManifest, approval: ApprovalRecord, *, narrative: object | None = None
+    ) -> RunState:
         digest = approval.manifest_digest
         state = await self._store.load()
         completed = set(state.commit.completed_steps if state.commit is not None else ())
@@ -440,7 +485,10 @@ class ManuscriptCommitter:
             if step in completed:
                 continue
             try:
-                await self._run_step(step, manifest, approval, digest)
+                if narrative is None:
+                    await self._run_step(step, manifest, approval, digest)
+                else:
+                    await self._run_automatic_step(step, manifest, narrative)
             except _BLOCKING_ERRORS as exc:
                 return await self._block(step, f"{type(exc).__name__}: {exc}")
             state = await self._complete(step)
@@ -453,6 +501,20 @@ class ManuscriptCommitter:
             lambda s: (set_phase(s, RunPhase.COMMITTED), None) if s.phase in EXECUTING_PHASES else (s, None)
         )
         return state
+
+    async def _run_automatic_step(self, step: str, manifest: ManuscriptCommitManifest, narrative: object) -> None:
+        """One commit step through the run's bound authority, which guards each owner transaction itself."""
+        from server.production_run.narrative_authority import AutomaticNarrativeAuthority
+
+        if type(narrative) is not AutomaticNarrativeAuthority:
+            raise BindingMismatch("automatic commit needs a bound run authority")
+        if step == STEP_CANON:
+            await narrative.commit_canon()
+        elif step == STEP_PLAN:
+            await narrative.commit_plan()
+        else:
+            entry = next(e for e in manifest.scenes if e.node_id == step)
+            await narrative.accept_scene(entry.decision_id, bible=self._bible)
 
     async def _run_step(
         self, step: str, manifest: ManuscriptCommitManifest, approval: ApprovalRecord, digest: str

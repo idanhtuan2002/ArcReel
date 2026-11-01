@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import hashlib
+import json
 from datetime import UTC, datetime
 from typing import Self
 
@@ -34,6 +36,7 @@ from r2.narrative_lifecycle.errors import NarrativeDecisionAuthorizationError
 from r2.narrative_lifecycle.evidence import NarrativeLifecycleEvidenceService
 from r2.narrative_lifecycle.ports import NarrativeLifecycleUnitOfWorkFactory
 from server.services.automation_grants import RunAutomationAuthority
+from server.story_authoring.checks import Severity
 from server.story_authoring.commit import (
     MANIFEST_SCHEMA,
     ManuscriptCommitManifest,
@@ -138,6 +141,21 @@ class _PlanCommitFence(SqlAlchemyNarrativePlanUnitOfWork):
             await super().__aexit__(exc_type, exc, traceback)
 
 
+def _only_stylistic(manifest: ManuscriptCommitManifest, quality_record: bytes | None) -> bool:
+    if not manifest.findings_open:
+        return True
+    if quality_record is None or manifest.quality_record_digest is None:
+        return False
+    if "sha256:" + hashlib.sha256(quality_record).hexdigest() != manifest.quality_record_digest:
+        return False
+    try:
+        findings = json.loads(quality_record)["findings"]
+        severities = {str(f["id"]): f["severity"] for f in findings}
+    except (ValueError, KeyError, TypeError):
+        return False
+    return all(severities.get(finding) == Severity.STYLISTIC.value for finding in manifest.findings_open)
+
+
 class AutomaticNarrativeAuthority:
     """Prepared provenance grants no effect without the final guard in this adapter's own UoW."""
 
@@ -165,12 +183,15 @@ class AutomaticNarrativeAuthority:
         authority: RunAutomationAuthority,
         subject: AuthorizationSubject,
         manifest: ManuscriptCommitManifest,
+        quality_record: bytes | None = None,
     ) -> Self:
+        """Bind a manifest with no offered exception. Open findings bind only when ``quality_record`` is the
+        manifest's exact quality record and names every open finding as ``STYLISTIC``."""
         if type(authority) is not RunAutomationAuthority:
             raise NarrativeDecisionAuthorizationError("ACTIVATED_AUTOMATION_AUTHORITY_REQUIRED")
         subject = AuthorizationSubject.model_validate(subject)
         manifest = ManuscriptCommitManifest.model_validate_json(manifest.model_dump_json())
-        if manifest.exceptions_offered or manifest.findings_open:
+        if manifest.exceptions_offered or not _only_stylistic(manifest, quality_record):
             raise NarrativeDecisionAuthorizationError("UNRESOLVED_STORY_FINDINGS")
         if (
             subject.operation is not AutomationOperation.STORY_COMMIT
@@ -220,6 +241,18 @@ class AutomaticNarrativeAuthority:
             proof=proof,
             binding=_BINDING_SEAL,
         )
+
+    @property
+    def actor_id(self) -> str:
+        return self._proof.principal
+
+    @property
+    def parent_event_digest(self) -> str:
+        return self._proof.parent_event_digest
+
+    @property
+    def admitted_at(self) -> datetime:
+        return self._proof.admitted_at
 
     async def _require_root(self, session: AsyncSession) -> None:
         try:

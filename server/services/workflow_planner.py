@@ -191,7 +191,11 @@ class WorkflowPlanner:
         queue: GenerationQueue,
     ) -> list[WorkflowTaskObservation]:
         rows: list[dict[str, Any]] = []
-        text_queries = [("text_episode_plan", ["episode-planning"])] if status.project.content_mode != "ad" else []
+        text_queries = (
+            [("text_asset_inventory", ["asset-inventory"]), ("text_episode_plan", ["episode-planning"])]
+            if status.project.content_mode != "ad"
+            else []
+        )
         if status.target is not None:
             episode_ids = [f"episode-{status.target.episode}"]
             text_queries.append(("text_episode_script", episode_ids))
