@@ -66,6 +66,11 @@ def configure_device_admission(port: DeviceAdmissionPort | None) -> None:
     _PORT = port
 
 
+def device_admission_configured() -> bool:
+    """Whether local device jobs are admitted one at a time with resident models of other workloads unloaded."""
+    return _PORT is not None
+
+
 def local_device_for(base_url: str | None) -> str | None:
     """The managed device a provider at ``base_url`` runs on, or ``None`` for a remote provider."""
     host = urlsplit(base_url or "").hostname
@@ -116,6 +121,7 @@ __all__ = [
     "DeviceLease",
     "JobReceipt",
     "configure_device_admission",
+    "device_admission_configured",
     "device_job",
     "local_device_for",
     "local_job",

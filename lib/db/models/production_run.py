@@ -285,3 +285,19 @@ class ModelObservationModel(Base):
     observation_json: Mapped[str] = mapped_column(Text, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     __table_args__ = (*_ceiling("observation_json"),)
+
+
+class LaunchQualificationModel(Base):
+    """One project's launch qualification: the profile, route set and resource envelope a release owner qualified."""
+
+    __tablename__ = "auto_launch_qualifications"
+    qualification_digest: Mapped[str] = mapped_column(String(71), primary_key=True)
+    user_id: Mapped[str] = mapped_column(String, nullable=False)
+    project_name: Mapped[str] = mapped_column(String(255), nullable=False)
+    launch_profile_id: Mapped[str] = mapped_column(String(255), nullable=False)
+    record_json: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    __table_args__ = (
+        Index("ix_auto_launch_qualification_scope", "user_id", "project_name", "launch_profile_id", "created_at"),
+        *_ceiling("record_json"),
+    )

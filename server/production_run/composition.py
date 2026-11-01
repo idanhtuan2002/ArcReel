@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import os
 import shutil
+import subprocess
 from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime
 from pathlib import Path
@@ -18,7 +19,11 @@ from pathlib import Path
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from lib.config.resolver import ConfigResolver
+from lib.db.models.quality import QualityProfileHeadModel
+from lib.db.repositories.launch_qualifications import LaunchQualificationRepository
+from lib.db.repositories.quality import QualityProfileRepository
 from lib.db.repositories.reviewer_qualifications import ReviewerQualificationRepository
+from lib.generation_resources import device_admission_configured
 from lib.project_manager import ProjectManager
 from r2.automation.profiles import resolve_launch_profile, route_digest
 from r2.contracts.automation import (
@@ -126,6 +131,38 @@ class ProjectPolicyResolver:
         )
 
 
+def gpu_schedulable_bytes(*, nvidia_smi: str = "nvidia-smi") -> int:
+    """GPU memory a production job can count on: the whole device under managed admission, which unloads other
+    resident models before each job, otherwise only the memory free now; 0 when the device cannot be read."""
+    field = "memory.total" if device_admission_configured() else "memory.free"
+    try:
+        out = subprocess.run(
+            [nvidia_smi, f"--query-gpu={field}", "--format=csv,noheader,nounits"],
+            capture_output=True,
+            text=True,
+            timeout=10,
+            check=True,
+        ).stdout
+        return int(out.splitlines()[0].strip()) * 1024 * 1024
+    except (OSError, subprocess.SubprocessError, ValueError, IndexError):
+        return 0
+
+
+def published_profile_reader(sessions: Sessions) -> Callable[[str, str, str], Awaitable[QualityProfileRevision | None]]:
+    """The revision a project's profile head currently points at, or ``None`` before it is published."""
+
+    async def read(user_id: str, project_name: str, profile_id: str) -> QualityProfileRevision | None:
+        async with sessions() as session:
+            head = await session.get(QualityProfileHeadModel, (user_id, project_name, profile_id))
+            if head is None or head.current_revision is None:
+                return None
+            return await QualityProfileRepository(session).get_revision(
+                user_id=user_id, project_name=project_name, profile_id=profile_id, revision=head.current_revision
+            )
+
+    return read
+
+
 class HostPreflightReader:
     """Actual project, configuration, profile, qualification and resource state; dispatches nothing."""
 
@@ -140,8 +177,8 @@ class HostPreflightReader:
         gpu_free_bytes: Callable[[], int] | None = None,
     ) -> None:
         self._sessions, self._projects, self._policies, self._witness = sessions, projects, policies, witness
-        self._profile_reader = profile_reader
-        self._gpu_free = gpu_free_bytes or (lambda: 0)
+        self._profile_reader = profile_reader or published_profile_reader(sessions)
+        self._gpu_free = gpu_free_bytes or gpu_schedulable_bytes
 
     async def read(self, *, user_id: str, project_name: str, policy: RunPolicy) -> PreflightSnapshot:
         project = self._projects.load_project(project_name)
@@ -153,11 +190,10 @@ class HostPreflightReader:
                 launch_profile_id=policy.launch_profile_id,
                 language=policy.language,
             )
-        profile = (
-            await self._profile_reader(user_id, project_name, policy.profile_id)
-            if self._profile_reader is not None
-            else None
-        )
+            launch = await LaunchQualificationRepository(session).current(
+                user_id=user_id, project_name=project_name, launch_profile_id=policy.launch_profile_id
+            )
+        profile = await self._profile_reader(user_id, project_name, policy.profile_id)
         mode = str(project.get("content_mode", ""))
         return PreflightSnapshot(
             user_id=user_id,
@@ -169,7 +205,7 @@ class HostPreflightReader:
             routes=await self._policies.routes(project_name),
             profile=profile,
             qualifications=qualifications,
-            launch_qualification=None,
+            launch_qualification=launch,
             voice_available=bool(settings.get("voice_available", False)),
             disk_free_bytes=shutil.disk_usage(self._projects.projects_root).free,
             required_disk_bytes=int(settings.get("required_disk_bytes", 0)),
