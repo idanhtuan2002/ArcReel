@@ -496,10 +496,29 @@ async def lifespan(app: FastAPI):
     # background task to manage.
     app.state.execution_event_stream_service = DurableEventStreamService()
 
-    # Automatic production stays unwired until its release gate qualifies owner adapters: run reads still work,
-    # commands answer AUTOMATIC_PRODUCTION_NOT_ACTIVATED and no production scheduler is started.
+    # Automatic production is wired only at its release gate (ARCREEL_AUTOMATIC_PRODUCTION=1 on a governance-activated
+    # host); otherwise run reads still work, commands answer AUTOMATIC_PRODUCTION_NOT_ACTIVATED and no production
+    # scheduler is started. GPU admission of local provider jobs is configured separately by its probe list.
+    from lib.generation_resources import configure_device_admission
+    from lib.project_manager import get_project_manager
+    from server.production_run.composition import activation_from_env, device_admission_from_env, wire_production
+
+    configure_device_admission(device_admission_from_env())
     app.state.production_run_service = None
     app.state.production_scheduler = None
+    if activation_from_env().enabled:
+        if governance_read_dir is None or governance_attestor_dir is None:
+            raise GovernanceStartupUnavailable
+        service, scheduler = await wire_production(
+            sessions=async_session_factory,
+            projects=get_project_manager(),
+            read_directory=Path(governance_read_dir),
+            socket_directory=Path(governance_attestor_dir),
+            grants=app.state.governance_grants,
+        )
+        app.state.production_run_service = service
+        app.state.production_scheduler = scheduler
+        await scheduler.start()
 
     logger.info("启动 ExecutionRecoveryScheduler...")
     execution_recovery_scheduler = ExecutionRecoveryScheduler()

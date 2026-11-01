@@ -12,12 +12,16 @@ import base64
 import json
 import subprocess
 import tempfile
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Protocol
 
 import httpx
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from lib.custom_provider import parse_provider_id
+from lib.db.repositories.custom_provider_repo import CustomProviderRepository
 from lib.generation_resources import device_job, local_job
 from lib.text_backends.ollama import normalize_ollama_base_url
 from r2.automation.assessment import CREATIVE_DIMENSIONS, AssessmentFinding, ModelAssessment
@@ -133,7 +137,7 @@ def sample_frames(final: Path, *, count: int = FRAME_COUNT, ffmpeg: str = "ffmpe
 class OllamaReviewer:
     """A reviewer route served by an Ollama chat endpoint that accepts images."""
 
-    def __init__(self, *, base_url_for: dict[str, str], timeout_seconds: float = 600) -> None:
+    def __init__(self, *, base_url_for: Callable[[str], Awaitable[str]], timeout_seconds: float = 600) -> None:
         self._base_url_for = base_url_for
         self._timeout = timeout_seconds
 
@@ -147,7 +151,7 @@ class OllamaReviewer:
         }
         try:
             frames = sample_frames(evidence.final_path)
-            url = normalize_ollama_base_url(self._base_url_for[route.provider_id])
+            url = normalize_ollama_base_url(await self._base_url_for(route.provider_id))
             body = {
                 "model": route.model_id,
                 "stream": False,
@@ -190,4 +194,24 @@ class OllamaReviewer:
             return ModelAssessment.model_validate({**base, "outcome": "FAILED"})
 
 
-__all__ = ["FinalEvidence", "OllamaReviewer", "QualifiedEvaluator", "evidence_digest", "prompt_digest"]
+def provider_base_url(sessions: async_sessionmaker[AsyncSession]) -> Callable[[str], Awaitable[str]]:
+    """The configured base URL of a custom provider, read at the moment a review is sent."""
+
+    async def base_url(provider_id: str) -> str:
+        async with sessions() as session:
+            provider = await CustomProviderRepository(session).get_provider(parse_provider_id(provider_id))
+        if provider is None:
+            raise KeyError(provider_id)
+        return provider.base_url
+
+    return base_url
+
+
+__all__ = [
+    "FinalEvidence",
+    "OllamaReviewer",
+    "QualifiedEvaluator",
+    "evidence_digest",
+    "prompt_digest",
+    "provider_base_url",
+]

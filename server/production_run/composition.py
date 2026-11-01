@@ -13,6 +13,7 @@ import os
 import shutil
 from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime
+from pathlib import Path
 
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
@@ -31,7 +32,7 @@ from r2.contracts.quality import QualityProfileRevision
 from server.production_run.assets_adapter import AssetsAdapter
 from server.production_run.configuration import inspect_model_route
 from server.production_run.controller import ProductionController
-from server.production_run.evaluators import QualifiedEvaluator
+from server.production_run.evaluators import OllamaReviewer, QualifiedEvaluator, provider_base_url
 from server.production_run.final_master_adapter import FinalMasterAdapter
 from server.production_run.inputs import ProjectInputWitness
 from server.production_run.media_adapter import MediaAdapter
@@ -40,11 +41,13 @@ from server.production_run.ports import OwnerAdapter
 from server.production_run.preflight import ProductionPreflight
 from server.production_run.quality_adapter import QualityAdapter
 from server.production_run.render_adapter import RenderAdapter
+from server.production_run.resource_admission import ComfyuiProbe, ManagedDeviceAdmission, OllamaProbe, ProviderProbe
 from server.production_run.scheduler import ProductionScheduler
 from server.production_run.service import ProductionActivation, ProductionRunRefused, ProductionRunService
 from server.production_run.story_adapter import BriefAdapter, HandoffAdapter, StoryAdapter, StoryCommitAdapter
 from server.production_run.text_adapter import EpisodePlanAdapter, ScriptAdapter, ScriptPlanAdapter
 from server.services.automation_grants import AutomationGrantCustodian, RunAutomationAuthority
+from server.services.governance_grants import CurrentShowrunnerGrantReader
 from server.story_authoring.handoff import SourceUpload
 from server.story_authoring.service import StoryAuthoringService
 
@@ -258,4 +261,92 @@ __all__ = [
     "activation_from_env",
     "build_adapters",
     "compose_production",
+    "device_admission_from_env",
+    "wire_production",
 ]
+
+
+GPU_PROBES_ENV = "ARCREEL_GPU_ADMISSION_PROBES"
+
+
+def device_admission_from_env() -> ManagedDeviceAdmission | None:
+    """``ARCREEL_GPU_ADMISSION_PROBES=ollama=http://127.0.0.1:11434,comfyui=http://127.0.0.1:8188``; unset means none."""
+    raw = os.environ.get(GPU_PROBES_ENV, "").strip()
+    if not raw:
+        return None
+    probes: list[ProviderProbe] = []
+    for item in raw.split(","):
+        kind, _, url = item.strip().partition("=")
+        if kind == "ollama":
+            probes.append(OllamaProbe(url))
+        elif kind == "comfyui":
+            probes.append(ComfyuiProbe(url))
+        else:
+            raise ValueError(f"unknown GPU admission probe {kind!r}")
+    return ManagedDeviceAdmission(tuple(probes))
+
+
+async def wire_production(
+    *,
+    sessions: Sessions,
+    projects: ProjectManager,
+    read_directory: Path,
+    socket_directory: Path,
+    grants: CurrentShowrunnerGrantReader | None,
+) -> tuple[ProductionRunService, ProductionScheduler]:
+    """Activate run delegation custody and compose production for the running host (release gate only)."""
+    from server.story_authoring.authority import GrantNarrativeShowrunnerAuthority
+    from server.tool_runtime import (
+        CallerContext,
+        ProjectScope,
+        Services,
+        ToolRequest,
+        UploadSourceRequest,
+        upload_source,
+    )
+
+    custodian = AutomationGrantCustodian(
+        sessions,
+        read_directory=read_directory,
+        socket_directory=socket_directory,
+        expected_uid=os.getuid(),
+        expected_gid=os.getgid(),
+    )
+    await custodian.activate()
+    resolver = ConfigResolver(sessions)
+    stories = StoryAuthoringService(
+        session_factory=sessions,
+        authority=GrantNarrativeShowrunnerAuthority(sessions, grants),
+        project_dir_for=projects.get_project_path,
+    )
+
+    def upload_for(intent):
+        from server.services import workflow_planner
+
+        async def upload(filename: str, content: str, on_conflict):
+            outcome = await upload_source(
+                ToolRequest(UploadSourceRequest(filename=filename, content=content, on_conflict=on_conflict)),
+                ProjectScope(project_name=intent.scope.project_name, projects_root=Path(projects.projects_root)),
+                CallerContext(user_id=intent.scope.user_id, source="embedded"),
+                Services(
+                    projects=projects,
+                    workflow_planner=workflow_planner.get_workflow_planner(projects),
+                    capabilities=resolver,
+                ),
+            )
+            if outcome.problem is not None or outcome.value is None:
+                raise RuntimeError(outcome.problem.code if outcome.problem else "upload_source failed")
+            return outcome.value
+
+        return upload
+
+    return compose_production(
+        sessions,
+        custodian=custodian,
+        projects=projects,
+        resolver=resolver,
+        stories=stories,
+        upload_for=upload_for,
+        evaluator=OllamaReviewer(base_url_for=provider_base_url(sessions)),
+        activation=ProductionActivation(enabled=True),
+    )

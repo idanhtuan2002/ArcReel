@@ -94,6 +94,13 @@ async def qualify(
     )
 
 
+def _fixed(url: str):
+    async def base_url(_provider_id: str) -> str:
+        return url
+
+    return base_url
+
+
 def _route(path: str) -> ModelRoute:
     return ModelRoute.model_validate_json(Path(path).read_text(encoding="utf-8"))
 
@@ -103,7 +110,7 @@ async def _main(args: argparse.Namespace) -> int:
     record = await qualify(
         corpus=Path(args.corpus),
         route=route,
-        evaluator=OllamaReviewer(base_url_for={route.provider_id: args.base_url}),
+        evaluator=OllamaReviewer(base_url_for=_fixed(args.base_url)),
         output=Path(args.output),
         profile_digest=args.profile_digest,
         launch_profile_id=args.launch_profile_id,
