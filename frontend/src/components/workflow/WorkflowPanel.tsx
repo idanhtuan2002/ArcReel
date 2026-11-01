@@ -6,6 +6,7 @@ import { useTasksStore } from "@/stores/tasks-store";
 import { useWorkflowStore } from "@/stores/workflow-store";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import type { NarrationDelivery } from "@/types/workflow";
+import { ProductionRunPanel } from "@/features/production-run/ui/ProductionRunPanel";
 import { ProblemList } from "./ProblemList";
 import { WorkflowStepRow } from "./WorkflowStepRow";
 import { STEP_RAILS } from "./state-language";
@@ -174,6 +175,7 @@ export function WorkflowPanel({ projectName, episode, onViewUnit, onRegenerate }
 
       {expanded && (
         <div id={panelId} className="mt-2 space-y-3">
+          <ProductionRunPanel key={projectName} projectName={projectName} />
           {blockers.length > 0 && (
             <div
               role="alert"
