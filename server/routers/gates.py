@@ -310,7 +310,7 @@ async def _locked_to_heads(
 
 
 @dataclass(frozen=True)
-class _CutApproval:
+class CutApproval:
     """One Gate C approval after its route validated the request and fixed the produced asset."""
 
     resource_type: str
@@ -338,7 +338,7 @@ class CutApprovalActor:
 
 
 async def _approve_cut(
-    *, user: CurrentUser, project_name: str, project_dir, approval: _CutApproval
+    *, user: CurrentUser, project_name: str, project_dir, approval: CutApproval
 ) -> dict[str, object]:
     return await approve_cut_core(
         actor=CutApprovalActor(user_id=user.id, principal=user.sub),
@@ -354,7 +354,7 @@ async def approve_cut_core(
     actor: CutApprovalActor,
     project_name: str,
     project_dir,
-    approval: _CutApproval,
+    approval: CutApproval,
     sessions: async_sessionmaker[AsyncSession],
     authority_guard: Callable[[AsyncSession], Awaitable[None]] | None = None,
 ) -> dict[str, object]:
@@ -666,7 +666,7 @@ async def final_cut_approval(project_name: str, req: FinalCutApprovalRequest, us
         user=user,
         project_name=project_name,
         project_dir=project_dir,
-        approval=_CutApproval(
+        approval=CutApproval(
             resource_type=req.resource_type,
             episode=req.episode,
             target_ref=req.target_ref,
@@ -728,7 +728,7 @@ async def r2_shot_approval(
         user=user,
         project_name=project_name,
         project_dir=project_dir,
-        approval=_CutApproval(
+        approval=CutApproval(
             resource_type="videos",
             episode=R2_SHOT_EPISODE,
             target_ref=cut.target_ref,

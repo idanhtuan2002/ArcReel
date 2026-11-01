@@ -43,7 +43,7 @@ async def master_owner_run(delegated_host, tmp_path):
     data = _media(b"automatic-master-owner")
     output = production / "SH01.mp4"
     output.write_bytes(data)
-    cut = gates._CutApproval(
+    cut = gates.CutApproval(
         resource_type="videos",
         episode=1,
         target_ref="SH01",
