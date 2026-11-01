@@ -1,0 +1,35 @@
+{
+  "title": "Mộ Đồng Đội",
+  "scenes": [
+    {
+      "narration": "Bụi hồng hoang phủ lớp sương mờ, tôi bước lại mảnh đất này với tim nặng trĩu.",
+      "narration_en": "Red dust and mist obscure the land; I step back with a heart heavy as lead.",
+      "image_prompt": "Vertical cinematic shot. An elderly Vietnamese soldier with weathered skin and deep wrinkles walks slowly through tall, dry grass in a ruined battlefield at dawn. Soft golden morning light filters through broken trees. Consistent character design: white hair tied loosely, worn olive-green uniform stained with dirt and moss. Atmosphere of quiet melancholy."
+    },
+    {
+      "narration": "Cây đa già vẫn đứng đó như người đợi chờ, mắt nhìn về phía quân đoàn xưa.",
+      "narration_en": "The old banyan tree stands there like a waiting friend, its gaze fixed on the former battalion's path.",
+      "image_prompt": "Vertical cinematic shot. The same elderly soldier stops under a massive ancient Banyan tree with thick hanging roots in rural Vietnam. Soft morning light highlights his weary face and trembling hands clutching a faded photo frame. Consistent character design: white hair, worn olive-green uniform. Background shows dilapidated wooden structures."
+    },
+    {
+      "narration": "Tôi tìm thấy nấm mồ nhỏ xíu giữa bãi rẫy hoang tàn, nơi anh vẫn nằm ngủ yên.",
+      "narration_en": "I find the tiny grave in the desolate field where he still sleeps peacefully forevermore.",
+      "image_prompt": "Vertical cinematic shot. Close-up of a small, simple earthen mound covered with dried leaves and wildflowers near a concrete bunker wall. The elderly soldier kneels beside it gently touching the soil. Soft diffused sunlight creates long shadows across broken earth. Consistent character design: white hair visible in profile, worn olive-green uniform."
+    },
+    {
+      "narration": "Tôi đặt bàn tay run rẩy lên phần mộ lạnh giá như chia sẻ hơi ấm cuối cùng.",
+      "narration_en": "I place my trembling hands on the cold grave to share a final warmth with him.",
+      "image_prompt": "Vertical cinematic shot. Extreme close-up of two wrinkled, dirt-stained old hands gently resting on dark soil next to a simple wooden cross marker. Rain begins to fall softly blurring background trees slightly but keeping focus on hands and earth. Warm ambient light reflects in puddles nearby. Consistent character design: veins visible in wrists matching previous shots."
+    },
+    {
+      "narration": "Tôi khóc nức nở nhớ lại nụ cười trẻ trung của anh ngày ấy trong chiến hào.",
+      "narration_en": "I sob loudly remembering his youthful smile from those trench days long ago now lost.",
+      "image_prompt": "Vertical cinematic shot. Over-the-shoulder view of the elderly soldier crying silently while facing a blurred background of misty forest ruins. His shoulders shake visibly under wet rain droplets catching light beams breaking through canopy above him creating dramatic lighting effect."
+    },
+    {
+      "narration": "Lòng tôi thư thái khi biết anh ở đây, dù chiến tranh đã lùi xa hàng trăm năm.",
+      "narration_en": "My heart finds peace knowing he rests here even though war has retreated centuries ago now gone.",
+      "image_prompt": "Vertical cinematic shot. The elderly soldier sits quietly beside the grave looking peaceful despite tears drying on face as sun breaks through clouds casting hopeful rays onto both figures standing together against vast green jungle backdrop fading into distant mountains silhouetted softly."
+    }
+  ]
+}

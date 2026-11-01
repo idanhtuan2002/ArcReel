@@ -1,0 +1,35 @@
+{
+  "title": "Chiếc Hộp Cũ",
+  "scenes": [
+    {
+      "narration": "Sông Hồng mênh mông, ông lão lặng lẽ thả lưới giữa dòng nước đỏ au.",
+      "narration_en": "The Red River stretches wide as the old fisherman quietly casts his net into the red water.",
+      "image_prompt": "Vertical cinematic shot of an elderly Vietnamese man with weathered skin casting a fishing net in the middle of the Mekong Delta's Red River, warm golden hour lighting reflecting on ripples, lush green mangroves background, consistent character design."
+    },
+    {
+      "narration": "Bỗng nhiên, một khối gỗ nặng bất ngờ bám chặt vào lưới cá của ông.",
+      "narration_en": "Suddenly, a heavy wooden block unexpectedly clings tightly to the fisherman's net.",
+      "image_prompt": "Close-up vertical shot of an old Vietnamese man pulling his fishing net out of water holding a mysterious antique wooden box trapped in mesh, soft diffused sunlight highlighting dust particles and texture of wood."
+    },
+    {
+      "narration": "Ông cẩn thận gỡ lưới ra và đặt chiếc hộp ẩm ướt lên lòng bàn tay nhăn nheo.",
+      "narration_en": "He carefully removes the net and places the damp wooden box onto his wrinkled palm.",
+      "image_prompt": "Medium vertical shot focusing on old Vietnamese man's weathered hands holding a small antique carved wooden box over calm red river surface, gentle breeze blowing white hair, warm soft morning light illuminating facial lines."
+    },
+    {
+      "narration": "Khi mở hộp ra, không có vàng bạc mà chỉ thấy bức tranh vẽ cảnh sông nước xưa.",
+      "narration_en": "When opening the box there is no gold but only a painting depicting scenes of ancient riverside life inside.",
+      "image_prompt": "Over-the-shoulder vertical shot from behind old Vietnamese man looking down at interior of antique wooden box containing delicate faded watercolor landscape painting, soft natural light entering frame gently highlighting artwork details."
+    },
+    {
+      "narration": "Ông mỉm cười hiền hậu rồi nhẹ nhàng thả hộp trở lại dòng nước mênh mang.",
+      "narration_en": "He smiles kindly and gently releases the box back into the vast flowing river.",
+      "image_prompt": "Wide vertical shot of old Vietnamese man kneeling by riverside releasing wooden box slowly into Red River, serene expression on face, steam rising from water surface, sunset glow creating rim light around silhouette."
+    },
+    {
+      "narration": "Chiếc hộp trôi xa mang theo ký ức những ngày tháng bình yên bên dòng sông.",
+      "narration_en": "The box floats away carrying memories of peaceful days by the river alongside its journey onward.",
+      "image_prompt": "Aerial vertical drone shot following wooden box drifting peacefully down Red River towards distant horizon, lush green vegetation lining banks under warm twilight sky, small figure of old man visible in background waving goodbye."
+    }
+  ]
+}

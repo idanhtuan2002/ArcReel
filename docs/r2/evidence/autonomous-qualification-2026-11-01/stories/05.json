@@ -1,0 +1,30 @@
+{
+  "title": "Mảnh Vườn Mồ Côi",
+  "scenes": [
+    {
+      "narration": "Hai anh em cãi vã dữ dội, mỗi người nắm chặt một bên gốc cây cam của mẹ.",
+      "narration_en": "Brothers fought fiercely, each gripping a branch of mother's orange tree tightly.",
+      "image_prompt": "Vertical cinematic shot in Vietnam. Two Vietnamese brothers, late 20s with consistent rugged features and torn shirts, pulling opposite sides of an old orange tree. Background is a rustic courtyard overgrown with weeds under harsh midday sunlight."
+    },
+    {
+      "narration": "Gió thổi lay cành khô, cuốn theo lá cuối cùng của mẹ rơi xuống đất lạnh.",
+      "narration_en": "Wind shook dry branches, blowing the mother's last leaf down onto cold ground.",
+      "image_prompt": "Vertical cinematic close-up. The same two brothers stand frozen in a stalemate as withered leaves fall around their shoes. Dust motes dance in shafts of golden afternoon light filtering through sparse clouds."
+    },
+    {
+      "narration": "Anh trai dừng lại, giọng run rẩy: 'Mẹ nói ai thương mẹ hơn thì để cho người đó lo.'",
+      "narration_en": "Elder brother stops abruptly, voice trembling: \"Mom said whoever loved her more should take care of everything.\"",
+      "image_prompt": "Vertical cinematic medium shot. The elder brother looks down at his younger sibling with tear-filled eyes reflecting the sunset glow. His hands drop from the tree trunk slowly in a moment of realization."
+    },
+    {
+      "narration": "Em trai bước tới, nắm chặt tay anh và cùng nhau tưới nước cho gốc cây cỗi.",
+      "narration_en": "Younger brother steps forward, gripping his older sibling's hand to water the ancient tree together.",
+      "image_prompt": "Vertical cinematic wide shot. The two brothers stand side by side holding hoses near each other, watering the orange tree roots amidst fallen leaves. Warm golden hour sunlight bathes their reconciled faces and the vibrant green sprouts emerging from earth."
+    },
+    {
+      "narration": "Chiều buông nhẹ nhàng, bóng hai người hòa làm một trước mảnh vườn mẹ đầy yêu thương.",
+      "narration_en": "Evening falls softly; shadows of two figures merge before mother's garden filled with love.",
+      "image_prompt": "Vertical cinematic silhouette shot. Two brothers stand back-to-back watching the orange tree under a vast purple twilight sky dotted with stars. Their outlines are warm and glowing against the darkening Vietnamese countryside."
+    }
+  ]
+}

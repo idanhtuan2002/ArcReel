@@ -1,0 +1,35 @@
+{
+  "title": "Bức Tranh Cho Cha",
+  "scenes": [
+    {
+      "narration": "Cậu bé ngồi vẽ, chờ tin cha từ biển xa chưa trở lại.",
+      "narration_en": "The boy sits drawing, waiting for news of his father from the distant sea who hasn't returned yet.",
+      "image_prompt": "Vertical cinematic shot. A Vietnamese elementary school boy sitting at a wooden desk in a dimly lit room filled with dust motes dancing in moonlight. He holds a pencil, focused on paper. Background shows worn walls and a photo of a fisherman father."
+    },
+    {
+      "narration": "Bút màu đỏ là máu của cha cậu, bay lượn trên giấy trắng.",
+      "narration_en": "The red paint is his father's blood, floating across the white paper.",
+      "image_prompt": "Vertical cinematic close-up. The boy's small hand coloring a boat shape with intense emotion using bright red marker on notebook paper. Soft warm light highlights dust in air."
+    },
+    {
+      "narration": "Cậu tưởng tượng cha mình đang lái con tàu màu đỏ trên sóng.",
+      "narration_en": "He imagines his father steering the red boat on waves.",
+      "image_prompt": "Vertical cinematic shot. The boy's face illuminated by window light, eyes closed imagining vividly. In front of him is a drawing emerging showing a large fishing boat and ocean."
+    },
+    {
+      "narration": "Điện thoại reo vang, tin nhắn báo cha đã về an toàn bến bờ.",
+      "narration_en": "The phone rings; the text message reports his father has safely returned to shore.",
+      "image_prompt": "Vertical cinematic shot. The boy jumps up from chair holding glowing smartphone with both hands in excitement. Room suddenly filled with warm golden sunlight streaming through window."
+    },
+    {
+      "narration": "Cậu chạy ra cổng, tay ôm bức tranh hoàn thành đầy nước mắt.",
+      "narration_en": "He runs to the gate hugging his completed painting which is full of tears.",
+      "image_prompt": "Vertical cinematic shot. The boy running outside a modest Vietnamese house towards camera holding up finished artwork showing red boat under yellow sun."
+    },
+    {
+      "narration": "Cha ôm con, bức tranh đỏ rực rỡ giữa nắng chiều vàng óng.",
+      "narration_en": "Father hugs son; the painting shines bright amidst golden evening sunlight.",
+      "image_prompt": "Vertical cinematic shot. Father and son embracing warmly in doorway. Boy holds up drawing showing father on boat under warm sunset sky with village houses behind."
+    }
+  ]
+}

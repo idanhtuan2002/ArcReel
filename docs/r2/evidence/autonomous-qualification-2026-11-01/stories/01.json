@@ -1,0 +1,35 @@
+{
+  "title": "Hồn Hoa Phố Cổ",
+  "scenes": [
+    {
+      "narration": "Chợ hoa Hội An, sương sớm mờ ảo quyện hương cam quýt ngọt ngào.",
+      "narration_en": "In Hoi An's flower market, morning mist blends with the sweet scent of oranges and osmanthus.",
+      "image_prompt": "Vertical cinematic shot. A young Vietnamese girl in a traditional conical hat selling colorful flowers on an old wooden cart at dawn. Soft blue hour lighting, warm lantern glow in background, narrow cobblestone street."
+    },
+    {
+      "narration": "Bao năm trôi qua, chỉ còn những bức thư cũ trong ngăn tủ gỗ.",
+      "narration_en": "Years passed; only old letters remain hidden inside a worn wooden drawer.",
+      "image_prompt": "Vertical cinematic shot. Close-up of hands holding yellowed, folded letters on an antique wooden table in a dimly lit room. Dust motes dance in shafts of golden sunlight streaming through paper windows."
+    },
+    {
+      "narration": "Một ngày đẹp trời, cô bé nhận thấy người bạn thân đã quay trở về.",
+      "narration_en": "On a bright day, the girl realizes her dear friend has returned unexpectedly.",
+      "image_prompt": "Vertical cinematic shot. The young flower seller stands amidst blooming bougainvillea in Hoi An old town. A man with kind eyes and slightly weathered features approaches from behind an ancient yellow wall. Warm afternoon sun."
+    },
+    {
+      "narration": "Cười vỡ òa, nước mắt chảy dài xóa nhòa khoảng cách mười năm xa cách.",
+      "narration_en": "Laughter breaks out; tears flow freely erasing ten years of separation instantly.",
+      "image_prompt": "Vertical cinematic shot. Emotional close-up of the two friends embracing tightly under orange tree branches falling petals. Golden hour backlighting creates a halo effect, soft focus on background architecture."
+    },
+    {
+      "narration": "Họ cùng nhau gói ghém những bó hoa mới gửi đến người thân khắp nơi.",
+      "narration_en": "Together they bundle fresh flowers to send greetings to loved ones everywhere.",
+      "image_prompt": "Vertical cinematic shot. The two friends working side-by-side arranging vibrant flower bouquets on a bamboo mat outdoors. Vibrant colors contrast with rustic wooden textures, gentle breeze moving their hair."
+    },
+    {
+      "narration": "Tình bạn đẹp như hoa mai vàng nở rộ giữa phố cổ bình yên này.",
+      "narration_en": "Friendship blooms as bright yellow apricot blossoms in this peaceful ancient town.",
+      "image_prompt": "Vertical cinematic shot. Wide angle of the two friends walking away hand-in-hand down a quiet Hoi An street lined with lanterns reflecting on wet stone steps. Warm twilight sky, silhouettes against glowing lights."
+    }
+  ]
+}

@@ -1,0 +1,35 @@
+{
+  "title": "Người Gác Hải Đăng và Mèo Con",
+  "scenes": [
+    {
+      "narration": "Xa tấp mênh mang giữa biển khơi, người gác hải đăng đứng bên cửa sổ đón đợi Tết.",
+      "narration_en": "Far out in the vast ocean, the lighthouse keeper stands by the window waiting for Tet.",
+      "image_prompt": "Cinematic vertical shot of a solitary elderly Vietnamese man standing at an old stone lighthouse window on a remote island. He wears a worn blue uniform and holds a cup of tea. Outside is a dark stormy sea with faint moonlight reflecting on waves."
+    },
+    {
+      "narration": "Chỉ có bóng con mèo đen cuộn tròn trên sàn gỗ lạnh lẽo để sưởi ấm.",
+      "narration_en": "Only the shadow of a black cat curled up on the cold wooden floor to seek warmth.",
+      "image_prompt": "Medium shot inside the dimly lit lighthouse room. The elderly man sits quietly reading while his small fluffy black kitten sleeps next to him by an oil lamp. Warm yellow light contrasts with cool blue moonlight from outside."
+    },
+    {
+      "narration": "Tiếng chuông đồng hồ điểm canh vang lên trong không gian yên tĩnh và cô đơn.",
+      "narration_en": "The clock chimes echo through the quiet and lonely space as midnight approaches.",
+      "image_prompt": "Close-up of an antique brass wall clock showing 12:00 AM inside the lighthouse. Soft dust motes dance in a beam of light hitting the floor where the man's feet are visible near his sleeping cat."
+    },
+    {
+      "narration": "Bỗng con mèo rúe lên, chỉ về phía cửa sổ nơi những đốm sáng pháo hoa hiện ra.",
+      "narration_en": "Suddenly the kitten meows and points towards the window where fireworks lights appear.",
+      "image_prompt": "Low angle shot from inside looking out through an open lighthouse door. Bright colorful Tet fireworks explode in the night sky above the dark ocean waves while rain lightly falls on glass panes."
+    },
+    {
+      "narration": "Người đàn ông nhìn ra xa, mỉm cười vì cảm thấy lòng mình đã cùng cả nước đón Tết.",
+      "narration_en": "The man looks far away and smiles feeling his heart celebrating Tet with the whole country.",
+      "image_prompt": "Wide vertical shot of the elderly lighthouse keeper standing on the balcony overlooking a beautiful coastal town below lit up by red lanterns during Tet celebration. He holds a small bouquet of flowers given to him."
+    },
+    {
+      "narration": "Chạm vai mèo, anh biết dù ở đâu cũng luôn có bóng dáng người thân đang chờ đợi.",
+      "narration_en": "Touching the cat's shoulder he knows that wherever they are there is always someone waiting for them nearby.",
+      "image_prompt": "Intimate close-up of the old man gently stroking his black kitten under warm lantern light. Both look content and peaceful with bokeh red decorations visible softly in background suggesting Vietnamese New Year atmosphere."
+    }
+  ]
+}

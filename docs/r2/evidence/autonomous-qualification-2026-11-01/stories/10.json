@@ -1,0 +1,35 @@
+{
+  "title": "Diều Và Máy Bay",
+  "scenes": [
+    {
+      "narration": "Trên đê sông Hồng nắng hạ, cậu bé Tú thả diều giữa trời xanh thẳm.",
+      "narration_en": "On the Red River levee under summer sun, little boy Tu flies a kite against the vast blue sky.",
+      "image_prompt": "Vertical cinematic shot of Vietnamese countryside. A young Hmong boy named Tu in a simple checkered shirt and shorts stands on a grassy river embankment flying a colorful traditional diamond-shaped kite. Bright harsh sunlight creates strong shadows. Background features lush green rice paddies, distant terraced hills, and clear blue sky with few clouds. No text or logos."
+    },
+    {
+      "narration": "Chờ gió thổi mạnh để diều bay cao, trong mắt Tú hình ảnh phi công đang mơ.",
+      "narration_en": "Waiting for strong wind to lift the kite high, in Tu's eyes lives a dream of becoming a pilot.",
+      "image_prompt": "Vertical cinematic close-up profile. The young Hmong boy Tu looks upwards with wide, hopeful eyes towards the sky where his kite is flying very high against blue clouds. Sunlight glints off his face and sweat on his brow showing effort. Background shows blurred green rice fields and distant village houses under bright daylight."
+    },
+    {
+      "narration": "Cơn gió lớn làm đứt sợi dây, diều bay mất và rơi xuống cánh đồng xa.",
+      "narration_en": "A sudden strong wind snaps the string, sending the kite flying away over the distant fields.",
+      "image_prompt": "Vertical cinematic medium shot. The young Hmong boy Tu stands alone on the river levee looking shocked and sad with arms slightly outstretched as if trying to catch something invisible. His colorful shirt is fluttering in a strong wind blowing from left to right. Background shows blurred green fields where his kite has fallen under dramatic cloudy sky lighting."
+    },
+    {
+      "narration": "Tú chạy theo từng bước chân, dù biết diều không thể trở lại được nữa.",
+      "narration_en": "Tu runs after it step by step, knowing the kite cannot come back no matter what he tries.",
+      "image_prompt": "Vertical cinematic low angle tracking shot. The young Hmong boy Tu running along the narrow dirt path of the river levee with determined posture and dusty face. His colorful shirt flutters violently in strong wind behind him showing motion blur effects on background fields."
+    },
+    {
+      "narration": "Dù diều đã mất, nhưng ước mơ bay giữa trời xanh vẫn luôn cháy trong tim.",
+      "narration_en": "Though the kite is lost, his dream of flying among blue skies still burns brightly in his heart forever more.",
+      "image_prompt": "Vertical cinematic medium shot. The young Hmong boy Tu standing alone on river levee looking up at sky with peaceful smile despite losing kite earlier scene just now shown before him today morning time setting sun golden hour lighting illuminates whole scene beautifully."
+    },
+    {
+      "narration": "Một chiếc máy bay quân sự xuất hiện trên bầu trời, mang theo hy vọng mới.",
+      "narration_en": "A military aircraft appears in the sky above bringing new hope to him once again today morning time setting sun golden hour lighting illuminates whole scene beautifully.",
+      "image_prompt": "Vertical cinematic wide shot showing young Hmong boy Tu standing on river levee looking up amazed at large grey-green propeller airplane flying overhead casting shadow over green fields below while Vietnamese village houses visible in distance under dramatic sunset sky with warm orange light. No text or logos present anywhere within frame composition."
+    }
+  ]
+}

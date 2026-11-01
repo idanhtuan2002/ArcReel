@@ -1,0 +1,35 @@
+{
+  "title": "Về Nhà Giữa Mùa Lũ",
+  "scenes": [
+    {
+      "narration": "Ba ngày trôi qua, dòng lũ miền Trung cuốn đi tất cả, chỉ còn chú chó nhỏ lạc đường.",
+      "narration_en": "Three days passed; the Central floodwaters swept everything away, leaving only the small lost stray dog.",
+      "image_prompt": "Vertical cinematic shot of a tiny muddy terrier standing alone in rushing brown floodwater, Vietnamese village houses half-submerged in background, overcast gray sky with soft rain falling on fur."
+    },
+    {
+      "narration": "Chân nó thương tích nhưng đôi mắt vẫn kiên định hướng về ngôi nhà cũ cuối làng.",
+      "narration_en": "Its paws were wounded yet its eyes remained fixed firmly upon the old wooden house at the village edge.",
+      "image_prompt": "Close-up vertical profile of a muddy dog with scraped paw pads looking intensely toward a distant dark silhouette of an old stilted Vietnamese house, rain streaks on lens bokeh effect."
+    },
+    {
+      "narration": "Nó bơi qua từng dòng nước xiết để vượt qua những con đê bị vỡ giữa đêm tối.",
+      "narration_en": "It swam through violent currents to cross the broken earthen levees under the cover of darkness.",
+      "image_prompt": "Wide vertical angle showing a small wet dog paddling hard against strong brown flood current near crumbling bamboo embankment, lightning flash illuminating terrified expressions in eyes."
+    },
+    {
+      "narration": "Khi bình minh ló dạng, sương mù tan đi và hình dáng quen thuộc hiện ra giữa tầm nhìn.",
+      "narration_en": "As dawn broke and mist cleared away the familiar shape of home appeared clearly within sight ahead.",
+      "image_prompt": "Golden morning light filtering through rain clouds illuminating a distant two-story Vietnamese tile-roofed house surrounded by green rice paddies, small dog silhouette walking determinedly toward it."
+    },
+    {
+      "narration": "Cánh cổng gỗ cọt kẹt khi chú chó chạy vồ lấy chân chủ nhân đang đứng chờ bên bậc thềm.",
+      "narration_en": "The wooden gate groaned as the exhausted dog sprinted to grasp its owner's legs standing on the porch steps.",
+      "image_prompt": "Emotional medium shot from low angle showing muddy dog leaping up to hug trembling elderly Vietnamese woman wearing conical hat, warm sunlight breaking through clouds onto wet faces and tearful reunion."
+    },
+    {
+      "narration": "Mùa lũ đã qua nhưng tình thương giữa chủ và vật vẫn vững bền như những cột nhà cũ.",
+      "narration_en": "Though the floodwaters receded the bond between owner and pet remained as unyielding as the old house pillars.",
+      "image_prompt": "Wide vertical shot of happy dog lying contentedly at feet of family in living room with repaired roof tiles visible through window showing clear blue sky outside Vietnamese countryside landscape fading into horizon glow."
+    }
+  ]
+}

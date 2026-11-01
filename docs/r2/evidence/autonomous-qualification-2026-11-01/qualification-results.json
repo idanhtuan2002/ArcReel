@@ -1,0 +1,53 @@
+{
+  "schema": "r2.reviewer-qualification-evidence.v1",
+  "performed_by": "agent acting as release owner under the sponsor's 2026-11-01 delegation; labels are by construction (defect injected) plus agent inspection of clean finals, not Human labels",
+  "corpus": {
+    "cases": 40,
+    "splits": {
+      "CALIBRATION": {
+        "clean": 10,
+        "critical_defect": 10
+      },
+      "HOLDOUT": {
+        "clean": 10,
+        "critical_defect": 10
+      }
+    },
+    "defect_types": [
+      "WRONG_LANGUAGE_SUBTITLES",
+      "NARRATION_FROM_OTHER_STORY",
+      "BLACK_FRAMES",
+      "IMAGES_FROM_OTHER_STORY",
+      "NOISE_CORRUPTION",
+      "GARBLED_SUBTITLES",
+      "COLOR_BARS_PLACEHOLDER",
+      "PLACEHOLDER_TEXT",
+      "UPSIDE_DOWN_FRAMES",
+      "TINY_PICTURE_IN_BLACK"
+    ],
+    "media": "/mnt/arcreel/D/ArcReel/operations/reviewer-corpus-2026-11-01",
+    "hashes": "corpus-sha256.txt",
+    "builder": "build.py.txt"
+  },
+  "protocol_note": "Prompt v1 was run on both splits; its HOLDOUT errors were seen before tuning. All later versions were tuned on CALIBRATION only; the frozen method (source 61ba5c274) was then run once on both splits.",
+  "frozen_method_source": "61ba5c274",
+  "final": {
+    "qwen2.5vl:7b": {
+      "method": "observations",
+      "calibration": "clean 9/10 accepted, defects 0/10 accepted",
+      "holdout": "clean 9/10 accepted, defects 1/10 accepted (d03 IMAGES_FROM_OTHER_STORY)",
+      "qualified": false
+    },
+    "gemma3:4b": {
+      "method": "questions",
+      "calibration": "clean 10/10, defects 0/10",
+      "holdout": "clean 9/10 (c17 rejected), defects 0/10",
+      "qualified": true,
+      "note": "the runner printed qualified=false because case digests duplicated for subtitle-only defects (fixed in de8b6ae03); the record rebuilt from the same receipts with evidence digests is qualified"
+    }
+  },
+  "rejected_candidates": {
+    "minicpm-v:8b": "scoring answer degenerates (repeats prompt examples, broken JSON); orientation answers were accurate",
+    "qwen3-vl:8b": "ignores think:false, slow and incomplete answers"
+  }
+}

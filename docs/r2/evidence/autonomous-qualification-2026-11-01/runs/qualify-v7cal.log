@@ -1,0 +1,6 @@
+qwen2.5vl:7b qualified: False 1700.3 s
+  CALIBRATION: clean accepted 1/10, defects accepted 0/10
+  HOLDOUT: clean accepted 0/0, defects accepted 0/0
+gemma3:4b qualified: False 1331.0 s
+  CALIBRATION: clean accepted 10/10, defects accepted 0/10
+  HOLDOUT: clean accepted 0/0, defects accepted 0/0

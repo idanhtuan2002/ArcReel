@@ -1,0 +1,35 @@
+{
+  "title": "Lá Thư Cuối Cùng",
+  "scenes": [
+    {
+      "narration": "Tiệm sách nhỏ góc phố Hà Nội sắp đóng cửa, mùi giấy cũ lan tỏa buồn bã.",
+      "narration_en": "The small bookshop in Hanoi's corner street is about to close; old paper scent fills the air with sadness.",
+      "image_prompt": "Vertical cinematic shot of a cozy vintage bookstore interior in Vietnam. An elderly Vietnamese man sits behind a wooden counter, looking tired and dejected. Warm golden hour sunlight streams through dust motes near closed shutters. Traditional tiled floor stacks are visible but empty shelves line the walls. No text on images."
+    },
+    {
+      "narration": "Bên quầy, ông chủ nhìn quanh căn phòng trống rỗng với ánh mắt lo lắng.",
+      "narration_en": "Behind the counter, the owner looks around his empty room with worried eyes.",
+      "image_prompt": "Vertical cinematic close-up of an elderly Vietnamese man sitting alone behind a worn wooden desk. He wears a simple faded shirt and holds a pen hesitantly. Soft focus background shows shelves losing their books to time. Warm but dim lighting highlights his weary face reflecting on the empty space beside him. No text."
+    },
+    {
+      "narration": "Đột nhiên, một phong bì màu vàng nhạt rơi xuống giữa nền giấy cũ.",
+      "narration_en": "Suddenly, a pale yellow envelope falls onto the old paper floor between them.",
+      "image_prompt": "Vertical cinematic shot focusing on an empty wooden counter surface covered with scattered dried leaves and dust. A single crisp pale yellow envelope lies slightly askew in center frame catching soft natural light filtering from above creating gentle shadows around it without any visible sender or recipient faces present yet."
+    },
+    {
+      "narration": "Ông chủ mở thư ra, dòng chữ 'Cảm ơn vì đã lưu giữ ký ức' làm tim ông thắt lại.",
+      "narration_en": "The owner opens the letter; words 'Thank you for preserving memories' make his heart tighten.",
+      "image_prompt": "Vertical cinematic medium shot showing hands of an elderly Vietnamese man gently holding open a handwritten yellowed envelope revealing neat black ink script inside. His fingers tremble slightly while reading under soft evening light that casts long shadows across the cluttered bookshop interior filled with nostalgic objects like teapots and dried herbs hanging nearby."
+    },
+    {
+      "narration": "Nụ cười lần đầu tiên trong nhiều ngày hiện lên trên khuôn mặt ông chủ.",
+      "narration_en": "A smile appears on the owner's face for the first time in many days.",
+      "image_prompt": "Vertical cinematic close-up of elderly Vietnamese man smiling warmly while sitting at his wooden desk surrounded by scattered books and stationery items. Soft golden lighting illuminates crinkles around eyes showing genuine joy overcoming previous melancholy mood within dimly lit vintage bookstore setting where dust particles dance gently in air beams."
+    },
+    {
+      "narration": "Tiệm sách không đóng, bởi ký ức của ngàn người sẽ luôn sống mãi ở đây.",
+      "narration_en": "The shop will not close; memories of thousands people will live here forever.",
+      "image_prompt": "Vertical cinematic wide shot revealing entire interior of renovated vintage bookstore now bustling subtly with soft glow from new lamps replacing previous darkness. Elderly Vietnamese man stands proudly organizing freshly arrived books under warm ambient lighting that makes every corner feel alive once more despite quiet atmosphere suggesting enduring legacy rather than abandonment."
+    }
+  ]
+}

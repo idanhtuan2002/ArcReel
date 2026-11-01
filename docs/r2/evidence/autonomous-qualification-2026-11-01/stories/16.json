@@ -1,0 +1,35 @@
+{
+  "title": "Mùa Mưa Bạc Liêu",
+  "scenes": [
+    {
+      "narration": "Bạc Liêu oi bức, cô gái vẫn miệt mài thu hoạch muối giữa nắng cháy da.",
+      "narration_en": "The heat in Bac Lieu is intense; the girl continues to work tirelessly under the scorching sun.",
+      "image_prompt": "Vertical cinematic shot of a Vietnamese young woman with weathered skin harvesting white salt crystals on cracked earth, bright harsh noon sunlight, golden hour rim light highlighting dust motes, sweat glistening on face, wide blue sky background, no text."
+    },
+    {
+      "narration": "Bỗng mây đen kéo đến nhanh chóng, cơn mưa trái mùa ập xuống không báo hiệu.",
+      "narration_en": "Suddenly dark clouds rush in quickly; an unexpected storm pours down without any warning sign.",
+      "image_prompt": "Vertical cinematic shot of the same Vietnamese woman looking up at a sudden heavy rainstorm, dramatic contrast between bright sky edge and dark swirling clouds, droplets hitting lens slightly, wet salt fields turning grey mud, intense natural lighting."
+    },
+    {
+      "narration": "Cô chạy đua với thời gian để bảo vệ những hạt muối quý giá khỏi dòng nước.",
+      "narration_en": "She races against time to protect the precious salt grains from rushing water currents.",
+      "image_prompt": "Vertical cinematic shot of the Vietnamese woman kneeling in muddy puddles scooping up floating white crystals, dynamic motion blur on raindrops, low angle emphasizing her struggle, dramatic shadows cast by heavy clouds, reflective wet ground."
+    },
+    {
+      "narration": "Lũ nước dâng cao nhanh quá sức người, cô ôm chặt bao muối trong tay.",
+      "narration_en": "The floodwaters rise faster than anyone can cope; she clutches the bundle of salt tightly in her arms.",
+      "image_prompt": "Vertical cinematic close-up of the Vietnamese woman's determined face partially submerged in rising brown water, holding a wet sack tight against chest, rain pouring down vertically, soft focus on background chaos, emotional lighting."
+    },
+    {
+      "narration": "Mưa tạnh dần, cô đứng giữa bãi muối tan chảy chỉ còn lại vẻ kiên cường.",
+      "narration_en": "The rain slowly subsides; she stands amidst melted salt fields with only her resilience remaining visible.",
+      "image_prompt": "Vertical cinematic wide shot of the Vietnamese woman standing alone in a vast flat landscape where white salt has dissolved into grey puddles, overcast but clearing sky, melancholic soft light illuminating silhouette against horizon."
+    },
+    {
+      "narration": "Cô nhặt lại từng chút còn sót lại, biết rằng ngày mai sẽ là một cuộc chiến mới.",
+      "narration_en": "She gathers every remaining fragment knowing tomorrow will be another battle ahead for her.",
+      "image_prompt": "Vertical cinematic medium shot of the Vietnamese woman carefully picking up small wet salt crystals from mud with trembling hands, gentle morning light breaking through clouds, hopeful expression forming on tired face, shallow depth of field."
+    }
+  ]
+}

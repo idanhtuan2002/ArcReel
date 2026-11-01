@@ -1,0 +1,35 @@
+{
+  "title": "Cái Ví Trả Lại",
+  "scenes": [
+    {
+      "narration": "Xe máy lướt qua Sài Gòn oi bức, chàng trai mồ hôi nhễnhại đang chạy gấp đơn hàng cuối ngày.",
+      "narration_en": "The motorbike speeds through the humid Saigon; the boy is sweaty and rushing his last order of the day.",
+      "image_prompt": "Cinematic vertical shot, young Vietnamese delivery rider on a scooter in bustling Ho Chi Minh City street at golden hour, sweat glistening on forehead, intense focus eyes, traditional orange uniform, shallow depth of field, no text."
+    },
+    {
+      "narration": "Khi đến nhà khách hàng, anh giật mình thấy chiếc ví dày đặc tiền nằm ngay trên tay vịn xe máy.",
+      "narration_en": "Arriving at the customer's door, he gasps as a thick wallet full of cash is found right on his scooter handlebar.",
+      "image_prompt": "Close-up vertical shot inside an apartment hallway in Vietnam, delivery rider looking shocked and confused holding a heavy leather wallet with Vietnamese currency, warm indoor lighting casting soft shadows, detailed texture on money and fabric, no text."
+    },
+    {
+      "narration": "Số tiền ấy đủ chi trả bữa ăn cả tháng của gia đình anh nghèo khó giữa lòng thành phố.",
+      "narration_en": "That amount could feed his poor family for a month in the heart of the city.",
+      "image_prompt": "Medium vertical shot, delivery rider standing alone on small balcony with makeshift view of skyline, clutching wallet tightly then trembling hands letting go, sunset light hitting face showing inner struggle, realistic urban poverty details like plastic bags and wires, no text."
+    },
+    {
+      "narration": "Cảm giác áy náy khiến anh quyết định quay lại ngay lập tức để trả lại tài sản cho chủ nhân.",
+      "narration_en": "Guilt drives him to decide he must return immediately to give the property back to its owner.",
+      "image_prompt": "Action vertical shot, delivery rider riding fast through busy Saigon traffic at dusk carrying wallet in handbag or bag strap, determined expression despite exhaustion, motion blur on background buildings and neon signs reflecting rain-slicked roads, no text."
+    },
+    {
+      "narration": "Khi đặt ví lên bàn chủ nhà, nụ cười vỡ òa và lời cảm ơn vang dội trong căn phòng nhỏ.",
+      "narration_en": "Placing the wallet on the homeowner's table causes a burst of smile and echoing thanks inside the small room.",
+      "image_prompt": "Warm vertical interior shot in modest Vietnamese home living room, elderly couple embracing delivery rider who looks relieved and happy, golden evening light streaming through window illuminating dust motes dancing in air, cozy atmosphere with family photos on shelf background visible but not focused, no text."
+    },
+    {
+      "narration": "Chiếc ví trở thành kỷ vật quý giá nhất mà cả ba người cùng nhau gìn giữ trọn đời.",
+      "narration_en": "The wallet becomes the most precious keepsake cherished forever by all three people together.",
+      "image_prompt": "Peaceful vertical shot of delivery rider sitting on stoop outside house watching family eat simple dinner under streetlamp glow, silhouette against night sky with distant city lights twinkling softly behind him, hopeful expression reflected in eyes, calm composition emphasizing unity and gratitude, no text."
+    }
+  ]
+}

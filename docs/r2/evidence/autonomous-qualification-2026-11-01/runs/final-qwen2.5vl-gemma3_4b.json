@@ -1,0 +1,2088 @@
+{
+  "qwen2.5vl:7b": {
+    "qualified": false,
+    "seconds": 3727.0,
+    "rows": [
+      {
+        "case": "d04",
+        "split": "HOLDOUT",
+        "label": "CRITICAL_DEFECT",
+        "defect": "NOISE_CORRUPTION",
+        "accepted": false,
+        "outcome": "COMPLETED",
+        "language": "vi",
+        "scores": {
+          "story": 3,
+          "visual": 1,
+          "audio": 5,
+          "continuity": 2,
+          "pacing": 4
+        },
+        "findings": [
+          [
+            "CRITICAL",
+            "OBSERVED_BROKEN_FRAMES"
+          ],
+          [
+            "CRITICAL",
+            "OBSERVED_UNRELATED_FRAMES"
+          ],
+          [
+            "MAJOR",
+            "NOISE"
+          ]
+        ]
+      },
+      {
+        "case": "c04",
+        "split": "CALIBRATION",
+        "label": "CLEAN",
+        "defect": null,
+        "accepted": true,
+        "outcome": "COMPLETED",
+        "language": "vi",
+        "scores": {
+          "story": 5,
+          "visual": 4,
+          "audio": 5,
+          "continuity": 5,
+          "pacing": 5
+        },
+        "findings": [
+          [
+            "MINOR",
+            "MINOR"
+          ]
+        ]
+      },
+      {
+        "case": "d11",
+        "split": "CALIBRATION",
+        "label": "CRITICAL_DEFECT",
+        "defect": "NARRATION_FROM_OTHER_STORY",
+        "accepted": false,
+        "outcome": "COMPLETED",
+        "language": "vi",
+        "scores": {
+          "story": 4,
+          "visual": 3,
+          "audio": 5,
+          "continuity": 2,
+          "pacing": 3
+        },
+        "findings": [
+          [
+            "CRITICAL",
+            "OBSERVED_UNRELATED_FRAMES"
+          ],
+          [
+            "MINOR",
+            "CONTINUITY_ISSUE"
+          ]
+        ]
+      },
+      {
+        "case": "c10",
+        "split": "HOLDOUT",
+        "label": "CLEAN",
+        "defect": null,
+        "accepted": true,
+        "outcome": "COMPLETED",
+        "language": "vi",
+        "scores": {
+          "story": 5,
+          "visual": 4,
+          "audio": 5,
+          "continuity": 5,
+          "pacing": 5
+        },
+        "findings": [
+          [
+            "MINOR",
+            "MINOR"
+          ]
+        ]
+      },
+      {
+        "case": "c14",
+        "split": "HOLDOUT",
+        "label": "CLEAN",
+        "defect": null,
+        "accepted": true,
+        "outcome": "COMPLETED",
+        "language": "vi",
+        "scores": {
+          "story": 5,
+          "visual": 4,
+          "audio": 5,
+          "continuity": 5,
+          "pacing": 5
+        },
+        "findings": [
+          [
+            "MINOR",
+            "MINOR"
+          ]
+        ]
+      },
+      {
+        "case": "c03",
+        "split": "CALIBRATION",
+        "label": "CLEAN",
+        "defect": null,
+        "accepted": true,
+        "outcome": "COMPLETED",
+        "language": "vi",
+        "scores": {
+          "story": 5,
+          "visual": 4,
+          "audio": 5,
+          "continuity": 4,
+          "pacing": 4
+        },
+        "findings": [
+          [
+            "MINOR",
+            "MINOR"
+          ]
+        ]
+      },
+      {
+        "case": "c19",
+        "split": "HOLDOUT",
+        "label": "CLEAN",
+        "defect": null,
+        "accepted": false,
+        "outcome": "COMPLETED",
+        "language": "vi",
+        "scores": {
+          "story": 4,
+          "visual": 4,
+          "audio": 5,
+          "continuity": 3,
+          "pacing": 4
+        },
+        "findings": [
+          [
+            "MINOR",
+            "CONTINUITY"
+          ]
+        ]
+      },
+      {
+        "case": "d06",
+        "split": "HOLDOUT",
+        "label": "CRITICAL_DEFECT",
+        "defect": "COLOR_BARS_PLACEHOLDER",
+        "accepted": false,
+        "outcome": "COMPLETED",
+        "language": "vi",
+        "scores": {
+          "story": 4,
+          "visual": 2,
+          "audio": 5,
+          "continuity": 3,
+          "pacing": 3
+        },
+        "findings": [
+          [
+            "CRITICAL",
+            "OBSERVED_BROKEN_FRAMES"
+          ],
+          [
+            "CRITICAL",
+            "OBSERVED_UNRELATED_FRAMES"
+          ],
+          [
+            "MINOR",
+            "TEST_PATTERN"
+          ]
+        ]
+      },
+      {
+        "case": "c08",
+        "split": "CALIBRATION",
+        "label": "CLEAN",
+        "defect": null,
+        "accepted": true,
+        "outcome": "COMPLETED",
+        "language": "vi",
+        "scores": {
+          "story": 5,
+          "visual": 4,
+          "audio": 5,
+          "continuity": 5,
+          "pacing": 5
+        },
+        "findings": [
+          [
+            "MINOR",
+            "MATCHES_NARRATION_FALSE"
+          ]
+        ]
+      },
+      {
+        "case": "d19",
+        "split": "CALIBRATION",
+        "label": "CRITICAL_DEFECT",
+        "defect": "TINY_PICTURE_IN_BLACK",
+        "accepted": false,
+        "outcome": "COMPLETED",
+        "language": "vi",
+        "scores": {
+          "story": 5,
+          "visual": 4,
+          "audio": 5,
+          "continuity": 5,
+          "pacing": 5
+        },
+        "findings": [
+          [
+            "CRITICAL",
+            "CHECK_BLACK_PICTURE"
+          ],
+          [
+            "CRITICAL",
+            "CHECK_PICTURE_NOT_FILLING_FRAME"
+          ],
+          [
+            "MINOR",
+            "MINOR"
+          ]
+        ]
+      },
+      {
+        "case": "d13",
+        "split": "CALIBRATION",
+        "label": "CRITICAL_DEFECT",
+        "defect": "IMAGES_FROM_OTHER_STORY",
+        "accepted": false,
+        "outcome": "COMPLETED",
+        "language": "vi",
+        "scores": {
+          "story": 4,
+          "visual": 3,
+          "audio": 5,
+          "continuity": 4,
+          "pacing": 4
+        },
+        "findings": [
+          [
+            "MINOR",
+            "F01"
+          ]
+        ]
+      },
+      {
+        "case": "d00",
+        "split": "HOLDOUT",
+        "label": "CRITICAL_DEFECT",
+        "defect": "WRONG_LANGUAGE_SUBTITLES",
+        "accepted": false,
+        "outcome": "COMPLETED",
+        "language": "vi",
+        "scores": {
+          "story": 5,
+          "visual": 4,
+          "audio": 5,
+          "continuity": 5,
+          "pacing": 5
+        },
+        "findings": [
+          [
+            "CRITICAL",
+            "CHECK_SUBTITLES_NOT_VIETNAMESE"
+          ],
+          [
+            "CRITICAL",
+            "CHECK_SUBTITLES_NOT_NARRATION"
+          ],
+          [
+            "MINOR",
+            "MINOR"
+          ]
+        ]
+      },
+      {
+        "case": "c05",
+        "split": "CALIBRATION",
+        "label": "CLEAN",
+        "defect": null,
+        "accepted": false,
+        "outcome": "COMPLETED",
+        "language": "vi",
+        "scores": {
+          "story": 4,
+          "visual": 3,
+          "audio": 5,
+          "continuity": 4,
+          "pacing": 4
+        },
+        "findings": [
+          [
+            "MINOR",
+            "1"
+          ],
+          [
+            "MINOR",
+            "2"
+          ]
+        ]
+      },
+      {
+        "case": "c12",
+        "split": "HOLDOUT",
+        "label": "CLEAN",
+        "defect": null,
+        "accepted": true,
+        "outcome": "COMPLETED",
+        "language": "vi",
+        "scores": {
+          "story": 5,
+          "visual": 4,
+          "audio": 5,
+          "continuity": 4,
+          "pacing": 4
+        },
+        "findings": [
+          [
+            "MINOR",
+            "MINOR"
+          ]
+        ]
+      },
+      {
+        "case": "c11",
+        "split": "HOLDOUT",
+        "label": "CLEAN",
+        "defect": null,
+        "accepted": true,
+        "outcome": "COMPLETED",
+        "language": "vi",
+        "scores": {
+          "story": 5,
+          "visual": 4,
+          "audio": 5,
+          "continuity": 4,
+          "pacing": 4
+        },
+        "findings": [
+          [
+            "MINOR",
+            "MATCHES_NARRATION_FALSE"
+          ]
+        ]
+      },
+      {
+        "case": "c09",
+        "split": "CALIBRATION",
+        "label": "CLEAN",
+        "defect": null,
+        "accepted": true,
+        "outcome": "COMPLETED",
+        "language": "vi",
+        "scores": {
+          "story": 5,
+          "visual": 4,
+          "audio": 5,
+          "continuity": 4,
+          "pacing": 4
+        },
+        "findings": [
+          [
+            "MINOR",
+            "CONTINUITY_ISSUE"
+          ]
+        ]
+      },
+      {
+        "case": "c17",
+        "split": "HOLDOUT",
+        "label": "CLEAN",
+        "defect": null,
+        "accepted": true,
+        "outcome": "COMPLETED",
+        "language": "vi",
+        "scores": {
+          "story": 5,
+          "visual": 4,
+          "audio": 5,
+          "continuity": 5,
+          "pacing": 5
+        },
+        "findings": [
+          [
+            "MINOR",
+            "MATCHES_NARRATION_FALSE"
+          ]
+        ]
+      },
+      {
+        "case": "c06",
+        "split": "CALIBRATION",
+        "label": "CLEAN",
+        "defect": null,
+        "accepted": true,
+        "outcome": "COMPLETED",
+        "language": "vi",
+        "scores": {
+          "story": 5,
+          "visual": 4,
+          "audio": 5,
+          "continuity": 5,
+          "pacing": 5
+        },
+        "findings": [
+          [
+            "MINOR",
+            "MATCHES_NARRATION"
+          ]
+        ]
+      },
+      {
+        "case": "d18",
+        "split": "CALIBRATION",
+        "label": "CRITICAL_DEFECT",
+        "defect": "UPSIDE_DOWN_FRAMES",
+        "accepted": false,
+        "outcome": "COMPLETED",
+        "language": "vi",
+        "scores": {
+          "story": 5,
+          "visual": 4,
+          "audio": 5,
+          "continuity": 5,
+          "pacing": 5
+        },
+        "findings": [
+          [
+            "CRITICAL",
+            "FRAME_UPSIDE_DOWN"
+          ],
+          [
+            "MINOR",
+            "F01"
+          ]
+        ]
+      },
+      {
+        "case": "d15",
+        "split": "CALIBRATION",
+        "label": "CRITICAL_DEFECT",
+        "defect": "GARBLED_SUBTITLES",
+        "accepted": false,
+        "outcome": "COMPLETED",
+        "language": "vi",
+        "scores": {
+          "story": 5,
+          "visual": 4,
+          "audio": 5,
+          "continuity": 4,
+          "pacing": 4
+        },
+        "findings": [
+          [
+            "CRITICAL",
+            "CHECK_SUBTITLES_GARBLED"
+          ],
+          [
+            "CRITICAL",
+            "CHECK_SUBTITLES_NOT_NARRATION"
+          ],
+          [
+            "MINOR",
+            "MATCHES_NARRATION_FALSE"
+          ]
+        ]
+      },
+      {
+        "case": "d05",
+        "split": "HOLDOUT",
+        "label": "CRITICAL_DEFECT",
+        "defect": "GARBLED_SUBTITLES",
+        "accepted": false,
+        "outcome": "COMPLETED",
+        "language": "vi",
+        "scores": {
+          "story": 4,
+          "visual": 5,
+          "audio": 5,
+          "continuity": 4,
+          "pacing": 4
+        },
+        "findings": [
+          [
+            "CRITICAL",
+            "CHECK_SUBTITLES_GARBLED"
+          ],
+          [
+            "CRITICAL",
+            "CHECK_SUBTITLES_NOT_NARRATION"
+          ],
+          [
+            "MINOR",
+            "MATCH_NARRATION_FALSE_1"
+          ]
+        ]
+      },
+      {
+        "case": "c00",
+        "split": "CALIBRATION",
+        "label": "CLEAN",
+        "defect": null,
+        "accepted": true,
+        "outcome": "COMPLETED",
+        "language": "vi",
+        "scores": {
+          "story": 5,
+          "visual": 4,
+          "audio": 5,
+          "continuity": 5,
+          "pacing": 5
+        },
+        "findings": [
+          [
+            "MINOR",
+            "1"
+          ]
+        ]
+      },
+      {
+        "case": "d09",
+        "split": "HOLDOUT",
+        "label": "CRITICAL_DEFECT",
+        "defect": "TINY_PICTURE_IN_BLACK",
+        "accepted": false,
+        "outcome": "COMPLETED",
+        "language": "vi",
+        "scores": {
+          "story": 5,
+          "visual": 4,
+          "audio": 5,
+          "continuity": 4,
+          "pacing": 4
+        },
+        "findings": [
+          [
+            "CRITICAL",
+            "CHECK_PICTURE_NOT_FILLING_FRAME"
+          ],
+          [
+            "MINOR",
+            "MATCHES_NARRATION_FALSE"
+          ]
+        ]
+      },
+      {
+        "case": "d14",
+        "split": "CALIBRATION",
+        "label": "CRITICAL_DEFECT",
+        "defect": "NOISE_CORRUPTION",
+        "accepted": false,
+        "outcome": "COMPLETED",
+        "language": "vi",
+        "scores": {
+          "story": 2,
+          "visual": 1,
+          "audio": 5,
+          "continuity": 3,
+          "pacing": 4
+        },
+        "findings": [
+          [
+            "CRITICAL",
+            "OBSERVED_BROKEN_FRAMES"
+          ],
+          [
+            "CRITICAL",
+            "OBSERVED_UNRELATED_FRAMES"
+          ],
+          [
+            "MAJOR",
+            "NOISE"
+          ]
+        ]
+      },
+      {
+        "case": "d17",
+        "split": "CALIBRATION",
+        "label": "CRITICAL_DEFECT",
+        "defect": "PLACEHOLDER_TEXT",
+        "accepted": false,
+        "outcome": "COMPLETED",
+        "language": "vi",
+        "scores": {
+          "story": 5,
+          "visual": 5,
+          "audio": 4,
+          "continuity": 5,
+          "pacing": 5
+        },
+        "findings": [
+          [
+            "CRITICAL",
+            "CHECK_PLACEHOLDER_TEXT"
+          ],
+          [
+            "MINOR",
+            "CONTINUITY_ISSUE"
+          ]
+        ]
+      },
+      {
+        "case": "d07",
+        "split": "HOLDOUT",
+        "label": "CRITICAL_DEFECT",
+        "defect": "PLACEHOLDER_TEXT",
+        "accepted": false,
+        "outcome": "COMPLETED",
+        "language": "vi",
+        "scores": {
+          "story": 3,
+          "visual": 4,
+          "audio": 5,
+          "continuity": 2,
+          "pacing": 3
+        },
+        "findings": [
+          [
+            "CRITICAL",
+            "CHECK_PLACEHOLDER_TEXT"
+          ],
+          [
+            "CRITICAL",
+            "OBSERVED_UNRELATED_FRAMES"
+          ],
+          [
+            "MAJOR",
+            "CONTINUITY_ISSUE"
+          ],
+          [
+            "MINOR",
+            "PACING_ISSUE"
+          ]
+        ]
+      },
+      {
+        "case": "c13",
+        "split": "HOLDOUT",
+        "label": "CLEAN",
+        "defect": null,
+        "accepted": true,
+        "outcome": "COMPLETED",
+        "language": "vi",
+        "scores": {
+          "story": 5,
+          "visual": 4,
+          "audio": 5,
+          "continuity": 5,
+          "pacing": 5
+        },
+        "findings": [
+          [
+            "MINOR",
+            "MINOR"
+          ]
+        ]
+      },
+      {
+        "case": "c16",
+        "split": "HOLDOUT",
+        "label": "CLEAN",
+        "defect": null,
+        "accepted": true,
+        "outcome": "COMPLETED",
+        "language": "vi",
+        "scores": {
+          "story": 5,
+          "visual": 4,
+          "audio": 5,
+          "continuity": 4,
+          "pacing": 4
+        },
+        "findings": [
+          [
+            "MINOR",
+            "MINOR"
+          ]
+        ]
+      },
+      {
+        "case": "d16",
+        "split": "CALIBRATION",
+        "label": "CRITICAL_DEFECT",
+        "defect": "COLOR_BARS_PLACEHOLDER",
+        "accepted": false,
+        "outcome": "COMPLETED",
+        "language": "vi",
+        "scores": {
+          "story": 3,
+          "visual": 2,
+          "audio": 5,
+          "continuity": 4,
+          "pacing": 4
+        },
+        "findings": [
+          [
+            "CRITICAL",
+            "OBSERVED_BROKEN_FRAMES"
+          ],
+          [
+            "CRITICAL",
+            "OBSERVED_UNRELATED_FRAMES"
+          ],
+          [
+            "MINOR",
+            "TEST_PATTERN"
+          ]
+        ]
+      },
+      {
+        "case": "c15",
+        "split": "HOLDOUT",
+        "label": "CLEAN",
+        "defect": null,
+        "accepted": true,
+        "outcome": "COMPLETED",
+        "language": "vi",
+        "scores": {
+          "story": 5,
+          "visual": 4,
+          "audio": 5,
+          "continuity": 4,
+          "pacing": 4
+        },
+        "findings": [
+          [
+            "MINOR",
+            "MINOR"
+          ]
+        ]
+      },
+      {
+        "case": "c02",
+        "split": "CALIBRATION",
+        "label": "CLEAN",
+        "defect": null,
+        "accepted": true,
+        "outcome": "COMPLETED",
+        "language": "vi",
+        "scores": {
+          "story": 5,
+          "visual": 4,
+          "audio": 5,
+          "continuity": 5,
+          "pacing": 5
+        },
+        "findings": [
+          [
+            "MINOR",
+            "MINOR"
+          ]
+        ]
+      },
+      {
+        "case": "d10",
+        "split": "CALIBRATION",
+        "label": "CRITICAL_DEFECT",
+        "defect": "WRONG_LANGUAGE_SUBTITLES",
+        "accepted": false,
+        "outcome": "COMPLETED",
+        "language": "vi",
+        "scores": {
+          "story": 5,
+          "visual": 4,
+          "audio": 5,
+          "continuity": 4,
+          "pacing": 4
+        },
+        "findings": [
+          [
+            "CRITICAL",
+            "CHECK_SUBTITLES_NOT_VIETNAMESE"
+          ],
+          [
+            "CRITICAL",
+            "CHECK_SUBTITLES_NOT_NARRATION"
+          ],
+          [
+            "MINOR",
+            "MINOR"
+          ]
+        ]
+      },
+      {
+        "case": "d08",
+        "split": "HOLDOUT",
+        "label": "CRITICAL_DEFECT",
+        "defect": "UPSIDE_DOWN_FRAMES",
+        "accepted": false,
+        "outcome": "COMPLETED",
+        "language": "vi",
+        "scores": {
+          "story": 4,
+          "visual": 3,
+          "audio": 5,
+          "continuity": 2,
+          "pacing": 3
+        },
+        "findings": [
+          [
+            "CRITICAL",
+            "FRAME_UPSIDE_DOWN"
+          ],
+          [
+            "CRITICAL",
+            "OBSERVED_UPSIDE_DOWN"
+          ],
+          [
+            "MINOR",
+            "F01"
+          ]
+        ]
+      },
+      {
+        "case": "c07",
+        "split": "CALIBRATION",
+        "label": "CLEAN",
+        "defect": null,
+        "accepted": true,
+        "outcome": "COMPLETED",
+        "language": "vi",
+        "scores": {
+          "story": 5,
+          "visual": 4,
+          "audio": 5,
+          "continuity": 5,
+          "pacing": 5
+        },
+        "findings": [
+          [
+            "MINOR",
+            "MINOR"
+          ]
+        ]
+      },
+      {
+        "case": "c18",
+        "split": "HOLDOUT",
+        "label": "CLEAN",
+        "defect": null,
+        "accepted": true,
+        "outcome": "COMPLETED",
+        "language": "vi",
+        "scores": {
+          "story": 5,
+          "visual": 4,
+          "audio": 5,
+          "continuity": 4,
+          "pacing": 4
+        },
+        "findings": [
+          [
+            "MINOR",
+            "CONTINUITY"
+          ]
+        ]
+      },
+      {
+        "case": "c01",
+        "split": "CALIBRATION",
+        "label": "CLEAN",
+        "defect": null,
+        "accepted": true,
+        "outcome": "COMPLETED",
+        "language": "vi",
+        "scores": {
+          "story": 5,
+          "visual": 4,
+          "audio": 5,
+          "continuity": 4,
+          "pacing": 4
+        },
+        "findings": [
+          [
+            "MINOR",
+            "MATCHES_NARRATION_FALSE"
+          ]
+        ]
+      },
+      {
+        "case": "d01",
+        "split": "HOLDOUT",
+        "label": "CRITICAL_DEFECT",
+        "defect": "NARRATION_FROM_OTHER_STORY",
+        "accepted": false,
+        "outcome": "COMPLETED",
+        "language": "vi",
+        "scores": {
+          "story": 3,
+          "visual": 2,
+          "audio": 5,
+          "continuity": 2,
+          "pacing": 4
+        },
+        "findings": [
+          [
+            "CRITICAL",
+            "OBSERVED_UNRELATED_FRAMES"
+          ],
+          [
+            "MINOR",
+            "F01"
+          ]
+        ]
+      },
+      {
+        "case": "d12",
+        "split": "CALIBRATION",
+        "label": "CRITICAL_DEFECT",
+        "defect": "BLACK_FRAMES",
+        "accepted": false,
+        "outcome": "COMPLETED",
+        "language": "vi",
+        "scores": {
+          "story": 4,
+          "visual": 3,
+          "audio": 5,
+          "continuity": 2,
+          "pacing": 3
+        },
+        "findings": [
+          [
+            "CRITICAL",
+            "CHECK_BLACK_PICTURE"
+          ],
+          [
+            "CRITICAL",
+            "OBSERVED_BROKEN_FRAMES"
+          ],
+          [
+            "CRITICAL",
+            "OBSERVED_UNRELATED_FRAMES"
+          ],
+          [
+            "MAJOR",
+            "CONTINUITY_ISSUE"
+          ]
+        ]
+      },
+      {
+        "case": "d03",
+        "split": "HOLDOUT",
+        "label": "CRITICAL_DEFECT",
+        "defect": "IMAGES_FROM_OTHER_STORY",
+        "accepted": true,
+        "outcome": "COMPLETED",
+        "language": "vi",
+        "scores": {
+          "story": 5,
+          "visual": 4,
+          "audio": 5,
+          "continuity": 5,
+          "pacing": 5
+        },
+        "findings": [
+          [
+            "MINOR",
+            "MINOR"
+          ]
+        ]
+      },
+      {
+        "case": "d02",
+        "split": "HOLDOUT",
+        "label": "CRITICAL_DEFECT",
+        "defect": "BLACK_FRAMES",
+        "accepted": false,
+        "outcome": "COMPLETED",
+        "language": "vi",
+        "scores": {
+          "story": 4,
+          "visual": 3,
+          "audio": 5,
+          "continuity": 2,
+          "pacing": 3
+        },
+        "findings": [
+          [
+            "CRITICAL",
+            "CHECK_BLACK_PICTURE"
+          ],
+          [
+            "CRITICAL",
+            "OBSERVED_BROKEN_FRAMES"
+          ],
+          [
+            "CRITICAL",
+            "OBSERVED_UNRELATED_FRAMES"
+          ],
+          [
+            "MAJOR",
+            "F01"
+          ]
+        ]
+      }
+    ]
+  },
+  "gemma3:4b": {
+    "qualified": false,
+    "seconds": 2688.1,
+    "rows": [
+      {
+        "case": "d04",
+        "split": "HOLDOUT",
+        "label": "CRITICAL_DEFECT",
+        "defect": "NOISE_CORRUPTION",
+        "accepted": false,
+        "outcome": "COMPLETED",
+        "language": "vi",
+        "scores": {
+          "story": 4,
+          "visual": 4,
+          "audio": 5,
+          "continuity": 4,
+          "pacing": 4
+        },
+        "findings": [
+          [
+            "CRITICAL",
+            "FRAME_BROKEN"
+          ],
+          [
+            "CRITICAL",
+            "FRAME_UPSIDE_DOWN"
+          ],
+          [
+            "CRITICAL",
+            "FRAME_NOT_ILLUSTRATING_NARRATION"
+          ]
+        ]
+      },
+      {
+        "case": "c04",
+        "split": "CALIBRATION",
+        "label": "CLEAN",
+        "defect": null,
+        "accepted": true,
+        "outcome": "COMPLETED",
+        "language": "vi",
+        "scores": {
+          "story": 4,
+          "visual": 5,
+          "audio": 5,
+          "continuity": 4,
+          "pacing": 4
+        },
+        "findings": [
+          [
+            "MINOR",
+            "VISUAL_001"
+          ],
+          [
+            "MINOR",
+            "SCRIPT_002"
+          ]
+        ]
+      },
+      {
+        "case": "d11",
+        "split": "CALIBRATION",
+        "label": "CRITICAL_DEFECT",
+        "defect": "NARRATION_FROM_OTHER_STORY",
+        "accepted": false,
+        "outcome": "COMPLETED",
+        "language": "vi",
+        "scores": {
+          "story": 4,
+          "visual": 5,
+          "audio": 4,
+          "continuity": 4,
+          "pacing": 4
+        },
+        "findings": [
+          [
+            "CRITICAL",
+            "FRAME_NOT_ILLUSTRATING_NARRATION"
+          ]
+        ]
+      },
+      {
+        "case": "c10",
+        "split": "HOLDOUT",
+        "label": "CLEAN",
+        "defect": null,
+        "accepted": true,
+        "outcome": "COMPLETED",
+        "language": "vi",
+        "scores": {
+          "story": 4,
+          "visual": 5,
+          "audio": 5,
+          "continuity": 4,
+          "pacing": 4
+        },
+        "findings": [
+          [
+            "MINOR",
+            "VISUAL_001"
+          ],
+          [
+            "MINOR",
+            "SCRIPT_002"
+          ]
+        ]
+      },
+      {
+        "case": "c14",
+        "split": "HOLDOUT",
+        "label": "CLEAN",
+        "defect": null,
+        "accepted": true,
+        "outcome": "COMPLETED",
+        "language": "vi",
+        "scores": {
+          "story": 4,
+          "visual": 5,
+          "audio": 4,
+          "continuity": 4,
+          "pacing": 4
+        },
+        "findings": []
+      },
+      {
+        "case": "c03",
+        "split": "CALIBRATION",
+        "label": "CLEAN",
+        "defect": null,
+        "accepted": true,
+        "outcome": "COMPLETED",
+        "language": "vi",
+        "scores": {
+          "story": 4,
+          "visual": 5,
+          "audio": 5,
+          "continuity": 4,
+          "pacing": 4
+        },
+        "findings": [
+          [
+            "MINOR",
+            "VISUAL_001"
+          ],
+          [
+            "MINOR",
+            "AUDIO_002"
+          ],
+          [
+            "MINOR",
+            "CONTINUITY_003"
+          ],
+          [
+            "MINOR",
+            "AUDIO_004"
+          ]
+        ]
+      },
+      {
+        "case": "c19",
+        "split": "HOLDOUT",
+        "label": "CLEAN",
+        "defect": null,
+        "accepted": true,
+        "outcome": "COMPLETED",
+        "language": "vi",
+        "scores": {
+          "story": 4,
+          "visual": 5,
+          "audio": 5,
+          "continuity": 4,
+          "pacing": 5
+        },
+        "findings": [
+          [
+            "MINOR",
+            "VISUAL_001"
+          ],
+          [
+            "MINOR",
+            "SCRIPT_002"
+          ]
+        ]
+      },
+      {
+        "case": "d06",
+        "split": "HOLDOUT",
+        "label": "CRITICAL_DEFECT",
+        "defect": "COLOR_BARS_PLACEHOLDER",
+        "accepted": false,
+        "outcome": "COMPLETED",
+        "language": "vi",
+        "scores": {
+          "story": 4,
+          "visual": 4,
+          "audio": 5,
+          "continuity": 4,
+          "pacing": 4
+        },
+        "findings": [
+          [
+            "CRITICAL",
+            "FRAME_BROKEN"
+          ],
+          [
+            "CRITICAL",
+            "FRAME_NOT_ILLUSTRATING_NARRATION"
+          ],
+          [
+            "MINOR",
+            "VISUAL_001"
+          ],
+          [
+            "MINOR",
+            "AUDIO_001"
+          ]
+        ]
+      },
+      {
+        "case": "c08",
+        "split": "CALIBRATION",
+        "label": "CLEAN",
+        "defect": null,
+        "accepted": true,
+        "outcome": "COMPLETED",
+        "language": "vi",
+        "scores": {
+          "story": 4,
+          "visual": 5,
+          "audio": 5,
+          "continuity": 4,
+          "pacing": 4
+        },
+        "findings": [
+          [
+            "MINOR",
+            "F-001"
+          ]
+        ]
+      },
+      {
+        "case": "d19",
+        "split": "CALIBRATION",
+        "label": "CRITICAL_DEFECT",
+        "defect": "TINY_PICTURE_IN_BLACK",
+        "accepted": false,
+        "outcome": "COMPLETED",
+        "language": "vi",
+        "scores": {
+          "story": 4,
+          "visual": 5,
+          "audio": 5,
+          "continuity": 4,
+          "pacing": 5
+        },
+        "findings": [
+          [
+            "CRITICAL",
+            "CHECK_BLACK_PICTURE"
+          ],
+          [
+            "CRITICAL",
+            "CHECK_PICTURE_NOT_FILLING_FRAME"
+          ],
+          [
+            "CRITICAL",
+            "FRAME_BROKEN"
+          ],
+          [
+            "CRITICAL",
+            "FRAME_UPSIDE_DOWN"
+          ]
+        ]
+      },
+      {
+        "case": "d13",
+        "split": "CALIBRATION",
+        "label": "CRITICAL_DEFECT",
+        "defect": "IMAGES_FROM_OTHER_STORY",
+        "accepted": false,
+        "outcome": "COMPLETED",
+        "language": "vi",
+        "scores": {
+          "story": 4,
+          "visual": 5,
+          "audio": 5,
+          "continuity": 4,
+          "pacing": 4
+        },
+        "findings": [
+          [
+            "CRITICAL",
+            "FRAME_NOT_ILLUSTRATING_NARRATION"
+          ]
+        ]
+      },
+      {
+        "case": "d00",
+        "split": "HOLDOUT",
+        "label": "CRITICAL_DEFECT",
+        "defect": "WRONG_LANGUAGE_SUBTITLES",
+        "accepted": false,
+        "outcome": "COMPLETED",
+        "language": "vi",
+        "scores": {
+          "story": 4,
+          "visual": 4,
+          "audio": 5,
+          "continuity": 4,
+          "pacing": 4
+        },
+        "findings": [
+          [
+            "CRITICAL",
+            "CHECK_SUBTITLES_NOT_VIETNAMESE"
+          ],
+          [
+            "CRITICAL",
+            "CHECK_SUBTITLES_NOT_NARRATION"
+          ]
+        ]
+      },
+      {
+        "case": "c05",
+        "split": "CALIBRATION",
+        "label": "CLEAN",
+        "defect": null,
+        "accepted": true,
+        "outcome": "COMPLETED",
+        "language": "vi",
+        "scores": {
+          "story": 4,
+          "visual": 4,
+          "audio": 5,
+          "continuity": 4,
+          "pacing": 4
+        },
+        "findings": []
+      },
+      {
+        "case": "c12",
+        "split": "HOLDOUT",
+        "label": "CLEAN",
+        "defect": null,
+        "accepted": true,
+        "outcome": "COMPLETED",
+        "language": "vi",
+        "scores": {
+          "story": 4,
+          "visual": 5,
+          "audio": 4,
+          "continuity": 4,
+          "pacing": 4
+        },
+        "findings": [
+          [
+            "MINOR",
+            "VISUAL_001"
+          ],
+          [
+            "MINOR",
+            "SCRIPT_001"
+          ],
+          [
+            "MINOR",
+            "AUDIO_001"
+          ]
+        ]
+      },
+      {
+        "case": "c11",
+        "split": "HOLDOUT",
+        "label": "CLEAN",
+        "defect": null,
+        "accepted": true,
+        "outcome": "COMPLETED",
+        "language": "vi",
+        "scores": {
+          "story": 4,
+          "visual": 5,
+          "audio": 5,
+          "continuity": 4,
+          "pacing": 5
+        },
+        "findings": [
+          [
+            "MINOR",
+            "VISUAL_001"
+          ],
+          [
+            "MINOR",
+            "SCRIPT_002"
+          ]
+        ]
+      },
+      {
+        "case": "c09",
+        "split": "CALIBRATION",
+        "label": "CLEAN",
+        "defect": null,
+        "accepted": true,
+        "outcome": "COMPLETED",
+        "language": "vi",
+        "scores": {
+          "story": 4,
+          "visual": 5,
+          "audio": 4,
+          "continuity": 5,
+          "pacing": 4
+        },
+        "findings": [
+          [
+            "MINOR",
+            "F-001"
+          ]
+        ]
+      },
+      {
+        "case": "c17",
+        "split": "HOLDOUT",
+        "label": "CLEAN",
+        "defect": null,
+        "accepted": false,
+        "outcome": "COMPLETED",
+        "language": "vi",
+        "scores": {
+          "story": 4,
+          "visual": 4,
+          "audio": 5,
+          "continuity": 4,
+          "pacing": 4
+        },
+        "findings": [
+          [
+            "CRITICAL",
+            "FRAME_NOT_ILLUSTRATING_NARRATION"
+          ],
+          [
+            "MINOR",
+            "F1"
+          ]
+        ]
+      },
+      {
+        "case": "c06",
+        "split": "CALIBRATION",
+        "label": "CLEAN",
+        "defect": null,
+        "accepted": true,
+        "outcome": "COMPLETED",
+        "language": "vi",
+        "scores": {
+          "story": 4,
+          "visual": 5,
+          "audio": 5,
+          "continuity": 4,
+          "pacing": 4
+        },
+        "findings": [
+          [
+            "MINOR",
+            "VISUAL_001"
+          ],
+          [
+            "MINOR",
+            "SCRIPT_002"
+          ],
+          [
+            "MINOR",
+            "AUDIO_001"
+          ]
+        ]
+      },
+      {
+        "case": "d18",
+        "split": "CALIBRATION",
+        "label": "CRITICAL_DEFECT",
+        "defect": "UPSIDE_DOWN_FRAMES",
+        "accepted": false,
+        "outcome": "COMPLETED",
+        "language": "vi",
+        "scores": {
+          "story": 4,
+          "visual": 5,
+          "audio": 5,
+          "continuity": 4,
+          "pacing": 4
+        },
+        "findings": [
+          [
+            "CRITICAL",
+            "FRAME_UPSIDE_DOWN"
+          ],
+          [
+            "CRITICAL",
+            "FRAME_NOT_ILLUSTRATING_NARRATION"
+          ],
+          [
+            "MINOR",
+            "VISUAL_001"
+          ],
+          [
+            "MINOR",
+            "AUDIO_001"
+          ],
+          [
+            "MINOR",
+            "CONTINUITY_001"
+          ],
+          [
+            "MINOR",
+            "PHONETIC_001"
+          ]
+        ]
+      },
+      {
+        "case": "d15",
+        "split": "CALIBRATION",
+        "label": "CRITICAL_DEFECT",
+        "defect": "GARBLED_SUBTITLES",
+        "accepted": false,
+        "outcome": "COMPLETED",
+        "language": "vi",
+        "scores": {
+          "story": 4,
+          "visual": 4,
+          "audio": 5,
+          "continuity": 4,
+          "pacing": 4
+        },
+        "findings": [
+          [
+            "CRITICAL",
+            "CHECK_SUBTITLES_GARBLED"
+          ],
+          [
+            "CRITICAL",
+            "CHECK_SUBTITLES_NOT_NARRATION"
+          ]
+        ]
+      },
+      {
+        "case": "d05",
+        "split": "HOLDOUT",
+        "label": "CRITICAL_DEFECT",
+        "defect": "GARBLED_SUBTITLES",
+        "accepted": false,
+        "outcome": "COMPLETED",
+        "language": "vi",
+        "scores": {
+          "story": 4,
+          "visual": 4,
+          "audio": 5,
+          "continuity": 5,
+          "pacing": 4
+        },
+        "findings": [
+          [
+            "CRITICAL",
+            "CHECK_SUBTITLES_GARBLED"
+          ],
+          [
+            "CRITICAL",
+            "CHECK_SUBTITLES_NOT_NARRATION"
+          ]
+        ]
+      },
+      {
+        "case": "c00",
+        "split": "CALIBRATION",
+        "label": "CLEAN",
+        "defect": null,
+        "accepted": true,
+        "outcome": "COMPLETED",
+        "language": "vi",
+        "scores": {
+          "story": 4,
+          "visual": 5,
+          "audio": 5,
+          "continuity": 4,
+          "pacing": 4
+        },
+        "findings": []
+      },
+      {
+        "case": "d09",
+        "split": "HOLDOUT",
+        "label": "CRITICAL_DEFECT",
+        "defect": "TINY_PICTURE_IN_BLACK",
+        "accepted": false,
+        "outcome": "COMPLETED",
+        "language": "vi",
+        "scores": {
+          "story": 4,
+          "visual": 5,
+          "audio": 5,
+          "continuity": 4,
+          "pacing": 4
+        },
+        "findings": [
+          [
+            "CRITICAL",
+            "CHECK_PICTURE_NOT_FILLING_FRAME"
+          ],
+          [
+            "CRITICAL",
+            "FRAME_UPSIDE_DOWN"
+          ],
+          [
+            "MINOR",
+            "VISUAL_001"
+          ],
+          [
+            "MINOR",
+            "AUDIO_002"
+          ],
+          [
+            "MINOR",
+            "AUDIO_003"
+          ],
+          [
+            "MINOR",
+            "CONTINUITY_004"
+          ]
+        ]
+      },
+      {
+        "case": "d14",
+        "split": "CALIBRATION",
+        "label": "CRITICAL_DEFECT",
+        "defect": "NOISE_CORRUPTION",
+        "accepted": false,
+        "outcome": "COMPLETED",
+        "language": "vi",
+        "scores": {
+          "story": 4,
+          "visual": 4,
+          "audio": 5,
+          "continuity": 4,
+          "pacing": 4
+        },
+        "findings": [
+          [
+            "CRITICAL",
+            "FRAME_BROKEN"
+          ],
+          [
+            "CRITICAL",
+            "FRAME_UPSIDE_DOWN"
+          ],
+          [
+            "CRITICAL",
+            "FRAME_NOT_ILLUSTRATING_NARRATION"
+          ]
+        ]
+      },
+      {
+        "case": "d17",
+        "split": "CALIBRATION",
+        "label": "CRITICAL_DEFECT",
+        "defect": "PLACEHOLDER_TEXT",
+        "accepted": false,
+        "outcome": "COMPLETED",
+        "language": "vi",
+        "scores": {
+          "story": 4,
+          "visual": 4,
+          "audio": 4,
+          "continuity": 4,
+          "pacing": 4
+        },
+        "findings": [
+          [
+            "CRITICAL",
+            "CHECK_PLACEHOLDER_TEXT"
+          ],
+          [
+            "CRITICAL",
+            "FRAME_NOT_ILLUSTRATING_NARRATION"
+          ]
+        ]
+      },
+      {
+        "case": "d07",
+        "split": "HOLDOUT",
+        "label": "CRITICAL_DEFECT",
+        "defect": "PLACEHOLDER_TEXT",
+        "accepted": false,
+        "outcome": "COMPLETED",
+        "language": "vi",
+        "scores": {
+          "story": 4,
+          "visual": 4,
+          "audio": 4,
+          "continuity": 4,
+          "pacing": 4
+        },
+        "findings": [
+          [
+            "CRITICAL",
+            "CHECK_PLACEHOLDER_TEXT"
+          ]
+        ]
+      },
+      {
+        "case": "c13",
+        "split": "HOLDOUT",
+        "label": "CLEAN",
+        "defect": null,
+        "accepted": true,
+        "outcome": "COMPLETED",
+        "language": "vi",
+        "scores": {
+          "story": 4,
+          "visual": 5,
+          "audio": 5,
+          "continuity": 4,
+          "pacing": 4
+        },
+        "findings": []
+      },
+      {
+        "case": "c16",
+        "split": "HOLDOUT",
+        "label": "CLEAN",
+        "defect": null,
+        "accepted": true,
+        "outcome": "COMPLETED",
+        "language": "vi",
+        "scores": {
+          "story": 4,
+          "visual": 4,
+          "audio": 5,
+          "continuity": 4,
+          "pacing": 4
+        },
+        "findings": [
+          [
+            "MINOR",
+            "VISUAL_001"
+          ],
+          [
+            "MINOR",
+            "AUDIO_001"
+          ]
+        ]
+      },
+      {
+        "case": "d16",
+        "split": "CALIBRATION",
+        "label": "CRITICAL_DEFECT",
+        "defect": "COLOR_BARS_PLACEHOLDER",
+        "accepted": false,
+        "outcome": "COMPLETED",
+        "language": "vi",
+        "scores": {
+          "story": 4,
+          "visual": 3,
+          "audio": 5,
+          "continuity": 4,
+          "pacing": 4
+        },
+        "findings": [
+          [
+            "CRITICAL",
+            "FRAME_BROKEN"
+          ],
+          [
+            "CRITICAL",
+            "FRAME_UPSIDE_DOWN"
+          ],
+          [
+            "CRITICAL",
+            "FRAME_NOT_ILLUSTRATING_NARRATION"
+          ]
+        ]
+      },
+      {
+        "case": "c15",
+        "split": "HOLDOUT",
+        "label": "CLEAN",
+        "defect": null,
+        "accepted": true,
+        "outcome": "COMPLETED",
+        "language": "vi",
+        "scores": {
+          "story": 4,
+          "visual": 5,
+          "audio": 4,
+          "continuity": 4,
+          "pacing": 4
+        },
+        "findings": []
+      },
+      {
+        "case": "c02",
+        "split": "CALIBRATION",
+        "label": "CLEAN",
+        "defect": null,
+        "accepted": true,
+        "outcome": "COMPLETED",
+        "language": "vi",
+        "scores": {
+          "story": 4,
+          "visual": 5,
+          "audio": 5,
+          "continuity": 4,
+          "pacing": 4
+        },
+        "findings": [
+          [
+            "MINOR",
+            "VISUAL_001"
+          ],
+          [
+            "MINOR",
+            "AUDIO_001"
+          ]
+        ]
+      },
+      {
+        "case": "d10",
+        "split": "CALIBRATION",
+        "label": "CRITICAL_DEFECT",
+        "defect": "WRONG_LANGUAGE_SUBTITLES",
+        "accepted": false,
+        "outcome": "COMPLETED",
+        "language": "vi",
+        "scores": {
+          "story": 4,
+          "visual": 5,
+          "audio": 5,
+          "continuity": 4,
+          "pacing": 4
+        },
+        "findings": [
+          [
+            "CRITICAL",
+            "CHECK_SUBTITLES_NOT_VIETNAMESE"
+          ],
+          [
+            "CRITICAL",
+            "CHECK_SUBTITLES_NOT_NARRATION"
+          ],
+          [
+            "MINOR",
+            "VISUAL_001"
+          ],
+          [
+            "MINOR",
+            "SCRIPT_002"
+          ]
+        ]
+      },
+      {
+        "case": "d08",
+        "split": "HOLDOUT",
+        "label": "CRITICAL_DEFECT",
+        "defect": "UPSIDE_DOWN_FRAMES",
+        "accepted": false,
+        "outcome": "COMPLETED",
+        "language": "vi",
+        "scores": {
+          "story": 4,
+          "visual": 5,
+          "audio": 5,
+          "continuity": 4,
+          "pacing": 4
+        },
+        "findings": [
+          [
+            "CRITICAL",
+            "FRAME_UPSIDE_DOWN"
+          ],
+          [
+            "MINOR",
+            "VISUAL_001"
+          ]
+        ]
+      },
+      {
+        "case": "c07",
+        "split": "CALIBRATION",
+        "label": "CLEAN",
+        "defect": null,
+        "accepted": true,
+        "outcome": "COMPLETED",
+        "language": "vi",
+        "scores": {
+          "story": 4,
+          "visual": 4,
+          "audio": 5,
+          "continuity": 4,
+          "pacing": 4
+        },
+        "findings": [
+          [
+            "MINOR",
+            "VISUAL_001"
+          ],
+          [
+            "MINOR",
+            "SCRIPT_002"
+          ]
+        ]
+      },
+      {
+        "case": "c18",
+        "split": "HOLDOUT",
+        "label": "CLEAN",
+        "defect": null,
+        "accepted": true,
+        "outcome": "COMPLETED",
+        "language": "vi",
+        "scores": {
+          "story": 4,
+          "visual": 5,
+          "audio": 5,
+          "continuity": 4,
+          "pacing": 4
+        },
+        "findings": [
+          [
+            "MINOR",
+            "VISUAL_001"
+          ],
+          [
+            "MINOR",
+            "AUDIO_002"
+          ],
+          [
+            "MINOR",
+            "CONTINUITY_003"
+          ],
+          [
+            "MINOR",
+            "PHONETIC_004"
+          ]
+        ]
+      },
+      {
+        "case": "c01",
+        "split": "CALIBRATION",
+        "label": "CLEAN",
+        "defect": null,
+        "accepted": true,
+        "outcome": "COMPLETED",
+        "language": "vi",
+        "scores": {
+          "story": 4,
+          "visual": 5,
+          "audio": 5,
+          "continuity": 4,
+          "pacing": 4
+        },
+        "findings": []
+      },
+      {
+        "case": "d01",
+        "split": "HOLDOUT",
+        "label": "CRITICAL_DEFECT",
+        "defect": "NARRATION_FROM_OTHER_STORY",
+        "accepted": false,
+        "outcome": "COMPLETED",
+        "language": "vi",
+        "scores": {
+          "story": 4,
+          "visual": 5,
+          "audio": 5,
+          "continuity": 4,
+          "pacing": 4
+        },
+        "findings": [
+          [
+            "CRITICAL",
+            "FRAME_NOT_ILLUSTRATING_NARRATION"
+          ]
+        ]
+      },
+      {
+        "case": "d12",
+        "split": "CALIBRATION",
+        "label": "CRITICAL_DEFECT",
+        "defect": "BLACK_FRAMES",
+        "accepted": false,
+        "outcome": "COMPLETED",
+        "language": "vi",
+        "scores": {
+          "story": 4,
+          "visual": 4,
+          "audio": 5,
+          "continuity": 4,
+          "pacing": 4
+        },
+        "findings": [
+          [
+            "CRITICAL",
+            "CHECK_BLACK_PICTURE"
+          ],
+          [
+            "CRITICAL",
+            "FRAME_BROKEN"
+          ],
+          [
+            "CRITICAL",
+            "FRAME_NOT_ILLUSTRATING_NARRATION"
+          ]
+        ]
+      },
+      {
+        "case": "d03",
+        "split": "HOLDOUT",
+        "label": "CRITICAL_DEFECT",
+        "defect": "IMAGES_FROM_OTHER_STORY",
+        "accepted": false,
+        "outcome": "COMPLETED",
+        "language": "vi",
+        "scores": {
+          "story": 4,
+          "visual": 4,
+          "audio": 5,
+          "continuity": 4,
+          "pacing": 4
+        },
+        "findings": [
+          [
+            "CRITICAL",
+            "FRAME_NOT_ILLUSTRATING_NARRATION"
+          ]
+        ]
+      },
+      {
+        "case": "d02",
+        "split": "HOLDOUT",
+        "label": "CRITICAL_DEFECT",
+        "defect": "BLACK_FRAMES",
+        "accepted": false,
+        "outcome": "COMPLETED",
+        "language": "vi",
+        "scores": {
+          "story": 4,
+          "visual": 4,
+          "audio": 5,
+          "continuity": 4,
+          "pacing": 4
+        },
+        "findings": [
+          [
+            "CRITICAL",
+            "CHECK_BLACK_PICTURE"
+          ],
+          [
+            "CRITICAL",
+            "FRAME_BROKEN"
+          ]
+        ]
+      }
+    ]
+  }
+}

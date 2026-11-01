@@ -1,0 +1,35 @@
+{
+  "title": "Con Đường Lên Trường",
+  "scenes": [
+    {
+      "narration": "Hằng ngày, em gái tôi phải đi bộ mười cây số sương mù để đến trường.",
+      "narration_en": "Every day, my younger sister walks ten kilometers through the mist to get to school.",
+      "image_prompt": "Vertical cinematic shot of a poor Vietnamese teenage girl in Sapa wearing worn-out clothes and carrying a heavy backpack. She is walking on a narrow mountain path covered in morning fog at dawn, soft blue lighting, realistic texture."
+    },
+    {
+      "narration": "Bàn chân trần nứt nẻ của em chạm đất lạnh, nhưng đôi mắt vẫn sáng rực niềm hy vọng.",
+      "narration_en": "Her bare, cracked feet touch the cold ground, yet her eyes shine brightly with hope.",
+      "image_prompt": "Vertical cinematic close-up of the girl's muddy and cracked bare feet stepping on wet moss. Soft morning sunlight filters through pine trees in Sapa background, focusing on determined facial expression."
+    },
+    {
+      "narration": "Khi trời mưa tầm tã, em dùng chiếc áo cũ xộc xệch che chắn cho sách vở quý giá.",
+      "narration_en": "When it rains heavily, she uses her old ragged shirt to shield the precious books inside her bag.",
+      "image_prompt": "Vertical cinematic shot of rain pouring down in Sapa forest. The girl huddles under a tattered blue shirt protecting a stack of textbooks wrapped in plastic on her back, steam rising from cold air."
+    },
+    {
+      "narration": "Mỗi bước chân là một thử thách, nhưng em biết mình đang chạy theo giấc mơ.",
+      "narration_en": "Every step is a challenge, but she knows she is running towards her dream.",
+      "image_prompt": "Vertical cinematic low-angle shot of the girl climbing steep rocky steps in Sapa. Her face shows exhaustion mixed with determination, golden hour sunlight breaking through clouds illuminating dust particles."
+    },
+    {
+      "narration": "Khi đến trường, nụ cười hớn hở của em làm tan chảy cả những cô giáo già.",
+      "narration_en": "When reaching school, her huge smile melts even the hearts of old teachers.",
+      "image_prompt": "Vertical cinematic shot inside a rustic wooden classroom in Sapa. The girl stands at the door soaking wet but smiling broadly, sunlight streaming through window highlighting tears and joy."
+    },
+    {
+      "narration": "Tình thương của mọi người sẽ dẫn em đến thành công, dù con đường còn dài bao la.",
+      "narration_en": "Love from everyone will lead her to success, even though the road is still vast.",
+      "image_prompt": "Vertical cinematic wide shot of a group of diverse people (teachers and villagers) standing in front of a school building in Sapa holding warm clothes for the girl. Warm golden lighting at sunset."
+    }
+  ]
+}

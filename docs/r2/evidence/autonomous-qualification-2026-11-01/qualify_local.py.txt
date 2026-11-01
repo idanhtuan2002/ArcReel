@@ -1,0 +1,90 @@
+"""Run both candidate reviewers over the blind corpus with the production reviewer and print the qualification."""
+
+import asyncio
+import os
+import json
+import sys
+import time
+from pathlib import Path
+
+import httpx
+from r2.automation.profiles import reviewer_is_qualified
+from r2.contracts.automation import ModelRoute
+from scripts.r2.qualify_reviewers import qualify
+from server.production_run.evaluators import OllamaReviewer
+
+ROOT = Path(__file__).parent
+OLLAMA = "http://127.0.0.1:11434"
+
+
+def identity(model: str) -> str:
+    tags = httpx.get(f"{OLLAMA}/api/tags", timeout=10).json()["models"]
+    return f"ollama/{model}@sha256:" + next(m["digest"] for m in tags if m["name"] == model)
+
+
+async def base_url(_provider: str) -> str:
+    return OLLAMA
+
+
+async def main(models: list[str]) -> None:
+    full = {c["case_id"]: c for c in json.loads((ROOT / "manifest.full.json").read_text())["cases"]}
+    summary = {}
+    for model in models:
+        route = ModelRoute(
+            role="reviewer_a",
+            provider_id="custom-1",
+            model_id=model,
+            model_identity=identity(model),
+            config_digest="sha256:" + "0" * 64,
+            local=True,
+            paid=False,
+            currency="USD",
+            max_cost_per_call=None,
+        )
+        out = ROOT / os.environ.get("REVIEWS", "reviews") / model.replace(":", "_")
+        started = time.monotonic()
+        record = await qualify(
+            corpus=ROOT / os.environ.get("CORPUS", "manifest.json"),
+            route=route,
+            evaluator=OllamaReviewer(base_url_for=base_url),
+            output=out,
+            profile_digest="sha256:" + "0" * 64,
+            launch_profile_id="fiction_narration_vi_v1",
+            language="vi",
+        )
+        rows = []
+        for case in record.cases:
+            review = json.loads((out / case.receipt_ref).read_text())
+            cid = case.receipt_ref.split(".")[0]
+            rows.append(
+                {
+                    "case": cid,
+                    "split": case.split,
+                    "label": case.label,
+                    "defect": full[cid].get("defect"),
+                    "accepted": case.accepted,
+                    "outcome": review["outcome"],
+                    "language": review.get("language"),
+                    "scores": review.get("scores"),
+                    "findings": [(f["severity"], f["code"]) for f in review.get("findings") or []],
+                }
+            )
+        summary[model] = {
+            "qualified": reviewer_is_qualified(record),
+            "seconds": round(time.monotonic() - started, 1),
+            "rows": rows,
+        }
+        print(model, "qualified:", summary[model]["qualified"], summary[model]["seconds"], "s", flush=True)
+        for split in ("CALIBRATION", "HOLDOUT"):
+            clean = [r for r in rows if r["split"] == split and r["label"] == "CLEAN"]
+            bad = [r for r in rows if r["split"] == split and r["label"] != "CLEAN"]
+            print(
+                f"  {split}: clean accepted {sum(r['accepted'] for r in clean)}/{len(clean)}, "
+                f"defects accepted {sum(r['accepted'] for r in bad)}/{len(bad)}",
+                flush=True,
+            )
+    (ROOT / f"qualification-{int(time.time())}.json").write_text(json.dumps(summary, ensure_ascii=False, indent=2))
+
+
+if __name__ == "__main__":
+    asyncio.run(main(sys.argv[1:] or ["qwen2.5vl:7b", "gemma3:4b"]))

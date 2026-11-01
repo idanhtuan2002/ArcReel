@@ -1,0 +1,35 @@
+{
+  "title": "Cuối Cùng Của Dòng Rơi",
+  "scenes": [
+    {
+      "narration": "Gần sáu mươi năm, anh già vẫn đứng giữa vùng nước phản chiếu nắng chiều vàng óng.",
+      "narration_en": "After sixty years, the old man stands in water reflecting golden evening sunlight.",
+      "image_prompt": "Vertical cinematic shot of an elderly Vietnamese puppeteer with weathered skin and white hair standing at edge of traditional wooden stage. Background shows Hanoian river village scenery during sunset. Warm golden hour lighting illuminating his face."
+    },
+    {
+      "narration": "'Đây là vở diễn cuối cùng,' anh khẽ nói khi đôi tay run rẩy nâng con rối cá chép.",
+      "narration_en": "\"This is the final performance,\" he whispers softly as trembling hands lift a carp puppet.",
+      "image_prompt": "Close-up vertical shot of elderly man's weathered hands holding intricate bamboo marionette fish. Background shows blurred traditional Vietnamese water puppet stage with gentle ripples in river setting during twilight."
+    },
+    {
+      "narration": "'Nước chảy, người đi,' nhưng tiếng trống trận vẫn vang vọng trong tim mỗi khán giả nhỏ bé.",
+      "narration_en": "\"Water flows, people leave,\" but the battle drum echoes within every small audience member's heart.",
+      "image_prompt": "Medium vertical shot showing elderly puppeteer operating marionettes on traditional wooden stage. Audience includes children and elderly locals watching intently in rustic Vietnamese theater setting during evening performance."
+    },
+    {
+      "narration": "'Con rối sẽ nghỉ ngơi, nhưng nghệ thuật này vẫn sống mãi qua những giọt mồ hôi hôm nay.'",
+      "narration_en": "\"The puppets will rest,\" but this art lives on through today's sweat drops.",
+      "image_prompt": "Emotional close-up vertical shot of elderly puppeteer wiping forehead with towel while operating marionettes. Traditional Vietnamese water stage background shows dramatic lighting highlighting determined expression during climactic performance moment."
+    },
+    {
+      "narration": "'Đêm nay, khi màn hạ xuống, một kỷ nguyên sẽ khép lại với nụ cười của đứa con trai út.'",
+      "narration_en": "\"Tonight as the curtain falls,\" an era ends with youngest son's smile.",
+      "image_prompt": "Wide vertical shot showing traditional Vietnamese water puppet stage during final performance. Elderly master stands center surrounded by young apprentice and local audience members clapping warmly under dramatic evening lighting."
+    },
+    {
+      "narration": "'Chào tạm biệt dòng nước, anh già quay lưng bước đi giữa tiếng vỗ tay giòn giã của làng quê.'",
+      "narration_en": "\"Goodbye to the water stream,\" old man walks away amid village applause.",
+      "image_prompt": "Back view vertical shot of elderly puppeteer walking across traditional wooden stage after performance. Silhouette against dramatic sunset sky showing Hanoian river village landscape with audience waving goodbye in foreground."
+    }
+  ]
+}

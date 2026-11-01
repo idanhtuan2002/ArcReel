@@ -1,0 +1,41 @@
+"""Generate one FLUX.2 klein image through the local ComfyUI API."""
+import json, sys, time, urllib.request, uuid
+
+BASE = "http://127.0.0.1:8188"
+
+def workflow(prompt: str, seed: int, prefix: str, w: int = 576, h: int = 1024) -> dict:
+    return {
+        "1": {"class_type": "UnetLoaderGGUF", "inputs": {"unet_name": "flux-2-klein-4b-Q4_K_M.gguf"}},
+        "2": {"class_type": "CLIPLoaderGGUF", "inputs": {"clip_name": "Qwen3-4B-Q4_K_M.gguf", "type": "flux2"}},
+        "3": {"class_type": "VAELoader", "inputs": {"vae_name": "flux2-vae.safetensors"}},
+        "4": {"class_type": "CLIPTextEncode", "inputs": {"clip": ["2", 0], "text": prompt}},
+        "5": {"class_type": "ConditioningZeroOut", "inputs": {"conditioning": ["4", 0]}},
+        "6": {"class_type": "CFGGuider", "inputs": {"model": ["1", 0], "positive": ["4", 0], "negative": ["5", 0], "cfg": 1.0}},
+        "7": {"class_type": "KSamplerSelect", "inputs": {"sampler_name": "euler"}},
+        "8": {"class_type": "Flux2Scheduler", "inputs": {"steps": 4, "width": w, "height": h}},
+        "9": {"class_type": "EmptyFlux2LatentImage", "inputs": {"width": w, "height": h, "batch_size": 1}},
+        "10": {"class_type": "RandomNoise", "inputs": {"noise_seed": seed}},
+        "11": {"class_type": "SamplerCustomAdvanced", "inputs": {"noise": ["10", 0], "guider": ["6", 0], "sampler": ["7", 0], "sigmas": ["8", 0], "latent_image": ["9", 0]}},
+        "12": {"class_type": "VAEDecode", "inputs": {"samples": ["11", 0], "vae": ["3", 0]}},
+        "13": {"class_type": "SaveImage", "inputs": {"images": ["12", 0], "filename_prefix": prefix}},
+    }
+
+def generate(prompt: str, seed: int, out_path: str) -> None:
+    body = json.dumps({"prompt": workflow(prompt, seed, "corpus/" + uuid.uuid4().hex), "client_id": "corpus"}).encode()
+    pid = json.load(urllib.request.urlopen(urllib.request.Request(BASE + "/prompt", body, {"Content-Type": "application/json"})))["prompt_id"]
+    while True:
+        hist = json.load(urllib.request.urlopen(f"{BASE}/history/{pid}"))
+        if pid in hist:
+            entry = hist[pid]
+            if entry.get("status", {}).get("status_str") == "error":
+                raise RuntimeError(json.dumps(entry["status"])[:800])
+            img = entry["outputs"]["13"]["images"][0]
+            q = urllib.parse.urlencode({"filename": img["filename"], "subfolder": img["subfolder"], "type": img["type"]})
+            with urllib.request.urlopen(f"{BASE}/view?{q}") as r, open(out_path, "wb") as f:
+                f.write(r.read())
+            return
+        time.sleep(1)
+
+if __name__ == "__main__":
+    import urllib.parse  # noqa
+    t = time.time(); generate(sys.argv[1], int(sys.argv[2]), sys.argv[3]); print(f"ok {time.time()-t:.1f}s")

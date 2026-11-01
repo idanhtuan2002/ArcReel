@@ -1,0 +1,35 @@
+{
+  "title": "Lửa Sáng Cuối Cùng",
+  "scenes": [
+    {
+      "narration": "Gió lùa qua mái ngói cũ, người lão thợ đèn lồng ngồi lặng lẽ bên đống giấy màu.",
+      "narration_en": "Wind blew through the old roof tiles as the last lantern maker sat quietly by piles of colored paper.",
+      "image_prompt": "Vertical cinematic shot. An elderly Vietnamese craftsman with weathered face and white hair, wearing a faded blue tunic, sitting in a rustic workshop filled with stacks of red and gold paper lanterns. Warm dim lighting from an oil lamp illuminates dust motes dancing in the air. Background shows traditional wooden beams and hanging unfinished lanterns."
+    },
+    {
+      "narration": "Cháu nội nghịch ngợm chạy vào, tay cầm cành cây khô định quậy tung đống nguyên liệu quý giá.",
+      "narration_en": "A mischievous grandchild ran in waving a dry branch to mess up the precious materials.",
+      "image_prompt": "Vertical cinematic shot. Young Vietnamese boy with messy black hair and dirty clothes rushing into frame, holding a long stick menacingly towards the lantern maker who looks on calmly but sadly. The workshop background remains same with warm ambient light contrasting the chaotic movement of the child."
+    },
+    {
+      "narration": "\"Con hư lắm,\" lão thở dài nhưng vẫn dịu dàng bắt cháu ngồi xuống cạnh người mình.",
+      "narration_en": "'You are very naughty,' he sighed gently while coaxing his grandson to sit beside him.",
+      "image_prompt": "Vertical cinematic close-up. Elderly craftsman's wrinkled hands carefully stroking the boy's head affectionately as they both look at a half-finished lantern on the table between them. Soft golden light wraps around their faces, highlighting the contrast between the old man's gentle eyes and the child's curious gaze."
+    },
+    {
+      "narration": "Lão tỉ mỉ gấp từng lớp giấy mỏng, ngón tay run rẩy vì tuổi già truyền kỹ năng cuối cùng cho cháu.",
+      "narration_en": "He meticulously folded thin layers of paper, his trembling old hands teaching the final skill to his grandson.",
+      "image_prompt": "Vertical cinematic over-the-shoulder shot. Focus on elderly man's weathered fingers folding a delicate red silk lantern layer while young boy watches intently with wide eyes mirroring the gesture. Background softly blurred showing rows of colorful lanterns glowing faintly in twilight atmosphere."
+    },
+    {
+      "narration": "Đêm đến, hàng trăm chiếc đèn lồng rực rỡ được thắp sáng trên phố cổ vang tiếng reo hò của cả làng.",
+      "narration_en": "Night fell as hundreds of bright lanterns lit up the ancient street with villagers cheering loudly.",
+      "image_prompt": "Vertical cinematic wide shot. Vibrant night scene showing countless colorful paper lanterns floating above cobblestone streets in historic Vietnamese village at twilight. Silhouettes of smiling villagers holding baskets of glowing lights against starry sky backdrop creating magical bokeh effect."
+    },
+    {
+      "narration": "Lão nhắm mắt mỉm cười, biết nghề này giờ đã sống mãi trong tim đứa cháu nhỏ.",
+      "narration_en": "The old man closed his eyes smiling knowing this craft would live forever in the heart of the little boy now.",
+      "image_prompt": "Vertical cinematic intimate portrait. Elderly craftsman sitting peacefully on wooden stool holding young grandson who is trying to light a small lantern for him both bathed in warm candlelight glow with serene expressions showing intergenerational bond."
+    }
+  ]
+}

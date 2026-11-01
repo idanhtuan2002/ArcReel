@@ -1,0 +1,30 @@
+{
+  "title": "Đêm mưa bão và sự sống",
+  "scenes": [
+    {
+      "narration": "Bão táp đêm nay, bác sĩ trẻ chạy vội vào trạm y tế vùng cao đầy lo lắng.",
+      "narration_en": "In the stormy night tonight, a young doctor rushes into the mountain health station full of worry.",
+      "image_prompt": "Cinematic vertical shot. A determined but tired young Vietnamese male doctor in white scrubs running through mud and rain towards an old wooden clinic at dusk. Heavy monsoon rain streaks everywhere. Dim warm light leaks from broken windows behind him. Dark stormy sky with lightning flashes illuminating his face."
+    },
+    {
+      "narration": "Trong phòng sinh简陋, sản phụ đau đớn kêu gào giữa tiếng sấm rền vang ngoài trời.",
+      "narration_en": "In the shabby delivery room, the mother screams in pain amidst thunder booming outside.",
+      "image_prompt": "Cinematic vertical shot inside a rustic wooden clinic. A young Vietnamese male doctor holding hands with an anxious pregnant woman on a thin cot. Rain pours heavily through gaps in walls creating blue-tinted lighting. Warm candlelight flickers on their faces contrasting the dark storm."
+    },
+    {
+      "narration": "Bác sĩ khẩn trương chuẩn bị dụng cụ, tay run nhưng ánh mắt kiên định nhìn vào đứa bé.",
+      "narration_en": "The doctor urgently prepares instruments; his hands tremble but eyes remain firm on the baby.",
+      "image_prompt": "Cinematic vertical close-up. Young Vietnamese male doctor's face illuminated by flickering candlelight and emergency lamp glow. Sweat drips from forehead, intense focus in eyes looking slightly off-camera at a newborn. Rain visible as blurred streaks near window frame."
+    },
+    {
+      "narration": "Đứa bé cất tiếng khóc đầu tiên, xua tan sợ hãi khi bác sĩ nhẹ nhàng đặt nó vào lòng mẹ.",
+      "narration_en": "The baby cries for the first time, dispelling fear as doctor gently places it into mother's arms.",
+      "image_prompt": "Cinematic vertical medium shot. Young Vietnamese male doctor handing a swaddled newborn to an exhausted pregnant woman on wooden bed. Soft golden glow from oil lamp highlights their tearful relieved faces against dark rainy background."
+    },
+    {
+      "narration": "Sấm chớp dần tắt, bác sĩ ngồi xuống thở dài nhẹ nhõm sau đêm mưa bão nguy hiểm này.",
+      "narration_en": "Thunder fades; doctor sits down sighing with relief after this dangerous stormy night.",
+      "image_prompt": "Cinematic vertical shot. Young Vietnamese male doctor sitting on small stool beside wooden bed looking exhausted but peaceful at dawn light coming through window. Outside rain stops showing green mountains emerging from mist."
+    }
+  ]
+}

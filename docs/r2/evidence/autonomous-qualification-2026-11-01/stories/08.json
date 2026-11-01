@@ -1,0 +1,35 @@
+{
+  "title": "Hương Xôi Ấm",
+  "scenes": [
+    {
+      "narration": "Dưới nắng sớm, bà cụ lặng lẽ nhào nặn từng chiếc xôi thơm phức cho khu phố.",
+      "narration_en": "Under the morning sun, the old lady silently kneaded fragrant sticky rice for the neighborhood.",
+      "image_prompt": "Vertical cinematic shot of an elderly Vietnamese woman in a checkered apron steaming hot sticky rice at a street stall early morning. Soft golden sunlight illuminates her weathered face and steam rising from bamboo baskets. Consistent character design showing gray hair tied back, warm expression. No text on image."
+    },
+    {
+      "narration": "Một bé trai nhỏ lén nép vào góc bếp để ăn chung với bà mỗi sáng.",
+      "narration_en": "A small boy quietly hid in the corner of the kitchen to eat with her every morning.",
+      "image_prompt": "Vertical cinematic shot from over-the-shoulder perspective showing a tiny barefoot child hiding behind a bamboo steam basket, peeking at the old lady. Warm ambient light filters through open wooden windows revealing traditional Vietnamese street scene background. Consistent character design for both characters. No text on image."
+    },
+    {
+      "narration": "Hàng năm, bà luôn để một phần xôi ngon nhất bên chiếc bát vỡ của bé.",
+      "narration_en": "Every year, she left the best portion of sticky rice beside his broken bowl for him.",
+      "image_prompt": "Vertical cinematic close-up of a small child's face looking up hopefully at an old lady placing food into a chipped ceramic bowl. Soft natural lighting highlighting texture of wooden table and steam rising from bowls showing traditional Vietnamese street stall setting with consistent character designs. No text on image."
+    },
+    {
+      "narration": "Năm ấy mưa lớn, người dân phát hiện bé đã qua đời nhưng bà vẫn nấu xôi như thường.",
+      "narration_en": "That rainy year, neighbors found the child had passed away but she still cooked rice as usual.",
+      "image_prompt": "Vertical cinematic shot of heavy rain pouring outside a small Vietnamese house while an old lady stands silently by her cooking stove inside wearing wet clothes. Dim moody lighting contrasts with warm glow from fire pit showing consistent character design for elderly woman in traditional apron under storm clouds. No text on image."
+    },
+    {
+      "narration": "Giờ đây phố xá thay đổi, nhưng hương vị xôi của bà vẫn giữ nguyên vẹn.",
+      "narration_en": "Now streets have changed but her rice flavor remains exactly the same as before.",
+      "image_prompt": "Vertical cinematic wide shot of modern Vietnamese street with old lady's small stall remaining unchanged in center frame. Gentle golden hour sunlight reflects off wet pavement showing steam rising from traditional bamboo baskets while consistent character design shows elderly woman tending fire pit surrounded by blurred city life background. No text on image."
+    },
+    {
+      "narration": "Người ta bảo rằng linh hồn bé trai ấy vẫn thường xuyên đến giúp bà bán hàng mỗi ngày.",
+      "narration_en": "People say the boy's soul still comes daily to help her sell goods every day.",
+      "image_prompt": "Vertical cinematic shot of elderly woman smiling gently at empty space beside cooking stove where faint translucent silhouette of small child appears briefly. Warm magical lighting creates soft glow around figure showing traditional Vietnamese street stall setting with consistent character designs and no text overlay."
+    }
+  ]
+}

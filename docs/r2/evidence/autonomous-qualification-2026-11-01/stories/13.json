@@ -1,0 +1,35 @@
+{
+  "title": "Chân Không Nắng Trên Yên Tử",
+  "scenes": [
+    {
+      "narration": "Giữa rừng già Yên tử, tuyết rơi trắng xóa bao phủ cả đỉnh núi.",
+      "narration_en": "Deep in Yen Tu forest, snow falls heavily covering the mountain peak.",
+      "image_prompt": "Cinematic vertical shot of a young Vietnamese Buddhist monk with simple brown robes walking through deep fresh snow on Mount Yen Thu. He carries a wooden staff and looks concerned. Background features ancient pine trees heavy with white snow under soft blue twilight lighting. No text."
+    },
+    {
+      "narration": "Đột nhiên, sư trụ trì dừng lại khi nghe tiếng kêu yếu ớt từ bụi cây.",
+      "narration_en": "Suddenly the monk stops upon hearing a weak cry coming from the bushes.",
+      "image_prompt": "Close-up vertical shot of the same young Vietnamese Buddhist monk kneeling in snow. His face shows compassion and worry. Nearby bush reveals a small injured deer with visible wounds shivering in cold light. Soft focus background, natural daylight mixed with falling snowflakes."
+    },
+    {
+      "narration": "Sông sư cởi áo đắp lên mình hươu rồi dùng tay ấm che chắn gió lạnh.",
+      "narration_en": "The monk removes his outer robe to wrap around the deer and uses his warm hands to shield it from the cold wind.",
+      "image_prompt": "Medium vertical shot showing the young Vietnamese Buddhist monk gently wrapping his brown monastic robes around a small injured deer. Snow is falling softly around them. His expression is tender and protective while holding wood bowl nearby for water or medicine."
+    },
+    {
+      "narration": "Con hươu dần bình phục, đôi mắt long lanh nhìn sư với sự biết ơn sâu sắc.",
+      "narration_en": "The deer gradually recovers its eyes shining with deep gratitude looking at the monk.",
+      "image_prompt": "Close-up vertical shot of the healed small deer standing beside the young Vietnamese Buddhist monk. Both are covered in light snow but appear warm and safe now. Deer's large dark eyes reflect kindness, monks face shows peaceful smile."
+    },
+    {
+      "narration": "Sư tiễn con hươu về rừng và tiếp tục lên núi với tâm hồn thanh thản hơn.",
+      "narration_en": "The monk sends the deer back to forest and continues climbing mountain with calmer spirit.",
+      "image_prompt": "Wide vertical shot of young Vietnamese Buddhist monk walking away into snow-covered pine forests on Mount Yen Thu. Deer is seen in distance returning home safely. Golden hour sunlight breaks through clouds illuminating both figures creating hopeful atmosphere."
+    },
+    {
+      "narration": "Trên đỉnh núi, bình minh lên tỏa ánh sáng ấm áp làm tan hết băng giá.",
+      "narration_en": "At mountain peak morning rises spreading warm light melting all frost away.",
+      "image_prompt": "Epic vertical shot of sunrise over Mount Yen Thu with golden rays breaking through clouds. Young Vietnamese Buddhist monk stands peacefully on path looking out at vast snowy landscape transformed by dawn. Snow glistens warmly around ancient pines creating serene majestic scene."
+    }
+  ]
+}
