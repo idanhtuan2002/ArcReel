@@ -5,10 +5,15 @@ from __future__ import annotations
 import asyncio
 
 import pytest
+import sqlalchemy as sa
 
+from lib.db.models.production_run import ModelObservationModel
+from lib.db.models.quality_dispositions import QualityDispositionModel
 from lib.db.repositories.production_runs import ProductionRunRepository
+from lib.db.repositories.quality_dispositions import QualityDispositionRepository
 from lib.db.repositories.reviewer_qualifications import ReviewerQualificationRepository
 from r2.automation.assessment import AssessmentFinding, ModelAssessment
+from r2.automation.authorization import automation_principal
 from r2.contracts.automation import QualificationCase, ReviewerQualification, RunStage, RunStatus
 from server.production_run.controller import ProductionController
 from server.production_run.final_master_adapter import FinalMasterAdapter
@@ -25,6 +30,35 @@ from tests.integration.server.production_run.test_render_master_adapter import (
 from tests.integration.server.production_run.test_story_adapter import OWNER, Host
 from tests.integration.server.production_run.test_story_adapter import interactive_env as interactive_env
 from tests.integration.server.production_run.test_story_adapter import story_host as story_host
+
+
+@pytest.fixture
+def story_policy():
+    """Publish the automatic quality profile the run's policy names before the run exists."""
+    return _publish_profile
+
+
+async def _publish_profile(sessions) -> dict:
+    from server.services.quality_template import automatic_quality_policy, default_platform_constraints
+    from tests.integration.lib.db.repositories.test_quality_profiles_repository import append
+    from tests.unit.r2.quality.test_quality_profiles import publication_request
+
+    policy = automatic_quality_policy(
+        default_platform_constraints(
+            platform_profile_id="vertical-short",
+            width=576,
+            height=1024,
+            min_duration_ms=30000,
+            max_duration_ms=60000,
+            required_locales=("vi",),
+        )
+    )
+    profile = await append(
+        sessions,
+        publication_request(user_id="default", project_name="project", policy=policy.model_dump(mode="json")),
+    )
+    return {"profile_id": profile.profile_id, "profile_digest": profile.profile_digest}
+
 
 GOOD = dict.fromkeys(("story", "visual", "audio", "continuity", "pacing"), 4)
 
@@ -49,7 +83,7 @@ class Reviewer:
         )
 
 
-def _qualification(route) -> ReviewerQualification:
+def _qualification(route, host) -> ReviewerQualification:
     cases = [
         QualificationCase(
             split=split,
@@ -67,7 +101,7 @@ def _qualification(route) -> ReviewerQualification:
         )
     ]
     return ReviewerQualification(
-        profile_digest="sha256:" + "a" * 64,
+        profile_digest=host.run.policy.profile_digest,
         launch_profile_id="fiction_narration_vi_v1",
         language="vi",
         provider_id=route.provider_id,
@@ -140,7 +174,7 @@ async def _qualify(host):
     async with host.sessions() as session, session.begin():
         for route in host.run.policy.routes:
             if route.role in {"reviewer_a", "reviewer_b"}:
-                await ReviewerQualificationRepository(session).record(_qualification(route))
+                await ReviewerQualificationRepository(session).record(_qualification(route, host))
 
 
 async def test_two_qualified_accepting_reviews_pass_the_final(quality_host):
@@ -153,6 +187,18 @@ async def test_two_qualified_accepting_reviews_pass_the_final(quality_host):
     assert (passed.stage, passed.status, passed.reason) == (RunStage.PACKAGE, RunStatus.RUNNING, None)
     assert sorted(reviewer.calls) == ["reviewer_a", "reviewer_b"]
     assert passed.final_evaluations == 1
+    async with host.sessions() as session:
+        outcome = await ProductionRunRepository(session).stage_outcome(run=passed, stage=RunStage.QUALITY)
+        assert outcome is not None
+        disposition_id = outcome.receipts[0].receipt_ref.partition("@")[2]
+        disposition = await QualityDispositionRepository(session).disposition(
+            user_id="default", project_name="project", disposition_id=disposition_id
+        )
+        observations = list((await session.execute(sa.select(ModelObservationModel))).scalars())
+    assert disposition is not None
+    assert (disposition.decision, disposition.issuer_id) == ("PASS", automation_principal(host.run.run_id))
+    assert disposition.waiver_bindings == ()
+    assert len(observations) == 4
 
 
 async def test_reviewer_exception_never_passes_quality(quality_host):
@@ -188,6 +234,9 @@ async def test_both_rejecting_rework_exactly_the_named_stage(quality_host):
 
     assert (reworked.stage, reworked.status, reworked.generation) == (RunStage.MEDIA, RunStatus.RUNNING, 2)
     assert [(r.stage, r.unit_key, r.count) for r in reworked.repair_counts] == [(RunStage.MEDIA, "episode:1", 1)]
+    async with host.sessions() as session:
+        decisions = [row.decision for row in (await session.execute(sa.select(QualityDispositionModel))).scalars()]
+    assert decisions == ["REWORK"]
 
 
 async def test_a_passed_final_is_packaged_exported_and_the_run_succeeds(quality_host):

@@ -243,3 +243,75 @@ __all__ = [
     "private_digest",
     "quality_policy",
 ]
+
+
+AUTOMATIC_DISAGREEMENT_ID = "r2.disagreement.model-reviewers-block.v1"
+AUTOMATIC_DISAGREEMENT_DIGEST = private_digest(
+    AUTOMATIC_DISAGREEMENT_ID,
+    {"rule": "two model reviewers that disagree block for a Human; never resolved by a model"},
+)
+
+
+def _model_slot(slot_id: str) -> dict[str, Any]:
+    from r2.quality.runs import MODEL_REVIEWER_POLICY_ID, model_reviewer_policy_digest
+
+    return {
+        "slot_id": slot_id,
+        "kind": "NARRATIVE",
+        "assessor_class": "MODEL",
+        "qualification_policy_id": MODEL_REVIEWER_POLICY_ID,
+        "qualification_policy_digest": model_reviewer_policy_digest(),
+        "rule_ids": [REVIEW_RULE_ID],
+        "allowed_applicability_states": ["PASS", "FAIL", "INDETERMINATE"],
+        "producer_conflict_forbidden": True,
+        "required_independence_groups": 2,
+    }
+
+
+def _model_requirement(slot_id: str) -> dict[str, Any]:
+    """One requirement per slot: a reviewer may count in every requirement, never twice in one."""
+    return {
+        "requirement_id": f"auto-review-{slot_id}",
+        "mode": "ALL",
+        "slots": [_model_slot(slot_id)],
+        "minimum_satisfied_slots": 1,
+        "disagreement_policy_id": AUTOMATIC_DISAGREEMENT_ID,
+        "disagreement_policy_digest": AUTOMATIC_DISAGREEMENT_DIGEST,
+        "escalation_requirement_id": None,
+    }
+
+
+def automatic_quality_policy(
+    platform_constraints: dict[str, Any],
+    *,
+    supersession_effect: q.SupersessionEffect = q.SupersessionEffect.REEVALUATE_CURRENT,
+) -> q.QualityPolicyV2:
+    """The automatic production profile: two MODEL narrative slots, each needing two independent qualified reviewer
+    identities; no Human slot and nothing waivable. Technical checks of the final are the native renderer's."""
+    return q.QualityPolicyV2.model_validate(
+        {
+            "schema_id": "m10.quality-policy.v2",
+            "rule_ids": [REVIEW_RULE_ID, REVIEW_FRESHNESS_RULE_ID],
+            "probe_rules": [],
+            "assessment_requirements": [_model_requirement("story"), _model_requirement("audiovisual")],
+            "freshness_rules": [
+                {
+                    "rule_id": REVIEW_FRESHNESS_RULE_ID,
+                    "evidence_kind": "NARRATIVE",
+                    "max_age_seconds": FRESHNESS_SECONDS,
+                    "supersession_effect": supersession_effect,
+                }
+            ],
+            "disposition_rule": {
+                "max_disposition_ttl_seconds": 604800,
+                "max_waiver_ttl_seconds": 86400,
+                "waiverable_rule_ids": [],
+                "non_waiverable_failure_codes": ["IDENTITY_INVALID"],
+            },
+            "accessibility_rules": [],
+            "reference_eligibility_policy_id": REFERENCE_ELIGIBILITY_ID,
+            "reference_eligibility_policy_digest": REFERENCE_ELIGIBILITY_DIGEST,
+            "platform_constraints": platform_constraints,
+            "packaging_waiverable_rule_ids": [],
+        }
+    )

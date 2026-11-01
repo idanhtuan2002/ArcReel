@@ -267,3 +267,21 @@ class ReviewerQualificationModel(Base):
         Index("ix_auto_reviewer_qualification_scope", "profile_digest", "launch_profile_id", "language"),
         *_ceiling("record_json"),
     )
+
+
+class ModelObservationModel(Base):
+    """One MODEL observation produced by a qualified reviewer route for one Quality subject and profile."""
+
+    __tablename__ = "auto_model_observations"
+    user_id: Mapped[str] = mapped_column(String, primary_key=True)
+    project_name: Mapped[str] = mapped_column(String(255), primary_key=True)
+    observation_id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    run_id: Mapped[str] = mapped_column(String(255), nullable=False)
+    profile_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    profile_revision: Mapped[int] = mapped_column(Integer, nullable=False)
+    profile_digest: Mapped[str] = mapped_column(String(71), nullable=False)
+    qualification_digest: Mapped[str] = mapped_column(String(71), nullable=False)
+    observation_digest: Mapped[str] = mapped_column(String(71), nullable=False)
+    observation_json: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    __table_args__ = (*_ceiling("observation_json"),)

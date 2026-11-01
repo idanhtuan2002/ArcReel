@@ -1,7 +1,7 @@
 """Pure M10 run closure and validity projection; sealing records completeness, never acceptability.
 
-Only TECHNICAL/DETERMINISTIC (A4 receipts) and NARRATIVE/HUMAN (qualified showrunner) evidence is
-admitted. Every other kind or assessor class, including FACTUAL, fails closed until an accepted producer
+Only TECHNICAL/DETERMINISTIC (A4 receipts), NARRATIVE/HUMAN (qualified showrunner) and NARRATIVE/MODEL (a stored
+qualified reviewer route) evidence is admitted. Every other kind or assessor class, including FACTUAL, fails closed until an accepted producer
 exists. Callers must re-verify each observation's stored custody before admitting it here.
 """
 
@@ -25,6 +25,12 @@ _HUMAN_SHOWRUNNER_POLICY = {
     "proof": "current signed HUMAN_SHOWRUNNER governance grant for the exact user, project and principal",
     "independence_group": "human:<principal>",
 }
+MODEL_REVIEWER_POLICY_ID = "r2.qualification.model-reviewer.v1"
+_MODEL_REVIEWER_POLICY = {
+    "policy_id": MODEL_REVIEWER_POLICY_ID,
+    "proof": "a stored reviewer qualification of the exact route that meets the 10/10 calibration and hold-out rule",
+    "independence_group": "model:<model identity>",
+}
 _KIND = {
     q.ObservationType.TECHNICAL: q.AssessorKind.TECHNICAL,
     q.ObservationType.FACTUAL: q.AssessorKind.FACTUAL,
@@ -37,6 +43,7 @@ _KIND = {
 _ADMITTED = {
     (q.ObservationType.TECHNICAL, q.AssessorClass.DETERMINISTIC): "m10.technical-observation.v1",
     (q.ObservationType.NARRATIVE, q.AssessorClass.HUMAN): "m10.narrative-observation.v1",
+    (q.ObservationType.NARRATIVE, q.AssessorClass.MODEL): "m10.narrative-observation.v1",
 }
 
 type AdmittedBody = q.TechnicalObservation | q.NarrativeObservation
@@ -51,6 +58,10 @@ def _private_digest(domain: str, body: object) -> str:
 
 def human_showrunner_policy_digest() -> str:
     return _private_digest("m10.qualification-policy.v1", _HUMAN_SHOWRUNNER_POLICY)
+
+
+def model_reviewer_policy_digest() -> str:
+    return _private_digest("m10.qualification-policy.v1", _MODEL_REVIEWER_POLICY)
 
 
 def run_digest(run: q.QualityRun) -> str:
@@ -139,10 +150,12 @@ def _admit(
     else:
         if observation.status == q.ObservationStatus.INAPPLICABLE:
             raise RequiredEvidenceMissingError()
-        if (slot.qualification_policy_id, slot.qualification_policy_digest) != (
-            HUMAN_SHOWRUNNER_POLICY_ID,
-            human_showrunner_policy_digest(),
-        ):
+        qualification = (
+            (MODEL_REVIEWER_POLICY_ID, model_reviewer_policy_digest())
+            if item.assessor_class == q.AssessorClass.MODEL
+            else (HUMAN_SHOWRUNNER_POLICY_ID, human_showrunner_policy_digest())
+        )
+        if (slot.qualification_policy_id, slot.qualification_policy_digest) != qualification:
             raise RequiredEvidenceMissingError()
     binding = q.ObservationBinding(
         observation_id=observation.observation_id,
@@ -344,6 +357,7 @@ def project_validity(
 
 __all__ = [
     "HUMAN_SHOWRUNNER_POLICY_ID",
+    "MODEL_REVIEWER_POLICY_ID",
     "AdmittedObservation",
     "HumanObservationRequest",
     "RunValidity",
@@ -351,6 +365,7 @@ __all__ = [
     "close_run",
     "human_request_digest",
     "human_showrunner_policy_digest",
+    "model_reviewer_policy_digest",
     "project_validity",
     "run_digest",
 ]

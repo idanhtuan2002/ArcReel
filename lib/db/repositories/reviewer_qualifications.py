@@ -44,6 +44,16 @@ class ReviewerQualificationRepository:
             await self.session.flush()
         return digest
 
+    async def current(self, digest: str) -> ReviewerQualification | None:
+        """The intact record of ``digest`` while it still meets the qualification rule."""
+        row = await self.session.get(ReviewerQualificationModel, digest)
+        if row is None:
+            return None
+        record = ReviewerQualification.model_validate_json(row.record_json)
+        if qualification_digest(record) != digest or not reviewer_is_qualified(record):
+            return None
+        return record
+
     async def qualified(
         self, *, profile_digest: str, launch_profile_id: str, language: str
     ) -> tuple[ReviewerQualification, ...]:

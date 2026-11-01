@@ -25,12 +25,15 @@ from lib.db.repositories.quality_dispositions import DispositionKey, QualityDisp
 from lib.db.repositories.quality_runs import QualityRunRepository
 from r2.advanced_creative.digests import canonical_json_bytes
 from r2.advanced_creative.exploration import uuid7
+from r2.automation.authorization import automation_principal
+from r2.contracts.automation import AuthorizationSubject, AutomationAuthorizationV1
 from r2.governance.grant_transition import GrantScopeV1
 from r2.quality.digests import compute_digest, verify_caches
 from r2.quality.dispositions import Readiness, evaluate_decision, project_readiness
 from r2.quality.errors import DispositionStaleError, DispositionUnauthorizedError, M10Error, StaleHeadError
 from r2.quality.runs import run_digest
 from server.auth import get_current_interactive_user
+from server.services.automation_grants import RunAutomationAuthority
 from server.services.governance_grants import CheckpointedShowrunnerGrantReader, ShowrunnerGrantUnavailableError
 from server.services.governance_startup import GovernanceStartupUnavailable, verify_governance_activated_startup
 from server.services.quality_runs import (
@@ -216,11 +219,117 @@ class DispositionCustodian:
         return now
 
 
+AUTOMATIC_DISPOSITION_POLICY_ID = "r2.automation.quality-disposition.v1"
+AUTOMATIC_DISPOSITION_POLICY_VERSION = "1"
+
+
+class AutomaticDispositionCustodian:
+    """A production run's automation principal issuing PASS or REWORK, never WAIVE, under its current authority."""
+
+    def __init__(
+        self,
+        request: q.DispositionAuthorizationRequest,
+        sessions: async_sessionmaker[AsyncSession],
+        *,
+        authority: RunAutomationAuthority,
+        subject: AuthorizationSubject,
+    ) -> None:
+        if type(authority) is not RunAutomationAuthority:
+            raise DispositionUnauthorizedError()
+        self._request = q.DispositionAuthorizationRequest.model_validate(request)
+        self._binding = canonical_json_bytes(self._request)
+        self._sessions = sessions
+        self._authority = authority
+        self._subject = AuthorizationSubject.model_validate(subject)
+
+    @property
+    def reader(self) -> CheckpointedShowrunnerGrantReader:
+        return self._authority.reader
+
+    async def require_actor(self, request: q.DispositionAuthorizationRequest) -> None:
+        normalized = q.DispositionAuthorizationRequest.model_validate(request)
+        if (
+            canonical_json_bytes(normalized) != self._binding
+            or normalized.command.actor_id != automation_principal(self._subject.run_id)
+            or normalized.subject.decision not in {q.DispositionDecision.PASS, q.DispositionDecision.REWORK}
+            or normalized.subject.waiver_bindings
+        ):
+            raise DispositionUnauthorizedError()
+
+    async def _proof(self, session: AsyncSession) -> AutomationAuthorizationV1:
+        try:
+            return await self._authority.require_locked(session, subject=self._subject)
+        except PermissionError:
+            raise DispositionUnauthorizedError() from None
+
+    async def authorize_disposition(
+        self, request: q.DispositionAuthorizationRequest
+    ) -> q.DispositionAuthorizationLease:
+        await self.require_actor(request)
+        command = request.command
+        async with self._sessions() as session, session.begin():
+            repository = QualityDispositionRepository(session)
+            proof = await self._proof(session)
+            issued_at = await repository.database_now()
+            lease = q.DispositionAuthorizationLease(
+                authorization_id=uuid7(),
+                action="QUALITY_DISPOSITION",
+                user_id=command.user_id,
+                project_name=command.project_name,
+                actor_id=command.actor_id,
+                command_id=command.command_id,
+                request_digest=command.request_digest,
+                subject_digest=compute_digest("m10.disposition-subject.v1", request.subject),
+                policy_id=AUTOMATIC_DISPOSITION_POLICY_ID,
+                policy_version=AUTOMATIC_DISPOSITION_POLICY_VERSION,
+                evidence_digest=proof.request_digest,
+                issued_at=issued_at,
+                admit_not_after=issued_at + timedelta(seconds=_LEASE_SECONDS),
+            )
+            await repository.record_authorization(lease, grant_sequence=proof.parent_sequence)
+        return lease
+
+    async def admit(
+        self, session: AsyncSession, request: q.DispositionAuthorizationRequest, lease: q.DispositionAuthorizationLease
+    ) -> datetime:
+        await self.require_actor(request)
+        lease = q.DispositionAuthorizationLease.model_validate(lease)
+        command = request.command
+        repository = QualityDispositionRepository(session)
+        stored = await repository.load_authorization(
+            user_id=command.user_id, project_name=command.project_name, authorization_id=lease.authorization_id
+        )
+        if (
+            stored is None
+            or stored[0] != lease
+            or (lease.policy_id, lease.policy_version)
+            != (AUTOMATIC_DISPOSITION_POLICY_ID, AUTOMATIC_DISPOSITION_POLICY_VERSION)
+            or (lease.command_id, lease.request_digest, lease.subject_digest)
+            != (
+                command.command_id,
+                command.request_digest,
+                compute_digest("m10.disposition-subject.v1", request.subject),
+            )
+        ):
+            raise DispositionUnauthorizedError()
+        proof = await self._proof(session)
+        if (proof.parent_sequence, proof.request_digest) != (stored[1], lease.evidence_digest):
+            raise DispositionUnauthorizedError()
+        now = await repository.database_now()
+        if not lease.issued_at <= now <= lease.admit_not_after:
+            raise DispositionUnauthorizedError()
+        return now
+
+
 class DispositionService:
     """Issues one Human disposition; nothing in the request is trusted beyond its bound identity."""
 
     def __init__(
-        self, sessions: async_sessionmaker[AsyncSession], *, custodian: DispositionCustodian, project_root: Path
+        self,
+        sessions: async_sessionmaker[AsyncSession],
+        *,
+        custodian: DispositionCustodian | AutomaticDispositionCustodian,
+        project_root: Path,
     ) -> None:
         self._sessions = sessions
         self._custodian = custodian

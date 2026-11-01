@@ -19,6 +19,7 @@ from server.production_run.text_adapter import EpisodePlanAdapter
 from tests.integration.server.production_run.test_story_adapter import OWNER, Host
 from tests.integration.server.production_run.test_story_adapter import interactive_env as interactive_env
 from tests.integration.server.production_run.test_story_adapter import story_host as story_host
+from tests.integration.server.production_run.test_story_adapter import story_policy as story_policy
 from tests.integration.server.story_authoring.test_driver import MODEL
 
 EXTRACTED = {

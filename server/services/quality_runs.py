@@ -25,8 +25,10 @@ from lib.artifact_manifest import ArtifactManifestError, ProjectArtifactManifest
 from lib.db.models.governance_grant import ShowrunnerGrantHeadModel
 from lib.db.models.quality import QualityProfileHeadModel
 from lib.db.repositories.host_hardening import MasterAuthorityRepository
+from lib.db.repositories.model_observations import ModelObservationRepository
 from lib.db.repositories.quality import QualityProfileRepository
 from lib.db.repositories.quality_runs import QualityRunRepository, RunCommandKey
+from lib.db.repositories.reviewer_qualifications import ReviewerQualificationRepository
 from r2.advanced_creative.digests import canonical_json_bytes
 from r2.advanced_creative.exploration import uuid7
 from r2.contracts.artifact_metadata import R2ArtifactMetadata
@@ -361,6 +363,24 @@ async def _admit(
             raise RequiredEvidenceMissingError()
         digest = compute_digest("m10.technical-observation.v1", observation)
         admitted = AdmittedObservation(observation, q.AssessorClass.DETERMINISTIC)
+    elif binding.observation_type == q.ObservationType.NARRATIVE and (
+        model := await ModelObservationRepository(session).get(
+            user_id=user_id, project_name=project_name, observation_id=binding.observation_id
+        )
+    ):
+        qualification = await ReviewerQualificationRepository(session).current(model.qualification_digest)
+        observation = model.observation
+        if (
+            not _same_profile(profile, model.profile_id, model.profile_revision, model.profile_digest)
+            or qualification is None
+            or observation.assessor_qualification_digest != model.qualification_digest
+            or (observation.assessor_identity, observation.config_digest)
+            != (qualification.model_identity, qualification.config_digest)
+            or observation.independence_group != "model:" + qualification.model_identity
+        ):
+            raise RequiredEvidenceMissingError()
+        digest = model.digest
+        admitted = AdmittedObservation(observation, q.AssessorClass.MODEL)
     elif binding.observation_type == q.ObservationType.NARRATIVE:
         stored = await repository.human_observation(
             user_id=user_id, project_name=project_name, observation_id=binding.observation_id
@@ -398,6 +418,7 @@ class QualityRunService:
         grant_reader: GrantReaderFactory,
         project_root: Path,
         clock: Callable[[], datetime] | None = None,
+        automation: Callable[[AsyncSession | None], Awaitable[None]] | None = None,
     ) -> None:
         try:
             verify_caches(command)
@@ -409,6 +430,35 @@ class QualityRunService:
         self._grant_reader = grant_reader
         self._project_root = project_root
         self._clock = clock or (lambda: datetime.now(UTC))
+        self._automation = automation
+
+    @classmethod
+    def for_automation(
+        cls,
+        command: q.CompleteRunCommand,
+        sessions: async_sessionmaker[AsyncSession],
+        *,
+        guard: Callable[[AsyncSession | None], Awaitable[None]],
+        grant_reader: GrantReaderFactory,
+        project_root: Path,
+    ) -> Self:
+        """A run completion by a production run's automation principal; ``guard`` re-requires the run authority,
+        outside a transaction and again inside the sealing transaction."""
+        return cls(
+            command,
+            sessions,
+            interactive_token=None,
+            grant_reader=grant_reader,
+            project_root=project_root,
+            automation=guard,
+        )
+
+    async def _require_completer(self, session: AsyncSession | None = None) -> None:
+        subject = self._command.subject
+        if self._automation is not None:
+            await self._automation(session)
+            return
+        await _require_actor(self._token, subject.user_id, subject.actor_id)
 
     @classmethod
     async def for_request(
@@ -447,7 +497,7 @@ class QualityRunService:
         if canonical_json_bytes(command) != canonical_json_bytes(self._command):
             raise RequiredEvidenceMissingError()
         subject = command.subject
-        await _require_actor(self._token, subject.user_id, subject.actor_id)
+        await self._require_completer()
         key = RunCommandKey(
             subject.user_id, subject.project_name, subject.actor_id, "COMPLETE_RUN", command.command.command_id
         )
@@ -526,7 +576,7 @@ class QualityRunService:
                 tuple(sorted(subject.execution_refs, key=lambda item: item.encode("utf-8"))),
             ):
                 raise RequiredEvidenceMissingError()
-            await _require_actor(self._token, subject.user_id, subject.actor_id)
+            await self._require_completer(session)
             current = await repository.head(
                 user_id=subject.user_id,
                 project_name=subject.project_name,

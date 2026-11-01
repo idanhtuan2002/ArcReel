@@ -92,6 +92,11 @@ class RunAutomationAuthority:
             raise PermissionError("AUTOMATION_GOVERNANCE_NOT_ACTIVATED")
         self._reader = reader
 
+    @property
+    def reader(self) -> CheckpointedShowrunnerGrantReader:
+        """The activated signed grant reader owners re-verify Human evidence with."""
+        return self._reader
+
     async def require_locked(
         self, session: AsyncSession, *, subject: AuthorizationSubject
     ) -> AutomationAuthorizationV1:

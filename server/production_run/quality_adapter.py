@@ -15,7 +15,7 @@ import json
 from pathlib import Path
 
 from lib.db.repositories.production_runs import ProductionRunRepository
-from lib.db.repositories.reviewer_qualifications import ReviewerQualificationRepository
+from lib.db.repositories.reviewer_qualifications import ReviewerQualificationRepository, qualification_digest
 from lib.project_manager import ProjectManager
 from r2.automation.assessment import AssessmentVerdict, ModelAssessment, combine
 from r2.automation.identity import digest_value
@@ -24,12 +24,14 @@ from r2.contracts.automation import (
     DispatchIntent,
     ModelRoute,
     OwnerReceipt,
+    ReviewerQualification,
     RunSnapshot,
     RunStage,
     StageOutcome,
     UsageReceipt,
 )
 from r2.contracts.common import ensure_json_value
+from r2.quality.errors import M10Error
 from server.production_run.evaluators import FinalEvidence, QualifiedEvaluator
 from server.production_run.owner_support import (
     OwnerBlocked,
@@ -41,7 +43,8 @@ from server.production_run.owner_support import (
     usage_receipt,
 )
 from server.production_run.ports import StepPlan
-from server.production_run.text_adapter import receipt_revision, revision_receipt
+from server.production_run.quality_record import record_quality
+from server.production_run.text_adapter import receipt_revision
 from server.services.automation_grants import RunAutomationAuthority
 
 QUALITY_OWNER = "quality"
@@ -108,7 +111,8 @@ class QualityAdapter:
         if any(review is None for review in reviews.values()):
             await self._start(intent, receipt.digest, run, targets)
             return outcome(intent, "WAIT", owner_state="REVIEWING")
-        identities = await self._qualified(run)
+        records = await self._qualified_records(run)
+        identities = frozenset(records)
         writers = frozenset(r.model_identity for r in run.policy.routes if r.role in {"writer", "script"})
         verdicts: dict[int, AssessmentVerdict] = {}
         for episode, evidence in targets.items():
@@ -123,6 +127,11 @@ class QualityAdapter:
         blocked = [v for v in verdicts.values() if v.kind == "BLOCK"]
         if blocked:
             raise OwnerBlocked(blocked[0].reason or "REQUIRED_EVIDENCE_MISSING")
+        project_root = self._projects.get_project_path(run.project_name)
+        try:
+            dispositions = await self._record(intent, receipt, run, project_root, targets, reviews, verdicts, records)
+        except M10Error:
+            raise OwnerBlocked("QUALITY_EVIDENCE_REFUSED") from None
         reworks = [v for v in verdicts.values() if v.kind == "REWORK"]
         identity = intent.identity
         if reworks:
@@ -138,17 +147,7 @@ class QualityAdapter:
                 repair_stage=first.repair_stage,
                 receipts=(receipt,),
             )
-        evidence = tuple(
-            revision_receipt(
-                self.owner,
-                f"episode:{episode}:quality",
-                digest_value(
-                    "r2.production-quality-verdict.v1",
-                    ensure_json_value([a.model_dump(mode="json") for a in reviews[episode] or ()]),
-                ),
-            )
-            for episode in sorted(targets)
-        )
+        evidence = tuple(dispositions[episode] for episode in sorted(targets))
         return outcome(intent, "PASS", receipts=evidence, owner_state="PASS")
 
     async def usage(self, *, receipt: OwnerReceipt, reservation: BudgetReservation) -> UsageReceipt | None:
@@ -169,6 +168,36 @@ class QualityAdapter:
         return usage_receipt(receipt, reservation, model_calls=calls)
 
     # --- helpers -------------------------------------------------------------------------------------
+
+    async def _record(
+        self,
+        intent: DispatchIntent,
+        receipt: OwnerReceipt,
+        run: RunSnapshot,
+        project_root: Path,
+        targets: dict[int, FinalEvidence],
+        reviews: dict[int, tuple[ModelAssessment, ...] | None],
+        verdicts: dict[int, AssessmentVerdict],
+        records: dict[str, tuple[ReviewerQualification, str]],
+    ) -> dict[int, OwnerReceipt]:
+        """Each target's M10 disposition receipt, issued from its sealed M10 run."""
+        return {
+            episode: await record_quality(
+                self._sessions,
+                authority=self._authority,
+                intent=intent,
+                subject_digest=receipt.digest,
+                project_root=project_root,
+                episode=episode,
+                profile_id=run.policy.profile_id,
+                profile_digest=run.policy.profile_digest,
+                assessments=reviews[episode] or (),
+                verdict=verdicts[episode],
+                qualifications={identity: record for identity, (record, _) in records.items()},
+                qualification_digests={identity: digest for identity, (_, digest) in records.items()},
+            )
+            for episode in sorted(targets)
+        }
 
     def _targets(self, run: RunSnapshot, intent: DispatchIntent) -> dict[int, FinalEvidence]:
         project = self._projects.get_project_path(run.project_name)
@@ -212,7 +241,8 @@ class QualityAdapter:
             found.append(review)
         return tuple(found)
 
-    async def _qualified(self, run: RunSnapshot) -> frozenset[str]:
+    async def _qualified_records(self, run: RunSnapshot) -> dict[str, tuple[ReviewerQualification, str]]:
+        """The run's reviewer routes that hold a current qualification of the profile scope, by model identity."""
         async with self._sessions() as session:
             records = await ReviewerQualificationRepository(session).qualified(
                 profile_digest=run.policy.profile_digest,
@@ -220,14 +250,18 @@ class QualityAdapter:
                 language=run.policy.language,
             )
         routes = {r.role: r for r in run.policy.routes}
-        return frozenset(
-            record.model_identity
-            for record in records
-            for role in REVIEWER_ROLES
-            if (route := routes.get(role)) is not None
-            and (record.provider_id, record.model_id, record.model_identity, record.config_digest)
-            == (route.provider_id, route.model_id, route.model_identity, route.config_digest)
-        )
+        found: dict[str, tuple[ReviewerQualification, str]] = {}
+        for record in records:
+            for role in REVIEWER_ROLES:
+                route = routes.get(role)
+                if route is not None and (
+                    record.provider_id,
+                    record.model_id,
+                    record.model_identity,
+                    record.config_digest,
+                ) == (route.provider_id, route.model_id, route.model_identity, route.config_digest):
+                    found[record.model_identity] = (record, qualification_digest(record))
+        return found
 
     async def _start(
         self, intent: DispatchIntent, subject_digest: str, run: RunSnapshot, targets: dict[int, FinalEvidence]

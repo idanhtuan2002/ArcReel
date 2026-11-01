@@ -67,7 +67,7 @@ class _Unused:
     pass
 
 
-def _policy(provider_id: str) -> RunPolicy:
+def _policy(provider_id: str, **overrides) -> RunPolicy:
     writer = ModelRoute(
         role="writer",
         provider_id=provider_id,
@@ -79,9 +79,10 @@ def _policy(provider_id: str) -> RunPolicy:
         currency="USD",
         max_cost_per_call=None,
     )
+    fields = {"profile_id": "fiction_narration_vi_v1", "profile_digest": "sha256:" + "a" * 64, **overrides}
     return RunPolicy(
-        profile_id="fiction_narration_vi_v1",
-        profile_digest="sha256:" + "a" * 64,
+        profile_id=fields.pop("profile_id"),
+        profile_digest=fields.pop("profile_digest"),
         routes=(
             writer,
             writer.model_copy(update={"role": "script"}),
@@ -94,7 +95,19 @@ def _policy(provider_id: str) -> RunPolicy:
         max_tasks=50,
         max_runtime_seconds=43200,
         route_digests=("sha256:" + "b" * 64,),
+        **fields,
     )
+
+
+@pytest.fixture
+def story_policy():
+    """Policy fields a test module replaces; called with the session factory after custody exists, before the run."""
+
+    async def overrides(sessions) -> dict:
+        del sessions
+        return {}
+
+    return overrides
 
 
 @dataclass
@@ -110,7 +123,7 @@ class Host:
 
 
 @pytest.fixture
-async def story_host(concurrent_session_factory, tmp_path, interactive_env):
+async def story_host(concurrent_session_factory, tmp_path, interactive_env, story_policy):
     from server.services.governance_attestation import serve_governance_attestor
 
     sessions = concurrent_session_factory
@@ -129,7 +142,7 @@ async def story_host(concurrent_session_factory, tmp_path, interactive_env):
             Services(projects=projects, workflow_planner=_Unused(), capabilities=_Unused()),
         )
         assert created.problem is None
-        policy = _policy(await _provider(sessions))
+        policy = _policy(await _provider(sessions), **await story_policy(sessions))
         witness = ProjectInputWitness(sessions, projects=projects)
         start_input = await witness.digest(user_id="default", project_name="project")
         async with sessions() as session, session.begin():
