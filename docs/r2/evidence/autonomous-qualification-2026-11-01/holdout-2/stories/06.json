@@ -1,0 +1,35 @@
+{
+  "title": "Lời Ca Trên Phố",
+  "scenes": [
+    {
+      "narration": "Góc phố Hà Nội, tiếng đàn bầu da diết vang lên giữa nhịp sống hối hả.",
+      "narration_en": "In Hanoi's busy street corner, a mournful dan bau melody sounds amidst the rush of life.",
+      "image_prompt": "Vertical cinematic shot. A blind Vietnamese man in a simple grey shirt playing a dan Bau under warm golden sunset light at dusk."
+    },
+    {
+      "narration": "Cô bé hàng ngày lại xuất hiện, ngồi lặng lẽ bên đống rác thu gom giấy.",
+      "narration_en": "The little girl appears daily again, sitting quietly beside her paper-collecting pile of trash.",
+      "image_prompt": "Vertical cinematic shot. A poor Vietnamese schoolgirl in a worn blue uniform listening intently to the musician."
+    },
+    {
+      "narration": "Cô bé hỏi: \"Anh có biết mình đang chơi cho ai không?\" Tiếng đàn bỗng ngừng lại giữa câu.",
+      "narration_en": "\"Do you know whom you are playing for?\" she asks. The music suddenly stops mid-sentence.",
+      "image_prompt": "Vertical cinematic close-up. Close interaction between the blind musician and the poor schoolgirl under soft evening streetlights."
+    },
+    {
+      "narration": "'Tôi chơi cho những người không thể nghe thấy, và cả em,' anh cười vì mù mà vẫn biết cô bé.",
+      "narration_en": "\"I play for those who cannot hear,\" he smiles. He knows the girl despite his blindness.",
+      "image_prompt": "Vertical cinematic medium shot. Close-up of hands touching gently; warm lighting highlights their connection in a narrow alleyway."
+    },
+    {
+      "narration": "'Thế nên tôi mới chơi.' Nhạc nổi lên, cô bé mỉm cười lần đầu tiên thấy ánh sáng trong mắt người khác.",
+      "narration_en": "\"That is why I play.\" Music swells; the girl smiles seeing light in another's eyes for the first time.",
+      "image_prompt": "Vertical cinematic wide shot. The blind man playing passionately while a joyful poor schoolgirl listens under glowing Hanoi streetlights."
+    },
+    {
+      "narration": "Cô bé bỏ rác, trở thành người chăm sóc cho nhạc công mù mỗi tối trên phố cũ.",
+      "narration_en": "The girl discards her trash duties to become the musician's caretaker every evening on the old street.",
+      "image_prompt": "Vertical cinematic shot. Silhouette of a blind man and a caring schoolgirl sitting together playing music under moonlight."
+    }
+  ]
+}

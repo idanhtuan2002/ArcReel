@@ -1,0 +1,421 @@
+"""Build the reviewer qualification corpus: 20 Vietnamese narration finals, each with one critical-defect variant.
+
+Every step caches its output, so the script resumes where it stopped. Clean finals go through the production
+renderer (lib.presentation_renderer) under the production contract; each story's defect variant lands in the
+other split, so each split holds 10 clean and 10 defect cases with every defect type once.
+Run from the worktree: uv run --no-sync python /var/tmp/ar9b/corpus/build.py
+"""
+
+from __future__ import annotations
+
+import json
+import random
+import shutil
+import subprocess
+import sys
+import time
+import urllib.request
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).parent))
+import flux
+from lib.presentation_renderer import (
+    RenderContract,
+    RenderCue,
+    RenderInput,
+    RenderUnit,
+    render_presentations,
+)
+
+ROOT = Path(__file__).parent
+OLLAMA = "http://127.0.0.1:11434"
+TTS = "http://127.0.0.1:23340/v1/audio/speech"
+WRITER = "qwen3.5-vimax:9b"
+CONTRACT = RenderContract(width=576, height=1024, fps=24, min_seconds=30, max_seconds=60)
+US = 1_000_000
+VOICES = ["alloy", "nova", "echo", "shimmer", "onyx", "fable"]
+
+PREMISES = [
+    "Một cô thợ may ở chợ Bến Thành may chiếc áo dài cuối cùng cho người mẹ sắp đi xa.",
+    "Hai người bạn già chơi cờ tướng dưới gốc đa mỗi chiều, cho đến ngày một người vắng mặt.",
+    "Cậu bé bán vé số ở Cần Thơ tìm lại chiếc xe đạp bị mất để kịp đến kỳ thi.",
+    "Một người mẹ đơn thân chèo đò đưa con qua sông đến trường suốt mùa nước nổi.",
+    "Chú lính cứu hỏa trẻ lao vào căn nhà cháy cứu chú mèo của bé gái hàng xóm.",
+    "Bà ngoại dạy cháu gói bánh chưng đêm giao thừa trong căn bếp nhỏ ở Nam Định.",
+    "Một nhạc công mù chơi đàn bầu ở góc phố Hà Nội, và một cô bé ngày nào cũng dừng lại nghe.",
+    "Người nông dân ở Tây Nguyên cứu vườn cà phê khỏi đợt hạn hán bằng giếng nước tự đào.",
+    "Một cậu sinh viên nghèo dành dụm mua vé tàu về quê thăm cha đang ốm.",
+    "Cô giáo mầm non ở vùng lũ dắt cả lớp lên đồi cao trú mưa và kể chuyện cho các em nghe.",
+]
+
+STORY_SCHEMA = {
+    "type": "object",
+    "required": ["title", "scenes"],
+    "properties": {
+        "title": {"type": "string"},
+        "scenes": {
+            "type": "array",
+            "minItems": 5,
+            "maxItems": 6,
+            "items": {
+                "type": "object",
+                "required": ["narration", "image_prompt", "narration_en"],
+                "properties": {
+                    "narration": {"type": "string"},
+                    "narration_en": {"type": "string"},
+                    "image_prompt": {"type": "string"},
+                },
+            },
+        },
+    },
+}
+
+
+def log(*parts: object) -> None:
+    print(time.strftime("%H:%M:%S"), *parts, flush=True)
+
+
+def post(url: str, body: dict, timeout: float = 900) -> bytes:
+    request = urllib.request.Request(url, json.dumps(body).encode(), {"Content-Type": "application/json"})
+    with urllib.request.urlopen(request, timeout=timeout) as response:
+        return response.read()
+
+
+def story(index: int) -> dict:
+    path = ROOT / "stories" / f"{index:02d}.json"
+    if path.exists():
+        return json.loads(path.read_text(encoding="utf-8"))
+    prompt = (
+        "Viết một truyện ngắn kể chuyện tiếng Việt cho video dọc 40–50 giây, cảm động, có mở đầu, cao trào và kết.\n"
+        f"Ý tưởng: {PREMISES[index]}\n"
+        "Chia thành 5 hoặc 6 cảnh. Mỗi cảnh:\n"
+        "- narration: lời kể tiếng Việt tự nhiên, 1–2 câu, 18–30 từ, có dấu đầy đủ.\n"
+        "- narration_en: bản dịch tiếng Anh của narration.\n"
+        "- image_prompt: mô tả hình ảnh bằng tiếng Anh cho ảnh dọc điện ảnh, cụ thể về nhân vật, bối cảnh Việt Nam,"
+        " ánh sáng; giữ ngoại hình nhân vật nhất quán giữa các cảnh; không có chữ trong ảnh.\n"
+        "Trả về JSON."
+    )
+    for attempt in range(5):
+        raw = post(
+            OLLAMA + "/api/chat",
+            {
+                "model": WRITER,
+                "stream": False,
+                "think": False,
+                "format": STORY_SCHEMA,
+                "messages": [{"role": "user", "content": prompt}],
+                "options": {"temperature": 0.7, "num_ctx": 8192, "seed": 500 + index + 100 * attempt},
+            },
+        )
+        data = json.loads(json.loads(raw)["message"]["content"])
+        if all(len(s["narration"].split()) >= 8 and s["narration_en"].strip() and s["image_prompt"].strip() for s in data["scenes"]):
+            break
+    else:
+        raise RuntimeError(f"story {index} never had complete scenes")
+    path.parent.mkdir(exist_ok=True)
+    path.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+    log("story", index, data["title"])
+    return data
+
+
+def image(index: int, scene: int, prompt: str) -> Path:
+    path = ROOT / "images" / f"{index:02d}_{scene}.png"
+    if not path.exists():
+        path.parent.mkdir(exist_ok=True)
+        flux.generate(
+            "cinematic vertical photograph, " + prompt + ", natural light, highly detailed, no text",
+            50000 + 1000 * index + scene,
+            str(path),
+        )
+        log("image", path.name)
+    return path
+
+
+def speech(index: int, scene: int, text: str) -> Path:
+    path = ROOT / "audio" / f"{index:02d}_{scene}.wav"
+    if not path.exists():
+        path.parent.mkdir(exist_ok=True)
+        path.write_bytes(post(TTS, {"model": "vieneu", "input": text, "voice": VOICES[index % len(VOICES)]}))
+    return path
+
+
+def duration_us(path: Path) -> int:
+    out = subprocess.run(
+        ["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", str(path)],
+        capture_output=True,
+        text=True,
+        check=True,
+    ).stdout
+    return int(float(out) * US)
+
+
+def clip(source: Path, seconds: float, out: Path, index: int, scene: int, *, vf_extra: str = "") -> Path:
+    """A slow Ken Burns move over one still, the narration-format shot."""
+    if out.exists():
+        return out
+    out.parent.mkdir(parents=True, exist_ok=True)
+    frames = int(seconds * 24) + 1
+    zoom_in = (index + scene) % 2 == 0
+    z = "min(1.0+0.0009*on,1.15)" if zoom_in else "max(1.15-0.0009*on,1.0)"
+    vf = f"scale=1152:2048,zoompan=z='{z}':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d={frames}:s=576x1024:fps=24" + (
+        ("," + vf_extra) if vf_extra else ""
+    )
+    subprocess.run(
+        [
+            "ffmpeg",
+            "-nostdin",
+            "-loglevel",
+            "error",
+            "-y",
+            "-loop",
+            "1",
+            "-i",
+            str(source),
+            "-vf",
+            vf,
+            "-t",
+            f"{seconds:.3f}",
+            "-c:v",
+            "libx264",
+            "-pix_fmt",
+            "yuv420p",
+            "-r",
+            "24",
+            str(out),
+        ],
+        check=True,
+    )
+    return out
+
+
+def cues(text: str, length_us: int, offset_us: int) -> tuple[RenderCue, ...]:
+    """Split one narration into subtitle cues by clause, timed by character share."""
+    pieces: list[str] = []
+    for part in text.replace(";", ",").split(","):
+        part = part.strip()
+        if not part:
+            continue
+        if pieces and len(pieces[-1]) < 18:
+            pieces[-1] = pieces[-1] + ", " + part
+        else:
+            pieces.append(part)
+    total = sum(len(p) for p in pieces) or 1
+    out, start = [], offset_us
+    for i, piece in enumerate(pieces):
+        end = offset_us + length_us if i == len(pieces) - 1 else start + length_us * len(piece) // total
+        out.append(RenderCue(start_us=start, end_us=end, text=piece))
+        start = end
+    return tuple(out)
+
+
+def scene_plan(index: int, data: dict) -> list[dict]:
+    plan = []
+    for scene, item in enumerate(data["scenes"]):
+        audio = speech(index, scene, item["narration"])
+        narration_us = duration_us(audio)
+        plan.append(
+            {
+                "scene": scene,
+                "image": image(index, scene, item["image_prompt"]),
+                "audio": audio,
+                "narration_us": narration_us,
+                "unit_us": narration_us + 600_000,
+                "narration": item["narration"],
+                "narration_en": item["narration_en"],
+            }
+        )
+    total = sum(s["unit_us"] for s in plan)
+    if total < 33 * US:
+        for s in plan:
+            s["unit_us"] += (33 * US - total) // len(plan) + 1
+    return plan
+
+
+def render(case_id: str, units: list[RenderUnit]) -> dict:
+    out_dir = ROOT / "finals" / case_id
+    final = out_dir / "final.mp4"
+    if not final.exists():
+        receipt = render_presentations(
+            episode=RenderInput(episode=1, units=tuple(units)), output_dir=out_dir / "render", contract=CONTRACT
+        )
+        shutil.copy(receipt.final_path, final)
+        shutil.copy(receipt.subtitle_path, out_dir / "subtitles.srt")
+    return {"final": f"finals/{case_id}/final.mp4", "subtitles": f"finals/{case_id}/subtitles.srt"}
+
+
+def units_for(
+    index: int, plan: list[dict], *, clips: list[Path] | None = None, texts: list[str] | None = None
+) -> list[RenderUnit]:
+    units = []
+    for i, scene in enumerate(plan):
+        video = (
+            clips[i]
+            if clips
+            else clip(scene["image"], scene["unit_us"] / US, ROOT / "clips" / f"{index:02d}_{i}.mp4", index, i)
+        )
+        text = texts[i] if texts else scene["narration"]
+        units.append(
+            RenderUnit(
+                unit_id=f"s{i}",
+                video_path=video,
+                video_start_us=0,
+                duration_us=scene["unit_us"],
+                video_audio=False,
+                video_gain=0.0,
+                narration_path=scene["audio"],
+                narration_start_us=300_000,
+                narration_duration_us=scene["narration_us"],
+                cues=cues(text, scene["narration_us"], 300_000),
+            )
+        )
+    return units
+
+
+def write_case(case_id: str, files: dict, narration: str) -> dict:
+    path = ROOT / "finals" / case_id / "narration.txt"
+    path.write_text(narration, encoding="utf-8")
+    return {**files, "narration": f"finals/{case_id}/narration.txt"}
+
+
+DEFECTS = [
+    "WRONG_LANGUAGE_SUBTITLES",
+    "NARRATION_FROM_OTHER_STORY",
+    "BLACK_FRAMES",
+    "IMAGES_FROM_OTHER_STORY",
+    "NOISE_CORRUPTION",
+    "GARBLED_SUBTITLES",
+    "COLOR_BARS_PLACEHOLDER",
+    "PLACEHOLDER_TEXT",
+    "UPSIDE_DOWN_FRAMES",
+    "TINY_PICTURE_IN_BLACK",
+]
+
+
+def special_clip(kind: str, seconds: float, out: Path) -> Path:
+    if out.exists():
+        return out
+    out.parent.mkdir(parents=True, exist_ok=True)
+    source = {
+        "black": "color=c=black:s=576x1024:r=24",
+        "noise": "nullsrc=s=576x1024:r=24,geq=random(1)*255:128:128",
+        "bars": "smptehdbars=s=576x1024:r=24",
+    }[kind]
+    subprocess.run(
+        [
+            "ffmpeg",
+            "-nostdin",
+            "-loglevel",
+            "error",
+            "-y",
+            "-f",
+            "lavfi",
+            "-i",
+            source,
+            "-t",
+            f"{seconds:.3f}",
+            "-c:v",
+            "libx264",
+            "-pix_fmt",
+            "yuv420p",
+            "-r",
+            "24",
+            str(out),
+        ],
+        check=True,
+    )
+    return out
+
+
+def defect_case(
+    index: int, plan: list[dict], other: list[dict], other_index: int, kind: str
+) -> tuple[list[RenderUnit], str]:
+    """The defect variant's units and narration text; the defect covers most of the film."""
+    base = ROOT / "clips" / f"defect_{index:02d}"
+    narration = " ".join(s["narration"] for s in plan)
+    clips = [
+        clip(s["image"], s["unit_us"] / US, ROOT / "clips" / f"{index:02d}_{i}.mp4", index, i)
+        for i, s in enumerate(plan)
+    ]
+    hit = range(1, len(plan))  # every scene after the opening
+    if kind == "WRONG_LANGUAGE_SUBTITLES":
+        return units_for(index, plan, texts=[s["narration_en"] for s in plan]), narration
+    if kind == "NARRATION_FROM_OTHER_STORY":
+        texts = [other[i % len(other)]["narration"] for i in range(len(plan))]
+        return units_for(index, plan, texts=texts), " ".join(texts)
+    if kind == "PLACEHOLDER_TEXT":
+        texts = [f"[TODO: lời kể cảnh {i + 1}]" for i in range(len(plan))]
+        return units_for(index, plan, texts=texts), " ".join(texts)
+    if kind == "GARBLED_SUBTITLES":
+        texts = [s["narration"].encode("utf-8").decode("latin-1") for s in plan]
+        return units_for(index, plan, texts=texts), narration
+    for i in hit:
+        seconds = plan[i]["unit_us"] / US
+        if kind == "BLACK_FRAMES":
+            clips[i] = special_clip("black", seconds, base / f"{i}.mp4")
+        elif kind == "NOISE_CORRUPTION":
+            clips[i] = special_clip("noise", seconds, base / f"{i}.mp4")
+        elif kind == "COLOR_BARS_PLACEHOLDER":
+            clips[i] = special_clip("bars", seconds, base / f"{i}.mp4")
+        elif kind == "IMAGES_FROM_OTHER_STORY":
+            clips[i] = clip(other[i % len(other)]["image"], seconds, base / f"{i}.mp4", other_index, i)
+        elif kind == "UPSIDE_DOWN_FRAMES":
+            clips[i] = clip(plan[i]["image"], seconds, base / f"{i}.mp4", index, i, vf_extra="vflip")
+        elif kind == "TINY_PICTURE_IN_BLACK":
+            clips[i] = clip(
+                plan[i]["image"],
+                seconds,
+                base / f"{i}.mp4",
+                index,
+                i,
+                vf_extra="scale=96:170,pad=576:1024:240:427:black",
+            )
+    return units_for(index, plan, clips=clips), narration
+
+
+def main() -> None:
+    count = len(PREMISES)
+    stories = [story(i) for i in range(count)]
+    post(OLLAMA + "/api/generate", {"model": WRITER, "keep_alive": 0})
+    time.sleep(5)
+    plans = [scene_plan(i, stories[i]) for i in range(count)]
+    cases = []
+    for i in range(count):
+        clean_split = defect_split = "HOLDOUT"
+        clean_id = f"h{i:02d}"
+        files = render(clean_id, units_for(i, plans[i]))
+        cases.append(
+            {
+                "case_id": clean_id,
+                "split": clean_split,
+                "label": "CLEAN",
+                "story": i,
+                **write_case(clean_id, files, " ".join(s["narration"] for s in plans[i])),
+            }
+        )
+        kind = DEFECTS[i % len(DEFECTS)]
+        other_index = (i + 3) % count
+        units, narration = defect_case(i, plans[i], plans[other_index], other_index, kind)
+        defect_id = f"x{i:02d}"
+        files = render(defect_id, units)
+        cases.append(
+            {
+                "case_id": defect_id,
+                "split": defect_split,
+                "label": "CRITICAL_DEFECT",
+                "story": i,
+                "defect": kind,
+                **write_case(defect_id, files, narration),
+            }
+        )
+        log("case", clean_id, defect_id, kind)
+    random.Random(20261102).shuffle(cases)
+    (ROOT / "manifest.full.json").write_text(
+        json.dumps({"cases": cases}, ensure_ascii=False, indent=2), encoding="utf-8"
+    )
+    blind = [{k: c[k] for k in ("case_id", "split", "label", "final", "subtitles", "narration")} for c in cases]
+    (ROOT / "manifest.json").write_text(json.dumps({"cases": blind}, ensure_ascii=False, indent=2), encoding="utf-8")
+    log("done", len(cases))
+
+
+if __name__ == "__main__":
+    main()

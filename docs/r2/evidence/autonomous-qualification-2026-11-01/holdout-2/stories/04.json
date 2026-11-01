@@ -1,0 +1,35 @@
+{
+  "title": "Chiếc Gai Giữa Ngọn Lửa",
+  "scenes": [
+    {
+      "narration": "Đêm mưa, ngọn lửa吞噬 ngôi nhà nhỏ của bé Lan.",
+      "narration_en": "Rainy night, fire swallows little Lan's small house.",
+      "image_prompt": "Vertical cinematic shot. A young Vietnamese firefighter in full gear running towards a burning wooden house at night during rain. Dramatic lighting from flames reflecting on wet ground. Consistent character design: determined expression, uniform details."
+    },
+    {
+      "narration": "Mặc kệ nguy hiểm, chú lao vào đám cháy dữ dội.",
+      "narration_en": "Ignoring the danger, he charges into the fierce blaze.",
+      "image_prompt": "Vertical cinematic shot. Inside a dark burning house, smoke fills air. Young firefighter silhouette moving bravely through thick orange and black smoke. Rain drips from helmet. High contrast lighting."
+    },
+    {
+      "narration": "Chú tìm thấy chú mèo con đang run rẩy giữa đống đổ nát.",
+      "narration_en": "He finds a trembling kitten amidst the rubble.",
+      "image_prompt": "Vertical cinematic close-up. Small fluffy white kitten shivering in debris inside burning house. Warm firelight illuminating sad puppy eyes and firefighter's gloved hand reaching out."
+    },
+    {
+      "narration": "Chàng lính nâng chú mèo lên, lòng đầy thương cảm.",
+      "narration_en": "The soldier lifts the kitten up with a full heart of compassion.",
+      "image_prompt": "Vertical cinematic medium shot. Firefighter holding tiny white kitten gently in gloved hands inside burning house. Soft focus on firefighter's kind eyes visible through helmet visor, warm glow from fire."
+    },
+    {
+      "narration": "Lửa sắp bao vây nhưng chú vững tay cứu bé Lan.",
+      "narration_en": "Fire surrounds him but he saves little Lan steadily.",
+      "image_prompt": "Vertical cinematic action shot. Firefighter carrying kitten and exiting burning house doorway, smoke billowing behind. Rain streaks down lens, dynamic motion blur of flames, heroic pose."
+    },
+    {
+      "narration": "An toàn rồi! Bé Lan ôm chú mèo trong vòng tay ấm áp.",
+      "narration_en": "Safe at last! Little Lan hugs the kitten in a warm embrace.",
+      "image_prompt": "Vertical cinematic emotional shot. Safe outside house, rain stopping. Young girl hugging tiny white kitten while firefighter watches smiling from distance. Soft morning light breaking through clouds."
+    }
+  ]
+}

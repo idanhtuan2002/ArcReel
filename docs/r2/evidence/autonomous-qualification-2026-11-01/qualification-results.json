@@ -44,10 +44,34 @@
       "holdout": "clean 9/10 (c17 rejected), defects 0/10",
       "qualified": true,
       "note": "the runner printed qualified=false because case digests duplicated for subtitle-only defects (fixed in de8b6ae03); the record rebuilt from the same receipts with evidence digests is qualified"
+    },
+    "gemma3:12b": {
+      "method": "questions",
+      "calibration": "clean 0/10, defects 0/10",
+      "holdout": "clean 0/10, defects 0/10",
+      "qualified": false,
+      "note": "rejects every final (continuity 2, false upside-down)"
     }
   },
   "rejected_candidates": {
     "minicpm-v:8b": "scoring answer degenerates (repeats prompt examples, broken JSON); orientation answers were accurate",
     "qwen3-vl:8b": "ignores think:false, slow and incomplete answers"
+  },
+  "round_2": {
+    "source": "c441f4e65",
+    "corpus": "CALIBRATION of round 1 + fresh HOLDOUT-2 (10 new stories, holdout-2/), manifest D:/.../qualification-2.json",
+    "reason": "round-1 HOLDOUT was consumed for qwen2.5vl:7b; its new probabilities method (first-token logprobs, thresholds set on CALIBRATION) needed an unseen hold-out",
+    "qwen2.5vl:7b": {
+      "method": "probabilities",
+      "calibration": "clean 9/10, defects 0/10",
+      "holdout_2": "clean 9/10, defects 0/10",
+      "qualified": true
+    },
+    "gemma3:4b": {
+      "method": "questions (unchanged since 61ba5c274)",
+      "calibration": "clean 10/10, defects 0/10",
+      "holdout_2": "clean 10/10, defects 0/10",
+      "qualified": true
+    }
   }
 }

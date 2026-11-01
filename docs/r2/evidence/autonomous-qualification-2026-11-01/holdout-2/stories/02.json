@@ -1,0 +1,35 @@
+{
+  "title": "Chiếc Xe Và Bài Thi",
+  "scenes": [
+    {
+      "narration": "Cần Thơ mưa phùr lạnh, cậu bé tí hon đạp chiếc xe cũ kỹ qua những con hẻm ẩm ướt.",
+      "narration_en": "Can Tho misty rain falls; the tiny boy pedals his rusty bike through damp alleyways.",
+      "image_prompt": "Vertical cinematic shot of a small Vietnamese boy in worn-out clothes riding an old bicycle, heavy grey morning mist over Can Tho canal houses, soft diffused lighting, no text on image."
+    },
+    {
+      "narration": "Đột nhiên xe gãy giữa đường, vé số rơi ra đầy đất khi cậu bàng hoàng nhìn chiếc xích lô lạ.",
+      "narration_en": "Suddenly the bike breaks; lottery tickets scatter as he stares blankly at a strange cycle rickshaw nearby.",
+      "image_prompt": "Vertical cinematic shot of the boy in shock standing amidst scattered blue paper tickets, broken bicycle frame on wet pavement, dramatic low-angle lighting highlighting raindrops."
+    },
+    {
+      "narration": "Cậu chạy theo người lạ nhưng họ lắc đầu; cậu quay lại nhặt từng tờ vé còn sót trong nước mưa.",
+      "narration_en": "He chases strangers who shake their heads no; he returns to gather remaining tickets from the rainwater puddles.",
+      "image_prompt": "Vertical cinematic shot of boy running frantically through Can Tho streets, blurred background figures shaking hands negatively, golden hour light breaking through dark clouds."
+    },
+    {
+      "narration": "Người quen dẫn cậu đến cơ quan công an; họ tìm lại chiếc xe và trả lại những vé số còn nguyên.",
+      "narration_en": "An acquaintance leads him to the police station; they find his bike and return the intact lottery tickets.",
+      "image_prompt": "Vertical cinematic shot inside a simple Vietnamese office, warm sunlight streaming through window onto boy holding restored bicycle and ticket roll, emotional expressions."
+    },
+    {
+      "narration": "Vừa kịp cổng trường thi mưa tạnh; cậu nắm chặt vé số mới như giữ lấy ước mơ bay xa.",
+      "narration_en": "Just in time for the exam gate as rain stops; he grips new tickets tightly like holding dreams of flying away.",
+      "image_prompt": "Vertical cinematic shot of boy standing at school entrance under clear blue sky, sunlight illuminating his hopeful face and bicycle, soft focus on colorful ticket papers."
+    },
+    {
+      "narration": "Bài thi bắt đầu với nụ cười rạng rỡ; hành trình nhỏ bé hôm nay sẽ viết nên tương lai lớn lao.",
+      "narration_en": "Exam begins with radiant smile; today's small journey will write a grand future ahead for him now.",
+      "image_prompt": "Vertical cinematic shot of boy entering examination hall door, bright natural light filling frame, shallow depth of field showing smiling face and bicycle lock on shoulder."
+    }
+  ]
+}

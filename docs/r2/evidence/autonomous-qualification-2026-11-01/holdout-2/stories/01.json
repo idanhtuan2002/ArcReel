@@ -1,0 +1,35 @@
+{
+  "title": "Gốc Đa Cuối Chiều",
+  "scenes": [
+    {
+      "narration": "Mỗi chiều, ông Ba và chú Tư lại ngồi bên gốc đa già để cùng nhau bàn cờ dưới nắng vàng dịu dàng.",
+      "narration_en": "Every afternoon, Uncle Ba and Uncle Tu sat by the old banyan tree to play chess under the gentle golden sunlight.",
+      "image_prompt": "Vertical cinematic shot of two elderly Vietnamese men sitting on a wooden bench next to a massive ancient banyan tree. One man wears a faded blue shirt and cap, the other in white linen clothes. They are intently looking at a traditional wood chess board between them. The scene is backlit by warm late afternoon sun filtering through green leaves, creating long soft shadows. High detail on wrinkled faces and weathered hands. No text or subtitles."
+    },
+    {
+      "narration": "Họ cười đùa như những thanh niên, quên cả thời gian trôi qua trong tiếng lá xào xạc nhẹ nhàng.",
+      "narration_en": "They laughed like young men, forgetting the passing time amidst the gentle rustling of leaves.",
+      "image_prompt": "Close-up vertical shot focusing on the two elderly friends laughing heartily. The man in the blue shirt wipes sweat from his forehead while gesturing at a chess piece. His friend laughs with crinkled eyes and white teeth showing. Background shows blurred village scenery with dust motes dancing in sunbeams hitting their faces. Natural skin textures, realistic lighting. No text."
+    },
+    {
+      "narration": "Bỗng một chiều, chiếc ghế thường của chú Tư vẫn trống trơn giữa tiếng chim hót líu lo.",
+      "narration_en": "Suddenly one afternoon, Uncle Tu's usual chair remained empty among the songs of chirping birds.",
+      "image_prompt": "Vertical shot showing an elderly man in a blue shirt sitting alone on a wooden bench under the banyan tree. He looks confused and sad, staring at his half-finished chess board where only he is playing against himself. The other chair opposite him is visibly empty with dust settling on it. Soft focus background of green foliage. Mood is melancholic but peaceful lighting. No text."
+    },
+    {
+      "narration": "Ông Ba không dám đi tìm bạn, sợ rằng mình sẽ chẳng thể chịu nổi nỗi đau này.",
+      "narration_en": "Uncle Ba dared not look for his friend, fearing he could not bear such pain.",
+      "image_prompt": "Over-the-shoulder vertical shot of the elderly man in blue shirt playing chess alone. His back is to the camera looking towards a distant village path shrouded in mist and shadow. The foreground shows his trembling hands moving slowly over the board, casting long solitary shadows under dimming light. Emotional atmosphere with cool color tones contrasting warm memories implied. No text."
+    },
+    {
+      "narration": "Hàng tháng ông đều đặn gửi tiền về nhà chú Tư như chưa có gì bất thường xảy ra.",
+      "narration_en": "Every month, he regularly sent money to Uncle Tu's family as if nothing unusual had happened.",
+      "image_prompt": "Vertical shot of an elderly man in a blue shirt standing by the banyan tree root holding a small woven basket of local products. He looks towards his home direction with hopeful eyes. Soft morning light illuminates his face showing determination and hidden sadness. Background shows rural Vietnamese village path leading away into distance. No text."
+    },
+    {
+      "narration": "Mãi đến khi ông Ba qua đời, chú Tư mới biết rằng người bạn của mình đã mất cách đây lâu lắm rồi.",
+      "narration_en": "Only when Uncle Ba passed away did Uncle Tu learn that his friend had died long ago.",
+      "image_prompt": "Vertical cinematic shot showing the empty wooden bench under the banyan tree now covered with fresh flowers and a memorial wreath. The chess board sits untouched between them, slightly tilted by wind or rain damage over time. Sunlight breaks through clouds creating dramatic rim lighting on scattered fallen leaves covering roots where both men once sat together quietly reflecting past moments without characters present."
+    }
+  ]
+}

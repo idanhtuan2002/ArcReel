@@ -1,0 +1,384 @@
+{
+ "cases": [
+  {
+   "case_id": "c04",
+   "split": "CALIBRATION",
+   "label": "CLEAN",
+   "story": 4,
+   "final": "../corpus/finals/c04/final.mp4",
+   "subtitles": "../corpus/finals/c04/subtitles.srt",
+   "narration": "../corpus/finals/c04/narration.txt"
+  },
+  {
+   "case_id": "d11",
+   "split": "CALIBRATION",
+   "label": "CRITICAL_DEFECT",
+   "story": 11,
+   "defect": "NARRATION_FROM_OTHER_STORY",
+   "final": "../corpus/finals/d11/final.mp4",
+   "subtitles": "../corpus/finals/d11/subtitles.srt",
+   "narration": "../corpus/finals/d11/narration.txt"
+  },
+  {
+   "case_id": "c03",
+   "split": "CALIBRATION",
+   "label": "CLEAN",
+   "story": 3,
+   "final": "../corpus/finals/c03/final.mp4",
+   "subtitles": "../corpus/finals/c03/subtitles.srt",
+   "narration": "../corpus/finals/c03/narration.txt"
+  },
+  {
+   "case_id": "c08",
+   "split": "CALIBRATION",
+   "label": "CLEAN",
+   "story": 8,
+   "final": "../corpus/finals/c08/final.mp4",
+   "subtitles": "../corpus/finals/c08/subtitles.srt",
+   "narration": "../corpus/finals/c08/narration.txt"
+  },
+  {
+   "case_id": "d19",
+   "split": "CALIBRATION",
+   "label": "CRITICAL_DEFECT",
+   "story": 19,
+   "defect": "TINY_PICTURE_IN_BLACK",
+   "final": "../corpus/finals/d19/final.mp4",
+   "subtitles": "../corpus/finals/d19/subtitles.srt",
+   "narration": "../corpus/finals/d19/narration.txt"
+  },
+  {
+   "case_id": "d13",
+   "split": "CALIBRATION",
+   "label": "CRITICAL_DEFECT",
+   "story": 13,
+   "defect": "IMAGES_FROM_OTHER_STORY",
+   "final": "../corpus/finals/d13/final.mp4",
+   "subtitles": "../corpus/finals/d13/subtitles.srt",
+   "narration": "../corpus/finals/d13/narration.txt"
+  },
+  {
+   "case_id": "c05",
+   "split": "CALIBRATION",
+   "label": "CLEAN",
+   "story": 5,
+   "final": "../corpus/finals/c05/final.mp4",
+   "subtitles": "../corpus/finals/c05/subtitles.srt",
+   "narration": "../corpus/finals/c05/narration.txt"
+  },
+  {
+   "case_id": "c09",
+   "split": "CALIBRATION",
+   "label": "CLEAN",
+   "story": 9,
+   "final": "../corpus/finals/c09/final.mp4",
+   "subtitles": "../corpus/finals/c09/subtitles.srt",
+   "narration": "../corpus/finals/c09/narration.txt"
+  },
+  {
+   "case_id": "c06",
+   "split": "CALIBRATION",
+   "label": "CLEAN",
+   "story": 6,
+   "final": "../corpus/finals/c06/final.mp4",
+   "subtitles": "../corpus/finals/c06/subtitles.srt",
+   "narration": "../corpus/finals/c06/narration.txt"
+  },
+  {
+   "case_id": "d18",
+   "split": "CALIBRATION",
+   "label": "CRITICAL_DEFECT",
+   "story": 18,
+   "defect": "UPSIDE_DOWN_FRAMES",
+   "final": "../corpus/finals/d18/final.mp4",
+   "subtitles": "../corpus/finals/d18/subtitles.srt",
+   "narration": "../corpus/finals/d18/narration.txt"
+  },
+  {
+   "case_id": "d15",
+   "split": "CALIBRATION",
+   "label": "CRITICAL_DEFECT",
+   "story": 15,
+   "defect": "GARBLED_SUBTITLES",
+   "final": "../corpus/finals/d15/final.mp4",
+   "subtitles": "../corpus/finals/d15/subtitles.srt",
+   "narration": "../corpus/finals/d15/narration.txt"
+  },
+  {
+   "case_id": "c00",
+   "split": "CALIBRATION",
+   "label": "CLEAN",
+   "story": 0,
+   "final": "../corpus/finals/c00/final.mp4",
+   "subtitles": "../corpus/finals/c00/subtitles.srt",
+   "narration": "../corpus/finals/c00/narration.txt"
+  },
+  {
+   "case_id": "d14",
+   "split": "CALIBRATION",
+   "label": "CRITICAL_DEFECT",
+   "story": 14,
+   "defect": "NOISE_CORRUPTION",
+   "final": "../corpus/finals/d14/final.mp4",
+   "subtitles": "../corpus/finals/d14/subtitles.srt",
+   "narration": "../corpus/finals/d14/narration.txt"
+  },
+  {
+   "case_id": "d17",
+   "split": "CALIBRATION",
+   "label": "CRITICAL_DEFECT",
+   "story": 17,
+   "defect": "PLACEHOLDER_TEXT",
+   "final": "../corpus/finals/d17/final.mp4",
+   "subtitles": "../corpus/finals/d17/subtitles.srt",
+   "narration": "../corpus/finals/d17/narration.txt"
+  },
+  {
+   "case_id": "d16",
+   "split": "CALIBRATION",
+   "label": "CRITICAL_DEFECT",
+   "story": 16,
+   "defect": "COLOR_BARS_PLACEHOLDER",
+   "final": "../corpus/finals/d16/final.mp4",
+   "subtitles": "../corpus/finals/d16/subtitles.srt",
+   "narration": "../corpus/finals/d16/narration.txt"
+  },
+  {
+   "case_id": "c02",
+   "split": "CALIBRATION",
+   "label": "CLEAN",
+   "story": 2,
+   "final": "../corpus/finals/c02/final.mp4",
+   "subtitles": "../corpus/finals/c02/subtitles.srt",
+   "narration": "../corpus/finals/c02/narration.txt"
+  },
+  {
+   "case_id": "d10",
+   "split": "CALIBRATION",
+   "label": "CRITICAL_DEFECT",
+   "story": 10,
+   "defect": "WRONG_LANGUAGE_SUBTITLES",
+   "final": "../corpus/finals/d10/final.mp4",
+   "subtitles": "../corpus/finals/d10/subtitles.srt",
+   "narration": "../corpus/finals/d10/narration.txt"
+  },
+  {
+   "case_id": "c07",
+   "split": "CALIBRATION",
+   "label": "CLEAN",
+   "story": 7,
+   "final": "../corpus/finals/c07/final.mp4",
+   "subtitles": "../corpus/finals/c07/subtitles.srt",
+   "narration": "../corpus/finals/c07/narration.txt"
+  },
+  {
+   "case_id": "c01",
+   "split": "CALIBRATION",
+   "label": "CLEAN",
+   "story": 1,
+   "final": "../corpus/finals/c01/final.mp4",
+   "subtitles": "../corpus/finals/c01/subtitles.srt",
+   "narration": "../corpus/finals/c01/narration.txt"
+  },
+  {
+   "case_id": "d12",
+   "split": "CALIBRATION",
+   "label": "CRITICAL_DEFECT",
+   "story": 12,
+   "defect": "BLACK_FRAMES",
+   "final": "../corpus/finals/d12/final.mp4",
+   "subtitles": "../corpus/finals/d12/subtitles.srt",
+   "narration": "../corpus/finals/d12/narration.txt"
+  },
+  {
+   "case_id": "x06",
+   "split": "HOLDOUT",
+   "label": "CRITICAL_DEFECT",
+   "story": 6,
+   "defect": "COLOR_BARS_PLACEHOLDER",
+   "final": "../corpus2/finals/x06/final.mp4",
+   "subtitles": "../corpus2/finals/x06/subtitles.srt",
+   "narration": "../corpus2/finals/x06/narration.txt"
+  },
+  {
+   "case_id": "h08",
+   "split": "HOLDOUT",
+   "label": "CLEAN",
+   "story": 8,
+   "final": "../corpus2/finals/h08/final.mp4",
+   "subtitles": "../corpus2/finals/h08/subtitles.srt",
+   "narration": "../corpus2/finals/h08/narration.txt"
+  },
+  {
+   "case_id": "x09",
+   "split": "HOLDOUT",
+   "label": "CRITICAL_DEFECT",
+   "story": 9,
+   "defect": "TINY_PICTURE_IN_BLACK",
+   "final": "../corpus2/finals/x09/final.mp4",
+   "subtitles": "../corpus2/finals/x09/subtitles.srt",
+   "narration": "../corpus2/finals/x09/narration.txt"
+  },
+  {
+   "case_id": "x05",
+   "split": "HOLDOUT",
+   "label": "CRITICAL_DEFECT",
+   "story": 5,
+   "defect": "GARBLED_SUBTITLES",
+   "final": "../corpus2/finals/x05/final.mp4",
+   "subtitles": "../corpus2/finals/x05/subtitles.srt",
+   "narration": "../corpus2/finals/x05/narration.txt"
+  },
+  {
+   "case_id": "x04",
+   "split": "HOLDOUT",
+   "label": "CRITICAL_DEFECT",
+   "story": 4,
+   "defect": "NOISE_CORRUPTION",
+   "final": "../corpus2/finals/x04/final.mp4",
+   "subtitles": "../corpus2/finals/x04/subtitles.srt",
+   "narration": "../corpus2/finals/x04/narration.txt"
+  },
+  {
+   "case_id": "h02",
+   "split": "HOLDOUT",
+   "label": "CLEAN",
+   "story": 2,
+   "final": "../corpus2/finals/h02/final.mp4",
+   "subtitles": "../corpus2/finals/h02/subtitles.srt",
+   "narration": "../corpus2/finals/h02/narration.txt"
+  },
+  {
+   "case_id": "x00",
+   "split": "HOLDOUT",
+   "label": "CRITICAL_DEFECT",
+   "story": 0,
+   "defect": "WRONG_LANGUAGE_SUBTITLES",
+   "final": "../corpus2/finals/x00/final.mp4",
+   "subtitles": "../corpus2/finals/x00/subtitles.srt",
+   "narration": "../corpus2/finals/x00/narration.txt"
+  },
+  {
+   "case_id": "x03",
+   "split": "HOLDOUT",
+   "label": "CRITICAL_DEFECT",
+   "story": 3,
+   "defect": "IMAGES_FROM_OTHER_STORY",
+   "final": "../corpus2/finals/x03/final.mp4",
+   "subtitles": "../corpus2/finals/x03/subtitles.srt",
+   "narration": "../corpus2/finals/x03/narration.txt"
+  },
+  {
+   "case_id": "h04",
+   "split": "HOLDOUT",
+   "label": "CLEAN",
+   "story": 4,
+   "final": "../corpus2/finals/h04/final.mp4",
+   "subtitles": "../corpus2/finals/h04/subtitles.srt",
+   "narration": "../corpus2/finals/h04/narration.txt"
+  },
+  {
+   "case_id": "h07",
+   "split": "HOLDOUT",
+   "label": "CLEAN",
+   "story": 7,
+   "final": "../corpus2/finals/h07/final.mp4",
+   "subtitles": "../corpus2/finals/h07/subtitles.srt",
+   "narration": "../corpus2/finals/h07/narration.txt"
+  },
+  {
+   "case_id": "x07",
+   "split": "HOLDOUT",
+   "label": "CRITICAL_DEFECT",
+   "story": 7,
+   "defect": "PLACEHOLDER_TEXT",
+   "final": "../corpus2/finals/x07/final.mp4",
+   "subtitles": "../corpus2/finals/x07/subtitles.srt",
+   "narration": "../corpus2/finals/x07/narration.txt"
+  },
+  {
+   "case_id": "h05",
+   "split": "HOLDOUT",
+   "label": "CLEAN",
+   "story": 5,
+   "final": "../corpus2/finals/h05/final.mp4",
+   "subtitles": "../corpus2/finals/h05/subtitles.srt",
+   "narration": "../corpus2/finals/h05/narration.txt"
+  },
+  {
+   "case_id": "x08",
+   "split": "HOLDOUT",
+   "label": "CRITICAL_DEFECT",
+   "story": 8,
+   "defect": "UPSIDE_DOWN_FRAMES",
+   "final": "../corpus2/finals/x08/final.mp4",
+   "subtitles": "../corpus2/finals/x08/subtitles.srt",
+   "narration": "../corpus2/finals/x08/narration.txt"
+  },
+  {
+   "case_id": "h00",
+   "split": "HOLDOUT",
+   "label": "CLEAN",
+   "story": 0,
+   "final": "../corpus2/finals/h00/final.mp4",
+   "subtitles": "../corpus2/finals/h00/subtitles.srt",
+   "narration": "../corpus2/finals/h00/narration.txt"
+  },
+  {
+   "case_id": "h03",
+   "split": "HOLDOUT",
+   "label": "CLEAN",
+   "story": 3,
+   "final": "../corpus2/finals/h03/final.mp4",
+   "subtitles": "../corpus2/finals/h03/subtitles.srt",
+   "narration": "../corpus2/finals/h03/narration.txt"
+  },
+  {
+   "case_id": "x01",
+   "split": "HOLDOUT",
+   "label": "CRITICAL_DEFECT",
+   "story": 1,
+   "defect": "NARRATION_FROM_OTHER_STORY",
+   "final": "../corpus2/finals/x01/final.mp4",
+   "subtitles": "../corpus2/finals/x01/subtitles.srt",
+   "narration": "../corpus2/finals/x01/narration.txt"
+  },
+  {
+   "case_id": "x02",
+   "split": "HOLDOUT",
+   "label": "CRITICAL_DEFECT",
+   "story": 2,
+   "defect": "BLACK_FRAMES",
+   "final": "../corpus2/finals/x02/final.mp4",
+   "subtitles": "../corpus2/finals/x02/subtitles.srt",
+   "narration": "../corpus2/finals/x02/narration.txt"
+  },
+  {
+   "case_id": "h06",
+   "split": "HOLDOUT",
+   "label": "CLEAN",
+   "story": 6,
+   "final": "../corpus2/finals/h06/final.mp4",
+   "subtitles": "../corpus2/finals/h06/subtitles.srt",
+   "narration": "../corpus2/finals/h06/narration.txt"
+  },
+  {
+   "case_id": "h01",
+   "split": "HOLDOUT",
+   "label": "CLEAN",
+   "story": 1,
+   "final": "../corpus2/finals/h01/final.mp4",
+   "subtitles": "../corpus2/finals/h01/subtitles.srt",
+   "narration": "../corpus2/finals/h01/narration.txt"
+  },
+  {
+   "case_id": "h09",
+   "split": "HOLDOUT",
+   "label": "CLEAN",
+   "story": 9,
+   "final": "../corpus2/finals/h09/final.mp4",
+   "subtitles": "../corpus2/finals/h09/subtitles.srt",
+   "narration": "../corpus2/finals/h09/narration.txt"
+  }
+ ]
+}

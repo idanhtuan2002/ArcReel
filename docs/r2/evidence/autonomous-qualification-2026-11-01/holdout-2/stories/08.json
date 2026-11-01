@@ -1,0 +1,35 @@
+{
+  "title": "Vé Tàu Về",
+  "scenes": [
+    {
+      "narration": "Tiền trả học phí còn thiếu, cậu sinh viên nghèo quyết định bán quần áo cũ để mua vé tàu.",
+      "narration_en": "With tuition fees still unpaid, the poor student decides to sell his old clothes just to buy a train ticket.",
+      "image_prompt": "Vertical cinematic shot. A slender Vietnamese male college student, wearing worn-out but clean clothes and carrying an oversized backpack filled with second-hand items he is selling. He stands on a busy street corner in Hanoi under the warm golden sunset light filtering through tall buildings. His face shows determination mixed with sadness. No text."
+    },
+    {
+      "narration": "Cậu đứng giữa dòng người tấp nập, nắm chặt vé tàu trong tay như nắm lấy hy vọng duy nhất.",
+      "narration_en": "Standing amidst the bustling crowd, he clutches his train ticket tightly as if holding onto his only hope.",
+      "image_prompt": "Vertical cinematic shot. The same Vietnamese male student from before, now in a busy urban setting with blurred faces of commuters around him to emphasize isolation. He is looking down at a small printed paper (the ticket) held firmly in both hands. Soft focus background showing the chaotic city life contrasting with his calm resolve during dusk lighting."
+    },
+    {
+      "narration": "Tàu chạy rầm rộ, gió lùa qua cửa sổ đưa cậu đến gần quê hương mà lòng đầy mong chờ.",
+      "narration_en": "The train rumble loudly; wind blows through the window as he approaches his hometown with a heart full of anticipation.",
+      "image_prompt": "Vertical cinematic shot. Interior view from inside an old Vietnamese passenger train carriage looking out at passing green rice fields transitioning into village rooftops. The same student sits on a wooden bench, bathed in soft morning light streaming through the window dust particles dancing in the air. He looks small against the vast landscape."
+    },
+    {
+      "narration": "Khi tàu dừng lại tại ga nhỏ xíu, cậu nhìn thấy bóng dáng người cha gầy gao đang đứng đợi ở cửa.",
+      "narration_en": "When the train stops at a tiny station, he sees his father's emaciated figure waiting at the entrance.",
+      "image_prompt": "Vertical cinematic shot. Exterior of an old rustic railway station in rural Vietnam with weathered wooden posts and tiled roof covered in moss. The same student steps off the train looking up towards the platform where a very thin older man (Vietnamese father) stands holding his cane, wearing faded traditional shirt, under gray overcast sky light."
+    },
+    {
+      "narration": "Hai cha con chạy vào nhau giữa tiếng còi tàu, nước mắt không nén nổi rơi trên vai người cha.",
+      "narration_en": "Father and son run into each other amidst the train whistle; uncontained tears fall onto his father's shoulder.",
+      "image_prompt": "Vertical cinematic close-up. Emotional medium shot of a young Vietnamese man embracing an elderly thin man in traditional rural clothing tightly. The background is slightly blurred showing rustic village houses with smoke rising from chimneys. Warm morning sunlight breaks through the clouds illuminating their tear-stained faces and trembling hands without any text overlays."
+    },
+    {
+      "narration": "Cậu không còn quan tâm đến tiền bạc nữa, chỉ mong cha khỏe mạnh để cùng nhau ăn bữa cơm quê.",
+      "narration_en": "He no longer cares about money now; he only hopes his father recovers so they can share a meal in the countryside together.",
+      "image_prompt": "Vertical cinematic shot. Interior of a simple rural Vietnamese house with bamboo walls and straw mat floor. The student sits beside an older man at a small wooden table covered with steaming bowls of rice porridge, fresh vegetables, and pickles. Soft natural light filters through paper windows creating a peaceful atmosphere showing reconciliation."
+    }
+  ]
+}

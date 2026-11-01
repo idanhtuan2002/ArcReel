@@ -1,0 +1,35 @@
+{
+  "title": "Hồn Bánh Chưng",
+  "scenes": [
+    {
+      "narration": "Đêm giao thừa, bếp nhà bà ngoại Nam Định ấm áp mùi lá dong và gạo nếp thơm.",
+      "narration_en": "On New Year's Eve, Grandma's kitchen in Nam Dinh is warm with the scent of banana leaves and fragrant sticky rice.",
+      "image_prompt": "Vertical cinematic shot of a small Vietnamese kitchen at night. An elderly woman with white hair tied back sits on a low wooden stool, wearing traditional floral cotton pajamas. Next to her stands a young child with short black hair in a yellow hoodie. They are surrounded by tall bundles of dried banana leaves and piles of glutinous rice under warm amber lamp light reflecting off polished wood surfaces."
+    },
+    {
+      "narration": "Bà cầm tay cháu, chỉ cách gấp lá xanh: 'Thịt phải vuông, mỡ thì dày mới gọi là đầy đặn.'",
+      "narration_en": "Grandma holds the child's hand, pointing to folding green leaves. She says softly that meat must be square and fat thick to represent completeness.",
+      "image_prompt": "Vertical cinematic close-up of two hands working together on a wooden table in a dimly lit Vietnamese kitchen. An elderly woman with weathered skin gently guides a young boy's smaller hand as they fold vibrant green banana leaves around pork belly slices. Warm golden light from an overhead bulb highlights the steam rising and the texture of the rice."
+    },
+    {
+      "narration": "Bếp chật hẹp nhưng tiếng cười rúc lên mỗi lần cháu vấp ngã, bà lại nâng cháu dậy.",
+      "narration_en": "The small kitchen is crowded yet filled with laughter every time the child stumbles; Grandma lifts him up again instantly.",
+      "image_prompt": "Vertical cinematic medium shot inside a cozy but cluttered Vietnamese wooden house. An elderly woman stands helping a young boy who just fell while carrying heavy rice baskets. Dust motes dance in shafts of moonlight mixing with warm interior lighting. Traditional woven mats cover the floor, and steam rises from pots on a small stove."
+    },
+    {
+      "narration": "Bánh chín thơm bay khắp nhà khi mọi người quây quần bên mâm cỗ đầy đặn của bà.",
+      "narration_en": "The fragrant aroma of cooked cakes fills the house as everyone gathers around Grandma's abundant feast table.",
+      "image_prompt": "Vertical cinematic low-angle shot looking up at a round wooden dining table laden with steaming square green rice cake blocks, banana leaf parcels, and bowls of soup. An elderly woman sits smiling broadly in traditional attire while children reach for food under soft candlelight flickering against dark walls."
+    },
+    {
+      "narration": "Bà khẽ thở dài: 'Ngày mai cháu lớn rồi, bà lại nhớ những năm tháng gói bánh này cùng nhau.'",
+      "narration_en": "Grandma sighs softly. She says tomorrow the child will grow up and she will miss these years of making cakes together.",
+      "image_prompt": "Vertical cinematic intimate shot focusing on an elderly woman's wrinkled face showing gentle sadness mixed with pride as she looks down at a young boy eating quietly beside her in dim evening light filtering through paper windows."
+    },
+    {
+      "narration": "Bánh chưng gói trọn tình bà cháu, dù thời gian trôi nhanh thì hương vị ấy vẫn vẹn nguyên.",
+      "narration_en": "The rice cake wraps Grandma and grandchild's love completely; though time passes quickly this flavor remains unchanged forevermore.",
+      "image_prompt": "Vertical cinematic close-up of a finished square green rice cake sitting on dark wood next to an empty woven basket. Soft focus background shows blurred silhouettes of family members hugging in warm golden light that creates long shadows across the polished floor."
+    }
+  ]
+}

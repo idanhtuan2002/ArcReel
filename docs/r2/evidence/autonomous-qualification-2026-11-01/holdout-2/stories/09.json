@@ -1,0 +1,35 @@
+{
+  "title": "Người Kể Chuyện Giữa Mưa",
+  "scenes": [
+    {
+      "narration": "Mưa dầm thấm lâu, cô giáo nhẹ nhàng dìu từng em nhỏ rời khỏi nhà trường ngập nước.",
+      "narration_en": "The rain pours down heavily; the teacher gently guides each small child away from the flooded schoolhouse.",
+      "image_prompt": "Vertical cinematic shot of a Vietnamese female kindergarten teacher with short hair and mud-stained clothes holding hands with three tiny children, walking through knee-deep floodwater towards a distant green hill under dark stormy sky at dusk."
+    },
+    {
+      "narration": "Đến đỉnh đồi an toàn, cô bảo các em ngồi thành vòng tròn ấm áp bên đống lửa nhỏ.",
+      "narration_en": "At the safe peak of the hill, she tells them to sit in a warm circle beside a small fire.",
+      "image_prompt": "Vertical cinematic shot from above showing the teacher sitting on dry grass with six diverse Vietnamese toddlers in colorful raincoats forming a perfect circle around a crackling campfire under heavy falling rain and lightning."
+    },
+    {
+      "narration": "Mặc dù ướt sũng, ánh lửa hồng chiếu rọi lên những khuôn mặt ngây thơ đang lắng nghe cô kể chuyện.",
+      "narration_en": "Though soaked in water, the warm firelight illuminates their innocent faces as they listen intently to her story.",
+      "image_prompt": "Vertical close-up cinematic shot focusing on the teacher's kind eyes and a smiling toddler listening to the story, with glowing embers reflecting softly on wet cheeks under dim natural lighting."
+    },
+    {
+      "narration": "Cô cười dịu dàng nói rằng dù mưa có lớn đến đâu thì tình yêu thương sẽ luôn che chắn cho các em.",
+      "narration_en": "She smiles gently and says that no matter how big the rain, love will always protect them all.",
+      "image_prompt": "Vertical medium shot of the teacher holding a toddler close while whispering softly to another child listening with wide eyes, surrounded by swirling mist and dim firelight in a lush Vietnamese forest setting."
+    },
+    {
+      "narration": "Khi trời sáng, lũ rút dần, cô cùng các em trở về nhà trường như thể không có chuyện gì xảy ra.",
+      "narration_en": "When morning comes and the flood recedes, she returns with them to school as if nothing ever happened.",
+      "image_prompt": "Vertical cinematic wide shot of the teacher walking hand-in-hand with children across drying mud near their rebuilt schoolhouse under golden sunrise rays piercing through breaking storm clouds."
+    },
+    {
+      "narration": "Trong tim các em nhỏ, câu chuyện cô kể hôm qua vẫn còn ấm áp đến tận ngày nay.",
+      "narration_en": "In the children's hearts, the story she told yesterday remains warm until this very day.",
+      "image_prompt": "Vertical cinematic close-up of a toddler hugging the teacher tightly with tears of joy on cheeks, soft golden sunlight filtering through leaves creating lens flares around them in a peaceful Vietnamese village landscape."
+    }
+  ]
+}
