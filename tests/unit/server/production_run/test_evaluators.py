@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import math
 import shutil
 import subprocess
 from pathlib import Path
@@ -12,13 +13,15 @@ from r2.contracts.automation import ModelRoute
 from server.production_run.evaluators import (
     CONTEXT_TOKENS,
     FRAME_COUNT,
-    OBSERVATIONS,
+    PROBABILITIES,
     QUESTIONS,
     FinalEvidence,
     OllamaReviewer,
     cue_at,
+    first_token_probability,
     frame_answer_findings,
     frame_times,
+    illustration_findings,
     prompt_digest,
     review_method,
     upright_letter,
@@ -167,38 +170,76 @@ def test_frame_answer_thresholds() -> None:
     assert [upright_letter(t) for t in ("A", " B.", "**b**", "C")] == [False, True, True, None]
 
 
-OBSERVING = ROUTE.model_copy(update={"model_id": "qwen2.5vl:7b", "model_identity": "ollama/qwen2.5vl:7b"})
+PROBABLE = ROUTE.model_copy(update={"model_id": "qwen2.5vl:7b", "model_identity": "ollama/qwen2.5vl:7b"})
 
 
-def _observed(*, defect: str = "NONE", matches: bool = True, upside_down: bool = False) -> dict:
-    frame = {"content": "cảnh", "matches_narration": matches, "upside_down": upside_down, "defect": defect}
-    return {**ANSWER, "frames": [frame] * FRAME_COUNT}
+def _probable(*, b: float = 0.05, broken: float = 0.01, illustrates: float = 0.8, sent: list[dict] | None = None):
+    """A scripted Ollama returning first-token log-probabilities for each one-picture question."""
+
+    def tops(first: str, p_first: float, second: str) -> dict:
+        return {
+            "message": {"content": first},
+            "logprobs": [
+                {
+                    "token": first,
+                    "logprob": math.log(p_first),
+                    "top_logprobs": [
+                        {"token": first, "logprob": math.log(p_first)},
+                        {"token": second, "logprob": math.log(1 - p_first)},
+                    ],
+                }
+            ],
+        }
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        body = json.loads(request.content)
+        if sent is not None:
+            sent.append(body)
+        text = body["messages"][0]["content"]
+        if "format" in body:
+            return httpx.Response(200, json={"message": {"content": json.dumps(ANSWER)}})
+        if "Which one is upright" in text:
+            return httpx.Response(200, json=tops("B", b, "A"))
+        if "broken" in text:
+            return httpx.Response(200, json=tops("yes", broken, "no"))
+        return httpx.Response(200, json=tops("yes", illustrates, "no"))
+
+    return OllamaReviewer(base_url_for=_base_url, transport=httpx.MockTransport(handler))
 
 
-async def test_an_observing_reviewer_asks_orientation_per_frame_then_observes_while_scoring(tmp_path: Path) -> None:
+async def test_a_probability_reviewer_reads_first_token_logprobs_per_frame(tmp_path: Path) -> None:
     sent: list[dict] = []
 
-    review = await _reviewer(_observed(), sent=sent).assess(route=OBSERVING, evidence=_evidence(tmp_path))
+    review = await _probable(sent=sent).assess(route=PROBABLE, evidence=_evidence(tmp_path))
 
-    assert review_method(OBSERVING) == OBSERVATIONS
-    assert review.prompt_digest == prompt_digest(OBSERVATIONS) != prompt_digest(QUESTIONS)
+    assert review_method(PROBABLE) == PROBABILITIES
+    assert review.prompt_digest == prompt_digest(PROBABILITIES) != prompt_digest(QUESTIONS)
     assert review.accepts()
-    assert len(sent) == FRAME_COUNT + 1
-    assert "frames" in sent[-1]["format"]["required"]
+    assert len(sent) == 3 * FRAME_COUNT + 1
+    assert all(b["logprobs"] is True and b["options"]["num_predict"] == 1 for b in sent[:-1])
 
 
 @pytest.mark.parametrize(
-    ("answer", "upright", "code"),
+    ("answers", "code"),
     [
-        (_observed(defect="NOISE"), "A", "OBSERVED_BROKEN_FRAMES"),
-        (_observed(upside_down=True), "A", "OBSERVED_UPSIDE_DOWN"),
-        (_observed(matches=False), "A", "OBSERVED_UNRELATED_FRAMES"),
-        (_observed(), "B", "FRAME_UPSIDE_DOWN"),
+        ({"b": 0.9}, "FRAME_UPSIDE_DOWN"),
+        ({"broken": 0.9}, "FRAME_BROKEN"),
+        ({"illustrates": 0.05}, "FRAMES_NOT_ILLUSTRATING_NARRATION"),
     ],
 )
-async def test_an_observing_reviewer_rejects_what_it_observed(
-    tmp_path: Path, answer: dict, upright: str, code: str
+async def test_a_probability_reviewer_rejects_by_calibrated_thresholds(
+    tmp_path: Path, answers: dict, code: str
 ) -> None:
-    review = await _reviewer(answer, upright=upright).assess(route=OBSERVING, evidence=_evidence(tmp_path))
+    review = await _probable(**answers).assess(route=PROBABLE, evidence=_evidence(tmp_path))
 
     assert [f.code for f in review.findings if f.severity == "CRITICAL"] == [code]
+
+
+def test_first_token_probability_normalises_between_the_two_answers() -> None:
+    tops = [{"top_logprobs": [{"token": " Yes", "logprob": math.log(0.6)}, {"token": "no", "logprob": math.log(0.2)}]}]
+
+    assert first_token_probability(tops, yes="yes", no="no") == pytest.approx(0.75)
+    assert first_token_probability([{"top_logprobs": [{"token": "maybe", "logprob": 0.0}]}], yes="yes", no="no") is None
+    assert first_token_probability(None, yes="yes", no="no") is None
+    assert illustration_findings([0.1, 0.1, None], unit_key="e")[0].code == "FRAMES_NOT_ILLUSTRATING_NARRATION"
+    assert illustration_findings([0.2, 0.1], unit_key="e") == []

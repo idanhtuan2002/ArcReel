@@ -6,7 +6,9 @@ about the writer, the other reviewer or the run. Per frame it is asked one-pictu
 rotation is upright", either answer counting; does it illustrate the narration line shown at its moment — and
 then, with every frame and its line, for the language, an anchored 1–5 score per creative dimension and its
 findings. Fixed rules turn the answers into CRITICAL findings (``frame_answer_findings``): two or more broken or
-upside-down frames, or two or more frames that do not illustrate their line. Subtitles and the picture's fill are
+upside-down frames, or two or more frames that do not illustrate their line. The ``probabilities`` method instead
+reads each answer's yes/no probability from the first token's log-probabilities and applies calibrated thresholds
+(``illustration_findings``: frames that on average do not illustrate their line). Subtitles and the picture's fill are
 judged by the fixed technical checks of ``final_checks``, which are part of every review. A transport error, timeout
 or a response outside the schema is a FAILED assessment, never a pass.
 """
@@ -16,6 +18,7 @@ from __future__ import annotations
 import asyncio
 import base64
 import json
+import math
 import subprocess
 import tempfile
 from collections.abc import Awaitable, Callable
@@ -79,17 +82,6 @@ LỜI KỂ:
 {narration}
 """
 
-OBSERVATION_STEP = """Bước 0 — quan sát, ghi vào "frames" đúng {frame_count} mục theo thứ tự:
-- content: khung hình thực sự cho thấy gì (ngắn gọn);
-- matches_narration: true nếu hình hợp với câu phụ đề của chính khung đó (cùng nhân vật, bối cảnh hoặc sự việc),
-  false nếu hình nói về chuyện khác hẳn;
-- upside_down: true nếu hình bị lộn ngược (trời ở dưới, người chổng ngược);
-- defect: BLACK (đen/trống), NOISE (nhiễu hạt, vỡ hình), TEST_PATTERN (sọc màu thử sóng), TINY_OR_CROPPED (hình nhỏ
-  giữa nền đen hoặc bị cắt mất phần chính), DISTORTED (méo, kéo giãn), hoặc NONE.
-
-"""
-FRAME_DEFECTS = ("NONE", "BLACK", "NOISE", "TEST_PATTERN", "TINY_OR_CROPPED", "DISTORTED")
-
 SCHEMA = {
     "type": "object",
     "required": ["language", "scores", "findings"],
@@ -117,83 +109,47 @@ SCHEMA = {
 }
 
 
-OBSERVATION_SCHEMA = {
-    **SCHEMA,
-    "required": ["frames", *SCHEMA["required"]],
-    "properties": {
-        "frames": {
-            "type": "array",
-            "items": {
-                "type": "object",
-                "required": ["content", "matches_narration", "upside_down", "defect"],
-                "properties": {
-                    "content": {"type": "string"},
-                    "matches_narration": {"type": "boolean"},
-                    "upside_down": {"type": "boolean"},
-                    "defect": {"enum": list(FRAME_DEFECTS)},
-                },
-            },
-        },
-        **SCHEMA["properties"],
-    },
-}
-
 QUESTIONS = "questions"
-OBSERVATIONS = "observations"
+PROBABILITIES = "probabilities"
+PROBABILITY_CUT = 0.5
+MAX_MEAN_ILLUSTRATES = 0.15
 # Review method of each qualified reviewer model, chosen on the calibration split; unlisted models ask questions.
-REVIEW_METHODS: dict[str, str] = {"qwen2.5vl:7b": OBSERVATIONS, "gemma3:4b": QUESTIONS}
+REVIEW_METHODS: dict[str, str] = {"qwen2.5vl:7b": PROBABILITIES, "gemma3:4b": QUESTIONS}
 
 
 def review_method(route: ModelRoute) -> str:
     return REVIEW_METHODS.get(route.model_id, QUESTIONS)
 
 
-def review_prompt(method: str) -> str:
-    return (
-        PROMPT.replace("Bước 1 — chấm điểm", OBSERVATION_STEP + "Bước 1 — chấm điểm")
-        if method == OBSERVATIONS
-        else PROMPT
-    )
+def illustration_findings(probabilities: list[float | None], *, unit_key: str) -> list[AssessmentFinding]:
+    """The ``probabilities`` method's rule: frames that on average do not illustrate their line are CRITICAL."""
+    known = [p for p in probabilities if p is not None]
+    if not known or sum(known) / len(known) >= MAX_MEAN_ILLUSTRATES:
+        return []
+    return [
+        AssessmentFinding(
+            code="FRAMES_NOT_ILLUSTRATING_NARRATION",
+            severity="CRITICAL",
+            unit_key=unit_key,
+            repair_stage=RunStage.MEDIA,
+            detail=f"mean probability {sum(known) / len(known):.2f} that a frame illustrates its line",
+        )
+    ]
 
 
-def observed_findings(answer: dict, *, unit_key: str) -> list[AssessmentFinding]:
-    """Findings from the scoring answer's own frame observations (the ``observations`` method)."""
-    frames = [frame for frame in answer.get("frames") or [] if isinstance(frame, dict)]
-    broken = [str(f.get("defect", "NONE")) for f in frames if str(f.get("defect", "NONE")) != "NONE"]
-    flipped = sum(1 for f in frames if f.get("upside_down") is True)
-    unrelated = sum(1 for f in frames if f.get("matches_narration") is False)
-    found: list[AssessmentFinding] = []
-    if len(broken) >= MIN_BROKEN_FRAMES:
-        found.append(
-            AssessmentFinding(
-                code="OBSERVED_BROKEN_FRAMES",
-                severity="CRITICAL",
-                unit_key=unit_key,
-                repair_stage=RunStage.MEDIA,
-                detail=", ".join(sorted(set(broken))) + f" in {len(broken)} frames",
-            )
-        )
-    if flipped >= MIN_FLIPPED_FRAMES:
-        found.append(
-            AssessmentFinding(
-                code="OBSERVED_UPSIDE_DOWN",
-                severity="CRITICAL",
-                unit_key=unit_key,
-                repair_stage=RunStage.MEDIA,
-                detail=f"{flipped} frames upside down",
-            )
-        )
-    if frames and 2 * unrelated >= len(frames):
-        found.append(
-            AssessmentFinding(
-                code="OBSERVED_UNRELATED_FRAMES",
-                severity="CRITICAL",
-                unit_key=unit_key,
-                repair_stage=RunStage.MEDIA,
-                detail=f"{unrelated} of {len(frames)} frames unrelated to their narration",
-            )
-        )
-    return found
+def first_token_probability(logprobs: list[dict] | None, *, yes: str, no: str) -> float | None:
+    """P(``yes``) between the two answers among the first generated token's top alternatives."""
+    if not logprobs:
+        return None
+    mass = {"yes": 0.0, "no": 0.0}
+    for entry in logprobs[0].get("top_logprobs") or []:
+        token = str(entry.get("token", "")).strip().lower().strip("*\"'")
+        if token == yes.lower():
+            mass["yes"] += math.exp(float(entry["logprob"]))
+        elif token == no.lower():
+            mass["no"] += math.exp(float(entry["logprob"]))
+    total = mass["yes"] + mass["no"]
+    return mass["yes"] / total if total else None
 
 
 def frame_answer_findings(
@@ -320,18 +276,21 @@ class QualifiedEvaluator(Protocol):
 
 def prompt_digest(method: str = QUESTIONS) -> str:
     """The digest of everything a reviewer of ``method`` is asked and the fixed rules applied to its answers."""
-    observing = method == OBSERVATIONS
+    questions = (
+        [BROKEN_QUESTION, ORIENTATION_QUESTION, MATCH_QUESTION]
+        if method == PROBABILITIES
+        else [BROKEN_QUESTION, UPRIGHT_QUESTION, ORIENTATION_QUESTION, MATCH_QUESTION]
+    )
     return digest_value(
-        "r2.production-review-prompt.v8",
+        "r2.production-review-prompt.v9",
         ensure_json_value(
             {
                 "method": method,
-                "prompt": review_prompt(method),
-                "schema": OBSERVATION_SCHEMA if observing else SCHEMA,
-                "questions": [ORIENTATION_QUESTION]
-                if observing
-                else [BROKEN_QUESTION, UPRIGHT_QUESTION, ORIENTATION_QUESTION, MATCH_QUESTION],
+                "prompt": PROMPT,
+                "schema": SCHEMA,
+                "questions": questions,
                 "thresholds": [MIN_BROKEN_FRAMES, MIN_FLIPPED_FRAMES, MIN_MISMATCHED_FRAMES],
+                "probabilities": [PROBABILITY_CUT, MAX_MEAN_ILLUSTRATES] if method == PROBABILITIES else None,
                 "frames": [FRAME_COUNT, FRAME_WIDTH],
             }
         ),
@@ -429,11 +388,11 @@ class OllamaReviewer:
                 "stream": False,
                 "truncate": False,
                 "shift": False,
-                "format": OBSERVATION_SCHEMA if method == OBSERVATIONS else SCHEMA,
+                "format": SCHEMA,
                 "messages": [
                     {
                         "role": "user",
-                        "content": review_prompt(method).format(
+                        "content": PROMPT.format(
                             frame_count=len(frames),
                             frame_cues=cues,
                             subtitles=subtitles[:6000],
@@ -471,14 +430,44 @@ class OllamaReviewer:
                     reply.raise_for_status()
                     return parse(str(reply.json()["message"].get("content") or ""))
 
+                async def probability(question: str, frame: bytes, yes: str, no: str) -> float | None:
+                    reply = await client.post(
+                        url + "/api/chat",
+                        json={
+                            "model": route.model_id,
+                            "stream": False,
+                            "think": False,
+                            "truncate": False,
+                            "logprobs": True,
+                            "top_logprobs": 10,
+                            "messages": [
+                                {
+                                    "role": "user",
+                                    "content": question,
+                                    "images": [base64.b64encode(frame).decode("ascii")],
+                                }
+                            ],
+                            "options": {"temperature": 0, "num_predict": 1, "num_ctx": CONTEXT_TOKENS},
+                        },
+                    )
+                    reply.raise_for_status()
+                    return first_token_probability(reply.json().get("logprobs"), yes=yes, no=no)
+
+                def above(value: float | None) -> bool | None:
+                    return None if value is None else value > PROBABILITY_CUT
+
                 broken: list[bool | None] = []
                 illustrates: list[bool | None] = []
                 flipped: list[bool | None] = []
+                illustrating: list[float | None] = []
                 for frame, pair, seconds in zip(frames, pairs, times, strict=True):
-                    compared = await ask(ORIENTATION_QUESTION, pair, upright_letter)
-                    if method == OBSERVATIONS:
-                        flipped.append(compared)
+                    if method == PROBABILITIES:
+                        flipped.append(above(await probability(ORIENTATION_QUESTION, pair, "B", "A")))
+                        broken.append(above(await probability(BROKEN_QUESTION, frame, "yes", "no")))
+                        cue = cue_at(subtitles, seconds) or "—"
+                        illustrating.append(await probability(MATCH_QUESTION.format(cue=cue), frame, "yes", "no"))
                         continue
+                    compared = await ask(ORIENTATION_QUESTION, pair, upright_letter)
                     broken.append(await ask(BROKEN_QUESTION, frame))
                     alone = await ask(UPRIGHT_QUESTION, frame)
                     flipped.append(True if True in (alone, compared) else None if None in (alone, compared) else False)
@@ -487,8 +476,8 @@ class OllamaReviewer:
             response.raise_for_status()
             answer = json.loads(response.json()["message"]["content"])
             checks += frame_answer_findings(flipped, illustrates, broken, unit_key=evidence.unit_key)
-            if method == OBSERVATIONS:
-                checks += observed_findings(answer, unit_key=evidence.unit_key)
+            if method == PROBABILITIES:
+                checks += illustration_findings(illustrating, unit_key=evidence.unit_key)
             return ModelAssessment.model_validate(
                 {
                     **base,
