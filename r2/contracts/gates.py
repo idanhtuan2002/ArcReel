@@ -10,7 +10,7 @@ own decision records, and Gate C's additive audit companion.
 
 from __future__ import annotations
 
-from typing import Literal
+from typing import Annotated, Literal
 
 from pydantic import AwareDatetime, ConfigDict, Field
 
@@ -24,6 +24,22 @@ class GateAuthorization(R2ContractModel):
     authorized_at: AwareDatetime
 
 
+class GateAutomationAuthorizationV1(R2ContractModel):
+    """Gate A only (ADR-0111 BRIEF): the run automation principal and its grant reference, never a Human."""
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+    schema_id: Literal["r2.gate-automation-authorization.v1"] = "r2.gate-automation-authorization.v1"
+    authenticated_principal: NonEmptyStr
+    authority_role: Literal["RUN_AUTOMATION"] = "RUN_AUTOMATION"
+    automation_reference: NonEmptyStr
+    authorized_at: AwareDatetime
+
+
+GreenlightAuthorization = Annotated[
+    GateAuthorization | GateAutomationAuthorizationV1, Field(discriminator="authority_role")
+]
+
+
 class GreenlightDecision(R2ContractModel):
     model_config = ConfigDict(frozen=True, extra="forbid")
     decision_id: NonEmptyStr
@@ -31,7 +47,7 @@ class GreenlightDecision(R2ContractModel):
     project_name: NonEmptyStr
     source_digest: NonEmptyStr
     action: Literal["GREENLIGHT", "REVOKE"]
-    authorization: GateAuthorization
+    authorization: GreenlightAuthorization
     sequence: int = Field(ge=1)
     created_at: AwareDatetime
 
@@ -89,6 +105,8 @@ class FinalCutReceipt(R2ContractModel):
 __all__ = [
     "FinalCutReceipt",
     "GateAuthorization",
+    "GateAutomationAuthorizationV1",
+    "GreenlightAuthorization",
     "GreenlightDecision",
     "PublishApprovalDecision",
     "ScriptLockDecision",
