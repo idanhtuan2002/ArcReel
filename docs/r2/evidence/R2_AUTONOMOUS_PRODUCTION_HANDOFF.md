@@ -1,5 +1,16 @@
 # Autonomous production implementation handoff — in progress
 
+## Current state (2026-11-01, Claude Code took over after Codex usage limit until 2026-11-04)
+
+- Worktree `/home/anhtuan/.codex/worktrees/9b89/content-production-os`, branch `impl/autonomous-production`, not pushed. Check `git log --oneline -6` for the live HEAD.
+- **Tasks 1–5 complete (scoped source gates only).** Task 5 commits after `ed26ef069`: `291eb3316` shared Gate C `approve_cut_core` with guarded automatic branch; `08c21ce00` `server/production_run/master_authority.py` `AutomaticMasterApproval` (sealed R2 shot via real `prepare_r2_shot_cut`, subject `master_subject_digest(target_id, task_id)`); `c974c69c0` Gate A `GateAutomationAuthorizationV1` + `server/production_run/greenlight_authority.py` (subject `greenlight_subject_digest(source_digest)`).
+- Verification at those commits: production_run + Gate/Story regression **136 pass**; master/Gate C/R2 shot regression **123 pass**; mutation checks (removing the in-transaction guard) fail the revocation tests; full ruff/format, basedpyright 0/0, import-linter 23 kept, test audit 0. Not a full-backend pass.
+- **Ruling:** automatic variants only where a planned consumer needs them. M6 adaptation (MapApproval/ScreenplayAdmission) and factual ScriptLock (Gate B) stay Human-only and fail closed for automation (no consumer in story→legacy script→media path; media does not read ScriptLock). Gate D never delegated.
+- **Next: Task 6** (controller, scheduler, Start/control/review API) per plan. Then 7–12. Open carried items: anonymous packaging archive 422 vs 401 (by Task 10); final frozen full backend (Task 12); drama lip-sync route qualification (MuseTalk candidate, unqualified).
+- Test env: PG container `arcreel-auto-test-9b89` at 127.0.0.1:32769 (`DATABASE_URL=postgresql+asyncpg://autotest@127.0.0.1:32769/autonomous_test`); pass a **short** `--basetemp=/var/tmp/ar9b/<x>` — long paths make governance fixtures fail at setup with `GovernanceAttestationUnavailable` (AF_UNIX path length).
+- Detailed per-step ledger: `.superpowers/sdd/2026-10-30-autonomous-production-workflow/progress.md` (git-ignored, local only). Sections below are the earlier Codex history.
+
+
 Sponsor approved design, plan and continuous native execution: “dung dung lai, lam luon”. Do not ask again for routine step approval. Execute the 12-task plan; do not call the whole workflow complete from a foundation packet.
 
 ## Resume authority
