@@ -27,7 +27,6 @@ from r2.contracts.automation import AuthorizationSubject, DispatchIntent, OwnerR
 from r2.contracts.common import ensure_json_value
 from r2.quality.digests import compute_digest
 from r2.quality.runs import run_digest
-from server.production_run.evaluators import prompt_digest
 from server.production_run.final_master_adapter import final_target_ref
 from server.production_run.owner_support import OwnerBlocked, Sessions, current_subject
 from server.services.automation_grants import RunAutomationAuthority
@@ -91,6 +90,8 @@ def _observations(
         record = qualifications.get(review.model_identity)
         if record is None:
             raise OwnerBlocked("REVIEWER_NOT_QUALIFIED")
+        if review.prompt_digest != record.prompt_digest:
+            raise OwnerBlocked("REVIEWER_PROMPT_NOT_QUALIFIED")
         for requirement_id, slot in slots:
             key = f"{seed}:{review.model_identity}:{requirement_id}:{slot.slot_id}"
             findings = tuple(
@@ -126,7 +127,7 @@ def _observations(
                     evidence_digest=digest_value("r2.production-review-refs.v1", {"refs": list(refs)}),
                     observed_at=datetime.now(UTC),
                     rubric_id=RUBRIC_ID,
-                    rubric_digest=prompt_digest(),
+                    rubric_digest=review.prompt_digest,
                     segment_closure_digest=digest_value(
                         "r2.production-review-segments.v1", {"subject": subject_digest, "segments": ["whole"]}
                     ),

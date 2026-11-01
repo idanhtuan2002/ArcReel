@@ -31,6 +31,7 @@ from server.production_run.evaluators import (
     QualifiedEvaluator,
     prompt_digest,
     provider_base_url,
+    review_method,
 )
 
 
@@ -100,7 +101,7 @@ async def qualify(
         model_id=route.model_id,
         model_identity=route.model_identity,
         config_digest=route.config_digest,
-        prompt_digest=prompt_digest(),
+        prompt_digest=prompt_digest(review_method(route)),
         cases=tuple(cases),
     )
 

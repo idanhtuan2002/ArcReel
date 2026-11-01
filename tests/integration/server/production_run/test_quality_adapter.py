@@ -222,6 +222,17 @@ async def test_unqualified_reviewers_cannot_pass(quality_host):
     assert (blocked.stage, blocked.reason) == (RunStage.QUALITY, "REVIEWER_NOT_QUALIFIED")
 
 
+async def test_a_review_asked_with_an_unqualified_prompt_cannot_pass(quality_host):
+    host, controller, render, quality, reviewer = quality_host
+    await _qualify(host)
+    reviewer.answers["reviewer_a"] = {"prompt_digest": "sha256:" + "9" * 64}
+    await _to_quality(host, controller, render)
+
+    blocked = await _review(host, controller, quality)
+
+    assert (blocked.stage, blocked.reason) == (RunStage.QUALITY, "REVIEWER_PROMPT_NOT_QUALIFIED")
+
+
 async def test_both_rejecting_rework_exactly_the_named_stage(quality_host):
     host, controller, render, quality, reviewer = quality_host
     await _qualify(host)

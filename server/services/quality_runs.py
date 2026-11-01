@@ -374,8 +374,8 @@ async def _admit(
             not _same_profile(profile, model.profile_id, model.profile_revision, model.profile_digest)
             or qualification is None
             or observation.assessor_qualification_digest != model.qualification_digest
-            or (observation.assessor_identity, observation.config_digest)
-            != (qualification.model_identity, qualification.config_digest)
+            or (observation.assessor_identity, observation.config_digest, observation.assessor_version)
+            != (qualification.model_identity, qualification.config_digest, qualification.prompt_digest)
             or observation.independence_group != "model:" + qualification.model_identity
         ):
             raise RequiredEvidenceMissingError()
