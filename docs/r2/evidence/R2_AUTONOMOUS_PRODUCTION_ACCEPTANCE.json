@@ -1,0 +1,54 @@
+{
+  "schema": "r2.autonomous-production.acceptance-status.v1",
+  "date": "2026-11-01",
+  "branch": "impl/autonomous-production",
+  "source_head": "66dd8e339",
+  "pushed": false,
+  "accepted": false,
+  "verdict": "NOT_ACCEPTED",
+  "summary": "All 12 plan tasks are implemented and the code path is verified by tests with real FFmpeg renders, real governance, Gate C masters and sealed M10 Quality runs. Launch acceptance is not claimed: reviewer qualification, a real-project Quality profile and launch record, and a real GPU end-to-end run have not happened, and no independent review has run.",
+  "verification": {
+    "full_backend_gate": {
+      "head": "312a7d6c3",
+      "command": "uv run --no-sync python -m pytest -n 4 --dist loadfile -q -p no:randomly (no DATABASE_URL)",
+      "result": "69 failed, 19291 passed, 550 skipped, 1 error",
+      "triage": {
+        "environment": "PostgreSQL-only tests run without DATABASE_URL, and governance socket/checkpoint tests under a long TMPDIR (AF_UNIX path too long); they pass rerun with PostgreSQL and a short TMPDIR",
+        "fixed_in_66dd8e339": [
+          "collection error: duplicate test module basename test_master_authority.py",
+          "tests/unit/r2/test_m5b_architecture_boundaries.py::test_only_the_plan_service_calls_plan_authoritative_writes",
+          "tests/integration/lib/db/repositories/test_production_run_schema.py::test_upgrade_downgrade_preserves_unrelated_user_rows"
+        ],
+        "pre_existing": [
+          "tests/integration/server/test_auth_enforcement.py::test_every_protected_endpoint_rejects_anonymous (anonymous packaging export archive returns 422, not 401)"
+        ]
+      }
+    },
+    "rerun_of_failed_files": {
+      "head": "66dd8e339",
+      "environment": "DATABASE_URL=PostgreSQL 16 disposable container, short TMPDIR",
+      "result": "158 passed, 4 failed",
+      "remaining": [
+        "test_upgrade_downgrade_preserves_unrelated_user_rows: fixed afterwards in the same commit, file rerun 9 passed",
+        "test_every_protected_endpoint_rejects_anonymous: pre-existing 422-vs-401 item",
+        "test_authenticated_request_passes, test_auth_disabled_bypasses_enforcement: 500 under PostgreSQL from the known sync TestClient/asyncpg cross-loop issue; they pass on SQLite in the full run"
+      ]
+    },
+    "static_gates_at_66dd8e339": "ruff check, ruff format --check, basedpyright --warnings 0/0, audit_tests --check 0; lint-imports 23 kept and deptry clean at 312a7d6c3 (no source change since)",
+    "frontend_at_57a6d8ccb": "eslint, tsc, knip, vitest 237 files / 2668 tests pass"
+  },
+  "design_decisions": [
+    "Automatic runs do not use the M10 package-selection/export owners. PACKAGE and EXPORT build and re-verify a deterministic archive bound to the M10 PASS disposition receipt; the M10 owners stay Human-operated.",
+    "Automatic Quality can only issue PASS or REWORK dispositions; it can never waive.",
+    "Automatic owner variants exist only where a launch consumer needs them: Narrative/Canon/Plan, Gate A greenlight and Gate C master. M6 adaptation, Gate B ScriptLock and Gate D stay Human-only."
+  ],
+  "blockers": [
+    {"id": "REVIEWER_QUALIFICATION", "owner": "Human", "detail": "A Human-labeled corpus of 40 finals (20 calibration + 20 hold-out, 10 clean + 10 critical-defect each) and two distinct local multimodal reviewer models. Only qwen3.5-vimax:9b and bge-m3 are installed. Run scripts/r2/qualify_reviewers.py --record per reviewer."},
+    {"id": "PROJECT_QUALITY_PROFILE_AND_LAUNCH_RECORD", "owner": "Human", "detail": "A published automatic Quality profile and a launch qualification record for a real project. Preflight refuses to start a run until both exist."},
+    {"id": "REAL_GPU_E2E_RUN", "owner": "Human + agent", "detail": "One real run on the GPU host through scripts/r2/qualify_autonomous_production.py, after the two blockers above are cleared."},
+    {"id": "DRAMA_LIP_SYNC", "owner": "Human", "detail": "The drama lip-sync route is unqualified, so drama launch stays blocked; narration is the only candidate launch profile."},
+    {"id": "INDEPENDENT_REVIEW", "owner": "Codex", "detail": "Independent review by codex:codex-rescue, available after the Codex usage reset on 2026-11-04."},
+    {"id": "ANONYMOUS_PACKAGING_422", "owner": "carried", "detail": "Anonymous GET /api/v1/projects/{project_name}/packaging/exports/{archive_hex}/archive returns 422 instead of 401. Pre-existing, outside this branch."},
+    {"id": "RELEASE_AND_ACTIVATION", "owner": "Human", "detail": "Merge, tag, deploy, then set ARCREEL_AUTOMATIC_PRODUCTION=1 and ARCREEL_GPU_ADMISSION_PROBES on a governance-activated host."}
+  ]
+}
