@@ -27,16 +27,21 @@ from lib.db.models.custom_provider import CustomProvider, CustomProviderModel
 from lib.db.repositories.launch_qualifications import LaunchQualificationRepository
 from lib.db.repositories.quality_dispositions import QualityDispositionRepository
 from lib.db.repositories.reviewer_qualifications import ReviewerQualificationRepository
+from lib.generation_resources import configure_device_admission
 from lib.project_manager import ProjectManager
 from r2.automation.profiles import reviewer_is_qualified
 from r2.contracts.automation import ModelRoute
 from server import auth
-from server.production_run.composition import ProjectPolicyResolver
+from server.production_run.composition import ProjectPolicyResolver, device_admission_from_env
 from server.production_run.evaluators import OllamaReviewer, provider_base_url
+from tests.integration.server.services.test_automation_grants import interactive_env as interactive_env
 
-pytestmark = pytest.mark.skipif(
-    os.environ.get("ARCREEL_E2E_AUTOMATION") != "1", reason="real-model automatic production e2e is opt-in"
-)
+pytestmark = [
+    pytest.mark.skipif(
+        os.environ.get("ARCREEL_E2E_AUTOMATION") != "1", reason="real-model automatic production e2e is opt-in"
+    ),
+    pytest.mark.timeout(12 * 3600),
+]
 
 REPO = Path(__file__).resolve().parents[3]
 MEDIA_EVIDENCE = REPO / "docs/r2/evidence/media-local-2026-10-30"
@@ -128,7 +133,7 @@ async def _configure_providers(sessions) -> None:
                 display_name="Wan 2.2",
                 endpoint="ce-2",
                 price_input=0.0,
-                supported_durations=[2],
+                supported_durations=json.dumps([2]),
                 resolution="480p",
             )
         )
@@ -208,15 +213,46 @@ async def _qualify_reviewers(sessions, projects: ProjectManager, corpus: Path, o
     return results
 
 
+@pytest.fixture
+async def e2e_sessions():
+    """The process-wide session factory on ``DATABASE_URL``: a PostgreSQL database migrated to head for this run.
+
+    Worker, scheduler and app all use that factory, exactly as on a host. The fixture custody stamps the schema
+    version and installs the Quality publication immutability triggers itself, so the migrated stamp and those
+    triggers are removed first; the run's user is seeded.
+    """
+    import sqlalchemy as sa
+
+    from lib.db import async_session_factory
+
+    engine = async_session_factory.kw["bind"]
+    if engine.dialect.name != "postgresql":
+        pytest.skip("automatic production e2e needs a migrated PostgreSQL database")
+    async with engine.begin() as connection:
+        await connection.execute(sa.text("DROP TABLE IF EXISTS alembic_version"))
+        for table in (
+            "m10_profile_publication_authorizations",
+            "m10_quality_profile_revisions",
+            "m10_quality_commands",
+            "m10_quality_outbox",
+        ):
+            await connection.execute(sa.text(f'DROP TRIGGER IF EXISTS "{table}_immutable" ON "{table}"'))
+        await connection.execute(
+            sa.text(
+                "INSERT INTO users (id, username, role, is_active, created_at, updated_at) "
+                "VALUES ('default', 'default', 'user', true, NOW(), NOW()) ON CONFLICT (id) DO NOTHING"
+            )
+        )
+    return async_session_factory
+
+
 def _write_evidence(record: dict) -> None:
     target = os.environ.get("ARCREEL_E2E_EVIDENCE")
     if target:
         Path(target).write_text(json.dumps(record, ensure_ascii=False, indent=2, default=str), encoding="utf-8")
 
 
-async def test_new_idea_reaches_current_quality_pass_and_export(
-    concurrent_session_factory, tmp_path, interactive_env, monkeypatch
-):
+async def test_new_idea_reaches_current_quality_pass_and_export(e2e_sessions, tmp_path, interactive_env, monkeypatch):
     import server.app as app_module
     from scripts.r2.record_launch_qualification import build_record
     from server.services.governance_attestation import serve_governance_attestor
@@ -226,7 +262,7 @@ async def test_new_idea_reaches_current_quality_pass_and_export(
     from tests.integration.server.services.test_quality_profile_custodian import prepare_qualified_custody
 
     corpus = Path(os.environ["ARCREEL_E2E_REVIEWER_CORPUS"])
-    sessions = concurrent_session_factory
+    sessions = e2e_sessions
     evidence: dict = {
         "source_head": await asyncio.to_thread(_source_head),
         "started_at": datetime.now(UTC).isoformat(),
@@ -261,6 +297,8 @@ async def test_new_idea_reaches_current_quality_pass_and_export(
     evidence["reviewer_qualification"] = await _qualify_reviewers(sessions, projects, corpus, tmp_path / "reviews")
     assert all(item["qualified"] for item in evidence["reviewer_qualification"].values()), "reviewers not qualified"
 
+    monkeypatch.setenv("ARCREEL_GPU_ADMISSION_PROBES", f"ollama={OLLAMA},comfyui={COMFYUI}")
+    configure_device_admission(device_admission_from_env())
     record, reasons = await build_record(
         sessions,
         projects=projects,
@@ -274,7 +312,6 @@ async def test_new_idea_reaches_current_quality_pass_and_export(
     evidence["launch_qualification"] = record.model_dump(mode="json")
 
     monkeypatch.setenv("ARCREEL_AUTOMATIC_PRODUCTION", "1")
-    monkeypatch.setenv("ARCREEL_GPU_ADMISSION_PROBES", f"ollama={OLLAMA},comfyui={COMFYUI}")
     _configure_lifespan(sessions, root, runtime, projects_root, monkeypatch)
     headers = {"Authorization": f"Bearer {auth.create_token('actor')}"}
     base = "/api/v1/projects/project/production-runs"

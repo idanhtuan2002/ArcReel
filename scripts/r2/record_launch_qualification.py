@@ -5,7 +5,8 @@ qualified (``qualify_reviewers.py --record``). ``--evidence`` is the host's medi
 launch profile's image, video and audio routes. It resolves the policy a run would freeze, runs the real preflight,
 and refuses unless the only blocking reason is the missing launch qualification. The record binds the project, launch
 profile, profile digest, route digests and the project's declared resource envelope; the evidence file is named and
-hashed in the receipt. A run admitted by this record is the acceptance evidence, not the record itself.
+hashed in the receipt. GPU capacity is read as the host reads it: with the admission probes of
+``ARCREEL_GPU_ADMISSION_PROBES`` configured. A run admitted by this record is the acceptance evidence, not the record itself.
 """
 
 from __future__ import annotations
@@ -19,9 +20,10 @@ from pathlib import Path
 from lib.config.resolver import ConfigResolver
 from lib.db import async_session_factory
 from lib.db.repositories.launch_qualifications import LaunchQualificationRepository
+from lib.generation_resources import configure_device_admission
 from lib.project_manager import ProjectManager, get_project_manager
 from r2.contracts.automation import AutomationMode, LaunchQualification
-from server.production_run.composition import HostPreflightReader, ProjectPolicyResolver
+from server.production_run.composition import HostPreflightReader, ProjectPolicyResolver, device_admission_from_env
 from server.production_run.inputs import ProjectInputWitness
 from server.production_run.preflight import ProductionPreflight
 
@@ -70,6 +72,7 @@ async def build_record(
 
 
 async def _main(args: argparse.Namespace) -> int:
+    configure_device_admission(device_admission_from_env())
     record, reasons = await build_record(
         async_session_factory,
         projects=get_project_manager(),
