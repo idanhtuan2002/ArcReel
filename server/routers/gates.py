@@ -31,7 +31,7 @@ from urllib.parse import quote
 from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, ConfigDict, Field, field_validator
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from lib.async_thread import run_noninterruptible_sync
 from lib.candidate_store import CandidateStoreError
@@ -45,7 +45,11 @@ from lib.db.repositories.gates import (
     PublishApprovalRepository,
     ScriptLockRepository,
 )
-from lib.db.repositories.host_hardening import CandidateIdentityConflictError, MasterHeadConflictError
+from lib.db.repositories.host_hardening import (
+    CandidateIdentityConflictError,
+    MasterAuthorityRepository,
+    MasterHeadConflictError,
+)
 from lib.project_manager import get_project_manager
 from r2.adaptation.authority import AdaptationAuthorityService
 from r2.adaptation.session_authority import SessionAuthenticatedShowrunnerAuthority
@@ -325,15 +329,41 @@ class _CutApproval:
     slot_guard: Callable[[AsyncSession], Awaitable[None]] | None = None
 
 
+@dataclass(frozen=True)
+class CutApprovalActor:
+    """Identity data for trusted composition; this value alone conveys no authorization."""
+
+    user_id: str
+    principal: str
+
+
 async def _approve_cut(
     *, user: CurrentUser, project_name: str, project_dir, approval: _CutApproval
+) -> dict[str, object]:
+    return await approve_cut_core(
+        actor=CutApprovalActor(user_id=user.id, principal=user.sub),
+        project_name=project_name,
+        project_dir=project_dir,
+        approval=approval,
+        sessions=async_session_factory,
+    )
+
+
+async def approve_cut_core(
+    *,
+    actor: CutApprovalActor,
+    project_name: str,
+    project_dir,
+    approval: _CutApproval,
+    sessions: async_sessionmaker[AsyncSession],
+    authority_guard: Callable[[AsyncSession], Awaitable[None]] | None = None,
 ) -> dict[str, object]:
     """Stage, promote, project and receipt one approval: the shared Gate C core of every approval route."""
     host = GoldenAHostIntegration(project_dir, resource_type=approval.resource_type, episode=approval.episode)
     operation_id = str(
         uuid.uuid5(
             uuid.NAMESPACE_URL,
-            f"gate-c/{user.id}/{project_name}/{approval.episode}/{approval.target_ref}/{approval.approval_record}",
+            f"gate-c/{actor.user_id}/{project_name}/{approval.episode}/{approval.target_ref}/{approval.approval_record}",
         )
     )
     request_digest = approval.request_digest
@@ -389,7 +419,7 @@ async def _approve_cut(
         approved = host.approve(
             registered,
             approval_record=approval.approval_record,
-            selected_by=user.sub,
+            selected_by=actor.principal,
             selected_at=datetime.now(UTC),
             semantic_state=_semantic_state(),
         )
@@ -406,7 +436,7 @@ async def _approve_cut(
             try:
                 await verify_masters(
                     session,
-                    user_id=user.id,
+                    user_id=actor.user_id,
                     project_name=project_name,
                     project_dir=project_dir,
                     artifact_keys=source_keys,
@@ -431,7 +461,7 @@ async def _approve_cut(
             raise HTTPException(status_code=409, detail=f"master_conflict: {exc}") from exc
         try:
             head = await master_authority_unit(session, defer_commit=True).promote_staged(
-                user_id=user.id,
+                user_id=actor.user_id,
                 project_name=project_name,
                 project_dir=project_root,
                 artifact_key=registered.artifact_key,
@@ -443,6 +473,8 @@ async def _approve_cut(
             )
         except _MASTER_CONFLICTS as exc:
             raise HTTPException(status_code=409, detail=f"master_conflict: {exc}") from exc
+        if authority_guard is not None:
+            await authority_guard(session)
         return registered, head.candidate_id
 
     project_root = await run_noninterruptible_sync(project_dir.resolve)
@@ -450,24 +482,46 @@ async def _approve_cut(
     # The database master head is the authority (ADR-0096). Phase 1 stages, checks and promotes in
     # one transaction under the artifact's row lock, and commits: files never run ahead of it.
     async with serialized_artifacts(
-        async_session_factory,
-        user_id=user.id,
+        sessions,
+        user_id=actor.user_id,
         project_name=project_name,
         artifact_keys=[artifact_key, *source_keys],
     ) as session:
         registered, candidate_id = await _stage_and_promote(session)
+
     # Phase 2 projects and exports under the row lock again, only while this candidate is the head,
     # so an older approval can never overwrite a newer projection or export.
-    try:
-        async with async_session_factory() as session:
-            approved_master, export = await project_if_current(
-                session,
-                user_id=user.id,
-                project_name=project_name,
-                artifact_key=artifact_key,
-                candidate_id=candidate_id,
-                project=lambda: run_noninterruptible_sync(lambda: _project_and_export(registered)),
+    async def _check_current_automatic(session: AsyncSession) -> None:
+        head = await MasterAuthorityRepository(session).get_current(
+            user_id=actor.user_id, project_name=project_name, artifact_key=artifact_key
+        )
+        if head is None or head.candidate_id != candidate_id:
+            raise MasterSupersededError("master moved before automatic projection or receipt")
+        if composite:
+            current_dependencies = await run_noninterruptible_sync(
+                lambda: composite_dependencies(host, approval.produced.source_master_refs)
             )
+            if list(current_dependencies) != staged_dependencies:
+                raise SourceMasterMismatchError("source masters moved before automatic projection or receipt")
+
+    try:
+        if authority_guard is None:
+            async with sessions() as session:
+                approved_master, export = await project_if_current(
+                    session,
+                    user_id=actor.user_id,
+                    project_name=project_name,
+                    artifact_key=artifact_key,
+                    candidate_id=candidate_id,
+                    project=lambda: run_noninterruptible_sync(lambda: _project_and_export(registered)),
+                )
+        else:
+            async with serialized_artifacts(
+                sessions, user_id=actor.user_id, project_name=project_name, artifact_keys=[artifact_key, *source_keys]
+            ) as session:
+                await _check_current_automatic(session)
+                await authority_guard(session)
+                approved_master, export = await run_noninterruptible_sync(lambda: _project_and_export(registered))
     except MasterSupersededError as exc:
         raise HTTPException(status_code=409, detail=f"master_superseded: {exc}") from exc
     except (PostApprovalExportError, KeyError, ValueError) as exc:
@@ -475,33 +529,57 @@ async def _approve_cut(
         raise _gate_c_retry_error(approval.approval_record) from exc
 
     receipt = FinalCutReceipt(
-        user_id=user.id,
+        user_id=actor.user_id,
         project_name=project_name,
         artifact_key=host.artifact_key_for(approval.target_ref),
         selected_candidate_id=approved_master.selected_candidate_id,
         content_fingerprint=approval.content_fingerprint,
         approval_record=approval.approval_record,
-        selected_by=user.sub,
+        selected_by=actor.principal,
         selected_at=approved_master.selected_at,
         sequence=1,  # ignored by append(); the repository assigns the real, race-safe value
         audio_decision=approval.audio_decision,
     )
     receipt_id = str(uuid.uuid5(uuid.NAMESPACE_URL, f"gate-c-receipt/{operation_id}"))
     try:
-        async with async_session_factory() as session:
-            repository = FinalCutReceiptRepository(session)
-            stored_receipt = await repository.get_by_id(receipt_id)
-            if stored_receipt is None:
-                await repository.append(receipt, receipt_id=receipt_id)
-                await session.commit()
+        if authority_guard is None:
+            async with sessions() as session:
+                repository = FinalCutReceiptRepository(session)
                 stored_receipt = await repository.get_by_id(receipt_id)
-            if stored_receipt is None:
-                raise RuntimeError("committed Final Cut receipt is not visible")
+                if stored_receipt is None:
+                    await repository.append(receipt, receipt_id=receipt_id)
+                    await session.commit()
+                    stored_receipt = await repository.get_by_id(receipt_id)
+                if stored_receipt is None:
+                    raise RuntimeError("committed Final Cut receipt is not visible")
+        else:
+            async with serialized_artifacts(
+                sessions, user_id=actor.user_id, project_name=project_name, artifact_keys=[artifact_key, *source_keys]
+            ) as session:
+                await _check_current_automatic(session)
+                repository = FinalCutReceiptRepository(session)
+                stored_receipt = await repository.get_by_id(receipt_id)
+                if stored_receipt is None:
+                    await repository.append(receipt, receipt_id=receipt_id)
+                    stored_receipt = await repository.get_by_id(receipt_id)
+                await authority_guard(session)
+                if stored_receipt is None:
+                    raise RuntimeError("staged Final Cut receipt is not visible")
     except GateSequenceConflictError:
-        async with async_session_factory() as session:
-            stored_receipt = await FinalCutReceiptRepository(session).get_by_id(receipt_id)
+        if authority_guard is None:
+            async with sessions() as session:
+                stored_receipt = await FinalCutReceiptRepository(session).get_by_id(receipt_id)
+        else:
+            async with serialized_artifacts(
+                sessions, user_id=actor.user_id, project_name=project_name, artifact_keys=[artifact_key, *source_keys]
+            ) as session:
+                await _check_current_automatic(session)
+                stored_receipt = await FinalCutReceiptRepository(session).get_by_id(receipt_id)
+                await authority_guard(session)
         if stored_receipt is None:
             raise _gate_c_retry_error(approval.approval_record) from None
+    except PermissionError:
+        raise
     except Exception as exc:
         raise _gate_c_retry_error(approval.approval_record) from exc
     if stored_receipt.model_dump(exclude={"sequence"}) != receipt.model_dump(exclude={"sequence"}):
