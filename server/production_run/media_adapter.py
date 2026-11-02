@@ -140,7 +140,7 @@ class MediaAdapter:
                     raise OwnerBlocked("WORKFLOW_CONFIRM_REQUEST_DURATION")
                 plan = await self._plan(intent.scope.user_id, intent.scope.project_name, episode, confirmed)
             action = plan.next_action
-            if action.type is A.EXPORT:
+            if action.type is A.EXPORT or (action.type is A.PLAN_EPISODES and self._episode_media_current(plan)):
                 artifacts = digest_value("r2.production-media-artifacts.v1", ensure_json_value(plan.status.artifacts))
                 evidence.append(revision_receipt(self.owner, f"episode:{episode}:media", artifacts))
                 continue
@@ -213,6 +213,24 @@ class MediaAdapter:
             submitted = await self._tools[action.type](context, args)
             if submitted.problem is not None:
                 raise OwnerBlocked("MEDIA_" + submitted.problem.code.upper())
+
+    @staticmethod
+    def _episode_media_current(plan: WorkflowPlan) -> bool:
+        """The target episode's script and every unit's storyboard, video and audio are current.
+
+        The plan names a project-wide next step (planning more episodes from the remaining source) once the
+        target episode is complete; that step is outside this run's targets."""
+        artifacts = plan.status.artifacts
+        script = artifacts.get("script")
+        if not isinstance(script, dict) or script.get("state") != "current":
+            return False
+        for kind in ("storyboards", "videos", "audio"):
+            collection = artifacts.get(kind)
+            if not isinstance(collection, dict) or not collection.get("current_ids"):
+                return False
+            if collection.get("missing_ids") or collection.get("stale_ids"):
+                return False
+        return True
 
     @staticmethod
     def _proposed_durations(plan: WorkflowPlan) -> dict[str, int]:

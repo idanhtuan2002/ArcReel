@@ -28,6 +28,7 @@ def _plan(
     *,
     sheets: dict[str, list[str]] | None = None,
     args: dict | None = None,
+    artifacts: dict | None = None,
 ) -> WorkflowPlan:
     status = WorkflowStatus.model_construct(
         project_revision="r",
@@ -40,6 +41,7 @@ def _plan(
         artifacts={
             "videos": {"state": "current"},
             "asset_sheets": {kind: {"missing_ids": names} for kind, names in (sheets or {}).items()},
+            **(artifacts or {}),
         },
         next_action=WorkflowNextAction(type=action, reason="test"),
     )
@@ -251,3 +253,32 @@ async def test_a_proposed_duration_tier_is_confirmed_and_sent_with_the_videos(me
             "confirmed_request_durations": {"E1S01": 8},
         },
     )
+
+
+def _episode_media(*, missing_video: bool = False) -> dict:
+    done = {"current_ids": ["E1S01"], "missing_ids": [], "stale_ids": []}
+    return {
+        "script": {"state": "current"},
+        "storyboards": done,
+        "videos": {**done, "missing_ids": ["E1S02"]} if missing_video else done,
+        "audio": done,
+    }
+
+
+async def test_a_complete_target_episode_passes_while_more_episodes_await_planning(media_host):
+    sessions, controller, run, planner, tools, _ = media_host
+    planner.plans = [_plan(A.PLAN_EPISODES, artifacts=_episode_media())]
+
+    passed = await _tick(sessions, controller, run)
+
+    assert (passed.stage, passed.status) == (RunStage.RENDER, RunStatus.RUNNING)
+    assert tools.calls == []
+
+
+async def test_planning_more_episodes_before_the_target_is_complete_is_an_input_change(media_host):
+    sessions, controller, run, planner, _, _ = media_host
+    planner.plans = [_plan(A.PLAN_EPISODES, artifacts=_episode_media(missing_video=True))]
+
+    blocked = await _tick(sessions, controller, run)
+
+    assert (blocked.status, blocked.reason) == (RunStatus.BLOCKED_INPUT_CHANGED, "EXTERNAL_INPUT_CHANGED")
