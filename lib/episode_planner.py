@@ -701,6 +701,7 @@ def _finalize_ends(window: str, ends: list[int], *, snap_whitespace_tail: bool) 
 
 # 单集体量超过每集目标体量的这个倍数即拒绝该集：目标是软偏好，但数倍于目标的集说明模型跳过了切分点
 _MAX_TARGET_MULTIPLE = 3
+_MIN_TARGET_DIVISOR = 4
 
 
 def _screen_episodes(
@@ -710,11 +711,14 @@ def _screen_episodes(
     *,
     language: str | None,
     max_units: int | None,
+    min_units: int | None = None,
 ) -> tuple[int, list[str]]:
     """逐集复核草稿文本与体量，返回（首个不合格集的下标，原因）；全部合格时下标为集数、原因为空。
 
     按词计的源文语言（越南语、英语）下标题、钩子与大纲文本不得含汉字或 CJK 标点；给出体量上限时
     单集阅读单位不得超过上限——仅当集内还有更早的句末可切时才拒绝，单句即超限的集按不可再分接受。
+    给出体量下限时（调用方仅在本批窗口至少容得下两集目标体量时给出），本批最后一集以外的各集阅读单位
+    不得低于下限（最后一集可能是源文结尾，允许偏短）。
     """
     latin = reading_unit_noun(language) == "词"
     unit_noun = reading_unit_noun(language)
@@ -739,6 +743,13 @@ def _screen_episodes(
                 problems.append(
                     f"第 {idx + 1} 集约 {units} {unit_noun}，超过每集目标体量的 {_MAX_TARGET_MULTIPLE} 倍"
                     f"（上限 {max_units} {unit_noun}），请在这一段中间增加切分点: {draft.end_anchor!r}"
+                )
+        if min_units is not None and idx < len(ends) - 1:
+            units = count_reading_units(window[start:end], language)
+            if units < min_units:
+                problems.append(
+                    f"第 {idx + 1} 集仅约 {units} {unit_noun}，不足每集目标体量的 1/{_MIN_TARGET_DIVISOR}"
+                    f"（下限 {min_units} {unit_noun}），请把它的结尾锚点后移、与下一集合并: {draft.end_anchor!r}"
                 )
         if problems and first_bad == len(ends):
             first_bad = idx
@@ -976,6 +987,11 @@ class EpisodePlanner:
                 if (target := resolve_episode_target_volume(project, language=language)) is not None
                 else None
             ),
+            min_episode_units=(
+                target.units // _MIN_TARGET_DIVISOR
+                if target is not None and count_reading_units(window, language) >= 2 * target.units
+                else None
+            ),
         )
 
         summaries: list[EpisodePlanSummary] = []
@@ -1088,6 +1104,7 @@ class EpisodePlanner:
         max_episodes: int | None,
         language: str | None = None,
         max_episode_units: int | None = None,
+        min_episode_units: int | None = None,
     ) -> tuple[list[NarrationEpisodeDraft], list[int]]:
         """LLM 调用 + schema/机械校验循环；重试 prompt 附上一轮失败原因。
 
@@ -1135,7 +1152,7 @@ class EpisodePlanner:
                     drafts = drafts[:max_episodes]
                 ends = _resolve_boundaries(window, drafts, snap_whitespace_tail=snap_whitespace_tail)
                 first_bad, screen_reasons = _screen_episodes(
-                    window, drafts, ends, language=language, max_units=max_episode_units
+                    window, drafts, ends, language=language, max_units=max_episode_units, min_units=min_episode_units
                 )
                 if screen_reasons:
                     raise _DraftRejected(screen_reasons, valid_prefix_ends=ends[:first_bad])
@@ -1150,6 +1167,7 @@ class EpisodePlanner:
                         prefix_ends,
                         language=language,
                         max_units=max_episode_units,
+                        min_units=min_episode_units,
                     )
                     prefix_ends = prefix_ends[:kept]
                 if prefix_ends and (best_prefix is None or len(prefix_ends) > len(best_prefix[1])):

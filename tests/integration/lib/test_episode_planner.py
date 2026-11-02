@@ -1115,6 +1115,29 @@ class TestPlan:
         assert "目标体量" in fake.requests[1].prompt
         assert [s.title for s in result.episodes] == ["Vừa"]
 
+    async def test_plan_rejects_an_episode_far_under_the_target_volume(self, tmp_path: Path):
+        sentences = [f"Câu số {i} kể chuyện bến sông." for i in range(1, 41)]
+        source = "Bến sông. " + " ".join(sentences)
+        project_dir = _write_project(
+            tmp_path, source_text=source, extra={"source_language": "vi", "episode_target_units": 20}
+        )
+        tiny_first = [
+            {"title": "Tựa", "hook": "h", "end_anchor": "Bến sông."},
+            {"title": "Sau", "hook": "h", "end_anchor": "Câu số 4 kể chuyện bến sông."},
+        ]
+        fake = _FakeTextGenerator(
+            [
+                _plan_response(tiny_first),
+                _plan_response([{"title": "Vừa", "hook": "h", "end_anchor": "Câu số 4 kể chuyện bến sông."}]),
+            ]
+        )
+
+        result = await EpisodePlanner(project_dir, generator=fake).plan()
+
+        assert len(fake.requests) == 2
+        assert "下限" in fake.requests[1].prompt
+        assert [s.title for s in result.episodes] == ["Vừa"]
+
     async def test_plan_accepts_a_single_sentence_longer_than_the_volume_cap(self, tmp_path: Path):
         long_sentence = "Ông Tư " + " ".join(f"chèo{i}" for i in range(1, 60)) + " mãi."
         source = long_sentence + " Hết."
