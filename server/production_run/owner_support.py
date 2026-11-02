@@ -168,11 +168,14 @@ def same_policy(run: RunSnapshot, intent: DispatchIntent) -> bool:
 
 
 _SCRIPT_ITEM_LISTS = ("segments", "scenes", "shots", "units")
+#: Item fields media generation writes back: the produced artifacts and the duration tier the video was made at.
+_MEDIA_ITEM_FIELDS = frozenset({"generated_assets", "duration_seconds"})
 
 
 def script_revision(path: Path) -> str | None:
     """The episode script's content revision: its canonical JSON without the media state media generation writes
-    back (each item's ``generated_assets`` and ``metadata.updated_at``); ``None`` when the script is missing."""
+    back (each item's ``generated_assets`` and ``duration_seconds``, and ``metadata.updated_at``); ``None`` when
+    the script is missing."""
     try:
         data: Any = json.loads(path.read_bytes())
     except FileNotFoundError:
@@ -182,7 +185,7 @@ def script_revision(path: Path) -> str | None:
         for key in _SCRIPT_ITEM_LISTS:
             if isinstance(data.get(key), list):
                 data[key] = [
-                    {k: v for k, v in item.items() if k != "generated_assets"} if isinstance(item, dict) else item
+                    {k: v for k, v in item.items() if k not in _MEDIA_ITEM_FIELDS} if isinstance(item, dict) else item
                     for item in data[key]
                 ]
         if isinstance(data.get("metadata"), dict):

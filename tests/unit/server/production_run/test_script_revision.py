@@ -21,7 +21,9 @@ def test_media_state_written_back_keeps_the_revision(tmp_path):
     path.write_text(json.dumps(_script()), encoding="utf-8")
     before = script_revision(path)
 
-    after_media = _script(generated_assets={"status": "storyboard_ready", "storyboard_image": "storyboards/a.png"})
+    after_media = _script(
+        generated_assets={"status": "storyboard_ready", "storyboard_image": "storyboards/a.png"}, duration_seconds=8
+    )
     after_media["metadata"]["updated_at"] = "2026-11-02T01:00:00Z"
     path.write_text(json.dumps(after_media), encoding="utf-8")
 
