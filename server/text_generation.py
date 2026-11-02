@@ -1325,17 +1325,23 @@ def _covers_source_verbatim(parts: list[str], source: str) -> bool:
     return cursor == len(source)
 
 
-REALIGN_MIN_RATIO = 0.98
-REALIGN_MIN_SEGMENT_RATIO = 0.9
+REALIGN_MIN_KEPT = 0.98
+REALIGN_MIN_COVERED = 0.9
+REALIGN_MIN_SEGMENT_KEPT = 0.9
+
+
+def _matched(matcher: difflib.SequenceMatcher[str]) -> int:
+    return sum(block.size for block in matcher.get_matching_blocks())
 
 
 def _realign_segments_to_source(segments: list[dict[str, Any]], source: str) -> None:
-    """近乎逐字覆盖源文的分镜（多 / 少个标点、空白、个别字形）就地改写为源文的原样切片。
+    """近乎逐字覆盖源文的分镜（多 / 少个标点、空白、个别字形，或漏抄个别句子）就地改写为源文的原样切片。
 
     只含标点 / 空白、没有任何字母数字的分镜先被移除；其余分镜的边界按 ``difflib`` 对齐映射到源文
-    坐标，每段取源文对应区间。整体相似度不低于 ``REALIGN_MIN_RATIO`` 且每段与其源文切片相似度
-    不低于 ``REALIGN_MIN_SEGMENT_RATIO`` 时才改写；真实的删减、改写或重排保持原样，由覆盖校验
-    照常报违约。已逐字覆盖时不做任何改动。
+    坐标，每段取源文对应区间（漏抄的句子因此落回所在切片）。分镜正文至少 ``REALIGN_MIN_KEPT`` 按序
+    出现在源文里、源文至少 ``REALIGN_MIN_COVERED`` 被分镜覆盖、且每段正文至少 ``REALIGN_MIN_SEGMENT_KEPT``
+    出现在其源文切片里时才改写；改写或重排的正文在源文里找不到出处，保持原样，由覆盖校验照常报违约。
+    已逐字覆盖时不做任何改动。
     """
     if not all(isinstance(s.get("novel_text"), str) for s in segments):
         return
@@ -1348,7 +1354,8 @@ def _realign_segments_to_source(segments: list[dict[str, Any]], source: str) -> 
     parts = [_normalize_for_coverage(s["novel_text"]) for s in kept]
     joined = " ".join(parts)
     matcher = difflib.SequenceMatcher(None, joined, target, autojunk=False)
-    if matcher.ratio() < REALIGN_MIN_RATIO:
+    matched = _matched(matcher)
+    if matched < REALIGN_MIN_KEPT * len(joined) or matched < REALIGN_MIN_COVERED * len(target):
         return
     blocks = matcher.get_opcodes()
 
@@ -1365,7 +1372,8 @@ def _realign_segments_to_source(segments: list[dict[str, Any]], source: str) -> 
     bounds.append(len(target))
     slices = [target[start:end].strip() for start, end in itertools.pairwise(bounds)]
     if any(
-        not new or difflib.SequenceMatcher(None, old, new, autojunk=False).ratio() < REALIGN_MIN_SEGMENT_RATIO
+        not new
+        or _matched(difflib.SequenceMatcher(None, old, new, autojunk=False)) < REALIGN_MIN_SEGMENT_KEPT * len(old)
         for old, new in zip(parts, slices, strict=True)
     ):
         return

@@ -44,3 +44,15 @@ def test_a_paraphrase_is_left_for_the_coverage_check():
     _realign_segments_to_source(segments, SOURCE)
 
     assert segments == expected
+
+
+def test_a_skipped_sentence_is_restored_into_its_segment_from_the_source():
+    first = "Nam nhặt chiếc chai thủy tinh cũ trên bãi cát trắng, tay run run khi thấy tờ giấy cuộn tròn bên trong."
+    second = "Mẹ cậu đứng ở bậc cửa, nước mắt lăn dài trên đôi má gầy, giọng run rẩy gọi tên người chồng đã khuất."
+    third = "Biển vẫn rì rào như mọi ngày, những con sóng nhỏ vỗ vào bờ cát dưới nắng chiều."
+    skipped = "Nam im lặng."
+    segments = _segments(first, second, third)
+
+    _realign_segments_to_source(segments, f"{first} {second} {skipped} {third}")
+
+    assert [s["novel_text"] for s in segments] == [first, f"{second} {skipped}", third]
