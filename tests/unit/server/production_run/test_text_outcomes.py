@@ -188,14 +188,21 @@ async def test_succeeded_task_whose_output_the_status_still_lacks_never_passes(t
         await adapter.inspect(intent=intent, receipt=intent.input_refs[0])
 
 
-async def test_a_failed_owner_task_blocks_and_is_not_resubmitted(tasks, monkeypatch):
+async def test_a_failed_owner_task_is_resubmitted_until_the_attempts_are_spent(tasks, monkeypatch):
     adapter = _adapter(ScriptAdapter, Statuses({1: [_status(A.GENERATE_SCRIPT)]}), monkeypatch)
     intent = _intent(RunStage.SCRIPT)
-    tasks.tasks["script:1:sha256:" + "7" * 64] = {"status": "failed"}
+    first = "script:1:sha256:" + "7" * 64
+    tasks.tasks[first] = {"status": "failed"}
 
+    waiting = await adapter.inspect(intent=intent, receipt=intent.input_refs[0])
+
+    assert waiting.kind == "WAIT"
+    assert [sub for sub, *_ in tasks.submitted] == [f"{first}#attempt-2"]
+    tasks.tasks[f"{first}#attempt-2"] = {"status": "failed"}
+    tasks.tasks[f"{first}#attempt-3"] = {"status": "failed"}
     with pytest.raises(OwnerBlocked, match="OWNER_TASK_FAILED"):
         await adapter.inspect(intent=intent, receipt=intent.input_refs[0])
-    assert tasks.submitted == []
+    assert [sub for sub, *_ in tasks.submitted] == [f"{first}#attempt-2"]
 
 
 @pytest.mark.parametrize(

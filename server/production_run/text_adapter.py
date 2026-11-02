@@ -118,6 +118,8 @@ class WorkflowStageAdapter:
     per_target: bool = True
     calls_per_unit = 8
     seconds_per_unit = 900
+    #: Owner tasks a sub-command may run before a failed one blocks the stage; model output varies per run.
+    max_task_attempts = 3
 
     def __init__(
         self,
@@ -210,25 +212,27 @@ class WorkflowStageAdapter:
         resource_id: str,
         payload: dict[str, Any],
     ) -> bool:
-        """Submit the sub-command's task once; ``False`` while it runs. A finished task the status still asks
-        for again failed or produced nothing."""
-        task = await find_task(self._sessions, intent, sub_key)
-        if task is None:
-            await submit_task(
-                self._sessions,
-                self._authority,
-                intent,
-                sub_key=sub_key,
-                task_type=task_type,
-                resource_id=resource_id,
-                payload={**payload, "projects_root": str(self._projects.projects_root)},
-                subject_digest=subject,
-            )
-            return False
-        if task["status"] in ACTIVE:
-            return False
-        if task["status"] == "succeeded":
-            raise OwnerBlocked("OWNER_OUTPUT_MISSING")
+        """Submit the sub-command's task; ``False`` while it runs. A failed task is submitted again under the next
+        attempt key, up to ``max_task_attempts``; a succeeded task the status still asks for produced nothing."""
+        for attempt in range(1, self.max_task_attempts + 1):
+            key = sub_key if attempt == 1 else f"{sub_key}#attempt-{attempt}"
+            task = await find_task(self._sessions, intent, key)
+            if task is None:
+                await submit_task(
+                    self._sessions,
+                    self._authority,
+                    intent,
+                    sub_key=key,
+                    task_type=task_type,
+                    resource_id=resource_id,
+                    payload={**payload, "projects_root": str(self._projects.projects_root)},
+                    subject_digest=subject,
+                )
+                return False
+            if task["status"] in ACTIVE:
+                return False
+            if task["status"] == "succeeded":
+                raise OwnerBlocked("OWNER_OUTPUT_MISSING")
         raise OwnerBlocked("OWNER_TASK_FAILED")
 
     async def _act(self, intent: DispatchIntent, subject: str, status: WorkflowStatus, episode: int | None) -> bool:
