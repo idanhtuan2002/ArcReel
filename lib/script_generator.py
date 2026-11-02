@@ -97,6 +97,7 @@ from lib.script_models import (
     ReferenceScriptPlanDraft,
     ReferenceVideoScript,
     build_episode_script_model,
+    build_narration_visual_model,
     merge_drama_visual_into_scenes,
     script_duration_total,
 )
@@ -631,7 +632,7 @@ class ScriptGenerator:
             )
             # prompt_authoring 只产视觉层（image_prompt/video_prompt），按 segment_id 对齐 script_plan 合并；
             # novel_text/时长/break 由 script_plan 透传，不进 LLM 输出，从工程上根除扩写漂移。
-            schema = NarrationVisualEpisodeScript
+            schema = build_narration_visual_model([str(s["segment_id"]) for s in narration_script_plan])
 
         # unit 时长的单一真相是 script_plan 完成内容确认时的值：schema 只把 duration_seconds 枚举约束到
         # supported_durations 成员，不会把它钉死在某个具体 unit 已确认的档位上，LLM 因而能在

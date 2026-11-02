@@ -387,6 +387,27 @@ class NarrationVisualEpisodeScript(BaseModel):
     segments: list[NarrationVisualSegment] = Field(description="各分镜的视觉层，按 segment_id 一一对齐 script_plan")
 
 
+def build_narration_visual_model(segment_ids: list[str]) -> type[BaseModel]:
+    """构造 ``segment_id`` 被本次 prompt_authoring 分镜表枚举硬约束的旁白视觉层模型。
+
+    对齐锚只能取 script_plan 已有的 ``segment_id``（response_schema 渲染为 enum / const），LLM 生成层即
+    无法发明分镜；缺、重仍由按 segment_id 合并时的全覆盖校验拦截。空集抛 ValueError。
+    """
+    values = tuple(dict.fromkeys(segment_ids))
+    if not values:
+        raise ValueError("segment_ids 为空，无法构造 segment_id 枚举约束")
+    segment = create_model(
+        NarrationVisualSegment.__name__,
+        __base__=NarrationVisualSegment,
+        segment_id=(Literal[values], Field(description="对齐锚：必须取自 script_plan 分镜表，逐一对应、不增不减")),
+    )
+    return create_model(
+        "NarrationVisualEpisodeScript",
+        __base__=NarrationVisualEpisodeScript,
+        segments=(list[segment], Field(description="各分镜的视觉层，按 segment_id 一一对齐 script_plan")),
+    )
+
+
 # ============ 剧情演绎（Drama） ============
 
 
