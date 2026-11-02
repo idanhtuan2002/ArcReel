@@ -11,6 +11,7 @@ anything else blocks. Model evidence never satisfies a Human slot and is never w
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import json
 from pathlib import Path
 
@@ -135,6 +136,9 @@ class QualityAdapter:
         reworks = [v for v in verdicts.values() if v.kind == "REWORK"]
         identity = intent.identity
         if reworks:
+            if any(_unchanged_since_last_generation(evidence.final_path) for evidence in targets.values()):
+                # Reworking again would review the same final; the reviewers' rejection stands.
+                raise OwnerBlocked("REWORK_WITHOUT_CHANGE")
             first = reworks[0]
             return StageOutcome(
                 stage=identity.stage,
@@ -292,6 +296,23 @@ class QualityAdapter:
                 staged = path.with_suffix(".tmp")
                 staged.write_text(review.model_dump_json(), encoding="utf-8")
                 staged.replace(path)
+
+
+def _unchanged_since_last_generation(final: Path) -> bool:
+    """Whether the previous generation rendered byte-identical final video for the same episode."""
+    generation = final.parent.parent
+    if not generation.name.startswith("g") or not generation.name[1:].isdigit() or int(generation.name[1:]) <= 1:
+        return False
+    previous = generation.parent / f"g{int(generation.name[1:]) - 1}" / final.parent.name / final.name
+    return previous.is_file() and final.is_file() and _sha256(previous) == _sha256(final)
+
+
+def _sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1 << 20), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
 
 
 __all__ = ["QUALITY_OWNER", "REVIEWER_ROLES", "QualityAdapter"]
