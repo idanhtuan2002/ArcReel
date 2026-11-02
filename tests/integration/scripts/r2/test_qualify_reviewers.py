@@ -7,8 +7,8 @@ from pathlib import Path
 
 from r2.automation.assessment import ModelAssessment
 from r2.automation.profiles import reviewer_is_qualified
-from r2.contracts.automation import ModelRoute
-from scripts.r2.qualify_reviewers import qualify
+from r2.contracts.automation import ModelRoute, QualificationCase
+from scripts.r2.qualify_reviewers import cannot_qualify, qualify
 
 ROUTE = ModelRoute(
     role="reviewer_a",
@@ -135,3 +135,38 @@ async def test_a_subtitle_only_defect_of_a_clean_final_is_its_own_case(tmp_path:
 
     assert len({case.case_digest for case in record.cases}) == 40
     assert reviewer_is_qualified(record)
+
+
+async def test_stop_early_ends_at_the_first_answer_that_rules_the_route_out(tmp_path: Path):
+    reviewer = Reviewer(miss_defects=1)
+
+    record = await qualify(
+        corpus=_corpus(tmp_path),
+        route=ROUTE,
+        evaluator=reviewer,
+        output=tmp_path / "receipts",
+        profile_digest="sha256:" + "a" * 64,
+        launch_profile_id="fiction_narration_vi_v1",
+        language="vi",
+        stop_early=True,
+    )
+
+    assert not reviewer_is_qualified(record)
+    assert len(record.cases) == 11
+    assert record.cases[-1].label == "CRITICAL_DEFECT"
+    assert record.cases[-1].accepted
+
+
+def test_too_many_rejected_clean_cases_rule_a_route_out():
+    def case(index: int, accepted: bool) -> QualificationCase:
+        return QualificationCase(
+            split="HOLDOUT",
+            label="CLEAN",
+            accepted=accepted,
+            case_digest="sha256:" + f"{index:064x}",
+            receipt_ref=f"r{index}",
+            receipt_digest="sha256:" + f"{index:064x}",
+        )
+
+    assert not cannot_qualify([case(0, False), case(1, False)], {"HOLDOUT": 10})
+    assert cannot_qualify([case(0, False), case(1, False), case(2, False)], {"HOLDOUT": 10})

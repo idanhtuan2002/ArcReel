@@ -22,6 +22,7 @@ from pathlib import Path
 import httpx
 import pytest
 
+import lib.project_manager as project_manager_module
 from lib.db.models.custom_endpoint import CustomEndpoint
 from lib.db.models.custom_provider import CustomProvider, CustomProviderModel
 from lib.db.repositories.launch_qualifications import LaunchQualificationRepository
@@ -50,8 +51,7 @@ COMFYUI = "http://127.0.0.1:8188"
 TTS = "http://127.0.0.1:23340/v1"
 WRITER = "qwen3.5-vimax:9b"
 REVIEWERS = {"reviewer_a": "qwen2.5vl:7b", "reviewer_b": "gemma3:4b"}
-TERMINAL = {"SUCCEEDED", "FAILED", "FAILED_QUALITY", "CANCELLED"}
-STOPPED = {"WAITING_REVIEW", "PAUSED"}
+ACTIVE = {"PENDING", "RUNNING", "WAITING_TASK", "CANCELLING"}
 IDEA = "Một cậu bé ở làng chài miền Trung nhặt được chiếc chai có lá thư của người cha đã mất tích ngoài biển."
 
 
@@ -199,6 +199,7 @@ async def _qualify_reviewers(sessions, projects: ProjectManager, corpus: Path, o
             profile_digest=settings["profile_digest"],
             launch_profile_id=settings["launch_profile_id"],
             language="vi",
+            stop_early=True,
         )
         qualified = reviewer_is_qualified(record)
         results[route.role] = {
@@ -246,6 +247,18 @@ async def e2e_sessions():
     return async_session_factory
 
 
+def _require_services(corpus: Path) -> None:
+    """Fail before any long step when a provider, a model or the corpus is missing."""
+    names = {item["name"] for item in httpx.get(f"{OLLAMA}/api/tags", timeout=10).json()["models"]}
+    missing = {WRITER, *REVIEWERS.values()} - names
+    assert not missing, f"Ollama models missing: {sorted(missing)}"
+    httpx.get(f"{COMFYUI}/system_stats", timeout=10).raise_for_status()
+    httpx.get(TTS.removesuffix("/v1") + "/health", timeout=10).raise_for_status()
+    cases = json.loads(corpus.read_text(encoding="utf-8"))["cases"]
+    absent = [c[k] for c in cases for k in ("final", "subtitles", "narration") if not (corpus.parent / c[k]).is_file()]
+    assert not absent, f"corpus files missing: {absent[:3]}"
+
+
 def _write_evidence(record: dict) -> None:
     target = os.environ.get("ARCREEL_E2E_EVIDENCE")
     if target:
@@ -268,10 +281,17 @@ async def test_new_idea_reaches_current_quality_pass_and_export(e2e_sessions, tm
         "started_at": datetime.now(UTC).isoformat(),
         "idea": IDEA,
     }
+    await asyncio.to_thread(_require_services, corpus)
     root, runtime, *_ = await prepare_qualified_custody(sessions, tmp_path)
+    async with serve_governance_attestor(
+        root, runtime, session_factory=sessions, expected_uid=os.getuid(), expected_gid=os.getgid()
+    ):
+        pass
     projects_root = tmp_path / "projects"
     projects_root.mkdir()
     projects = ProjectManager(projects_root)
+    monkeypatch.setenv("ARCREEL_DATA_DIR", str(projects_root))
+    monkeypatch.setattr(project_manager_module, "_project_manager", projects)
     created = await create_project(
         ToolRequest(
             CreateProjectToolRequest(
@@ -347,7 +367,7 @@ async def test_new_idea_reaches_current_quality_pass_and_export(e2e_sessions, tm
         )
         history = [{"t": 0.0, "stage": run["stage"], "status": run["status"]}]
         deadline = float(os.environ.get("ARCREEL_E2E_TIMEOUT_SECONDS", 6 * 3600))
-        while run["status"] not in TERMINAL | STOPPED and time.monotonic() - started < deadline:
+        while run["status"] in ACTIVE and time.monotonic() - started < deadline:
             await asyncio.sleep(15)
             run = (await http.get(f"{base}/{run['run_id']}", headers=headers)).raise_for_status().json()
             if (history[-1]["stage"], history[-1]["status"]) != (run["stage"], run["status"]):

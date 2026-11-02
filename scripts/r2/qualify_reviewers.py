@@ -70,6 +70,18 @@ def _receipt(output: Path, name: str, body: str) -> tuple[str, str]:
     return receipt.name, _digest(receipt)
 
 
+def cannot_qualify(cases: list[QualificationCase], clean_totals: dict[str, int]) -> bool:
+    """True once the answers so far already break the rule: an accepted defect, or too many rejected clean cases."""
+    for case in cases:
+        if case.label == "CRITICAL_DEFECT" and case.accepted:
+            return True
+    for split, total in clean_totals.items():
+        rejected = sum(1 for c in cases if c.split == split and c.label == "CLEAN" and not c.accepted)
+        if (total - rejected) * 5 < total * 4:
+            return True
+    return False
+
+
 async def qualify(
     *,
     corpus: Path,
@@ -79,9 +91,18 @@ async def qualify(
     profile_digest: str,
     launch_profile_id: str,
     language: str,
+    stop_early: bool = False,
 ) -> ReviewerQualification:
-    cases = []
-    for case, evidence in _evidence(corpus, output):
+    """The reviewer's record over the corpus; with ``stop_early`` it ends at the first answer that rules it out."""
+    cases: list[QualificationCase] = []
+    prepared = _evidence(corpus, output)
+    clean_totals: dict[str, int] = {}
+    for case, _ in prepared:
+        if case["label"] == "CLEAN":
+            clean_totals[case["split"]] = clean_totals.get(case["split"], 0) + 1
+    for case, evidence in prepared:
+        if stop_early and cannot_qualify(cases, clean_totals):
+            break
         review = await evaluator.assess(route=route, evidence=evidence)
         name, digest = _receipt(
             output, f"{case['case_id']}.{route.model_identity.replace('/', '_')}.json", review.model_dump_json()
@@ -149,6 +170,7 @@ async def _main(args: argparse.Namespace) -> int:
         profile_digest=profile_digest,
         launch_profile_id=args.launch_profile_id,
         language=args.language,
+        stop_early=args.stop_early,
     )
     qualified = reviewer_is_qualified(record)
     print(json.dumps({"qualified": qualified, "record": record.model_dump(mode="json")}, ensure_ascii=False, indent=2))
@@ -170,6 +192,7 @@ def main() -> int:
     parser.add_argument("--launch-profile-id", default="fiction_narration_vi_v1")
     parser.add_argument("--language", default="vi")
     parser.add_argument("--record", action="store_true", help="store a qualifying record")
+    parser.add_argument("--stop-early", action="store_true", help="stop at the first answer that rules the route out")
     return asyncio.run(_main(parser.parse_args()))
 
 
