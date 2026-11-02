@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import asyncio
+import difflib
+import itertools
 import json
 import logging
 import re
@@ -1323,6 +1325,57 @@ def _covers_source_verbatim(parts: list[str], source: str) -> bool:
     return cursor == len(source)
 
 
+REALIGN_MIN_RATIO = 0.98
+REALIGN_MIN_SEGMENT_RATIO = 0.9
+
+
+def _realign_segments_to_source(segments: list[dict[str, Any]], source: str) -> None:
+    """近乎逐字覆盖源文的分镜（多 / 少个标点、空白、个别字形）就地改写为源文的原样切片。
+
+    只含标点 / 空白、没有任何字母数字的分镜先被移除；其余分镜的边界按 ``difflib`` 对齐映射到源文
+    坐标，每段取源文对应区间。整体相似度不低于 ``REALIGN_MIN_RATIO`` 且每段与其源文切片相似度
+    不低于 ``REALIGN_MIN_SEGMENT_RATIO`` 时才改写；真实的删减、改写或重排保持原样，由覆盖校验
+    照常报违约。已逐字覆盖时不做任何改动。
+    """
+    if not all(isinstance(s.get("novel_text"), str) for s in segments):
+        return
+    target = _normalize_for_coverage(source)
+    if _covers_source_verbatim([_normalize_for_coverage(s["novel_text"]) for s in segments], target):
+        return
+    kept = [s for s in segments if any(ch.isalnum() for ch in s["novel_text"])]
+    if not kept:
+        return
+    parts = [_normalize_for_coverage(s["novel_text"]) for s in kept]
+    joined = " ".join(parts)
+    matcher = difflib.SequenceMatcher(None, joined, target, autojunk=False)
+    if matcher.ratio() < REALIGN_MIN_RATIO:
+        return
+    blocks = matcher.get_opcodes()
+
+    def mapped(offset: int) -> int:
+        for _tag, a0, a1, b0, b1 in blocks:
+            if a0 <= offset < a1:
+                return b0 + min(offset - a0, b1 - b0)
+        return len(target)
+
+    bounds, offset = [0], 0
+    for part in parts[:-1]:
+        offset += len(part) + 1
+        bounds.append(mapped(offset))
+    bounds.append(len(target))
+    slices = [target[start:end].strip() for start, end in itertools.pairwise(bounds)]
+    if any(
+        not new or difflib.SequenceMatcher(None, old, new, autojunk=False).ratio() < REALIGN_MIN_SEGMENT_RATIO
+        for old, new in zip(parts, slices, strict=True)
+    ):
+        return
+    if not _covers_source_verbatim(slices, target):
+        return
+    for segment, new in zip(kept, slices, strict=True):
+        segment["novel_text"] = new
+    segments[:] = kept
+
+
 def _collect_narration_violations(
     segments: list[dict[str, Any]],
     *,
@@ -1680,6 +1733,7 @@ async def generate_narration_script_plan(
         raw_segments = content.get("segments")
         if not isinstance(raw_segments, list) or not raw_segments:
             raise ValueError("script_plan 拆分内容结构异常：segments 必须是非空的分镜对象数组")
+        _realign_segments_to_source(raw_segments, novel_text)
 
         violations = _collect_narration_violations(
             raw_segments,

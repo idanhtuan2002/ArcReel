@@ -342,17 +342,21 @@ async def test_split_narration_segments_rejects_reordered_novel_text(fake_ctx: T
     assert not (fake_ctx.project_path / "drafts" / "episode_1" / "script_plan_segments.json").exists()
 
 
-async def test_split_narration_segments_rejects_dropped_word_space(fake_ctx: ToolContext, monkeypatch) -> None:
-    """空格分词语言里模型丢失词间空格（"Hello world" -> "Helloworld"）属实质内容损坏，须拦截。"""
+async def test_split_narration_segments_restores_dropped_word_space_from_the_source(
+    fake_ctx: ToolContext, monkeypatch
+) -> None:
+    """模型丢失词间空格（"Hello world" -> "Helloworld"）：落盘的分镜正文取源文原样，不保存损坏文本。"""
     out = await _nr_source_and_call(
         fake_ctx,
         monkeypatch,
         "Hello world, this is fine.",
         [nr_segment("E1S01", 4, "Helloworld, this is fine.")],
     )
-    assert out.get("is_error") is True
-    assert "未按序、逐字、完整覆盖小说原文" in out["content"][0]["text"]
-    assert not (fake_ctx.project_path / "drafts" / "episode_1" / "script_plan_segments.json").exists()
+    assert out.get("is_error") is not True
+    saved = json.loads(
+        (fake_ctx.project_path / "drafts" / "episode_1" / "script_plan_segments.json").read_text(encoding="utf-8")
+    )
+    assert [segment["novel_text"] for segment in saved["segments"]] == ["Hello world, this is fine."]
 
 
 async def test_split_narration_segments_accepts_unicode_form_difference(fake_ctx: ToolContext, monkeypatch) -> None:
@@ -406,19 +410,21 @@ async def test_split_narration_segments_accepts_split_at_halfwidth_punctuation(
     assert script_plan_path.exists()
 
 
-async def test_split_narration_segments_rejects_dropped_space_after_punctuation(
+async def test_split_narration_segments_restores_dropped_space_after_punctuation_from_the_source(
     fake_ctx: ToolContext, monkeypatch
 ) -> None:
-    """标点后的词间空格在分镜内部（非边界）丢失："Hello, world." -> "Hello,world."，属实质内容损坏，须拦截。"""
+    """标点后的词间空格丢失（"Hello, world." -> "Hello,world."）：落盘的分镜正文取源文原样。"""
     out = await _nr_source_and_call(
         fake_ctx,
         monkeypatch,
         "Hello, world. This is fine.",
         [nr_segment("E1S01", 4, "Hello,world. This is fine.")],
     )
-    assert out.get("is_error") is True
-    assert "未按序、逐字、完整覆盖小说原文" in out["content"][0]["text"]
-    assert not (fake_ctx.project_path / "drafts" / "episode_1" / "script_plan_segments.json").exists()
+    assert out.get("is_error") is not True
+    saved = json.loads(
+        (fake_ctx.project_path / "drafts" / "episode_1" / "script_plan_segments.json").read_text(encoding="utf-8")
+    )
+    assert [segment["novel_text"] for segment in saved["segments"]] == ["Hello, world. This is fine."]
 
 
 async def test_split_narration_segments_no_source(fake_ctx: ToolContext) -> None:

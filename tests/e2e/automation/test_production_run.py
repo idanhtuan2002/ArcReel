@@ -291,7 +291,7 @@ async def test_new_idea_reaches_current_quality_pass_and_export(e2e_sessions, tm
     projects_root.mkdir()
     projects = ProjectManager(projects_root)
     monkeypatch.setenv("ARCREEL_DATA_DIR", str(projects_root))
-    monkeypatch.setattr(project_manager_module, "_project_manager", projects)
+    assert Path(project_manager_module.get_project_manager().projects_root) == projects_root, "data dir not current"
     created = await create_project(
         ToolRequest(
             CreateProjectToolRequest(
