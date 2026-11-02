@@ -11,7 +11,7 @@ Every target's final script is pinned when the stage is planned; a different cur
 
 from __future__ import annotations
 
-from collections.abc import Awaitable, Callable
+from collections.abc import Awaitable, Callable, Mapping
 from pathlib import Path
 from typing import Any
 
@@ -132,6 +132,13 @@ class MediaAdapter:
             plan = await self._plan(intent.scope.user_id, intent.scope.project_name, episode)
             if self._script_fingerprint(intent.scope.project_name, plan) != receipt_revision(pin):
                 raise OwnerBlocked("EXTERNAL_INPUT_CHANGED")
+            confirmed: dict[str, int] = {}
+            if plan.next_action.type is A.CONFIRM_REQUEST_DURATION:
+                # The automatic owner takes the tier the planner proposes for each unit, as a Human confirming it would.
+                confirmed = self._proposed_durations(plan)
+                if not confirmed:
+                    raise OwnerBlocked("WORKFLOW_CONFIRM_REQUEST_DURATION")
+                plan = await self._plan(intent.scope.user_id, intent.scope.project_name, episode, confirmed)
             action = plan.next_action
             if action.type is A.EXPORT:
                 artifacts = digest_value("r2.production-media-artifacts.v1", ensure_json_value(plan.status.artifacts))
@@ -145,7 +152,7 @@ class MediaAdapter:
                 if plan.blockers:
                     raise OwnerBlocked("WORKFLOW_" + plan.blockers[0].code.upper())
                 raise OwnerBlocked("WORKFLOW_" + action.type.value.upper())
-            await self._submit(intent, receipt.digest, plan)
+            await self._submit(intent, receipt.digest, plan, confirmed)
             return outcome(intent, "WAIT", owner_state="OWNER_TASK_SUBMITTED")
         return outcome(intent, "PASS", receipts=tuple(evidence), owner_state="EXPORT_READY")
 
@@ -156,10 +163,14 @@ class MediaAdapter:
 
     # --- helpers -------------------------------------------------------------------------------------
 
-    async def _plan(self, user_id: str, project_name: str, episode: int) -> WorkflowPlan:
+    async def _plan(
+        self, user_id: str, project_name: str, episode: int, confirmed: Mapping[str, int] | None = None
+    ) -> WorkflowPlan:
         return await self._planner.get_plan(
             project_name,
-            WorkflowPlanRequest(episode=episode, narration_delivery=USE_TTS),
+            WorkflowPlanRequest(
+                episode=episode, narration_delivery=USE_TTS, confirmed_request_durations=dict(confirmed or {})
+            ),
             user_id=user_id,
             queue=self._queue,
             config_resolver=self._resolver,
@@ -176,11 +187,13 @@ class MediaAdapter:
             raise OwnerBlocked("UPSTREAM_RECEIPT_MISSING")
         return fingerprint
 
-    async def _submit(self, intent: DispatchIntent, subject_digest: str, plan: WorkflowPlan) -> None:
+    async def _submit(
+        self, intent: DispatchIntent, subject_digest: str, plan: WorkflowPlan, confirmed: Mapping[str, int]
+    ) -> None:
         action = plan.next_action
         target = plan.status.target
         assert target is not None
-        for sub_key, args in self._requests(plan, target.script_filename):
+        for sub_key, args in self._requests(plan, target.script_filename, confirmed):
             async with self._sessions() as session:
                 attempts = await ProductionRunRepository(session).owner_attempts(intent=intent, sub_key=sub_key)
             if attempts >= self._max_attempts:
@@ -202,7 +215,28 @@ class MediaAdapter:
                 raise OwnerBlocked("MEDIA_" + submitted.problem.code.upper())
 
     @staticmethod
-    def _requests(plan: WorkflowPlan, script: str) -> list[tuple[str, dict[str, Any]]]:
+    def _proposed_durations(plan: WorkflowPlan) -> dict[str, int]:
+        """Each unit's proposed request duration where the plan asks to confirm a different tier."""
+        admission = plan.next_action.args.get("admission")
+        units = admission.get("units") if isinstance(admission, dict) else None
+        proposed: dict[str, int] = {}
+        for unit in units if isinstance(units, list) else []:
+            if not isinstance(unit, dict):
+                continue
+            seconds = unit.get("request_duration_seconds")
+            problems = unit.get("problems") or []
+            if (
+                isinstance(seconds, int)
+                and seconds > 0
+                and any(p.get("action") == A.CONFIRM_REQUEST_DURATION.value for p in problems if isinstance(p, dict))
+            ):
+                proposed[str(unit["unit_id"])] = seconds
+        return proposed
+
+    @staticmethod
+    def _requests(
+        plan: WorkflowPlan, script: str, confirmed: Mapping[str, int] | None = None
+    ) -> list[tuple[str, dict[str, Any]]]:
         """The tool calls for the plan's next action, each with the sub key its attempts are counted under."""
         action = plan.next_action
         ids = sorted(action.requested_ids)
@@ -226,7 +260,13 @@ class MediaAdapter:
         return [
             (
                 key,
-                {"script": script, "target": scope, "narration_delivery": USE_TTS, **({"force": True} if ids else {})},
+                {
+                    "script": script,
+                    "target": scope,
+                    "narration_delivery": USE_TTS,
+                    **({"force": True} if ids else {}),
+                    **({"confirmed_request_durations": dict(confirmed)} if confirmed else {}),
+                },
             )
         ]
 

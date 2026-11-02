@@ -23,7 +23,11 @@ A = WorkflowActionType
 
 
 def _plan(
-    action: WorkflowActionType, ids: list[str] | None = None, *, sheets: dict[str, list[str]] | None = None
+    action: WorkflowActionType,
+    ids: list[str] | None = None,
+    *,
+    sheets: dict[str, list[str]] | None = None,
+    args: dict | None = None,
 ) -> WorkflowPlan:
     status = WorkflowStatus.model_construct(
         project_revision="r",
@@ -45,7 +49,7 @@ def _plan(
         steps=[],
         blockers=[],
         problems=[],
-        next_action=WorkflowNextAction(type=action, requested_ids=ids or [], reason="test"),
+        next_action=WorkflowNextAction(type=action, requested_ids=ids or [], args=args or {}, reason="test"),
     )
 
 
@@ -222,3 +226,28 @@ def test_an_asset_name_no_sheet_type_lists_blocks_the_media_step():
 
     with pytest.raises(OwnerBlocked, match="MEDIA_ASSET_TYPE_UNKNOWN"):
         MediaAdapter._requests(plan, "episode_1.json")
+
+
+async def test_a_proposed_duration_tier_is_confirmed_and_sent_with_the_videos(media_host):
+    sessions, controller, run, planner, tools, _ = media_host
+    unit = {
+        "unit_id": "E1S01",
+        "request_duration_seconds": 8,
+        "problems": [{"code": "reference_duration_confirmation_required", "action": "confirm_request_duration"}],
+    }
+    confirm = _plan(A.CONFIRM_REQUEST_DURATION, ["E1S01"], args={"admission": {"units": [unit]}})
+    planner.plans = [confirm, confirm, _plan(A.GENERATE_VIDEOS, ["E1S01"])]
+
+    await _tick(sessions, controller, run)
+
+    assert [r.confirmed_request_durations for r in planner.requests][-2:] == [{}, {"E1S01": 8}]
+    assert tools.calls[-1] == (
+        A.GENERATE_VIDEOS,
+        {
+            "script": "episode_1.json",
+            "target": {"scope": "selected", "ids": ["E1S01"]},
+            "narration_delivery": "use_tts",
+            "force": True,
+            "confirmed_request_durations": {"E1S01": 8},
+        },
+    )
