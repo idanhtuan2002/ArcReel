@@ -144,7 +144,7 @@ async def _configure_providers(sessions) -> None:
                 display_name="Still-image clip",
                 endpoint="ce-4",
                 price_input=0.0,
-                supported_durations=json.dumps(list(range(1, 16))),
+                supported_durations=json.dumps(list(range(1, 31))),
                 resolution="480p",
             )
         )

@@ -11,6 +11,6 @@ therefore uses this endpoint: the unit's storyboard is the first frame, held for
 - `validate_comfyui_definition`: no errors, no warnings. Derived capabilities: first frame, no text-to-video, no
   references, silent.
 - Real render (2026-11-02): a generated storyboard held for 169 frames = 7.04 s, 576×1024, in 3.1 s.
-- Host setup: endpoint `ce-4` on the ComfyUI provider, model `still-clip-local` with supported durations 1-15 s, and
+- Host setup: endpoint `ce-4` on the ComfyUI provider, model `still-clip-local` with supported durations 1-30 s (the clip has no length limit; 30 s holds about 110 narrated words), and
   the project's `video_backend` `custom-3/still-clip-local`. Wan stays configured for the drama profile and for
   production with stronger or cloud video models.
