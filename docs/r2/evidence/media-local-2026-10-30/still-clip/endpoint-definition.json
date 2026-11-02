@@ -1,0 +1,144 @@
+{
+ "id": 4,
+ "key": "ce-4",
+ "display_name": "Still-image clip local (storyboard held to narration length)",
+ "kind": "comfyui",
+ "schema_version": "1.0.0",
+ "media_type": "video",
+ "definition": {
+  "kind": "comfyui",
+  "schema_version": "1.0.0",
+  "media_type": "video",
+  "meta": {
+   "name": "Still-image clip local (storyboard held to narration length)",
+   "author": "ArcReel",
+   "version": "1.0.0"
+  },
+  "workflow": {
+   "1": {
+    "class_type": "LoadImage",
+    "inputs": {
+     "image": "first-frame.png"
+    },
+    "_meta": {
+     "title": "First frame"
+    }
+   },
+   "2": {
+    "class_type": "ImageScale",
+    "inputs": {
+     "image": [
+      "1",
+      0
+     ],
+     "upscale_method": "lanczos",
+     "width": 576,
+     "height": 1024,
+     "crop": "center"
+    }
+   },
+   "3": {
+    "class_type": "RepeatImageBatch",
+    "inputs": {
+     "image": [
+      "2",
+      0
+     ],
+     "amount": 49
+    }
+   },
+   "4": {
+    "class_type": "CreateVideo",
+    "inputs": {
+     "images": [
+      "3",
+      0
+     ],
+     "fps": 24
+    }
+   },
+   "5": {
+    "class_type": "SaveVideo",
+    "inputs": {
+     "video": [
+      "4",
+      0
+     ],
+     "filename_prefix": "ArcReel-still",
+     "format": "mp4",
+     "codec": "h264"
+    }
+   },
+   "6": {
+    "class_type": "PrimitiveStringMultiline",
+    "inputs": {
+     "value": "prompt"
+    },
+    "_meta": {
+     "title": "Prompt (unused by the still clip)"
+    }
+   }
+  },
+  "bindings": {
+   "prompt": [
+    {
+     "node": "6",
+     "class_type": "PrimitiveStringMultiline",
+     "title": "Prompt (unused by the still clip)",
+     "input": "value"
+    }
+   ],
+   "start_image": [
+    {
+     "node": "1",
+     "class_type": "LoadImage",
+     "title": "First frame",
+     "input": "image"
+    }
+   ],
+   "frames": [
+    {
+     "node": "3",
+     "class_type": "RepeatImageBatch",
+     "title": "",
+     "input": "amount",
+     "step": 1
+    }
+   ],
+   "fps": [
+    {
+     "node": "4",
+     "class_type": "CreateVideo",
+     "title": "",
+     "input": "fps",
+     "direction": "read"
+    }
+   ],
+   "width": [
+    {
+     "node": "2",
+     "class_type": "ImageScale",
+     "title": "",
+     "input": "width",
+     "step": 32
+    }
+   ],
+   "height": [
+    {
+     "node": "2",
+     "class_type": "ImageScale",
+     "title": "",
+     "input": "height",
+     "step": 32
+    }
+   ],
+   "output": [
+    {
+     "node": "5",
+     "class_type": "SaveVideo",
+     "title": ""
+    }
+   ]
+  }
+ }
+}

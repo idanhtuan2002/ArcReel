@@ -19,7 +19,7 @@ def complete_snapshot():
             provider_id={"image": "custom-3", "video": "custom-3", "audio": "custom-2"}.get(role, "local"),
             model_id={
                 "image": "flux2-klein-4b-gguf",
-                "video": "wan2.2-ti2v-5b-gguf",
+                "video": "still-clip-local",
                 "audio": "vieneu-tts-v3-turbo",
             }.get(role, role),
             model_identity=role,

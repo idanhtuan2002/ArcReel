@@ -17,7 +17,7 @@ def test_launch_profiles_pin_output_and_candidate_media_routes():
     )
     assert narration.target_duration_seconds == 45
     assert narration.image_route == ("custom-3", "flux2-klein-4b-gguf")
-    assert narration.video_route == ("custom-3", "wan2.2-ti2v-5b-gguf")
+    assert narration.video_route == ("custom-3", "still-clip-local")
     assert narration.audio_route == ("custom-2", "vieneu-tts-v3-turbo")
     assert narration.requires_lip_sync is False
     assert drama.requires_lip_sync is True

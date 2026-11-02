@@ -75,8 +75,9 @@ async def _configure_providers(sessions) -> None:
     flux = _definition(MEDIA_EVIDENCE / "endpoint-definition.json")
     wan = _definition(MEDIA_EVIDENCE / "wan-2.2/saved-endpoint-definition.json")
     flux_reference = _definition(MEDIA_EVIDENCE / "flux2-klein-reference/endpoint-definition.json")
+    still_clip = _definition(MEDIA_EVIDENCE / "still-clip/endpoint-definition.json")
     async with sessions() as session, session.begin():
-        for endpoint_id, definition in ((1, flux), (2, wan), (3, flux_reference)):
+        for endpoint_id, definition in ((1, flux), (2, wan), (3, flux_reference), (4, still_clip)):
             session.add(
                 CustomEndpoint(
                     id=endpoint_id,
@@ -139,6 +140,17 @@ async def _configure_providers(sessions) -> None:
         session.add(
             CustomProviderModel(
                 provider_id=3,
+                model_id="still-clip-local",
+                display_name="Still-image clip",
+                endpoint="ce-4",
+                price_input=0.0,
+                supported_durations=json.dumps(list(range(1, 16))),
+                resolution="480p",
+            )
+        )
+        session.add(
+            CustomProviderModel(
+                provider_id=3,
                 model_id="wan2.2-ti2v-5b-gguf",
                 display_name="Wan 2.2",
                 endpoint="ce-2",
@@ -166,8 +178,8 @@ def _automation_settings(profile: dict) -> dict:
         {
             "role": "video",
             "provider_id": "custom-3",
-            "model_id": "wan2.2-ti2v-5b-gguf",
-            "model_identity": "comfyui/wan2.2-ti2v-5b-Q4_K_M",
+            "model_id": "still-clip-local",
+            "model_identity": "comfyui/still-clip-local",
         },
         {
             "role": "audio",
@@ -326,7 +338,7 @@ async def test_new_idea_reaches_current_quality_pass_and_export(e2e_sessions, tm
         project["default_text_backend"] = f"custom-1/{WRITER}"
         project["default_image_backend"] = "custom-3/flux2-klein-4b-gguf"
         project["image_provider_i2i"] = "custom-3/flux2-klein-4b-ref-gguf"
-        project["video_backend"] = "custom-3/wan2.2-ti2v-5b-gguf"
+        project["video_backend"] = "custom-3/still-clip-local"
         project["audio_backend"] = "custom-2/vieneu-tts-v3-turbo"
         project["narration_voice"] = "nova"
 
