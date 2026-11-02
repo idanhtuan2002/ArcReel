@@ -25,7 +25,9 @@ from typing import Any
 
 from lib.config.resolver import ConfigResolver
 from lib.project_manager import ProjectManager
+from lib.script_batch_edit import script_revision as batch_script_revision
 from lib.script_review import content_fingerprint, script_plan_path
+from lib.speech_composition import SpeechProblemCode, admit_script_unit
 from lib.text_backends.base import TextTaskType
 from lib.workflow_state import WorkflowActionType, WorkflowStateService, WorkflowStatus
 from r2.automation.identity import digest_value
@@ -53,7 +55,16 @@ from server.production_run.owner_support import (
 from server.production_run.owner_tasks import ACTIVE, find_task, step_usage, submit_task
 from server.production_run.ports import StepPlan
 from server.services.automation_grants import RunAutomationAuthority
+from server.services.workflow_planner import WorkflowPlanner
 from server.text_generation import TextGenerationRequest
+from server.tool_runtime import (
+    CallerContext,
+    PatchEpisodeScriptRequest,
+    ProjectScope,
+    Services,
+    ToolRequest,
+    patch_episode_script,
+)
 
 type StatusReader = Callable[[str, int | None], WorkflowStatus]
 
@@ -196,12 +207,16 @@ class WorkflowStageAdapter:
                     raise OwnerBlocked("WORKFLOW_" + status.blockers[0].code.upper())
                 raise OwnerBlocked("WORKFLOW_" + action.type.value.upper())
             if rank > self.done_rank:
+                await self._settle(intent, status)
                 return Progress(await asyncio.to_thread(self._evidence, intent, status, episode))
             if rank < self.first_rank or action.type is A.RESET_EPISODE_PLANNING:
                 raise OwnerBlocked("EXTERNAL_INPUT_CHANGED")
             if not await self._act(intent, receipt.digest, status, episode):
                 return None
         raise OwnerBlocked("OWNER_OUTPUT_MISSING")
+
+    async def _settle(self, intent: DispatchIntent, status: WorkflowStatus) -> None:
+        """Last owner edits before the stage's output is pinned; none by default."""
 
     async def _submit_once(
         self,
@@ -415,6 +430,52 @@ class ScriptAdapter(WorkflowStageAdapter):
             resource_id=f"episode-{episode}",
             payload=TextGenerationRequest(episode=episode).to_payload(),
         )
+
+    async def _settle(self, intent: DispatchIntent, status: WorkflowStatus) -> None:
+        """Narration segments whose only speech problem is a character line written into ``video_prompt`` are
+        patched to the narrator through the script edit tool: the narrator already reads that line in
+        ``novel_text``. Any other replanning need is left for the media stage to report."""
+        if status.project.content_mode != "narration" or status.target is None:
+            return
+        name = intent.scope.project_name
+        script = await asyncio.to_thread(self._projects.load_script, name, status.target.script_filename)
+        operations = []
+        for segment in script.get("segments") or []:
+            if not isinstance(segment, dict) or not segment.get("needs_replan"):
+                continue
+            problems = admit_script_unit("segments", segment, ignore_marker=True).problems
+            video_prompt = segment.get("video_prompt")
+            if (
+                problems
+                and all(problem.code is SpeechProblemCode.MIXED_SPEECH for problem in problems)
+                and isinstance(video_prompt, dict)
+            ):
+                operations.append(
+                    {
+                        "op": "update",
+                        "id": segment["segment_id"],
+                        "fields": {"video_prompt": {**video_prompt, "dialogue": []}},
+                    }
+                )
+        if not operations:
+            return
+        request = PatchEpisodeScriptRequest.model_validate(
+            {
+                "script": status.target.script_filename,
+                "base_revision": batch_script_revision(script),
+                "operations": operations,
+            }
+        )
+        edited = await patch_episode_script(
+            ToolRequest(request),
+            ProjectScope(name, Path(self._projects.projects_root)),
+            CallerContext(user_id=intent.scope.user_id, source="mcp"),
+            Services(
+                projects=self._projects, workflow_planner=WorkflowPlanner(self._projects), capabilities=self._resolver
+            ),
+        )
+        if edited.problem is not None or edited.value is None or not edited.value.success:
+            raise OwnerBlocked("SCRIPT_SPEECH_PATCH_REFUSED")
 
     def _evidence(self, intent: DispatchIntent, status: WorkflowStatus, episode: int | None) -> OwnerReceipt:
         if status.target is None:

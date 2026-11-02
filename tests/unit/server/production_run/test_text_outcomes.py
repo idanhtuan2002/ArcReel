@@ -58,6 +58,9 @@ class Projects:
 
         return Path("/projects") / name
 
+    def load_script(self, name: str, filename: str) -> dict[str, Any]:
+        return {"segments": []}
+
 
 class Statuses:
     def __init__(self, by_episode: dict[int | None, list[WorkflowStatus]]) -> None:
