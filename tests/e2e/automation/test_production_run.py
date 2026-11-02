@@ -74,8 +74,9 @@ async def _configure_providers(sessions) -> None:
     """The launch profile's provider ids, exactly as the host is configured: Ollama, VieNeu and ComfyUI."""
     flux = _definition(MEDIA_EVIDENCE / "endpoint-definition.json")
     wan = _definition(MEDIA_EVIDENCE / "wan-2.2/saved-endpoint-definition.json")
+    flux_reference = _definition(MEDIA_EVIDENCE / "flux2-klein-reference/endpoint-definition.json")
     async with sessions() as session, session.begin():
-        for endpoint_id, definition in ((1, flux), (2, wan)):
+        for endpoint_id, definition in ((1, flux), (2, wan), (3, flux_reference)):
             session.add(
                 CustomEndpoint(
                     id=endpoint_id,
@@ -123,6 +124,15 @@ async def _configure_providers(sessions) -> None:
                 model_id="flux2-klein-4b-gguf",
                 display_name="FLUX.2 klein",
                 endpoint="ce-1",
+                price_input=0.0,
+            )
+        )
+        session.add(
+            CustomProviderModel(
+                provider_id=3,
+                model_id="flux2-klein-4b-ref-gguf",
+                display_name="FLUX.2 klein reference",
+                endpoint="ce-3",
                 price_input=0.0,
             )
         )
@@ -315,6 +325,7 @@ async def test_new_idea_reaches_current_quality_pass_and_export(e2e_sessions, tm
         project["automation"] = _automation_settings(profile)
         project["default_text_backend"] = f"custom-1/{WRITER}"
         project["default_image_backend"] = "custom-3/flux2-klein-4b-gguf"
+        project["image_provider_i2i"] = "custom-3/flux2-klein-4b-ref-gguf"
         project["video_backend"] = "custom-3/wan2.2-ti2v-5b-gguf"
         project["audio_backend"] = "custom-2/vieneu-tts-v3-turbo"
         project["narration_voice"] = "nova"
