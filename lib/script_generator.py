@@ -99,6 +99,7 @@ from lib.script_models import (
     build_episode_script_model,
     build_narration_visual_model,
     merge_drama_visual_into_scenes,
+    narration_visual_segments,
     script_duration_total,
 )
 from lib.script_plan_entries import (
@@ -2056,7 +2057,7 @@ class ScriptGenerator:
         ).model_dump()
 
     def _parse_narration_visual(self, response_text: str, episode: int) -> dict:
-        """解析 prompt_authoring 视觉层 LLM 响应（NarrationVisualEpisodeScript）。
+        """解析 prompt_authoring 视觉层 LLM 响应（键控形态先还原为 NarrationVisualEpisodeScript 的列表形态）。
 
         严格校验 + model_dump：视觉 schema 的 segment 走 ``extra="forbid"``，LLM 若混入
         novel_text 等非视觉字段即拒（而非静默携带进合并覆盖 script_plan 透传值）；dump 后视觉
@@ -2067,6 +2068,8 @@ class ScriptGenerator:
             data = json.loads(text)
         except json.JSONDecodeError as e:
             raise ValueError(f"prompt_authoring 视觉层 JSON 解析失败: {e}") from e
+        if isinstance(data, dict):
+            data = narration_visual_segments(data)
         try:
             validated = NarrationVisualEpisodeScript.model_validate(data)
         except ValidationError as e:

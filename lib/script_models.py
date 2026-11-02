@@ -387,25 +387,39 @@ class NarrationVisualEpisodeScript(BaseModel):
     segments: list[NarrationVisualSegment] = Field(description="各分镜的视觉层，按 segment_id 一一对齐 script_plan")
 
 
-def build_narration_visual_model(segment_ids: list[str]) -> type[BaseModel]:
-    """构造 ``segment_id`` 被本次 prompt_authoring 分镜表枚举硬约束的旁白视觉层模型。
+class NarrationVisualContent(BaseModel):
+    """一个分镜的视觉层（不含对齐锚）：按 segment_id 键控产出时的值。"""
 
-    对齐锚只能取 script_plan 已有的 ``segment_id``（response_schema 渲染为 enum / const），LLM 生成层即
-    无法发明分镜；缺、重仍由按 segment_id 合并时的全覆盖校验拦截。空集抛 ValueError。
+    model_config = _STRICT_CONFIG
+
+    image_prompt: ImagePrompt = Field(description="分镜图生成提示词")
+    video_prompt: VideoPrompt = Field(description="视频生成提示词")
+
+
+def build_narration_visual_model(segment_ids: list[str]) -> type[BaseModel]:
+    """构造按本次 prompt_authoring 分镜表键控的旁白视觉层模型：``segments`` 是以每个 ``segment_id`` 为必填键的对象。
+
+    每个分镜恰好一个键，LLM 生成层即无法发明、遗漏或重复分镜；对象形态的必填属性各结构化输出后端都支持。
+    :func:`narration_visual_segments` 把它还原为 ``NarrationVisualEpisodeScript`` 的列表形态。空集抛 ValueError。
     """
-    values = tuple(dict.fromkeys(segment_ids))
+    values = list(dict.fromkeys(segment_ids))
     if not values:
-        raise ValueError("segment_ids 为空，无法构造 segment_id 枚举约束")
-    segment = create_model(
-        NarrationVisualSegment.__name__,
-        __base__=NarrationVisualSegment,
-        segment_id=(Literal[values], Field(description="对齐锚：必须取自 script_plan 分镜表，逐一对应、不增不减")),
-    )
+        raise ValueError("segment_ids 为空，无法构造分镜键")
+    fields: dict[str, Any] = dict.fromkeys(values, (NarrationVisualContent, ...))
+    keyed = create_model("NarrationVisualSegmentsBySegmentId", __config__=_STRICT_CONFIG, **fields)
     return create_model(
-        "NarrationVisualEpisodeScript",
-        __base__=NarrationVisualEpisodeScript,
-        segments=(list[segment], Field(description="各分镜的视觉层，按 segment_id 一一对齐 script_plan")),
+        "NarrationVisualEpisodeScriptBySegmentId",
+        title=(str, Field(description="剧集标题")),
+        segments=(keyed, Field(description="各分镜的视觉层，以 script_plan 的 segment_id 为键，每个分镜恰好一项")),
     )
+
+
+def narration_visual_segments(data: dict[str, Any]) -> dict[str, Any]:
+    """键控形态的视觉层响应还原为列表形态（``segments`` 已是列表时原样返回）。"""
+    segments = data.get("segments")
+    if not isinstance(segments, dict):
+        return data
+    return {**data, "segments": [{"segment_id": sid, **value} for sid, value in segments.items()]}
 
 
 # ============ 剧情演绎（Drama） ============
