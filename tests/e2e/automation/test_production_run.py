@@ -2,7 +2,7 @@
 
 Opt-in: ``ARCREEL_E2E_AUTOMATION=1`` with PostgreSQL, Ollama (writer and both reviewers pulled), ComfyUI (FLUX.2
 klein and Wan 2.2) and the VieNeu TTS shim running, and ``ARCREEL_E2E_REVIEWER_CORPUS`` naming a labeled corpus
-manifest. The host is the real app lifespan with run delegation activated over fixture governance custody. Setup
+manifest, and ``ARCREEL_DATA_DIR`` naming an empty projects directory. The host is the real app lifespan with run delegation activated over fixture governance custody. Setup
 does what a release owner does once per project: configure the launch profile's routes, publish the automatic
 Quality profile, qualify both reviewers on the blind corpus and record the launch qualification. The run itself is
 driven only through the public API. A record of the run is written to ``ARCREEL_E2E_EVIDENCE`` when set.
@@ -259,6 +259,15 @@ def _require_services(corpus: Path) -> None:
     assert not absent, f"corpus files missing: {absent[:3]}"
 
 
+def _empty_data_dir(projects: ProjectManager) -> Path:
+    """The process's projects directory, which the run's workers also use: ``ARCREEL_DATA_DIR``, empty."""
+    root = Path(projects.projects_root)
+    assert os.environ.get("ARCREEL_DATA_DIR"), "set ARCREEL_DATA_DIR to an empty directory for the run"
+    assert root == Path(os.environ["ARCREEL_DATA_DIR"]).resolve(), root
+    assert not any(root.iterdir()), f"{root} is not empty"
+    return root
+
+
 def _write_evidence(record: dict) -> None:
     target = os.environ.get("ARCREEL_E2E_EVIDENCE")
     if target:
@@ -287,11 +296,8 @@ async def test_new_idea_reaches_current_quality_pass_and_export(e2e_sessions, tm
         root, runtime, session_factory=sessions, expected_uid=os.getuid(), expected_gid=os.getgid()
     ):
         pass
-    projects_root = tmp_path / "projects"
-    projects_root.mkdir()
-    projects = ProjectManager(projects_root)
-    monkeypatch.setenv("ARCREEL_DATA_DIR", str(projects_root))
-    assert Path(project_manager_module.get_project_manager().projects_root) == projects_root, "data dir not current"
+    projects = project_manager_module.get_project_manager()
+    projects_root = await asyncio.to_thread(_empty_data_dir, projects)
     created = await create_project(
         ToolRequest(
             CreateProjectToolRequest(
