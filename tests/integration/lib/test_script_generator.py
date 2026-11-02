@@ -1765,6 +1765,21 @@ class TestMergeNarrationVisual:
         with pytest.raises(ValueError, match="E1S01"):
             sg._merge_narration_visual(script_plan, visual, episode=1)
 
+    def test_equal_count_with_a_duplicate_id_aligns_by_order(self, tmp_path):
+        """条数与 script_plan 相等但 id 重复：按顺序对齐，对齐锚取 script_plan 的 id。"""
+        sg = _bare_generator(tmp_path)
+        script_plan = [_script_plan_seg("E1S01", "甲"), _script_plan_seg("E1S02", "乙")]
+        visual = {
+            "title": "t",
+            "segments": [_visual_seg("E1S01", scene="甲画面"), _visual_seg("E1S01", scene="乙画面")],
+        }
+
+        merged = sg._merge_narration_visual(script_plan, visual, episode=1)
+
+        assert [s["segment_id"] for s in merged["segments"]] == ["E1S01", "E1S02"]
+        assert [s["image_prompt"]["scene"] for s in merged["segments"]] == ["甲画面", "乙画面"]
+        assert [s["novel_text"] for s in merged["segments"]] == ["甲", "乙"]
+
     def test_title_fallback_when_missing(self, tmp_path):
         sg = _bare_generator(tmp_path)
         script_plan = [_script_plan_seg("E1S01", "甲")]

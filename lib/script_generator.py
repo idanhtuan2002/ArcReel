@@ -2078,10 +2078,20 @@ class ScriptGenerator:
 
         script_plan 结构（novel_text、时长、segment_break 等内容字段）是单一真相源，逐字透传；
         LLM 只产出视觉层，按 segment_id 对齐合并回各分镜——novel_text 永不经 LLM 重出，
-        从工程上根除扩写漂移。校验 segment_id 唯一且与 script_plan 全覆盖：缺、多、重都 fail-loud，
-        杜绝顺序错配与漏段。
+        从工程上根除扩写漂移。segment_id 唯一且与 script_plan 全覆盖时按 id 对齐；id 有缺、多、重
+        但视觉层条数与 script_plan 分镜数相等时，按顺序逐一对齐（prompt 要求按分镜表顺序一一产出），
+        对齐锚改写为 script_plan 的 id；条数不等则 fail-loud，杜绝漏段。
         """
         visual_segments = visual_data["segments"]
+        script_plan_ids = [s["segment_id"] for s in script_plan_segments]
+        visual_ids = [item["segment_id"] for item in visual_segments]
+        if sorted(visual_ids) != sorted(script_plan_ids) and len(visual_segments) == len(script_plan_segments):
+            logger.warning(
+                "episode %s 视觉层 segment_id 与 script_plan 不一一对应，按顺序对齐: %s", episode, visual_ids
+            )
+            visual_segments = [
+                {**item, "segment_id": sid} for item, sid in zip(visual_segments, script_plan_ids, strict=True)
+            ]
 
         visual_by_id: dict[str, dict] = {}
         for item in visual_segments:
@@ -2090,7 +2100,6 @@ class ScriptGenerator:
                 raise ValueError(f"episode {episode} 视觉层 segment_id 重复: {sid}")
             visual_by_id[sid] = item
 
-        script_plan_ids = [s["segment_id"] for s in script_plan_segments]
         script_plan_id_set = set(script_plan_ids)
         missing = [sid for sid in script_plan_ids if sid not in visual_by_id]
         if missing:
