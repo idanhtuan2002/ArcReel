@@ -6,10 +6,15 @@ the snapshot it planned from; the owner then re-requires the same subject inside
 
 from __future__ import annotations
 
+import json
+from pathlib import Path
+from typing import Any
+
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from lib.db.repositories.automation_grants import AutomationGrantRepository
 from lib.db.repositories.production_runs import ProductionRunConflict, ProductionRunRepository
+from lib.script_review import content_fingerprint_of_data
 from r2.automation.identity import policy_digest
 from r2.contracts.automation import (
     AuthorizationSubject,
@@ -162,6 +167,29 @@ def same_policy(run: RunSnapshot, intent: DispatchIntent) -> bool:
     return policy_digest(run.policy) == intent.identity.policy_digest
 
 
+_SCRIPT_ITEM_LISTS = ("segments", "scenes", "shots", "units")
+
+
+def script_revision(path: Path) -> str | None:
+    """The episode script's content revision: its canonical JSON without the media state media generation writes
+    back (each item's ``generated_assets`` and ``metadata.updated_at``); ``None`` when the script is missing."""
+    try:
+        data: Any = json.loads(path.read_bytes())
+    except FileNotFoundError:
+        return None
+    if isinstance(data, dict):
+        data = dict(data)
+        for key in _SCRIPT_ITEM_LISTS:
+            if isinstance(data.get(key), list):
+                data[key] = [
+                    {k: v for k, v in item.items() if k != "generated_assets"} if isinstance(item, dict) else item
+                    for item in data[key]
+                ]
+        if isinstance(data.get("metadata"), dict):
+            data["metadata"] = {k: v for k, v in data["metadata"].items() if k != "updated_at"}
+    return content_fingerprint_of_data(data)
+
+
 __all__ = [
     "OwnerBlocked",
     "Sessions",
@@ -172,6 +200,7 @@ __all__ = [
     "required_receipt",
     "route_for",
     "same_policy",
+    "script_revision",
     "stage_receipt",
     "start_command",
     "step_intent",

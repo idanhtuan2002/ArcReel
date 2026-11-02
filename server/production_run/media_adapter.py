@@ -20,7 +20,6 @@ from lib.db.repositories.production_runs import ProductionRunRepository
 from lib.generation_queue import GenerationQueue, get_generation_queue
 from lib.narration_delivery import USE_TTS
 from lib.project_manager import ProjectManager
-from lib.script_review import content_fingerprint
 from lib.workflow_plan import WorkflowPlan, WorkflowPlanRequest
 from lib.workflow_state import WorkflowActionType
 from r2.automation.identity import digest_value
@@ -43,6 +42,7 @@ from server.production_run.owner_support import (
     Sessions,
     current_subject,
     outcome,
+    script_revision,
     step_intent,
 )
 from server.production_run.owner_tasks import attempt_window_tasks, tasks_usage
@@ -168,7 +168,7 @@ class MediaAdapter:
     def _script_fingerprint(self, project_name: str, plan: WorkflowPlan) -> str:
         target = plan.status.target
         fingerprint = (
-            content_fingerprint(self._projects.get_project_path(project_name) / target.script)
+            script_revision(self._projects.get_project_path(project_name) / target.script)
             if target is not None
             else None
         )

@@ -166,7 +166,7 @@ def _adapter(cls, statuses: Statuses, monkeypatch, *targets: str, projects: Proj
 async def test_script_stage_passes_only_when_every_target_has_moved_past_it(tasks, monkeypatch):
     statuses = Statuses({1: [_status(A.GENERATE_ASSET_SHEETS)], 2: [_status(A.GENERATE_SCRIPT, episode=2)]})
     adapter = _adapter(ScriptAdapter, statuses, monkeypatch, "episode:1", "episode:2")
-    monkeypatch.setattr(text_adapter, "content_fingerprint", lambda path: "sha256:" + "9" * 64)
+    monkeypatch.setattr(text_adapter, "script_revision", lambda path: "sha256:" + "9" * 64)
     intent = _intent(RunStage.SCRIPT)
 
     waiting = await adapter.inspect(intent=intent, receipt=intent.input_refs[0])

@@ -47,6 +47,7 @@ from server.production_run.owner_support import (
     outcome,
     required_receipt,
     route_for,
+    script_revision,
     step_intent,
 )
 from server.production_run.owner_tasks import ACTIVE, find_task, step_usage, submit_task
@@ -419,7 +420,7 @@ class ScriptAdapter(WorkflowStageAdapter):
         if status.target is None:
             raise OwnerBlocked("OWNER_OUTPUT_MISSING")
         project_path = self._projects.get_project_path(intent.scope.project_name)
-        revision = content_fingerprint(project_path / status.target.script)
+        revision = script_revision(project_path / status.target.script)
         if revision is None:
             raise OwnerBlocked("OWNER_OUTPUT_MISSING")
         return revision_receipt(self.owner, f"episode:{episode}:script", revision)
