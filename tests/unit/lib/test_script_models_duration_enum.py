@@ -216,3 +216,44 @@ class TestReferenceUnitsScriptPlanModel:
             self._model().model_validate({"units": [self._unit(text="")]})
         with pytest.raises(ValidationError):
             self._model().model_validate({"units": [self._unit(source_text="")]})
+
+
+class TestNarrationScriptPlanModel:
+    """build_narration_script_plan_model：分镜时长枚举硬约束，其余字段同静态 NarrationScriptPlanDraft。"""
+
+    def _model(self, durations: list[int]):
+        from lib.script_models import build_narration_script_plan_model
+
+        return build_narration_script_plan_model(durations)
+
+    def _segment(self, **overrides) -> dict:
+        segment = {
+            "segment_id": "E1S01",
+            "novel_text": "他起身。",
+            "duration_seconds": 2,
+            "characters_in_segment": [],
+            "scenes": [],
+            "props": [],
+        }
+        segment.update(overrides)
+        return segment
+
+    def test_single_tier_renders_as_const_and_multi_as_enum(self):
+        def duration(schema: dict) -> dict:
+            segment = next(d for d in schema["$defs"].values() if "novel_text" in d.get("properties", {}))
+            return segment["properties"]["duration_seconds"]
+
+        assert duration(self._model([2]).model_json_schema())["const"] == 2
+        assert duration(self._model([8, 4, 6]).model_json_schema())["enum"] == [4, 6, 8]
+
+    def test_off_tier_duration_rejected_and_tier_accepted(self):
+        model = self._model([2])
+        with pytest.raises(ValidationError):
+            model.model_validate({"segments": [self._segment(duration_seconds=3)]})
+        assert (
+            model.model_validate({"segments": [self._segment()]}).model_dump()["segments"][0]["duration_seconds"] == 2
+        )
+
+    def test_other_fields_keep_the_static_contract(self):
+        with pytest.raises(ValidationError):
+            self._model([2]).model_validate({"segments": [self._segment(segment_id="S1")]})

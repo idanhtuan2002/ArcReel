@@ -1152,3 +1152,21 @@ def build_reference_units_script_plan_model(supported_durations: list[int]) -> t
         __base__=ReferenceScriptPlanFlatDraft,
         units=(list[unit], Field(min_length=1, description="按叙事顺序排列的 unit 列表")),
     )
+
+
+def build_narration_script_plan_model(supported_durations: list[int]) -> type[BaseModel]:
+    """构造分镜时长被 ``supported_durations`` 枚举硬约束的旁白 script_plan 模型。
+
+    分镜时长即发给视频供应商的秒数；枚举加在 ``NarrationScriptPlanSegment.duration_seconds`` 上，
+    LLM 生成层即被卡死；没有 Agent 修改草稿的自动运行因此不会落入 ``duration_off_tier`` 修复闭环。
+    """
+    segment = _constrained_duration_item(
+        NarrationScriptPlanSegment,
+        _duration_literal(supported_durations),
+        "分镜时长（秒），必须取 supported_durations 中的值",
+    )
+    return create_model(
+        "NarrationScriptPlanDraft",
+        __base__=NarrationScriptPlanDraft,
+        segments=(list[segment], Field(description="分镜列表")),
+    )

@@ -81,6 +81,7 @@ from lib.script_generator import ScriptGenerator
 from lib.script_models import (
     NarrationScriptPlanDraft,
     build_drama_normalized_script_model,
+    build_narration_script_plan_model,
     build_reference_units_script_plan_model,
 )
 from lib.script_plan_entries import SCOPE_ALL, SCOPE_STALE, ScriptPlanEntryError
@@ -1663,7 +1664,9 @@ async def generate_narration_script_plan(
         result = await generator.generate(
             BackendTextGenerationRequest(
                 prompt=prompt,
-                response_schema=NarrationScriptPlanDraft,
+                response_schema=build_narration_script_plan_model(supported_durations)
+                if supported_durations
+                else NarrationScriptPlanDraft,
                 max_output_tokens=DEFAULT_MAX_OUTPUT_TOKENS,
             ),
             project_name=project_name,
