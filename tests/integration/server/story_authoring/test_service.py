@@ -20,7 +20,7 @@ from server.story_authoring.authority import GrantNarrativeShowrunnerAuthority
 from server.story_authoring.commit import CommitRefused
 from server.story_authoring.driver import StoryBrief
 from server.story_authoring.executor import execute_story_run_task
-from server.story_authoring.handoff import HandoffRefusal, HandoffRefused, OnConflict
+from server.story_authoring.handoff import HandoffRefusal, HandoffRefused, OnConflict, narration_source
 from server.story_authoring.runtime import RunPhase, RunStateStore
 from server.story_authoring.service import StoryActionRefused, StoryAuthoringService, StoryRunRef
 from server.tool_runtime import (
@@ -167,7 +167,7 @@ async def test_a_greenlit_brief_runs_to_an_approved_manuscript_handed_to_video(
     assert record == again
     assert (record.done, record.path, calls) == (True, "source/can-nha-cu.txt", ["can-nha-cu.md"])
     source = projects.get_project_path(PROJECT) / "source" / "can-nha-cu.txt"
-    assert source.read_text(encoding="utf-8") == export.decode("utf-8")
+    assert source.read_text(encoding="utf-8") == narration_source(export.decode("utf-8"))
     with pytest.raises(HandoffRefused) as other:
         await service.send_to_video(command_id="cmd-00000002", load_project=project, **send)
     assert other.value.code is HandoffRefusal.ALREADY_HANDED_OFF

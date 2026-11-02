@@ -298,7 +298,7 @@ async def test_a_new_idea_reaches_a_committed_manuscript_handed_to_video(story_h
     handed = await _tick(host)
     assert (handed.stage, handed.status) == (RunStage.ASSET_ANALYSIS, RunStatus.RUNNING)
     source = host.projects.get_project_path("project") / "source" / "can-nha-cu.txt"
-    assert source.read_text(encoding="utf-8").startswith("# Căn nhà cũ\n")
+    assert source.read_text(encoding="utf-8").startswith("Căn nhà cũ\n\n")
     assert host.uploads == ["can-nha-cu.md"]
     assert host.projects.load_project("project")["source_language"] == "vi"
 

@@ -27,3 +27,16 @@ def test_the_name_is_bounded_and_keeps_its_suffix():
     assert len(name) <= 80
     assert name.endswith("-0123abcd.md")
     assert not name.startswith("-")
+
+
+def test_narration_source_keeps_the_title_and_scene_text_without_markdown_layout():
+    from server.story_authoring.driver import render_markdown
+    from server.story_authoring.handoff import narration_source
+
+    markdown = render_markdown(
+        title="Căn nhà cũ",
+        blurb="Minh về làng.",
+        chapters=[["Cảnh một.", "Cảnh hai."], ["Cảnh ba."]],
+    )
+
+    assert narration_source(markdown) == "Căn nhà cũ\n\nCảnh một.\n\nCảnh hai.\n\nCảnh ba.\n"

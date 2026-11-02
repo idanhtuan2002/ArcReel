@@ -2,11 +2,12 @@
 
 Only a ``COMMITTED`` run hands off, and each run hands off once. The exported bytes are read by their digest,
 checked against the manifest's export digest and re-scanned for CJK before the upload. The source file name is
-an ASCII slug of the title; when a different file already holds that name, a short digest suffix is added.
+an ASCII slug of the title; when a different file already holds that name, a short digest suffix is added. The
+uploaded source is the manuscript as narration text (see :func:`narration_source`), not its Markdown.
 
 The hand-off is recorded ``PENDING`` with its file name before the upload and ``DONE`` after it. A repeated call
 with the same command id returns the recorded result; a resumed ``PENDING`` hand-off whose file already holds
-exactly the exported text is completed without a second upload, so a crash between the upload and the record
+exactly its narration text is completed without a second upload, so a crash between the upload and the record
 never writes a second source.
 
 Before uploading, a request claims the pending hand-off in the run state. While another request holds a claim
@@ -70,6 +71,25 @@ def _source_text(path: Path) -> str | None:
     return path.read_text(encoding="utf-8") if path.is_file() and not path.is_symlink() else None
 
 
+_SCENE_BREAK = "* * *"
+
+
+def narration_source(markdown: str) -> str:
+    """The exported manuscript as text to narrate: the title as a plain first line, then the scene paragraphs.
+
+    The blurb (``>``), chapter headings (``##``) and scene breaks (``* * *``) are layout, not narration.
+    """
+    lines = markdown.splitlines()
+    title = lines[0].removeprefix("# ").strip() if lines and lines[0].startswith("# ") else ""
+    body = lines[1:] if title else lines
+    paragraphs = [
+        line.strip()
+        for line in body
+        if line.strip() and not line.startswith(("#", ">")) and line.strip() != _SCENE_BREAK
+    ]
+    return "\n\n".join([title, *paragraphs] if title else paragraphs) + "\n"
+
+
 def _choose_filename(title: str, export_digest: str, source_dir: Path, text: str) -> str:
     base = slug_filename(title)
     existing = _source_text(source_dir / (Path(base).stem + SOURCE_SUFFIX))
@@ -107,23 +127,24 @@ async def send_to_video(
     if has_cjk(text):
         raise HandoffRefused(HandoffRefusal.CJK_IN_EXPORT, "the exported manuscript contains CJK characters")
 
+    source = narration_source(text)
     pending = state.handoff
     if pending is not None and pending.command_id != command_id:
         raise HandoffRefused(HandoffRefusal.ALREADY_HANDED_OFF, f"a hand-off as {pending.filename} is in progress")
     if pending is None:
         title = text.splitlines()[0].removeprefix("# ") if text else ""
-        filename = _choose_filename(title, manifest.export_digest, source_dir, text)
+        filename = _choose_filename(title, manifest.export_digest, source_dir, source)
         pending = HandoffRecord(command_id=command_id, filename=filename, export_digest=manifest.export_digest)
         pending = await _record_pending(store, pending)
 
     target = source_dir / (Path(pending.filename).stem + SOURCE_SUFFIX)
     claim: str | None = None
-    if _source_text(target) == text:
+    if _source_text(target) == source:
         result_path = f"source/{target.name}"
     else:
         claim = await _claim_upload(store, command_id, now=clock())
         try:
-            result = await upload(pending.filename, text, on_conflict)
+            result = await upload(pending.filename, source, on_conflict)
         except Exception as error:
             await _release_upload(store, claim)
             raise HandoffRefused(HandoffRefusal.UPLOAD_FAILED, str(error)) from error
