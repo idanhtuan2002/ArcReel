@@ -212,10 +212,7 @@ class MediaAdapter:
             + digest_value("r2.production-media-request.v1", ensure_json_value({"script": script, "ids": ids}))
         )
         if action.type is A.GENERATE_ASSET_SHEETS:
-            by_type: dict[str, list[str]] = {}
-            for unit in ids:
-                kind, _, name = unit.partition("/")
-                by_type.setdefault(kind, []).append(name)
+            by_type = MediaAdapter._missing_sheets_by_type(plan, ids)
             return [(f"{key}:{kind}", {"type": kind, "names": names}) for kind, names in sorted(by_type.items())]
         if action.type is A.GENERATE_STORYBOARDS:
             return [(key, {"script": script, **({"segment_ids": ids} if ids else {})})]
@@ -232,6 +229,24 @@ class MediaAdapter:
                 {"script": script, "target": scope, "narration_delivery": USE_TTS, **({"force": True} if ids else {})},
             )
         ]
+
+    @staticmethod
+    def _missing_sheets_by_type(plan: WorkflowPlan, ids: list[str]) -> dict[str, list[str]]:
+        """Requested asset names grouped by asset type, from the plan's per-type missing sheet ids.
+
+        The action names assets without their type; a name missing under several types is requested under each.
+        A name no type lists blocks the step.
+        """
+        sheets = plan.status.artifacts.get("asset_sheets")
+        by_type: dict[str, list[str]] = {}
+        for kind, collection in sorted(sheets.items()) if isinstance(sheets, dict) else ():
+            missing = collection.get("missing_ids", []) if isinstance(collection, dict) else []
+            names = [name for name in ids if name in missing]
+            if names:
+                by_type[kind] = names
+        if {name for names in by_type.values() for name in names} != set(ids):
+            raise OwnerBlocked("MEDIA_ASSET_TYPE_UNKNOWN")
+        return by_type
 
     @staticmethod
     def _tts_segments(plan: WorkflowPlan) -> list[str]:

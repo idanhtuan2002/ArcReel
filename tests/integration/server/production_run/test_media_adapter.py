@@ -22,7 +22,9 @@ from tests.integration.server.services.test_automation_grants import interactive
 A = WorkflowActionType
 
 
-def _plan(action: WorkflowActionType, ids: list[str] | None = None) -> WorkflowPlan:
+def _plan(
+    action: WorkflowActionType, ids: list[str] | None = None, *, sheets: dict[str, list[str]] | None = None
+) -> WorkflowPlan:
     status = WorkflowStatus.model_construct(
         project_revision="r",
         source_revision=None,
@@ -31,7 +33,10 @@ def _plan(action: WorkflowActionType, ids: list[str] | None = None) -> WorkflowP
         state="VIDEO",
         blockers=[],
         gates={},
-        artifacts={"videos": {"state": "current"}},
+        artifacts={
+            "videos": {"state": "current"},
+            "asset_sheets": {kind: {"missing_ids": names} for kind, names in (sheets or {}).items()},
+        },
         next_action=WorkflowNextAction(type=action, reason="test"),
     )
     return WorkflowPlan.model_construct(
@@ -172,7 +177,9 @@ async def test_a_changed_script_blocks_the_media_stage(media_host):
 
 async def test_requests_follow_the_agent_tool_contracts(media_host):
     sessions, controller, run, planner, tools, _ = media_host
-    planner.plans = [_plan(A.GENERATE_ASSET_SHEETS, ["character/Lan", "scene/Làng", "character/Mai"])]
+    planner.plans = [
+        _plan(A.GENERATE_ASSET_SHEETS, ["Lan", "Làng", "Mai"], sheets={"character": ["Mai", "Lan"], "scene": ["Làng"]})
+    ]
     await _tick(sessions, controller, run)
     planner.plans = [_plan(A.GENERATE_VIDEOS)]
     await _tick(sessions, controller, run)
@@ -205,3 +212,13 @@ async def test_a_refused_tool_call_blocks_with_its_code(media_host):
     blocked = await _tick(sessions, controller, run)
 
     assert blocked.reason == "MEDIA_WORKER_OFFLINE"
+
+
+def test_an_asset_name_no_sheet_type_lists_blocks_the_media_step():
+    from server.production_run.media_adapter import MediaAdapter
+    from server.production_run.owner_support import OwnerBlocked
+
+    plan = _plan(A.GENERATE_ASSET_SHEETS, ["Lan", "Ghost"], sheets={"character": ["Lan"]})
+
+    with pytest.raises(OwnerBlocked, match="MEDIA_ASSET_TYPE_UNKNOWN"):
+        MediaAdapter._requests(plan, "episode_1.json")
