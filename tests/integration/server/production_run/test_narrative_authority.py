@@ -65,7 +65,7 @@ async def test_manifest_projection_uses_actual_actor_and_exact_owner_member(manu
 
 
 @pytest.mark.parametrize("field", ["exceptions_offered", "findings_open"])
-async def test_unresolved_story_findings_cannot_be_accepted_automatically(manuscript_bound_run, field):
+async def test_story_findings_without_their_quality_record_cannot_be_accepted(manuscript_bound_run, field):
     from server.production_run.narrative_authority import AutomaticNarrativeAuthority
 
     issuer, sessions, _, _, manifest, subject, _ = manuscript_bound_run
@@ -87,19 +87,29 @@ def _quality(severity: str) -> tuple[bytes, str]:
     return record, "sha256:" + hashlib.sha256(record).hexdigest()
 
 
-async def test_only_stylistic_open_findings_bind_and_only_with_their_exact_record(manuscript_bound_run):
+@pytest.mark.parametrize("severity", ["STYLISTIC", "NARRATIVE_CRITICAL", "LOCAL_MODEL_LIMIT"])
+async def test_recorded_story_findings_are_accepted_as_is_only_with_their_exact_record(manuscript_bound_run, severity):
     from server.production_run.narrative_authority import AutomaticNarrativeAuthority
 
     issuer, sessions, _, _, manifest, subject, _ = manuscript_bound_run
-    stylistic, stylistic_digest = _quality("STYLISTIC")
-    critical, critical_digest = _quality("NARRATIVE_CRITICAL")
+    accepted, accepted_digest = _quality(severity)
+    hard, hard_digest = _quality("HARD_INTEGRITY")
+    exceptions = ("F001",) if severity != "STYLISTIC" else ()
 
-    def bound(digest: str):
-        changed = manifest.model_copy(update={"findings_open": ("F001",), "quality_record_digest": digest})
+    def bound(digest: str, offered: tuple[str, ...] = exceptions, open_: tuple[str, ...] = ("F001",)):
+        changed = manifest.model_copy(
+            update={"findings_open": open_, "exceptions_offered": offered, "quality_record_digest": digest}
+        )
         return changed, subject.model_copy(update={"subject_digest": changed.digest()})
 
-    for record, digest in ((critical, critical_digest), (critical, stylistic_digest), (None, stylistic_digest)):
-        refused_manifest, refused_subject = bound(digest)
+    refused = (
+        (accepted, hard_digest, exceptions, ("F001",)),
+        (None, accepted_digest, exceptions, ("F001",)),
+        (hard, hard_digest, exceptions, ("F001",)),
+        (accepted, accepted_digest, ("F002",), ("F001",)),
+    )
+    for record, digest, offered, open_ in refused:
+        refused_manifest, refused_subject = bound(digest, offered, open_)
         with pytest.raises(NarrativeDecisionAuthorizationError, match="UNRESOLVED_STORY_FINDINGS"):
             await AutomaticNarrativeAuthority.bind(
                 sessions=sessions,
@@ -108,13 +118,13 @@ async def test_only_stylistic_open_findings_bind_and_only_with_their_exact_recor
                 manifest=refused_manifest,
                 quality_record=record,
             )
-    accepted_manifest, accepted_subject = bound(stylistic_digest)
+    accepted_manifest, accepted_subject = bound(accepted_digest)
     narrative = await AutomaticNarrativeAuthority.bind(
         sessions=sessions,
         authority=issuer.authority(),
         subject=accepted_subject,
         manifest=accepted_manifest,
-        quality_record=stylistic,
+        quality_record=accepted,
     )
     assert narrative.actor_id.startswith("automation:")
 

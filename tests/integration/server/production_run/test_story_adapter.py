@@ -40,9 +40,11 @@ from server.production_run.story_adapter import (
     story_limits,
 )
 from server.services.automation_grants import AutomationGrantCustodian, RunAutomationAuthority
+from server.story_authoring.artifacts import StoryBlobStore
 from server.story_authoring.authority import GrantNarrativeShowrunnerAuthority
+from server.story_authoring.commit import load_offered_manifest, manifest_bytes
 from server.story_authoring.executor import execute_story_run_task
-from server.story_authoring.runtime import RunPhase, RunStateStore, set_phase
+from server.story_authoring.runtime import RunPhase, RunState, RunStateStore, set_phase
 from server.story_authoring.service import StoryAuthoringService
 from server.tool_runtime import (
     CallerContext,
@@ -290,6 +292,8 @@ async def test_a_new_idea_reaches_a_committed_manuscript_handed_to_video(story_h
     assert state.commit is not None
     assert state.commit.approval is not None
     assert state.commit.approval.actor_id == principal
+    offered_manifest = load_offered_manifest(StoryBlobStore(host.projects.get_project_path("project")), state)
+    assert state.commit.approval.accepted_exceptions == tuple(sorted(offered_manifest.exceptions_offered))
 
     handed = await _tick(host)
     assert (handed.stage, handed.status) == (RunStage.ASSET_ANALYSIS, RunStatus.RUNNING)
@@ -358,7 +362,44 @@ async def test_story_start_replays_to_the_same_story_run(story_host: Host):
         assert len(list(tasks)) == 1
 
 
-async def test_a_manifest_with_open_findings_is_never_committed_automatically(story_host: Host, monkeypatch):
+async def test_recorded_critical_findings_are_accepted_as_is_and_the_run_continues(story_host: Host):
+    import json
+
+    host = story_host
+    await _tick(host)
+    await _tick(host)
+    await _execute_story(host)
+    store = RunStateStore(host.sessions, task_id=await _story_task(host))
+    blobs = StoryBlobStore(host.projects.get_project_path("project"))
+    finding = {"id": "F001", "code": "NO_ENDING", "severity": "NARRATIVE_CRITICAL", "node_id": "scene_draft[1,1]"}
+    record = blobs.put(json.dumps({"findings": [finding], "packaging": None}).encode())
+    manifest = load_offered_manifest(blobs, await store.load()).model_copy(
+        update={"findings_open": ("F001",), "exceptions_offered": ("F001",), "quality_record_digest": record}
+    )
+    offered = blobs.put(manifest_bytes(manifest))
+
+    def reoffer(state: RunState) -> tuple[RunState, None]:
+        assert state.commit is not None
+        return state.model_copy(
+            update={"commit": state.commit.model_copy(update={"offered_manifest_digest": offered})}
+        ), None
+
+    await store.apply(reoffer)
+
+    await _tick(host)
+    committed = await _tick(host)
+
+    assert (committed.stage, committed.status, committed.reason) == (RunStage.HANDOFF, RunStatus.RUNNING, None)
+    state = await store.load()
+    assert state.phase is RunPhase.COMMITTED
+    assert state.commit is not None
+    assert state.commit.approval is not None
+    assert state.commit.approval.accepted_exceptions == ("F001",)
+
+
+async def test_a_manifest_whose_findings_are_not_recorded_is_never_committed_automatically(
+    story_host: Host, monkeypatch
+):
     from r2.narrative_lifecycle.errors import NarrativeDecisionAuthorizationError
     from server.production_run.narrative_authority import AutomaticNarrativeAuthority
 
@@ -377,7 +418,7 @@ async def test_a_manifest_with_open_findings_is_never_committed_automatically(st
     assert (blocked.stage, blocked.status, blocked.reason) == (
         RunStage.STORY_COMMIT,
         RunStatus.BLOCKED_CONFIGURATION,
-        "STORY_EXCEPTION_REQUIRES_HUMAN",
+        "STORY_FINDINGS_NOT_RECORDED",
     )
     state = await RunStateStore(host.sessions, task_id=await _story_task(host)).load()
     assert state.phase is RunPhase.READY_FOR_APPROVAL

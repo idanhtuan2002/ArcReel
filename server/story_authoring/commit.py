@@ -406,7 +406,8 @@ class ManuscriptCommitter:
 
     async def approve_automatically(self, *, narrative: object, manifest_digest_seen: str) -> RunState:
         """Approve and commit under a production run's bound automatic authority, or continue its interrupted
-        sequence. A manifest with offered exceptions or open findings never binds, so it never reaches here."""
+        sequence. The approval accepts every offered exception as is; the authority bound only a manifest whose
+        exceptions are in its exact quality record."""
         from server.production_run.narrative_authority import AutomaticNarrativeAuthority
 
         if type(narrative) is not AutomaticNarrativeAuthority:
@@ -429,6 +430,7 @@ class ManuscriptCommitter:
             actor_id=narrative.actor_id,
             grant_event_digest=narrative.parent_event_digest,
             approved_at=narrative.admitted_at,
+            accepted_exceptions=tuple(sorted(manifest.exceptions_offered)),
         )
 
         def change(current: RunState) -> tuple[RunState, bool]:

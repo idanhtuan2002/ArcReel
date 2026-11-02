@@ -291,7 +291,7 @@ class StoryCommitAdapter:
         except NarrativeDecisionAuthorizationError as refused:
             reason = str(refused)
             if "UNRESOLVED_STORY_FINDINGS" in reason:
-                raise OwnerBlocked("STORY_EXCEPTION_REQUIRES_HUMAN") from None
+                raise OwnerBlocked("STORY_FINDINGS_NOT_RECORDED") from None
             if "AUTOMATION_AUTHORITY_NOT_CURRENT" in reason:
                 raise OwnerBlocked("AUTOMATION_GRANT_NOT_CURRENT") from None
             raise OwnerBlocked("STORY_MANIFEST_BINDING_MISMATCH") from None

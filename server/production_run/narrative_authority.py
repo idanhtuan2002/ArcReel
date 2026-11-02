@@ -141,9 +141,18 @@ class _PlanCommitFence(SqlAlchemyNarrativePlanUnitOfWork):
             await super().__aexit__(exc_type, exc, traceback)
 
 
-def _only_stylistic(manifest: ManuscriptCommitManifest, quality_record: bytes | None) -> bool:
-    if not manifest.findings_open:
+_ACCEPTABLE_AS_IS = frozenset(
+    {Severity.STYLISTIC.value, Severity.NARRATIVE_CRITICAL.value, Severity.LOCAL_MODEL_LIMIT.value}
+)
+
+
+def _recorded_findings(manifest: ManuscriptCommitManifest, quality_record: bytes | None) -> bool:
+    """Every open finding and offered exception is in the manifest's exact quality record with a severity the
+    automatic run accepts as is (Shenbi escalation-review "accept and continue"); hard findings never are."""
+    if not manifest.findings_open and not manifest.exceptions_offered:
         return True
+    if not set(manifest.exceptions_offered) <= set(manifest.findings_open):
+        return False
     if quality_record is None or manifest.quality_record_digest is None:
         return False
     if "sha256:" + hashlib.sha256(quality_record).hexdigest() != manifest.quality_record_digest:
@@ -153,7 +162,7 @@ def _only_stylistic(manifest: ManuscriptCommitManifest, quality_record: bytes | 
         severities = {str(f["id"]): f["severity"] for f in findings}
     except (ValueError, KeyError, TypeError):
         return False
-    return all(severities.get(finding) == Severity.STYLISTIC.value for finding in manifest.findings_open)
+    return all(severities.get(finding) in _ACCEPTABLE_AS_IS for finding in manifest.findings_open)
 
 
 class AutomaticNarrativeAuthority:
@@ -185,13 +194,13 @@ class AutomaticNarrativeAuthority:
         manifest: ManuscriptCommitManifest,
         quality_record: bytes | None = None,
     ) -> Self:
-        """Bind a manifest with no offered exception. Open findings bind only when ``quality_record`` is the
-        manifest's exact quality record and names every open finding as ``STYLISTIC``."""
+        """Bind a manifest and accept its open findings and offered exceptions as is. They bind only when
+        ``quality_record`` is the manifest's exact quality record and names each of them with a non-hard severity."""
         if type(authority) is not RunAutomationAuthority:
             raise NarrativeDecisionAuthorizationError("ACTIVATED_AUTOMATION_AUTHORITY_REQUIRED")
         subject = AuthorizationSubject.model_validate(subject)
         manifest = ManuscriptCommitManifest.model_validate_json(manifest.model_dump_json())
-        if manifest.exceptions_offered or not _only_stylistic(manifest, quality_record):
+        if not _recorded_findings(manifest, quality_record):
             raise NarrativeDecisionAuthorizationError("UNRESOLVED_STORY_FINDINGS")
         if (
             subject.operation is not AutomationOperation.STORY_COMMIT
