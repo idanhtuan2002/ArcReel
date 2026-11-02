@@ -16,6 +16,7 @@ import time
 from pathlib import Path
 
 from lib.db.repositories.production_runs import ProductionRunRepository
+from lib.episode_target_duration import MAX_EPISODE_TARGET_DURATION, MIN_EPISODE_TARGET_DURATION
 from lib.narration_delivery import USE_TTS
 from lib.path_safety import safe_join
 from lib.presentation_renderer import (
@@ -63,7 +64,15 @@ RENDER_OWNER = "renderer"
 
 
 def render_contract(policy: RunPolicy) -> RenderContract:
-    return RenderContract(width=policy.width, height=policy.height, fps=policy.fps, min_seconds=30, max_seconds=60)
+    """The policy's output format; the episode length only has to fall inside the product's episode duration
+    interval, since the target duration is a planning preference, not a creative limit."""
+    return RenderContract(
+        width=policy.width,
+        height=policy.height,
+        fps=policy.fps,
+        min_seconds=MIN_EPISODE_TARGET_DURATION,
+        max_seconds=MAX_EPISODE_TARGET_DURATION,
+    )
 
 
 def render_dir(run: RunSnapshot, episode: int) -> Path:

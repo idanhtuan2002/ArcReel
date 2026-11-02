@@ -341,6 +341,8 @@ async def test_new_idea_reaches_current_quality_pass_and_export(e2e_sessions, tm
         project["video_backend"] = "custom-3/still-clip-local"
         project["audio_backend"] = "custom-2/vieneu-tts-v3-turbo"
         project["narration_voice"] = "nova"
+        project["episode_target_duration"] = 45
+        project["speech_rate_units_per_second"] = 3.6
 
     projects.update_project("project", configure)
     evidence["reviewer_qualification"] = await _qualify_reviewers(sessions, projects, corpus, tmp_path / "reviews")
