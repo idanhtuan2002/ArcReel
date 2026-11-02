@@ -71,6 +71,51 @@ class OllamaProtocolError(OllamaError):
     """HTTP 200 但响应不是预期形态（非 JSON、缺字段、类型不符）。"""
 
 
+_SHORTHAND_CLASSES = {"d": "0-9", "w": "A-Za-z0-9_", "s": " \\t\\n\\r\\f\\v"}
+
+
+def _explicit_pattern(pattern: str) -> str:
+    """把 ``pattern`` 中的 ``\\d`` / ``\\w`` / ``\\s`` 展开为显式字符区间：Ollama 的 JSON schema → grammar
+    转换不接受这些简写（HTTP 400 "failed to parse grammar"），但接受等价区间。"""
+    out: list[str] = []
+    in_class = False
+    i = 0
+    while i < len(pattern):
+        char = pattern[i]
+        if char == "\\" and i + 1 < len(pattern):
+            escaped = pattern[i + 1]
+            ranges = _SHORTHAND_CLASSES.get(escaped)
+            if ranges is None:
+                out.append(pattern[i : i + 2])
+            else:
+                out.append(ranges if in_class else f"[{ranges}]")
+            i += 2
+            continue
+        if char == "[" and not in_class:
+            in_class = True
+        elif char == "]" and in_class:
+            in_class = False
+        out.append(char)
+        i += 1
+    return "".join(out)
+
+
+def grammar_compatible_schema(schema: Mapping[str, Any]) -> dict[str, Any]:
+    """``schema`` 的副本，其中每个字符串 ``pattern`` 都可被 Ollama 的 grammar 转换解析。"""
+
+    def convert(node: Any) -> Any:
+        if isinstance(node, Mapping):
+            return {
+                key: _explicit_pattern(value) if key == "pattern" and isinstance(value, str) else convert(value)
+                for key, value in node.items()
+            }
+        if isinstance(node, list):
+            return [convert(item) for item in node]
+        return node
+
+    return convert(schema)
+
+
 @dataclass(frozen=True)
 class OllamaChatRequest:
     model: str
@@ -93,7 +138,7 @@ class OllamaChatRequest:
             "options": {**self.options, "num_ctx": self.num_ctx, "num_predict": self.num_predict},
         }
         if self.format is not None:
-            body["format"] = dict(self.format)
+            body["format"] = grammar_compatible_schema(self.format)
         if self.keep_alive is not None:
             body["keep_alive"] = self.keep_alive
         return body

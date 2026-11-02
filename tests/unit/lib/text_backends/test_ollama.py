@@ -264,3 +264,24 @@ async def test_images_are_refused_before_any_request():
         await backend.generate(TextGenerationRequest(prompt="x", images=[ImageInput(url="http://i")]))
 
     assert recorder.requests == []
+
+
+@pytest.mark.parametrize(
+    ("pattern", "expected"),
+    [
+        (r"^E[1-9]\d*S\d{2}$", "^E[1-9][0-9]*S[0-9]{2}$"),
+        (r"^[\w-]+\s\d$", r"^[A-Za-z0-9_-]+[ \t\n\r\f\v][0-9]$"),
+        (r'^([^"\\\u0000-\u001f]|\\["\\/bfnrt])*$', r'^([^"\\\u0000-\u001f]|\\["\\/bfnrt])*$'),
+        (r"^\.\d$", r"^\.[0-9]$"),
+    ],
+)
+def test_format_patterns_are_spelled_without_shorthand_classes(pattern, expected):
+    import re
+
+    request = _request(format={"type": "object", "properties": {"id": {"type": "string", "pattern": pattern}}})
+
+    sent = request.payload()["format"]["properties"]["id"]["pattern"]
+
+    assert sent == expected
+    for sample in ("E12S03", "a-b 7", "x", ".5"):
+        assert bool(re.fullmatch(pattern, sample)) == bool(re.fullmatch(sent, sample))
