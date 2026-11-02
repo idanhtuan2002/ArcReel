@@ -1725,7 +1725,14 @@ async def generate_narration_script_plan(
         result = await generator.generate(
             BackendTextGenerationRequest(
                 prompt=prompt,
-                response_schema=build_narration_script_plan_model(supported_durations)
+                response_schema=build_narration_script_plan_model(
+                    supported_durations,
+                    registered_assets={
+                        "characters_in_segment": list(characters),
+                        "scenes": list(scenes),
+                        "props": list(props),
+                    },
+                )
                 if supported_durations
                 else NarrationScriptPlanDraft,
                 max_output_tokens=DEFAULT_MAX_OUTPUT_TOKENS,

@@ -257,3 +257,20 @@ class TestNarrationScriptPlanModel:
     def test_other_fields_keep_the_static_contract(self):
         with pytest.raises(ValidationError):
             self._model([2]).model_validate({"segments": [self._segment(segment_id="S1")]})
+
+    def test_registered_asset_names_constrain_the_asset_arrays(self):
+        from lib.script_models import build_narration_script_plan_model
+
+        model = build_narration_script_plan_model(
+            [2], registered_assets={"characters_in_segment": ["Nam"], "scenes": ["Bãi biển"], "props": []}
+        )
+        segment = next(
+            d for d in model.model_json_schema()["$defs"].values() if "novel_text" in d.get("properties", {})
+        )
+        assert segment["properties"]["characters_in_segment"]["items"]["const"] == "Nam"
+        assert segment["properties"]["props"]["maxItems"] == 0
+        model.model_validate({"segments": [self._segment(characters_in_segment=["Nam"], scenes=["Bãi biển"])]})
+        with pytest.raises(ValidationError):
+            model.model_validate({"segments": [self._segment(scenes=["Lá thư"])]})
+        with pytest.raises(ValidationError):
+            model.model_validate({"segments": [self._segment(props=["Lá thư"])]})

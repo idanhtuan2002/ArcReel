@@ -7,6 +7,7 @@ script_models.py - 剧本数据模型
 """
 
 import logging
+from collections.abc import Mapping, Sequence
 from typing import Annotated, Any, ClassVar, Literal, get_args
 
 from pydantic import AfterValidator, BaseModel, BeforeValidator, ConfigDict, Field, create_model, model_validator
@@ -1189,17 +1190,38 @@ def build_reference_units_script_plan_model(supported_durations: list[int]) -> t
     )
 
 
-def build_narration_script_plan_model(supported_durations: list[int]) -> type[BaseModel]:
+_NARRATION_ASSET_FIELDS = {
+    "characters_in_segment": "出场角色名称列表；只能取已登记的角色名，无则写 []",
+    "scenes": "出场场景名称列表；只能取已登记的场景名，无则写 []",
+    "props": "出场道具名称列表；只能取已登记的道具名，无则写 []",
+}
+
+
+def build_narration_script_plan_model(
+    supported_durations: list[int], *, registered_assets: Mapping[str, Sequence[str]] | None = None
+) -> type[BaseModel]:
     """构造分镜时长被 ``supported_durations`` 枚举硬约束的旁白 script_plan 模型。
 
     分镜时长即发给视频供应商的秒数；枚举加在 ``NarrationScriptPlanSegment.duration_seconds`` 上，
     LLM 生成层即被卡死；没有 Agent 修改草稿的自动运行因此不会落入 ``duration_off_tier`` 修复闭环。
+    ``registered_assets`` 按 ``characters_in_segment`` / ``scenes`` / ``props`` 给出项目已登记的名称时，
+    对应数组的元素同样枚举硬约束（该类无登记名则只能为空数组），不落入 ``unregistered_asset`` 闭环。
     """
     segment = _constrained_duration_item(
         NarrationScriptPlanSegment,
         _duration_literal(supported_durations),
         "分镜时长（秒），必须取 supported_durations 中的值",
     )
+    if registered_assets is not None:
+        fields: dict[str, Any] = {}
+        for field_name, description in _NARRATION_ASSET_FIELDS.items():
+            names = tuple(dict.fromkeys(str(name) for name in registered_assets.get(field_name, ())))
+            item: Any = Literal[names] if names else str
+            fields[field_name] = (
+                list[item],
+                Field(description=description, max_length=None if names else 0),
+            )
+        segment = create_model(segment.__name__, __base__=segment, **fields)
     return create_model(
         "NarrationScriptPlanDraft",
         __base__=NarrationScriptPlanDraft,
