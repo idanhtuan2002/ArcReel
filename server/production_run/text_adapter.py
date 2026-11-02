@@ -411,6 +411,31 @@ class ScriptPlanAdapter(WorkflowStageAdapter):
         return revision_receipt(self.owner, f"episode:{episode}:script-plan", revision)
 
 
+def _narration_segment_fixes(segment: dict[str, Any]) -> dict[str, Any]:
+    """The prompt fields to replace on one narration segment (see ``ScriptAdapter._settle``); empty when none."""
+    fields: dict[str, Any] = {}
+    novel_text = str(segment.get("novel_text") or "").strip()
+    image_prompt = segment.get("image_prompt")
+    scene = ""
+    if isinstance(image_prompt, dict):
+        scene = str(image_prompt.get("scene") or "").strip()
+        if not scene and novel_text:
+            scene = novel_text
+            fields["image_prompt"] = {**image_prompt, "scene": scene}
+    video_prompt = segment.get("video_prompt")
+    if isinstance(video_prompt, dict):
+        changed = dict(video_prompt)
+        if segment.get("needs_replan"):
+            problems = admit_script_unit("segments", segment, ignore_marker=True).problems
+            if problems and all(problem.code is SpeechProblemCode.MIXED_SPEECH for problem in problems):
+                changed["dialogue"] = []
+        if not str(changed.get("action") or "").strip() and (scene or novel_text):
+            changed["action"] = scene or novel_text
+        if changed != video_prompt:
+            fields["video_prompt"] = changed
+    return fields
+
+
 class ScriptAdapter(WorkflowStageAdapter):
     owner = "script-writer"
     stage = RunStage.SCRIPT
@@ -432,31 +457,24 @@ class ScriptAdapter(WorkflowStageAdapter):
         )
 
     async def _settle(self, intent: DispatchIntent, status: WorkflowStatus) -> None:
-        """Narration segments whose only speech problem is a character line written into ``video_prompt`` are
-        patched to the narrator through the script edit tool: the narrator already reads that line in
-        ``novel_text``. Any other replanning need is left for the media stage to report."""
+        """Narration segments get the owner edits a writer would make before media, through the script edit tool:
+
+        - a segment whose only speech problem is a character line also written into ``video_prompt`` loses that
+          line; the narrator already reads it in ``novel_text``;
+        - an empty ``image_prompt.scene`` or ``video_prompt.action`` is filled from the segment's own text
+          (``novel_text``, or the scene for the action), since media refuses empty prompts.
+
+        Any other replanning need is left for the media stage to report."""
         if status.project.content_mode != "narration" or status.target is None:
             return
         name = intent.scope.project_name
         script = await asyncio.to_thread(self._projects.load_script, name, status.target.script_filename)
         operations = []
         for segment in script.get("segments") or []:
-            if not isinstance(segment, dict) or not segment.get("needs_replan"):
-                continue
-            problems = admit_script_unit("segments", segment, ignore_marker=True).problems
-            video_prompt = segment.get("video_prompt")
-            if (
-                problems
-                and all(problem.code is SpeechProblemCode.MIXED_SPEECH for problem in problems)
-                and isinstance(video_prompt, dict)
-            ):
-                operations.append(
-                    {
-                        "op": "update",
-                        "id": segment["segment_id"],
-                        "fields": {"video_prompt": {**video_prompt, "dialogue": []}},
-                    }
-                )
+            if isinstance(segment, dict):
+                fields = _narration_segment_fixes(segment)
+                if fields:
+                    operations.append({"op": "update", "id": segment["segment_id"], "fields": fields})
         if not operations:
             return
         request = PatchEpisodeScriptRequest.model_validate(
@@ -475,7 +493,7 @@ class ScriptAdapter(WorkflowStageAdapter):
             ),
         )
         if edited.problem is not None or edited.value is None or not edited.value.success:
-            raise OwnerBlocked("SCRIPT_SPEECH_PATCH_REFUSED")
+            raise OwnerBlocked("SCRIPT_SETTLE_PATCH_REFUSED")
 
     def _evidence(self, intent: DispatchIntent, status: WorkflowStatus, episode: int | None) -> OwnerReceipt:
         if status.target is None:

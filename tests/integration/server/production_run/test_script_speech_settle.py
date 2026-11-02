@@ -84,3 +84,18 @@ async def test_a_segment_without_a_speech_problem_is_left_as_is(tmp_path):
     await adapter._settle(_intent(), _status(projects))
 
     assert (projects.get_project_path("project") / "scripts" / "episode_1.json").read_bytes() == before
+
+
+async def test_empty_prompts_are_filled_from_the_segments_own_text(tmp_path):
+    empty = {**copy.deepcopy(SEGMENT), "needs_replan": False}
+    empty["video_prompt"]["dialogue"] = []
+    empty["video_prompt"]["action"] = " "
+    empty["image_prompt"]["scene"] = ""
+    projects = await _project(tmp_path, [empty])
+    adapter = ScriptAdapter(None, authority=None, projects=projects, resolver=None)
+
+    await adapter._settle(_intent(), _status(projects))
+
+    [segment] = projects.load_script("project", "episode_1.json")["segments"]
+    assert segment["image_prompt"]["scene"] == SEGMENT["novel_text"]
+    assert segment["video_prompt"]["action"] == SEGMENT["novel_text"]
