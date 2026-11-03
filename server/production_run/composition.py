@@ -39,6 +39,7 @@ from server.production_run.configuration import inspect_model_route
 from server.production_run.controller import ProductionController
 from server.production_run.evaluators import OllamaReviewer, QualifiedEvaluator, provider_base_url
 from server.production_run.final_master_adapter import FinalMasterAdapter
+from server.production_run.gemini_reviewer import GeminiReviewer, RoutedReviewer, provider_credentials
 from server.production_run.inputs import ProjectInputWitness
 from server.production_run.media_adapter import MediaAdapter
 from server.production_run.packaging_adapter import ExportAdapter, PackagingAdapter
@@ -383,6 +384,9 @@ async def wire_production(
         resolver=resolver,
         stories=stories,
         upload_for=upload_for,
-        evaluator=OllamaReviewer(base_url_for=provider_base_url(sessions)),
+        evaluator=RoutedReviewer(
+            local=OllamaReviewer(base_url_for=provider_base_url(sessions)),
+            gemini=GeminiReviewer(credentials_for=provider_credentials(sessions)),
+        ),
         activation=ProductionActivation(enabled=True),
     )

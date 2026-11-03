@@ -85,6 +85,26 @@ LỜI KỂ:
 {narration}
 """
 
+WATCH_PROMPT = """Bạn là người duyệt chất lượng phim ngắn tiếng Việt dạng kể chuyện (9:16, 30–60 giây).
+Bạn được xem toàn bộ video kèm âm thanh lời kể, cùng phụ đề và văn bản lời kể bên dưới.
+
+Bước 1 — chấm điểm 1–5 cho story, visual, audio, continuity, pacing theo mốc:
+5 xuất sắc; 4 đạt chất lượng phát hành, chỉ có điểm chưa hoàn hảo nhỏ; 3 có lỗi rõ làm người xem khó chịu;
+2 lỗi nặng; 1 hỏng. "audio" chấm giọng đọc nghe được: tiếng Việt tự nhiên, rõ, khớp phụ đề và hình.
+Không trừ điểm vì phong cách ảnh AI, ánh sáng, chi tiết nhân vật hơi khác giữa các cảnh, hình tĩnh ít chuyển động,
+hay câu chuyện đơn giản. Phim hình ảnh bình thường, khớp lời kể và kể mạch lạc thì chấm 4 hoặc 5.
+
+Bước 2 — "findings": chỉ ghi lỗi thật nhìn hoặc nghe thấy được (hình đen, nhiễu, lộn ngược, sai câu chuyện, sai
+ngôn ngữ, phụ đề hỏng, tiếng lệch hình...), mỗi lỗi có code, severity (CRITICAL/MAJOR/MINOR), repair_stage
+(SCRIPT_PLAN, SCRIPT, MEDIA, RENDER hoặc null) và detail ngắn. "language" là mã ngôn ngữ của lời kể (ví dụ "vi").
+
+PHỤ ĐỀ:
+{subtitles}
+
+LỜI KỂ:
+{narration}
+"""
+
 SCHEMA = {
     "type": "object",
     "required": ["language", "scores", "findings"],
@@ -114,6 +134,8 @@ SCHEMA = {
 
 QUESTIONS = "questions"
 PROBABILITIES = "probabilities"
+#: The reviewer watches the whole final, picture and narration audio together (Gemini models).
+WATCH = "watch"
 PROBABILITY_CUT = 0.5
 MAX_MEAN_ILLUSTRATES = 0.15
 # Review method of each qualified reviewer model, chosen on the calibration split; unlisted models ask questions.
@@ -121,6 +143,8 @@ REVIEW_METHODS: dict[str, str] = {"qwen2.5vl:7b": PROBABILITIES, "gemma3:4b": QU
 
 
 def review_method(route: ModelRoute) -> str:
+    if route.model_id.startswith("gemini-"):
+        return WATCH
     return REVIEW_METHODS.get(route.model_id, QUESTIONS)
 
 
@@ -284,6 +308,11 @@ def _min_flipped(method: str) -> int:
 
 def prompt_digest(method: str = QUESTIONS) -> str:
     """The digest of everything a reviewer of ``method`` is asked and the fixed rules applied to its answers."""
+    if method == WATCH:
+        return digest_value(
+            "r2.production-review-prompt.v9",
+            ensure_json_value({"method": method, "prompt": WATCH_PROMPT, "schema": SCHEMA}),
+        )
     questions = (
         [BROKEN_QUESTION, ORIENTATION_QUESTION, MATCH_QUESTION]
         if method == PROBABILITIES
