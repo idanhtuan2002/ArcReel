@@ -115,7 +115,7 @@
     {
       "id": "INDEPENDENT_REVIEW",
       "owner": "Codex",
-      "detail": "Independent review by codex:codex-rescue; Codex usage reset on 2026-11-04.",
+      "detail": "Independent review by codex:codex-rescue at ad16f3e77 (range a641673b6..HEAD, docs excluded). Attempted 2026-11-04 01:5x: Codex job failed after 6 s with a usage limit (\"try again at 11:38 PM\"); rerun the same prompt after the reset.",
       "status": "OPEN"
     },
     {
