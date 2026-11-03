@@ -251,6 +251,12 @@ def _optional_str(value: object) -> str | None:
     return value if isinstance(value, str) else None
 
 
+#: 本地模型单次生成的输出上限（token）。调用方常传云端口径的 64000，而本地上下文只有 32768：退化重复的生成
+#: 要写满上下文才停（约 11 token/s 下 25-38 分钟，越过读超时）。结构化输出实际只需数千 token，上限让退化生成
+#: 以截断失败尽早结束、交由调用方重试。
+LOCAL_MAX_OUTPUT_TOKENS = 12288
+
+
 class OllamaChatTextBackend:
     """通用 ``TextBackend`` 适配：结构化输出用服务端 grammar（``format``）约束，不做 Instructor 降级。"""
 
@@ -294,7 +300,7 @@ class OllamaChatTextBackend:
                 model=self._model,
                 messages=tuple(messages),
                 num_ctx=self._num_ctx,
-                num_predict=request.max_output_tokens or self._default_max_output_tokens,
+                num_predict=min(request.max_output_tokens or self._default_max_output_tokens, LOCAL_MAX_OUTPUT_TOKENS),
                 format=schema,
             )
         )

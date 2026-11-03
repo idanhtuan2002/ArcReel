@@ -285,3 +285,16 @@ def test_format_patterns_are_spelled_without_shorthand_classes(pattern, expected
     assert sent == expected
     for sample in ("E12S03", "a-b 7", "x", ".5"):
         assert bool(re.fullmatch(pattern, sample)) == bool(re.fullmatch(sent, sample))
+
+
+async def test_a_cloud_sized_output_budget_is_capped_for_the_local_model():
+    from lib.text_backends.ollama import LOCAL_MAX_OUTPUT_TOKENS
+
+    recorder = _Recorder(lambda _: _fixture("format_envelope"))
+    backend = OllamaChatTextBackend(base_url="http://h:1", model="ornith-32k:9b", transport=recorder.transport())
+
+    await backend.generate(TextGenerationRequest(prompt="p", response_schema=_Sentence, max_output_tokens=64000))
+    await backend.generate(TextGenerationRequest(prompt="p", response_schema=_Sentence, max_output_tokens=2000))
+
+    sent = [json.loads(r.content)["options"]["num_predict"] for r in recorder.requests]
+    assert sent == [LOCAL_MAX_OUTPUT_TOKENS, 2000]
