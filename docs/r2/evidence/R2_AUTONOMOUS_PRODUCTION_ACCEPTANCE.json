@@ -1,12 +1,12 @@
 {
   "schema": "r2.autonomous-production.acceptance-status.v1",
-  "date": "2026-11-01",
+  "date": "2026-11-04",
   "branch": "impl/autonomous-production",
-  "source_head": "66dd8e339",
+  "source_head": "5d8106e94",
   "pushed": false,
   "accepted": false,
   "verdict": "NOT_ACCEPTED",
-  "summary": "All 12 plan tasks are implemented and the code path is verified by tests with real FFmpeg renders, real governance, Gate C masters and sealed M10 Quality runs. Launch acceptance is not claimed: reviewer qualification, a real-project Quality profile and launch record, and a real GPU end-to-end run have not happened, and no independent review has run.",
+  "summary": "All 12 plan tasks are implemented. A real local-GPU end-to-end run (official attempt 3, fresh project, real qwen3.5-vimax:9b writer, no Human step) went idea -> EXPORT SUCCEEDED in 3 h 34 min with an M10 PASS disposition from two qualified local reviewers. Launch acceptance is not claimed: no independent review has run, the reviewer corpus was labeled by the agent under the 2026-11-01 sponsor delegation (not by a Human), and release/activation are Human steps.",
   "verification": {
     "full_backend_gate": {
       "head": "312a7d6c3",
@@ -35,7 +35,53 @@
       ]
     },
     "static_gates_at_66dd8e339": "ruff check, ruff format --check, basedpyright --warnings 0/0, audit_tests --check 0; lint-imports 23 kept and deptry clean at 312a7d6c3 (no source change since)",
-    "frontend_at_57a6d8ccb": "eslint, tsc, knip, vitest 237 files / 2668 tests pass"
+    "frontend_at_57a6d8ccb": "eslint, tsc, knip, vitest 237 files / 2668 tests pass",
+    "real_gpu_e2e": {
+      "head": "5d8106e94",
+      "test": "tests/e2e/automation/test_production_run.py (ARCREEL_E2E_AUTOMATION=1, fresh PostgreSQL database and data dir)",
+      "corpus": "/mnt/arcreel/D/ArcReel/operations/reviewer-corpus-2026-11-01/qualification-2.json (stored reviewer receipts reused by model, method and evidence digest)",
+      "result": "1 passed in 12822.68 s; run SUCCEEDED at EXPORT, quality_decision PASS",
+      "stages_seconds": {
+        "STORY": 11346,
+        "STORY_COMMIT..SCRIPT_PLAN": 615,
+        "SCRIPT": 105,
+        "MEDIA": 570,
+        "RENDER..MASTER": 15,
+        "QUALITY": 150
+      },
+      "reviews": {
+        "ollama/qwen2.5vl:7b": {
+          "story": 5,
+          "visual": 4,
+          "audio": 5,
+          "continuity": 5,
+          "pacing": 5
+        },
+        "ollama/gemma3:4b": {
+          "story": 4,
+          "visual": 4,
+          "audio": 5,
+          "continuity": 4,
+          "pacing": 4
+        }
+      },
+      "final": {
+        "duration_seconds": 25.15,
+        "size": "576x1024",
+        "segments": 3,
+        "archive_sha256": "9c9d83ca0771df27358ad890e0b0e9dcc10fbf34c9f1ea0aae88e0caadd5f5d5",
+        "archive_copy": "/mnt/arcreel/D/ArcReel/operations/autonomous-e2e-2026-11-04/episode_1.zip"
+      },
+      "evidence": [
+        "docs/r2/evidence/autonomous-run-2026-11-03/official-attempt-3-succeeded.json",
+        "docs/r2/evidence/autonomous-run-2026-11-03/official-attempt-3-frames.png"
+      ],
+      "earlier_attempts": {
+        "attempt_1": "STORY blocked by a spent scene cap after an earlier scene changed; fixed ab544c4a7",
+        "attempt_2": "SCRIPT_PLAN quarantined a near-verbatim plan and did not retry (fixed 024fbb740, 67d715905); after resume MEDIA stopped on empty dialogue entries (fixed 5d8106e94)"
+      },
+      "limits": "Episode 1 only (target duration 45 s, 25 s final); local models prove the pipeline, not commercial quality; record quality gate was not exercised because the reviewers passed the final."
+    }
   },
   "design_decisions": [
     "Automatic runs do not use the M10 package-selection/export owners. PACKAGE and EXPORT build and re-verify a deterministic archive bound to the M10 PASS disposition receipt; the M10 owners stay Human-operated.",
@@ -43,12 +89,44 @@
     "Automatic owner variants exist only where a launch consumer needs them: Narrative/Canon/Plan, Gate A greenlight and Gate C master. M6 adaptation, Gate B ScriptLock and Gate D stay Human-only."
   ],
   "blockers": [
-    {"id": "REVIEWER_QUALIFICATION", "owner": "Human", "detail": "A Human-labeled corpus of 40 finals (20 calibration + 20 hold-out, 10 clean + 10 critical-defect each) and two distinct local multimodal reviewer models. Only qwen3.5-vimax:9b and bge-m3 are installed. Run scripts/r2/qualify_reviewers.py --record per reviewer."},
-    {"id": "PROJECT_QUALITY_PROFILE_AND_LAUNCH_RECORD", "owner": "Human", "detail": "A published automatic Quality profile and a launch qualification record for a real project. Preflight refuses to start a run until both exist."},
-    {"id": "REAL_GPU_E2E_RUN", "owner": "Human + agent", "detail": "One real run on the GPU host through scripts/r2/qualify_autonomous_production.py, after the two blockers above are cleared."},
-    {"id": "DRAMA_LIP_SYNC", "owner": "Human", "detail": "The drama lip-sync route is unqualified, so drama launch stays blocked; narration is the only candidate launch profile."},
-    {"id": "INDEPENDENT_REVIEW", "owner": "Codex", "detail": "Independent review by codex:codex-rescue, available after the Codex usage reset on 2026-11-04."},
-    {"id": "ANONYMOUS_PACKAGING_422", "owner": "carried", "detail": "Anonymous GET /api/v1/projects/{project_name}/packaging/exports/{archive_hex}/archive returns 422 instead of 401. Pre-existing, outside this branch."},
-    {"id": "RELEASE_AND_ACTIVATION", "owner": "Human", "detail": "Merge, tag, deploy, then set ARCREEL_AUTOMATIC_PRODUCTION=1 and ARCREEL_GPU_ADMISSION_PROBES on a governance-activated host."}
+    {
+      "id": "REVIEWER_QUALIFICATION",
+      "owner": "agent (sponsor delegation 2026-11-01)",
+      "detail": "Two local reviewers (qwen2.5vl:7b, gemma3:4b) qualified on the 40-final corpus labeled by the agent (docs/r2/evidence/autonomous-qualification-2026-11-01/); a Human-labeled corpus is still the stronger evidence.",
+      "status": "DONE_UNDER_DELEGATION"
+    },
+    {
+      "id": "PROJECT_QUALITY_PROFILE_AND_LAUNCH_RECORD",
+      "owner": "Human",
+      "detail": "A published automatic Quality profile and a launch qualification record for a real project. Preflight refuses to start a run until both exist. The e2e publishes the profile and records the launch qualification through the real preflight; a production project still needs its own.",
+      "status": "DONE_IN_E2E"
+    },
+    {
+      "id": "REAL_GPU_E2E_RUN",
+      "owner": "Human + agent",
+      "detail": "Official attempt 3 SUCCEEDED at 5d8106e94 (verification.real_gpu_e2e).",
+      "status": "DONE"
+    },
+    {
+      "id": "DRAMA_LIP_SYNC",
+      "owner": "Human",
+      "detail": "The drama lip-sync route is unqualified, so drama launch stays blocked; narration is the only candidate launch profile."
+    },
+    {
+      "id": "INDEPENDENT_REVIEW",
+      "owner": "Codex",
+      "detail": "Independent review by codex:codex-rescue; Codex usage reset on 2026-11-04.",
+      "status": "OPEN"
+    },
+    {
+      "id": "ANONYMOUS_PACKAGING_422",
+      "owner": "carried",
+      "detail": "Anonymous GET /api/v1/projects/{project_name}/packaging/exports/{archive_hex}/archive returns 422 instead of 401. Pre-existing, outside this branch."
+    },
+    {
+      "id": "RELEASE_AND_ACTIVATION",
+      "owner": "Human",
+      "detail": "Merge, tag, deploy, then set ARCREEL_AUTOMATIC_PRODUCTION=1 and ARCREEL_GPU_ADMISSION_PROBES on a governance-activated host."
+    }
   ]
 }
