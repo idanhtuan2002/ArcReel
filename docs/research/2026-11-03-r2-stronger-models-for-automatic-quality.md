@@ -77,3 +77,20 @@ reviewer and generation models so an automatic run earns a real quality PASS.
    but the 8-frame approximation and the writer weaknesses remain.
 
 Recommended order: 1, then 2; 3 when commercial quality is the target; 4 as the free local fallback.
+
+## 6. Live Gemini probes (2026-11-03, key on the free tier)
+
+Watch-method reviews (`server/production_run/gemini_reviewer.py`), mp4 inline, temperature 0:
+
+| Model | d18 upside down | d03 other-story images | c05 clean (inconsistent characters) | debug final (`kb`) |
+| --- | --- | --- | --- | --- |
+| gemini-3.6-flash | rejected: "rotated 180° from 00:05" | rejected: visuals do not match narration | rejected: inconsistent characters (3s) | rejected: story 3, visual 3, no findings |
+| gemini-3.5-flash-lite | accepted (4s) | accepted (5s) | accepted (5s) | accepted (5s) |
+
+- Lite models accept real defects: unusable as reviewers.
+- `gemini-4-argon` answered 429 (quota; no free tier), `gemini-3.8-flash`, `gemini-3.6-flash` and `gemini-3.1-flash-lite`
+  answered 503 (high demand) for minutes at a time; the reviewer now backs off up to six times.
+- Inference: a real reviewer (3.6 Flash) judges the local productions at 3/5 — the debug story is a sentence pool
+  from several stories (story 3 is correct) and the pictures are still images with uneven characters. With a strict
+  reviewer a local run will not earn PASS; reaching EXPORT locally needs either a coherent real-writer story plus
+  better pictures, or a policy that records the quality verdict without gating export (sponsor decision).
