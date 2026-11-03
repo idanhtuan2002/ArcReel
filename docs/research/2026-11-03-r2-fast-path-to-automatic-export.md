@@ -74,3 +74,48 @@ evidence.
 3. Reach PACKAGE/EXPORT by resume, fix anything found by probe + resume.
 4. One official e2e from a fresh project, unattended (≈3 h story + qualification from reuse + media), and record the
    evidence.
+
+## 5. Second, deeper pass (2026-11-03): assumptions checked against code and real data
+
+### Resume harness — feasible, with two traps (code read)
+- `_resume` accepts `BLOCKED_CONFIGURATION` and `BLOCKED_INPUT_CHANGED`; without a rebind the run returns to RUNNING at
+  the same stage. RESUME renews the run's automation grant inside the parent Showrunner grant's expiry.
+- The custody that RESUME needs lives in the previous run's `custody/` and `run/` directories plus database rows.
+  Traps: pytest wipes `--basetemp` at start, so a resume process needs a different basetemp pointing at the old
+  custody; and the resume process must not re-run `e2e_sessions` (it drops `alembic_version` and the immutability
+  triggers) or `prepare_qualified_custody`.
+
+### Local generation bound — sizing (code read + measurement)
+- `OllamaChatTextBackend` uses `num_ctx` 32768; callers pass `max_output_tokens` 64000, so a degenerate generation
+  stops only when the context fills: about 25-38 min at the measured ~11 tokens/s of `qwen3.5-vimax:9b`, past the
+  1800 s read timeout. Real structured outputs need ~2.5-6 k tokens (19-segment plan / visual layer). A 12 k cap
+  bounds the worst case at ~18 min and turns it into a truncation, which the text-task retry already handles.
+
+### Reviewer false positive — the proposed fix was wrong; the data supports a threshold (experiment)
+- `gemma3:4b` orientation answers, per sampled frame (`orientation-probe/` evidence): the 180° comparison question
+  almost never names the rotated copy (real upside-down finals: 0-4 of 8), so requiring both answers (AND) would
+  stop detecting real defects. The standalone question carries the signal.
+- Standalone "upside down?" yes-count over 8 frames, whole corpus (40 cases): every CLEAN final 0-1; both real
+  UPSIDE_DOWN_FRAMES finals 7; the real run's final that was falsely rejected 3 (water-reflection shots).
+- Fix: raise `MIN_FLIPPED_FRAMES` from 2 to 5 of 8 sampled frames (more than half). It keeps both real defects
+  (7) and clears the false positive (3) and all clean cases. Trade-off: a single upside-down shot inside a long
+  episode would go unnoticed (the corpus has no such defect). Bind the threshold into the gemma review method so the
+  prompt digest changes, and requalify gemma (~45 min; qwen's record is unaffected).
+
+### Character settle — matching rule (design check)
+- Registered names overlap ("Nam" inside "Mẹ Nam"; short names such as "Tu"). Match registered names as whole words,
+  case-sensitive, longest first, and drop a match that lies inside a longer match, so "Mẹ Nam" does not also add
+  "Nam". Add only names the segment does not already list; patch through `patch_episode_script`.
+
+### Quality gate after a justified rejection — open policy question (donor check)
+- Shenbi (`docs/research/2026-10-21-r2-v2-task6-blocks-donor-recheck.md`): "Quality never ends a run" — a chapter
+  still failing after its revision rounds falls back to its best version and the Human may accept it as is. The
+  story stage already follows this (`079de5ecd`). The automatic video export is bound to an M10 PASS disposition; an
+  analogous "export the best version with the recorded FAIL disposition" in automatic mode would change that
+  contract and is a sponsor decision, not an engineering fix.
+
+### Revised sequence
+1. Resume harness; 12 k local output cap; gemma threshold + its requalification; character settle. No cost.
+2. Resume the blocked debug run at QUALITY. If qwen still scores visual 3 after the character settle, the remaining
+   options are Gemini reviewers (approval) or a stronger writer.
+3. PACKAGE/EXPORT by resume; then one official e2e from a fresh project.
