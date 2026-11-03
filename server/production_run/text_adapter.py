@@ -482,8 +482,13 @@ def _narration_segment_fixes(segment: dict[str, Any], characters: Sequence[str] 
     video_prompt = segment.get("video_prompt")
     if isinstance(video_prompt, dict):
         changed = dict(video_prompt)
+        dialogue = changed.get("dialogue")
+        if isinstance(dialogue, list):
+            spoken = [d for d in dialogue if not isinstance(d, dict) or str(d.get("line") or "").strip()]
+            if spoken != dialogue:
+                changed["dialogue"] = spoken
         if segment.get("needs_replan"):
-            problems = admit_script_unit("segments", segment, ignore_marker=True).problems
+            problems = admit_script_unit("segments", {**segment, "video_prompt": changed}, ignore_marker=True).problems
             if problems and all(problem.code is SpeechProblemCode.MIXED_SPEECH for problem in problems):
                 changed["dialogue"] = []
         if not str(changed.get("action") or "").strip() and (scene or novel_text):

@@ -111,3 +111,16 @@ async def test_a_registered_character_named_in_the_text_is_added_to_the_segment(
 
     [segment] = projects.load_script("project", "episode_1.json")["segments"]
     assert segment["characters_in_segment"] == ["Nam"]
+
+
+async def test_an_empty_dialogue_entry_is_dropped_and_the_segment_admitted(tmp_path):
+    blank = {**copy.deepcopy(SEGMENT), "novel_text": "Nam đọc lá thư trên bãi biển."}
+    blank["video_prompt"]["dialogue"] = [{"speaker": "", "line": ""}]
+    projects = await _project(tmp_path, [blank])
+    adapter = ScriptAdapter(None, authority=None, projects=projects, resolver=None)
+
+    await adapter._settle(_intent(), _status(projects))
+
+    [segment] = projects.load_script("project", "episode_1.json")["segments"]
+    assert segment["video_prompt"]["dialogue"] == []
+    assert not segment.get("needs_replan")
