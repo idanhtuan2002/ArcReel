@@ -1,0 +1,867 @@
+{
+  "source_head": "ab544c4a748adab153e62e3e0839ceeae97a0e7e",
+  "started_at": "2026-11-03T11:50:02.847274+00:00",
+  "idea": "Một cậu bé ở làng chài miền Trung nhặt được chiếc chai có lá thư của người cha đã mất tích ngoài biển.",
+  "reviewer_qualification": {
+    "reviewer_a": {
+      "model_identity": "ollama/qwen2.5vl:7b@sha256:5ced39dfa4bac325dc183dd1e4febaa1c46b3ea28bce48896c8e69c1e79611cc",
+      "qualified": true,
+      "seconds": 2.0,
+      "cases": [
+        {
+          "split": "CALIBRATION",
+          "label": "CLEAN",
+          "accepted": true,
+          "case_digest": "sha256:d1b4d2cb4f2461be5405d6ea5d88867855726bd36668933691c0c2911cdd6e6f",
+          "receipt_ref": "c04.ollama_qwen2.5vl:7b@sha256:5ced39dfa4bac325dc183dd1e4febaa1c46b3ea28bce48896c8e69c1e79611cc.json",
+          "receipt_digest": "sha256:2a88f5b9c72e9e030fb44e035d2038a8321d925237b1b855fbb649f15669ad77"
+        },
+        {
+          "split": "CALIBRATION",
+          "label": "CRITICAL_DEFECT",
+          "accepted": false,
+          "case_digest": "sha256:c580fe5502ba4c4790b240a902ca3301b35ef632d255891501f177b8b6612f60",
+          "receipt_ref": "d11.ollama_qwen2.5vl:7b@sha256:5ced39dfa4bac325dc183dd1e4febaa1c46b3ea28bce48896c8e69c1e79611cc.json",
+          "receipt_digest": "sha256:6b5ee3e2b2b363134a8421b7b06d3436ada88b622b8e5588550001a56cdb6167"
+        },
+        {
+          "split": "CALIBRATION",
+          "label": "CLEAN",
+          "accepted": true,
+          "case_digest": "sha256:3d94f8bda1327e33009adf75f84bb38988e03c48bffe4f7b2994b09891040793",
+          "receipt_ref": "c03.ollama_qwen2.5vl:7b@sha256:5ced39dfa4bac325dc183dd1e4febaa1c46b3ea28bce48896c8e69c1e79611cc.json",
+          "receipt_digest": "sha256:2ab1ac4586ceeb33a252f5575715ca88e583d147d0cdc43bd4b2a6da515080f5"
+        },
+        {
+          "split": "CALIBRATION",
+          "label": "CLEAN",
+          "accepted": true,
+          "case_digest": "sha256:6384904eeddba373c69d88dfa4727044ad0a3378f02f2997b0c97e937e2af7de",
+          "receipt_ref": "c08.ollama_qwen2.5vl:7b@sha256:5ced39dfa4bac325dc183dd1e4febaa1c46b3ea28bce48896c8e69c1e79611cc.json",
+          "receipt_digest": "sha256:3513bd26b5ad3c80ced85be5da9bb3d214d1ceef9634bb2082d9ba9dcf9205a8"
+        },
+        {
+          "split": "CALIBRATION",
+          "label": "CRITICAL_DEFECT",
+          "accepted": false,
+          "case_digest": "sha256:3d311657e15d47c51116aa1a827e6e708478fb34d857c0d7db6103328db88166",
+          "receipt_ref": "d19.ollama_qwen2.5vl:7b@sha256:5ced39dfa4bac325dc183dd1e4febaa1c46b3ea28bce48896c8e69c1e79611cc.json",
+          "receipt_digest": "sha256:9730e1587695be3497a92a06460934e4ceae605c499d1689949f661c8d2b48bd"
+        },
+        {
+          "split": "CALIBRATION",
+          "label": "CRITICAL_DEFECT",
+          "accepted": false,
+          "case_digest": "sha256:e5ce15e09bfdf97ce0276aa6fa1b840979c40286e165cd49f7a8c18a3b71f872",
+          "receipt_ref": "d13.ollama_qwen2.5vl:7b@sha256:5ced39dfa4bac325dc183dd1e4febaa1c46b3ea28bce48896c8e69c1e79611cc.json",
+          "receipt_digest": "sha256:2a63367eacdbf5a3757ff72499cf05b96e851aa5125f4e7e78b7664f3dcfe486"
+        },
+        {
+          "split": "CALIBRATION",
+          "label": "CLEAN",
+          "accepted": false,
+          "case_digest": "sha256:a81a29ad8ea3d55da2b37b0c71f0dfc33abc1988e0276553e5ae2d5215a4d270",
+          "receipt_ref": "c05.ollama_qwen2.5vl:7b@sha256:5ced39dfa4bac325dc183dd1e4febaa1c46b3ea28bce48896c8e69c1e79611cc.json",
+          "receipt_digest": "sha256:2dced92109a470980a6ca5da800464264cd37a68bcc1e044cf597302410dd8c3"
+        },
+        {
+          "split": "CALIBRATION",
+          "label": "CLEAN",
+          "accepted": true,
+          "case_digest": "sha256:c08df5dfb3d04d39dff847c0e2b7ce4ef1805aeeea71a32672081f142bab9cf4",
+          "receipt_ref": "c09.ollama_qwen2.5vl:7b@sha256:5ced39dfa4bac325dc183dd1e4febaa1c46b3ea28bce48896c8e69c1e79611cc.json",
+          "receipt_digest": "sha256:3b22294bd5e30fa69b0591d7ebbed28d332eec2f38f8e323e75b756a85e3e259"
+        },
+        {
+          "split": "CALIBRATION",
+          "label": "CLEAN",
+          "accepted": true,
+          "case_digest": "sha256:2249c0179cc6d349e7f57cc91f9b737d6da36c1310a6f7d5dcef2db769a74074",
+          "receipt_ref": "c06.ollama_qwen2.5vl:7b@sha256:5ced39dfa4bac325dc183dd1e4febaa1c46b3ea28bce48896c8e69c1e79611cc.json",
+          "receipt_digest": "sha256:9f0de228a6cf6559644aa3d47c6cf55226e02d22b43e001ab5b9a3708dc00090"
+        },
+        {
+          "split": "CALIBRATION",
+          "label": "CRITICAL_DEFECT",
+          "accepted": false,
+          "case_digest": "sha256:4211f1fc8d290da1f5bf18b883118d9fdce66cddd9cfc42384f801578f16f63f",
+          "receipt_ref": "d18.ollama_qwen2.5vl:7b@sha256:5ced39dfa4bac325dc183dd1e4febaa1c46b3ea28bce48896c8e69c1e79611cc.json",
+          "receipt_digest": "sha256:1ff7f2d5ee1b0ba003e53414ab530c4aa9907b51098b84a2438adfcd96d2638b"
+        },
+        {
+          "split": "CALIBRATION",
+          "label": "CRITICAL_DEFECT",
+          "accepted": false,
+          "case_digest": "sha256:67dbe804afadd2a518ea9b3446319b875f71d0f5d12a72be5f9f37309af47556",
+          "receipt_ref": "d15.ollama_qwen2.5vl:7b@sha256:5ced39dfa4bac325dc183dd1e4febaa1c46b3ea28bce48896c8e69c1e79611cc.json",
+          "receipt_digest": "sha256:05ee48a790a78bf9394d9939f1eaa81aba42a59c10d02c9969040a6302e7ddb6"
+        },
+        {
+          "split": "CALIBRATION",
+          "label": "CLEAN",
+          "accepted": true,
+          "case_digest": "sha256:bdf35f2e04f1db50be984f0ebd1962f2fd747fd2171e5fd1bc0a40ee10089bd1",
+          "receipt_ref": "c00.ollama_qwen2.5vl:7b@sha256:5ced39dfa4bac325dc183dd1e4febaa1c46b3ea28bce48896c8e69c1e79611cc.json",
+          "receipt_digest": "sha256:b70c0cbc1be480ff405e8a172a7baf71b098e4ade5d55b249b6f4297ef4553f6"
+        },
+        {
+          "split": "CALIBRATION",
+          "label": "CRITICAL_DEFECT",
+          "accepted": false,
+          "case_digest": "sha256:d5ab2a96d588dd3ee8c9e821d80e54fb115b2b4dfe8a47e24c1ad42e2c13291c",
+          "receipt_ref": "d14.ollama_qwen2.5vl:7b@sha256:5ced39dfa4bac325dc183dd1e4febaa1c46b3ea28bce48896c8e69c1e79611cc.json",
+          "receipt_digest": "sha256:3c89ceae0b952282e66def7c1620c19143aa9d536a5c463e13864e683c5ff0b8"
+        },
+        {
+          "split": "CALIBRATION",
+          "label": "CRITICAL_DEFECT",
+          "accepted": false,
+          "case_digest": "sha256:314107489d074e51c93aa432beb21768c4d93b4d46391e3a549be23b3a31cca5",
+          "receipt_ref": "d17.ollama_qwen2.5vl:7b@sha256:5ced39dfa4bac325dc183dd1e4febaa1c46b3ea28bce48896c8e69c1e79611cc.json",
+          "receipt_digest": "sha256:03f25c9aeba3f78be6e232199bcc780d2cea87c876df85c7f52b62b74eddad81"
+        },
+        {
+          "split": "CALIBRATION",
+          "label": "CRITICAL_DEFECT",
+          "accepted": false,
+          "case_digest": "sha256:bd4d403a9be9a178d1cce62a1a30f15b635b21f41e749cdfc41cf2bd859e81a6",
+          "receipt_ref": "d16.ollama_qwen2.5vl:7b@sha256:5ced39dfa4bac325dc183dd1e4febaa1c46b3ea28bce48896c8e69c1e79611cc.json",
+          "receipt_digest": "sha256:283371f0065e484ef21737cfc1aac0678b6d297345eec39e98ff41d2ca729ab6"
+        },
+        {
+          "split": "CALIBRATION",
+          "label": "CLEAN",
+          "accepted": true,
+          "case_digest": "sha256:51c62f31629269cd9a0d3138852d30d9a8fab16f16ebae91cf5a70a040ab8ad7",
+          "receipt_ref": "c02.ollama_qwen2.5vl:7b@sha256:5ced39dfa4bac325dc183dd1e4febaa1c46b3ea28bce48896c8e69c1e79611cc.json",
+          "receipt_digest": "sha256:48800efbb7efe324672dd1f9dc23e2900596cfc2d5e1fecbc3a73c91b92617f7"
+        },
+        {
+          "split": "CALIBRATION",
+          "label": "CRITICAL_DEFECT",
+          "accepted": false,
+          "case_digest": "sha256:59cee6521d3f50cff90e90fe899fea3a56aaeb56b3412aaf54f841bae3558299",
+          "receipt_ref": "d10.ollama_qwen2.5vl:7b@sha256:5ced39dfa4bac325dc183dd1e4febaa1c46b3ea28bce48896c8e69c1e79611cc.json",
+          "receipt_digest": "sha256:8f6bea48912c2e601ddba4c05195289a0168493642e6c251a19714f610d32a48"
+        },
+        {
+          "split": "CALIBRATION",
+          "label": "CLEAN",
+          "accepted": true,
+          "case_digest": "sha256:75e5405d33c2f126e44d66cb034e4cc9fb24e815379a9ba6f8ed0c5b5abf9cb3",
+          "receipt_ref": "c07.ollama_qwen2.5vl:7b@sha256:5ced39dfa4bac325dc183dd1e4febaa1c46b3ea28bce48896c8e69c1e79611cc.json",
+          "receipt_digest": "sha256:c9cd5eecf5e2ffceaf431cf7b886f68bd038e96b2eeed5ea9360dc320fd9604e"
+        },
+        {
+          "split": "CALIBRATION",
+          "label": "CLEAN",
+          "accepted": true,
+          "case_digest": "sha256:4673adfb134c2c0bca3dcae25dbc9ddd9acfddb20efd37c94e3150fd4d0e6f9a",
+          "receipt_ref": "c01.ollama_qwen2.5vl:7b@sha256:5ced39dfa4bac325dc183dd1e4febaa1c46b3ea28bce48896c8e69c1e79611cc.json",
+          "receipt_digest": "sha256:4b68b0779199e4e41fada05fe0ddfc7a91ff824e1aa9178568c47b1b28908fa7"
+        },
+        {
+          "split": "CALIBRATION",
+          "label": "CRITICAL_DEFECT",
+          "accepted": false,
+          "case_digest": "sha256:986bbc554876559dabf52595ae903bfd06e9113b0c36942dc66261441eb126f0",
+          "receipt_ref": "d12.ollama_qwen2.5vl:7b@sha256:5ced39dfa4bac325dc183dd1e4febaa1c46b3ea28bce48896c8e69c1e79611cc.json",
+          "receipt_digest": "sha256:9535562dc7d55fb8246fda41f58f9c0ba692c83fb60477bd1d3ea4c1b8530c48"
+        },
+        {
+          "split": "HOLDOUT",
+          "label": "CRITICAL_DEFECT",
+          "accepted": false,
+          "case_digest": "sha256:5d3326ac4f51efa25795d58406d7f7baaed58c749a5ac27426f21e5b5f92288a",
+          "receipt_ref": "x06.ollama_qwen2.5vl:7b@sha256:5ced39dfa4bac325dc183dd1e4febaa1c46b3ea28bce48896c8e69c1e79611cc.json",
+          "receipt_digest": "sha256:6af63dddb187282115f6789e9af54165d6022c48290bb338e82817f8dd03fbc1"
+        },
+        {
+          "split": "HOLDOUT",
+          "label": "CLEAN",
+          "accepted": true,
+          "case_digest": "sha256:bffcd9ecad43d19fb71b63022f597c97a714b2f1ee008a7a1c58ca87c3ac3d52",
+          "receipt_ref": "h08.ollama_qwen2.5vl:7b@sha256:5ced39dfa4bac325dc183dd1e4febaa1c46b3ea28bce48896c8e69c1e79611cc.json",
+          "receipt_digest": "sha256:522aa303228f76cf5b771778e5cd4387bdf7411a0cc053e4f5f0d886bd1d1a03"
+        },
+        {
+          "split": "HOLDOUT",
+          "label": "CRITICAL_DEFECT",
+          "accepted": false,
+          "case_digest": "sha256:6d446e3584b0f8138c7a014d9b96391b79d9afa347559b3dc1d3fca8e1de1b46",
+          "receipt_ref": "x09.ollama_qwen2.5vl:7b@sha256:5ced39dfa4bac325dc183dd1e4febaa1c46b3ea28bce48896c8e69c1e79611cc.json",
+          "receipt_digest": "sha256:b4e2be6cfe922e0652c36e125de324568bceb1904902b16e935fbd9433624156"
+        },
+        {
+          "split": "HOLDOUT",
+          "label": "CRITICAL_DEFECT",
+          "accepted": false,
+          "case_digest": "sha256:646b97d2d9682a2bf0ef5340e1dfc7c916cd994b1ffd6b661a81970c6b9562de",
+          "receipt_ref": "x05.ollama_qwen2.5vl:7b@sha256:5ced39dfa4bac325dc183dd1e4febaa1c46b3ea28bce48896c8e69c1e79611cc.json",
+          "receipt_digest": "sha256:75fa6a1c9ec10b56ed6a0cf36b357ac7226c1c6dd65ee398ba246848ce34db24"
+        },
+        {
+          "split": "HOLDOUT",
+          "label": "CRITICAL_DEFECT",
+          "accepted": false,
+          "case_digest": "sha256:9b6debe33eae4b8e1c9f8548c595b265b0309b36983c979603857b2f374eef36",
+          "receipt_ref": "x04.ollama_qwen2.5vl:7b@sha256:5ced39dfa4bac325dc183dd1e4febaa1c46b3ea28bce48896c8e69c1e79611cc.json",
+          "receipt_digest": "sha256:ef015d6c7ccc62c063bcb082dda68da172d2b0c3e72841f84399141bfb54dc02"
+        },
+        {
+          "split": "HOLDOUT",
+          "label": "CLEAN",
+          "accepted": true,
+          "case_digest": "sha256:c544d8d6103a9d5b859b71f857e42b6e292b2e46bc249a14060e39084418cfd8",
+          "receipt_ref": "h02.ollama_qwen2.5vl:7b@sha256:5ced39dfa4bac325dc183dd1e4febaa1c46b3ea28bce48896c8e69c1e79611cc.json",
+          "receipt_digest": "sha256:a84197da93d5802181c7a6b23c2a9ec7a3385c1c0f8f8aaadde28f3a2b4b4853"
+        },
+        {
+          "split": "HOLDOUT",
+          "label": "CRITICAL_DEFECT",
+          "accepted": false,
+          "case_digest": "sha256:51a285a1f1932b3c6a71b13dae0cde5b24edb9e48eb942d3eab85e6cff49e2fa",
+          "receipt_ref": "x00.ollama_qwen2.5vl:7b@sha256:5ced39dfa4bac325dc183dd1e4febaa1c46b3ea28bce48896c8e69c1e79611cc.json",
+          "receipt_digest": "sha256:677f658a7edb9e971c0d5533cb6a92401d837e0d9489b5a74c3544b95bb8fcc3"
+        },
+        {
+          "split": "HOLDOUT",
+          "label": "CRITICAL_DEFECT",
+          "accepted": false,
+          "case_digest": "sha256:588feaa6dca169e56ac097e37d5cd506311fd839efeedad74026b1174c3d1d3b",
+          "receipt_ref": "x03.ollama_qwen2.5vl:7b@sha256:5ced39dfa4bac325dc183dd1e4febaa1c46b3ea28bce48896c8e69c1e79611cc.json",
+          "receipt_digest": "sha256:b76604ef84b879ef40e43f1118f04ccb0b789498b5fc8ca0060b3b4a5b308822"
+        },
+        {
+          "split": "HOLDOUT",
+          "label": "CLEAN",
+          "accepted": true,
+          "case_digest": "sha256:6fb6ac4328cd284df10afb6e333474e4d3e7b6ddc3648c2b783fa38edb2de9a2",
+          "receipt_ref": "h04.ollama_qwen2.5vl:7b@sha256:5ced39dfa4bac325dc183dd1e4febaa1c46b3ea28bce48896c8e69c1e79611cc.json",
+          "receipt_digest": "sha256:279935514a3ae4fce6e22e4a46a783916d77f8afb05c2fc833a2ffca9dafb986"
+        },
+        {
+          "split": "HOLDOUT",
+          "label": "CLEAN",
+          "accepted": true,
+          "case_digest": "sha256:22f5948ce8c27645ca2b2722316d90aa5582b792a03de4c0ed9f155ee4322a5e",
+          "receipt_ref": "h07.ollama_qwen2.5vl:7b@sha256:5ced39dfa4bac325dc183dd1e4febaa1c46b3ea28bce48896c8e69c1e79611cc.json",
+          "receipt_digest": "sha256:56bce53ead51e32fb9b94ef66831b3b9d16ae5acc6a82f257087df7cbe851345"
+        },
+        {
+          "split": "HOLDOUT",
+          "label": "CRITICAL_DEFECT",
+          "accepted": false,
+          "case_digest": "sha256:9ab34839453662fba21b4669d0d381417241bc8617e698ef195a0a955325a0f4",
+          "receipt_ref": "x07.ollama_qwen2.5vl:7b@sha256:5ced39dfa4bac325dc183dd1e4febaa1c46b3ea28bce48896c8e69c1e79611cc.json",
+          "receipt_digest": "sha256:5f98729e257a83c182c81fcfff6e0227210adc90ae0422ca19428861217c68d3"
+        },
+        {
+          "split": "HOLDOUT",
+          "label": "CLEAN",
+          "accepted": true,
+          "case_digest": "sha256:305d417ab92826c62c97948cff97f973b19bb4f77804094d1473e6fb45872213",
+          "receipt_ref": "h05.ollama_qwen2.5vl:7b@sha256:5ced39dfa4bac325dc183dd1e4febaa1c46b3ea28bce48896c8e69c1e79611cc.json",
+          "receipt_digest": "sha256:84419538129e88051f6e9df57d3bcc50f99e98d4de2a4263c3993c925a7e3f50"
+        },
+        {
+          "split": "HOLDOUT",
+          "label": "CRITICAL_DEFECT",
+          "accepted": false,
+          "case_digest": "sha256:5c5c2bdfb5de58c4cf4f879f1105929cb426b36b42ed0a548be18c3024e5ec9f",
+          "receipt_ref": "x08.ollama_qwen2.5vl:7b@sha256:5ced39dfa4bac325dc183dd1e4febaa1c46b3ea28bce48896c8e69c1e79611cc.json",
+          "receipt_digest": "sha256:fbc22fa09942a0e6f5922212d16d094121b170ec488d7f979668a68be0b37dc2"
+        },
+        {
+          "split": "HOLDOUT",
+          "label": "CLEAN",
+          "accepted": false,
+          "case_digest": "sha256:0698605676108ff141c462fa026c58fc9b6e0b3d8e172859e1e08310587cd412",
+          "receipt_ref": "h00.ollama_qwen2.5vl:7b@sha256:5ced39dfa4bac325dc183dd1e4febaa1c46b3ea28bce48896c8e69c1e79611cc.json",
+          "receipt_digest": "sha256:393eef036706bf79bd77df064979ba723b29f3bddba7247916aa7cfab984ae6f"
+        },
+        {
+          "split": "HOLDOUT",
+          "label": "CLEAN",
+          "accepted": true,
+          "case_digest": "sha256:a6c3b89b396008d0fa18aa01859498a7bd61b2ccc2356152f6933b8c3fc7ddf7",
+          "receipt_ref": "h03.ollama_qwen2.5vl:7b@sha256:5ced39dfa4bac325dc183dd1e4febaa1c46b3ea28bce48896c8e69c1e79611cc.json",
+          "receipt_digest": "sha256:12c9449c98aa167db9efc622d72d3e4b3e2cdf370b5bd3ad577c47814f5891d6"
+        },
+        {
+          "split": "HOLDOUT",
+          "label": "CRITICAL_DEFECT",
+          "accepted": false,
+          "case_digest": "sha256:8ab52a5a9e0be25c0f4e4a180f476f317b10b080d30bb76a356d947d95fc1479",
+          "receipt_ref": "x01.ollama_qwen2.5vl:7b@sha256:5ced39dfa4bac325dc183dd1e4febaa1c46b3ea28bce48896c8e69c1e79611cc.json",
+          "receipt_digest": "sha256:a3e4eb1d07454fbbecd07932835936ab2a8e5927bbc8615c663d79e747411861"
+        },
+        {
+          "split": "HOLDOUT",
+          "label": "CRITICAL_DEFECT",
+          "accepted": false,
+          "case_digest": "sha256:39ea5eebefe205b10007e9a281e6f0572e504a855d26924546313478e67202fd",
+          "receipt_ref": "x02.ollama_qwen2.5vl:7b@sha256:5ced39dfa4bac325dc183dd1e4febaa1c46b3ea28bce48896c8e69c1e79611cc.json",
+          "receipt_digest": "sha256:94e470fb8484a4042a8424d66564380919ea94d45169fe1414dc6637bcf28151"
+        },
+        {
+          "split": "HOLDOUT",
+          "label": "CLEAN",
+          "accepted": true,
+          "case_digest": "sha256:e53737170c8e699c5f4ad740167c0d0ca059a480408495161ee2e3e5201932b6",
+          "receipt_ref": "h06.ollama_qwen2.5vl:7b@sha256:5ced39dfa4bac325dc183dd1e4febaa1c46b3ea28bce48896c8e69c1e79611cc.json",
+          "receipt_digest": "sha256:3d103e0c64a2aabd46346db04d81bd83f8cfa18a9aadb24a818f95cfde233618"
+        },
+        {
+          "split": "HOLDOUT",
+          "label": "CLEAN",
+          "accepted": true,
+          "case_digest": "sha256:a6836442c3f3c00e0d091eb67417ad259b7fe2f1b99ee8372b2c7da2d6fecacb",
+          "receipt_ref": "h01.ollama_qwen2.5vl:7b@sha256:5ced39dfa4bac325dc183dd1e4febaa1c46b3ea28bce48896c8e69c1e79611cc.json",
+          "receipt_digest": "sha256:71e93b279ee5628b446b9d339bb92ba9a1442fc905473cd263594bfd8e0e5a6c"
+        },
+        {
+          "split": "HOLDOUT",
+          "label": "CLEAN",
+          "accepted": true,
+          "case_digest": "sha256:9fb09dbc90fa769ba99c8e2017563e0c59cce6a6e6ee2aac987184d37b7c387f",
+          "receipt_ref": "h09.ollama_qwen2.5vl:7b@sha256:5ced39dfa4bac325dc183dd1e4febaa1c46b3ea28bce48896c8e69c1e79611cc.json",
+          "receipt_digest": "sha256:feb8efc7085d587cbc29f556687894bba2a9e5073f4841b5b4cbaeea39bb5a24"
+        }
+      ]
+    },
+    "reviewer_b": {
+      "model_identity": "ollama/gemma3:4b@sha256:68ceab7e468a31c988b44d5a4984a0e21f58c4f7158c6ce29c1804babac38df7",
+      "qualified": true,
+      "seconds": 1.1,
+      "cases": [
+        {
+          "split": "CALIBRATION",
+          "label": "CLEAN",
+          "accepted": true,
+          "case_digest": "sha256:d1b4d2cb4f2461be5405d6ea5d88867855726bd36668933691c0c2911cdd6e6f",
+          "receipt_ref": "c04.ollama_gemma3:4b@sha256:68ceab7e468a31c988b44d5a4984a0e21f58c4f7158c6ce29c1804babac38df7.json",
+          "receipt_digest": "sha256:91bd75a5b16093e25cf609ffd0dfe021b772f033079db8f79792d84f5a3b6678"
+        },
+        {
+          "split": "CALIBRATION",
+          "label": "CRITICAL_DEFECT",
+          "accepted": false,
+          "case_digest": "sha256:c580fe5502ba4c4790b240a902ca3301b35ef632d255891501f177b8b6612f60",
+          "receipt_ref": "d11.ollama_gemma3:4b@sha256:68ceab7e468a31c988b44d5a4984a0e21f58c4f7158c6ce29c1804babac38df7.json",
+          "receipt_digest": "sha256:f797a0c4c5e51bea1d70e0490bbc11d9a9e6677064ae68850eb760ee0b5ac2d0"
+        },
+        {
+          "split": "CALIBRATION",
+          "label": "CLEAN",
+          "accepted": true,
+          "case_digest": "sha256:3d94f8bda1327e33009adf75f84bb38988e03c48bffe4f7b2994b09891040793",
+          "receipt_ref": "c03.ollama_gemma3:4b@sha256:68ceab7e468a31c988b44d5a4984a0e21f58c4f7158c6ce29c1804babac38df7.json",
+          "receipt_digest": "sha256:cf33f6e11f893384ab62ed1d2de2ba7c388354e11fd07a8c071f72ddd5706e0f"
+        },
+        {
+          "split": "CALIBRATION",
+          "label": "CLEAN",
+          "accepted": true,
+          "case_digest": "sha256:6384904eeddba373c69d88dfa4727044ad0a3378f02f2997b0c97e937e2af7de",
+          "receipt_ref": "c08.ollama_gemma3:4b@sha256:68ceab7e468a31c988b44d5a4984a0e21f58c4f7158c6ce29c1804babac38df7.json",
+          "receipt_digest": "sha256:fb3ffdbdbcc0269cf557e9f94b575d49fe080cd9930654aafe264031b902220c"
+        },
+        {
+          "split": "CALIBRATION",
+          "label": "CRITICAL_DEFECT",
+          "accepted": false,
+          "case_digest": "sha256:3d311657e15d47c51116aa1a827e6e708478fb34d857c0d7db6103328db88166",
+          "receipt_ref": "d19.ollama_gemma3:4b@sha256:68ceab7e468a31c988b44d5a4984a0e21f58c4f7158c6ce29c1804babac38df7.json",
+          "receipt_digest": "sha256:8a93cc0fab1cafba0a8afaf3428905b7b103c5ca747b33e9d6c2417888e89213"
+        },
+        {
+          "split": "CALIBRATION",
+          "label": "CRITICAL_DEFECT",
+          "accepted": false,
+          "case_digest": "sha256:e5ce15e09bfdf97ce0276aa6fa1b840979c40286e165cd49f7a8c18a3b71f872",
+          "receipt_ref": "d13.ollama_gemma3:4b@sha256:68ceab7e468a31c988b44d5a4984a0e21f58c4f7158c6ce29c1804babac38df7.json",
+          "receipt_digest": "sha256:bd84dcb384e2f5ff141889b5d86385878cc00c7f4e75f3ed37dbecc7616dee12"
+        },
+        {
+          "split": "CALIBRATION",
+          "label": "CLEAN",
+          "accepted": true,
+          "case_digest": "sha256:a81a29ad8ea3d55da2b37b0c71f0dfc33abc1988e0276553e5ae2d5215a4d270",
+          "receipt_ref": "c05.ollama_gemma3:4b@sha256:68ceab7e468a31c988b44d5a4984a0e21f58c4f7158c6ce29c1804babac38df7.json",
+          "receipt_digest": "sha256:624f096f62c3211e5b1eefa3ac5d5f9b07d4553ee1f5ef9d675d63d73681132e"
+        },
+        {
+          "split": "CALIBRATION",
+          "label": "CLEAN",
+          "accepted": true,
+          "case_digest": "sha256:c08df5dfb3d04d39dff847c0e2b7ce4ef1805aeeea71a32672081f142bab9cf4",
+          "receipt_ref": "c09.ollama_gemma3:4b@sha256:68ceab7e468a31c988b44d5a4984a0e21f58c4f7158c6ce29c1804babac38df7.json",
+          "receipt_digest": "sha256:f976c37acfc7f0a905bbfccb5a2295f2e76447f9cb0ed244db1c226a70b0f89b"
+        },
+        {
+          "split": "CALIBRATION",
+          "label": "CLEAN",
+          "accepted": true,
+          "case_digest": "sha256:2249c0179cc6d349e7f57cc91f9b737d6da36c1310a6f7d5dcef2db769a74074",
+          "receipt_ref": "c06.ollama_gemma3:4b@sha256:68ceab7e468a31c988b44d5a4984a0e21f58c4f7158c6ce29c1804babac38df7.json",
+          "receipt_digest": "sha256:f965d4a790e67cae22bdcae2808a011a9b6b4ec0dd9fdbbf8c5f80f7bfeb8ad1"
+        },
+        {
+          "split": "CALIBRATION",
+          "label": "CRITICAL_DEFECT",
+          "accepted": false,
+          "case_digest": "sha256:4211f1fc8d290da1f5bf18b883118d9fdce66cddd9cfc42384f801578f16f63f",
+          "receipt_ref": "d18.ollama_gemma3:4b@sha256:68ceab7e468a31c988b44d5a4984a0e21f58c4f7158c6ce29c1804babac38df7.json",
+          "receipt_digest": "sha256:2ae71941844acc711c243df7784ee4e245f7eb12158141f57fd96a2cca2cbb00"
+        },
+        {
+          "split": "CALIBRATION",
+          "label": "CRITICAL_DEFECT",
+          "accepted": false,
+          "case_digest": "sha256:67dbe804afadd2a518ea9b3446319b875f71d0f5d12a72be5f9f37309af47556",
+          "receipt_ref": "d15.ollama_gemma3:4b@sha256:68ceab7e468a31c988b44d5a4984a0e21f58c4f7158c6ce29c1804babac38df7.json",
+          "receipt_digest": "sha256:1343b22ca30248d488190b5a61fb0ed69e3f5e0f6e9bfa1f475ec9ef2f65a462"
+        },
+        {
+          "split": "CALIBRATION",
+          "label": "CLEAN",
+          "accepted": true,
+          "case_digest": "sha256:bdf35f2e04f1db50be984f0ebd1962f2fd747fd2171e5fd1bc0a40ee10089bd1",
+          "receipt_ref": "c00.ollama_gemma3:4b@sha256:68ceab7e468a31c988b44d5a4984a0e21f58c4f7158c6ce29c1804babac38df7.json",
+          "receipt_digest": "sha256:9edcdb213bd288efc0395be0e9bef2caea41d5bd2c3de583a601083604b5fa59"
+        },
+        {
+          "split": "CALIBRATION",
+          "label": "CRITICAL_DEFECT",
+          "accepted": false,
+          "case_digest": "sha256:d5ab2a96d588dd3ee8c9e821d80e54fb115b2b4dfe8a47e24c1ad42e2c13291c",
+          "receipt_ref": "d14.ollama_gemma3:4b@sha256:68ceab7e468a31c988b44d5a4984a0e21f58c4f7158c6ce29c1804babac38df7.json",
+          "receipt_digest": "sha256:0d40b1d4d5c0bb1d880cf57a0451a4b15345e29b318acbf5e1c14c7841945f37"
+        },
+        {
+          "split": "CALIBRATION",
+          "label": "CRITICAL_DEFECT",
+          "accepted": false,
+          "case_digest": "sha256:314107489d074e51c93aa432beb21768c4d93b4d46391e3a549be23b3a31cca5",
+          "receipt_ref": "d17.ollama_gemma3:4b@sha256:68ceab7e468a31c988b44d5a4984a0e21f58c4f7158c6ce29c1804babac38df7.json",
+          "receipt_digest": "sha256:3ceba7076b17310cc14e4d25669254b03be359959a756ceca5b02a71b0836945"
+        },
+        {
+          "split": "CALIBRATION",
+          "label": "CRITICAL_DEFECT",
+          "accepted": false,
+          "case_digest": "sha256:bd4d403a9be9a178d1cce62a1a30f15b635b21f41e749cdfc41cf2bd859e81a6",
+          "receipt_ref": "d16.ollama_gemma3:4b@sha256:68ceab7e468a31c988b44d5a4984a0e21f58c4f7158c6ce29c1804babac38df7.json",
+          "receipt_digest": "sha256:d90290b80234fd7fb5b7bef4a8e6d0700457aa3fcb88c1941eac4e2a1ee87c75"
+        },
+        {
+          "split": "CALIBRATION",
+          "label": "CLEAN",
+          "accepted": true,
+          "case_digest": "sha256:51c62f31629269cd9a0d3138852d30d9a8fab16f16ebae91cf5a70a040ab8ad7",
+          "receipt_ref": "c02.ollama_gemma3:4b@sha256:68ceab7e468a31c988b44d5a4984a0e21f58c4f7158c6ce29c1804babac38df7.json",
+          "receipt_digest": "sha256:0b6cb9e0e0b5ab878df9a362bd2a4c12ea1aad7b3b16a8a0fb6e34a3b7df0f9e"
+        },
+        {
+          "split": "CALIBRATION",
+          "label": "CRITICAL_DEFECT",
+          "accepted": false,
+          "case_digest": "sha256:59cee6521d3f50cff90e90fe899fea3a56aaeb56b3412aaf54f841bae3558299",
+          "receipt_ref": "d10.ollama_gemma3:4b@sha256:68ceab7e468a31c988b44d5a4984a0e21f58c4f7158c6ce29c1804babac38df7.json",
+          "receipt_digest": "sha256:92f703247e26c043dba8d197cb68755c34073e67d8013bc4b84a7f755d60f6f6"
+        },
+        {
+          "split": "CALIBRATION",
+          "label": "CLEAN",
+          "accepted": true,
+          "case_digest": "sha256:75e5405d33c2f126e44d66cb034e4cc9fb24e815379a9ba6f8ed0c5b5abf9cb3",
+          "receipt_ref": "c07.ollama_gemma3:4b@sha256:68ceab7e468a31c988b44d5a4984a0e21f58c4f7158c6ce29c1804babac38df7.json",
+          "receipt_digest": "sha256:151383fad45359d0703cd5a1824e1075edcc1449e9d6acf7651bef6a92f190ad"
+        },
+        {
+          "split": "CALIBRATION",
+          "label": "CLEAN",
+          "accepted": true,
+          "case_digest": "sha256:4673adfb134c2c0bca3dcae25dbc9ddd9acfddb20efd37c94e3150fd4d0e6f9a",
+          "receipt_ref": "c01.ollama_gemma3:4b@sha256:68ceab7e468a31c988b44d5a4984a0e21f58c4f7158c6ce29c1804babac38df7.json",
+          "receipt_digest": "sha256:e803cddc7a14241171048146ff23f0017e25983a0b3c3112909027301ed024cf"
+        },
+        {
+          "split": "CALIBRATION",
+          "label": "CRITICAL_DEFECT",
+          "accepted": false,
+          "case_digest": "sha256:986bbc554876559dabf52595ae903bfd06e9113b0c36942dc66261441eb126f0",
+          "receipt_ref": "d12.ollama_gemma3:4b@sha256:68ceab7e468a31c988b44d5a4984a0e21f58c4f7158c6ce29c1804babac38df7.json",
+          "receipt_digest": "sha256:8f172443e4b2f19610cc3ef6a98db217e4cf6852d8fc11de5f417b87e9698739"
+        },
+        {
+          "split": "HOLDOUT",
+          "label": "CRITICAL_DEFECT",
+          "accepted": false,
+          "case_digest": "sha256:5d3326ac4f51efa25795d58406d7f7baaed58c749a5ac27426f21e5b5f92288a",
+          "receipt_ref": "x06.ollama_gemma3:4b@sha256:68ceab7e468a31c988b44d5a4984a0e21f58c4f7158c6ce29c1804babac38df7.json",
+          "receipt_digest": "sha256:53deabd91616f4b36e82e9d37e144c0f839ea08974a38e8cf3e617bb93af89dc"
+        },
+        {
+          "split": "HOLDOUT",
+          "label": "CLEAN",
+          "accepted": true,
+          "case_digest": "sha256:bffcd9ecad43d19fb71b63022f597c97a714b2f1ee008a7a1c58ca87c3ac3d52",
+          "receipt_ref": "h08.ollama_gemma3:4b@sha256:68ceab7e468a31c988b44d5a4984a0e21f58c4f7158c6ce29c1804babac38df7.json",
+          "receipt_digest": "sha256:676f22b8fccdcdaf4cfde3633af6c6d681d58f93d50bda8607200ec865880c85"
+        },
+        {
+          "split": "HOLDOUT",
+          "label": "CRITICAL_DEFECT",
+          "accepted": false,
+          "case_digest": "sha256:6d446e3584b0f8138c7a014d9b96391b79d9afa347559b3dc1d3fca8e1de1b46",
+          "receipt_ref": "x09.ollama_gemma3:4b@sha256:68ceab7e468a31c988b44d5a4984a0e21f58c4f7158c6ce29c1804babac38df7.json",
+          "receipt_digest": "sha256:b191548427d28d1bf5c30d8e254e507afe98b9402f940a8de6238d75228f86ec"
+        },
+        {
+          "split": "HOLDOUT",
+          "label": "CRITICAL_DEFECT",
+          "accepted": false,
+          "case_digest": "sha256:646b97d2d9682a2bf0ef5340e1dfc7c916cd994b1ffd6b661a81970c6b9562de",
+          "receipt_ref": "x05.ollama_gemma3:4b@sha256:68ceab7e468a31c988b44d5a4984a0e21f58c4f7158c6ce29c1804babac38df7.json",
+          "receipt_digest": "sha256:498861f1bd9be648d6c788ca76f355caa0fc6036c2c66f03b8a68f782b2161c9"
+        },
+        {
+          "split": "HOLDOUT",
+          "label": "CRITICAL_DEFECT",
+          "accepted": false,
+          "case_digest": "sha256:9b6debe33eae4b8e1c9f8548c595b265b0309b36983c979603857b2f374eef36",
+          "receipt_ref": "x04.ollama_gemma3:4b@sha256:68ceab7e468a31c988b44d5a4984a0e21f58c4f7158c6ce29c1804babac38df7.json",
+          "receipt_digest": "sha256:5a902d48afcbba8bcd7fe4c6e6258ef85a684f70a9a7e9b50a7ca92336c92af2"
+        },
+        {
+          "split": "HOLDOUT",
+          "label": "CLEAN",
+          "accepted": true,
+          "case_digest": "sha256:c544d8d6103a9d5b859b71f857e42b6e292b2e46bc249a14060e39084418cfd8",
+          "receipt_ref": "h02.ollama_gemma3:4b@sha256:68ceab7e468a31c988b44d5a4984a0e21f58c4f7158c6ce29c1804babac38df7.json",
+          "receipt_digest": "sha256:ffc20c04016471a7fa9e794207272e6d368d802f59ee0db88f2556566e83c06e"
+        },
+        {
+          "split": "HOLDOUT",
+          "label": "CRITICAL_DEFECT",
+          "accepted": false,
+          "case_digest": "sha256:51a285a1f1932b3c6a71b13dae0cde5b24edb9e48eb942d3eab85e6cff49e2fa",
+          "receipt_ref": "x00.ollama_gemma3:4b@sha256:68ceab7e468a31c988b44d5a4984a0e21f58c4f7158c6ce29c1804babac38df7.json",
+          "receipt_digest": "sha256:493f005b9e7de0ba73f73c41cd7b86e22e58338d7ca449a695f913af7479a35a"
+        },
+        {
+          "split": "HOLDOUT",
+          "label": "CRITICAL_DEFECT",
+          "accepted": false,
+          "case_digest": "sha256:588feaa6dca169e56ac097e37d5cd506311fd839efeedad74026b1174c3d1d3b",
+          "receipt_ref": "x03.ollama_gemma3:4b@sha256:68ceab7e468a31c988b44d5a4984a0e21f58c4f7158c6ce29c1804babac38df7.json",
+          "receipt_digest": "sha256:3f454bcddb468abae897ef69be84e1651137e6cde38cd17e6f0603da96dd6da5"
+        },
+        {
+          "split": "HOLDOUT",
+          "label": "CLEAN",
+          "accepted": true,
+          "case_digest": "sha256:6fb6ac4328cd284df10afb6e333474e4d3e7b6ddc3648c2b783fa38edb2de9a2",
+          "receipt_ref": "h04.ollama_gemma3:4b@sha256:68ceab7e468a31c988b44d5a4984a0e21f58c4f7158c6ce29c1804babac38df7.json",
+          "receipt_digest": "sha256:e4dda9c871e4ad2c8e0da6ce65be74aca8189227551878ccba8db2635b458bee"
+        },
+        {
+          "split": "HOLDOUT",
+          "label": "CLEAN",
+          "accepted": true,
+          "case_digest": "sha256:22f5948ce8c27645ca2b2722316d90aa5582b792a03de4c0ed9f155ee4322a5e",
+          "receipt_ref": "h07.ollama_gemma3:4b@sha256:68ceab7e468a31c988b44d5a4984a0e21f58c4f7158c6ce29c1804babac38df7.json",
+          "receipt_digest": "sha256:997fd5a2e859e98917b476c297e1b8dae8b6f9ed8148dd793d56539c35fe91dd"
+        },
+        {
+          "split": "HOLDOUT",
+          "label": "CRITICAL_DEFECT",
+          "accepted": false,
+          "case_digest": "sha256:9ab34839453662fba21b4669d0d381417241bc8617e698ef195a0a955325a0f4",
+          "receipt_ref": "x07.ollama_gemma3:4b@sha256:68ceab7e468a31c988b44d5a4984a0e21f58c4f7158c6ce29c1804babac38df7.json",
+          "receipt_digest": "sha256:3b70aa8375e67857a46375442f5e171140fc56d227517d44dc6284ed161e9ff3"
+        },
+        {
+          "split": "HOLDOUT",
+          "label": "CLEAN",
+          "accepted": true,
+          "case_digest": "sha256:305d417ab92826c62c97948cff97f973b19bb4f77804094d1473e6fb45872213",
+          "receipt_ref": "h05.ollama_gemma3:4b@sha256:68ceab7e468a31c988b44d5a4984a0e21f58c4f7158c6ce29c1804babac38df7.json",
+          "receipt_digest": "sha256:8ab14528af07c512345584217ec26bc60c46496fb7ef52fdf6dd6c95883628df"
+        },
+        {
+          "split": "HOLDOUT",
+          "label": "CRITICAL_DEFECT",
+          "accepted": false,
+          "case_digest": "sha256:5c5c2bdfb5de58c4cf4f879f1105929cb426b36b42ed0a548be18c3024e5ec9f",
+          "receipt_ref": "x08.ollama_gemma3:4b@sha256:68ceab7e468a31c988b44d5a4984a0e21f58c4f7158c6ce29c1804babac38df7.json",
+          "receipt_digest": "sha256:16eff224fd8ed888f835a30415a11029e8957f6c073f152ae8b91c0600632517"
+        },
+        {
+          "split": "HOLDOUT",
+          "label": "CLEAN",
+          "accepted": true,
+          "case_digest": "sha256:0698605676108ff141c462fa026c58fc9b6e0b3d8e172859e1e08310587cd412",
+          "receipt_ref": "h00.ollama_gemma3:4b@sha256:68ceab7e468a31c988b44d5a4984a0e21f58c4f7158c6ce29c1804babac38df7.json",
+          "receipt_digest": "sha256:554bbb4f0978ad67e6c0a30622be550b20fdba5aca0a1b324c0442ad65479abc"
+        },
+        {
+          "split": "HOLDOUT",
+          "label": "CLEAN",
+          "accepted": true,
+          "case_digest": "sha256:a6c3b89b396008d0fa18aa01859498a7bd61b2ccc2356152f6933b8c3fc7ddf7",
+          "receipt_ref": "h03.ollama_gemma3:4b@sha256:68ceab7e468a31c988b44d5a4984a0e21f58c4f7158c6ce29c1804babac38df7.json",
+          "receipt_digest": "sha256:58d3c17639a5dfd204cc478a072e36e806275a486f3c31e22f7ce105a56fb4ef"
+        },
+        {
+          "split": "HOLDOUT",
+          "label": "CRITICAL_DEFECT",
+          "accepted": false,
+          "case_digest": "sha256:8ab52a5a9e0be25c0f4e4a180f476f317b10b080d30bb76a356d947d95fc1479",
+          "receipt_ref": "x01.ollama_gemma3:4b@sha256:68ceab7e468a31c988b44d5a4984a0e21f58c4f7158c6ce29c1804babac38df7.json",
+          "receipt_digest": "sha256:abcd255a03e8134d19ef15be38ca9b32949c468493a90e5084671c43eafd16ee"
+        },
+        {
+          "split": "HOLDOUT",
+          "label": "CRITICAL_DEFECT",
+          "accepted": false,
+          "case_digest": "sha256:39ea5eebefe205b10007e9a281e6f0572e504a855d26924546313478e67202fd",
+          "receipt_ref": "x02.ollama_gemma3:4b@sha256:68ceab7e468a31c988b44d5a4984a0e21f58c4f7158c6ce29c1804babac38df7.json",
+          "receipt_digest": "sha256:71c149edb86f49bac4923b523dad1ae0214517afc4aa7241e25ee8b95d210f47"
+        },
+        {
+          "split": "HOLDOUT",
+          "label": "CLEAN",
+          "accepted": true,
+          "case_digest": "sha256:e53737170c8e699c5f4ad740167c0d0ca059a480408495161ee2e3e5201932b6",
+          "receipt_ref": "h06.ollama_gemma3:4b@sha256:68ceab7e468a31c988b44d5a4984a0e21f58c4f7158c6ce29c1804babac38df7.json",
+          "receipt_digest": "sha256:1990021d3de74d64512ec96780512f68940cca8dd89eb9329338f2503bbe14dd"
+        },
+        {
+          "split": "HOLDOUT",
+          "label": "CLEAN",
+          "accepted": true,
+          "case_digest": "sha256:a6836442c3f3c00e0d091eb67417ad259b7fe2f1b99ee8372b2c7da2d6fecacb",
+          "receipt_ref": "h01.ollama_gemma3:4b@sha256:68ceab7e468a31c988b44d5a4984a0e21f58c4f7158c6ce29c1804babac38df7.json",
+          "receipt_digest": "sha256:e32dfe5b9c5a6a617c7f5b67be129624e36ff3bccba54c8a957a933e103fb175"
+        },
+        {
+          "split": "HOLDOUT",
+          "label": "CLEAN",
+          "accepted": true,
+          "case_digest": "sha256:9fb09dbc90fa769ba99c8e2017563e0c59cce6a6e6ee2aac987184d37b7c387f",
+          "receipt_ref": "h09.ollama_gemma3:4b@sha256:68ceab7e468a31c988b44d5a4984a0e21f58c4f7158c6ce29c1804babac38df7.json",
+          "receipt_digest": "sha256:65d266e3582a329f99f2b85f23b4db5cbd2ec0fb0b07090969c5c846c96cce19"
+        }
+      ]
+    }
+  },
+  "launch_qualification": {
+    "owner": "launch-qualification",
+    "receipt_ref": "final-verification.json",
+    "digest": "sha256:d5255d3fb757c6b4da7fb839200aa3da6918bd37e05ed5e304d16aa1ed1c93fd",
+    "task_id": null,
+    "execution_id": null,
+    "user_id": "default",
+    "project_name": "project",
+    "launch_profile_id": "fiction_narration_vi_v1",
+    "profile_digest": "sha256:bfb5c06c5d5a4023d5e3530a3d547ee851ed9c2a73366d9e6521492c16e1af86",
+    "route_digests": [
+      "sha256:1430d78c25f77f0e613a84da63d72a6cd8463959ed1243dddeb2870f7df9744a",
+      "sha256:d43a485fde894849d0d17ff8ff4e66525344884b8bfa72eeb65fc753b833982c",
+      "sha256:260623dab5e25cfd79d7fe150aeb76572e9dec55b924a58e618e02eeb63571e4",
+      "sha256:88414aabe6abe19aa86aafc1cb369fd9490bd23ac4d1111149fd48346e638373",
+      "sha256:6a7b1018c98e5646d74b721b947c7c55c002d675cf4d83316a8346caf32c0859",
+      "sha256:868aaf3977166e420944983af61220693cddb51b667fb1d626c5b808b78ffd58",
+      "sha256:0477b92ee5409fb4694f483ff0fffccb5f6ee4f0c17efb368a24c7efa7acee30"
+    ],
+    "required_disk_bytes": 8589934592,
+    "required_gpu_bytes": 7516192768
+  },
+  "offer": {
+    "enabled": true,
+    "input_digest": "sha256:e823be88670a5272fc1b649db19c6d763f5b40ba9d7e317a159d51562e0c50a7",
+    "policy_digests": {
+      "auto": "sha256:c7c43209c5c7b1fdc34925689c8d3ed5cedf89ca4f0d9d1beb878a4d417ac444",
+      "semi": "sha256:193ab4ed987fa02d4f4e7eaa25ef6fe942f8417249563fbf7a33ac1a35519e8e"
+    }
+  },
+  "history": [
+    {
+      "t": 0.0,
+      "stage": "BRIEF",
+      "status": "PENDING"
+    },
+    {
+      "t": 15.2,
+      "stage": "STORY",
+      "status": "WAITING_TASK"
+    },
+    {
+      "t": 10671.0,
+      "stage": "ASSET_ANALYSIS",
+      "status": "WAITING_TASK"
+    },
+    {
+      "t": 10761.1,
+      "stage": "EPISODE_PLAN",
+      "status": "WAITING_TASK"
+    },
+    {
+      "t": 11031.2,
+      "stage": "SCRIPT_PLAN",
+      "status": "RUNNING"
+    },
+    {
+      "t": 11046.2,
+      "stage": "SCRIPT_PLAN",
+      "status": "WAITING_TASK"
+    },
+    {
+      "t": 11091.3,
+      "stage": "SCRIPT_PLAN",
+      "status": "BLOCKED_CONFIGURATION"
+    }
+  ],
+  "run": {
+    "user_id": "default",
+    "project_name": "project",
+    "run_id": "c1bade88-693f-59fd-af03-0a1547404799",
+    "schema_id": "r2.production-run.v1",
+    "policy": {
+      "schema_id": "r2.production-policy.v1",
+      "mode": "auto",
+      "profile_id": "0199f00d-0000-7000-8000-000000000001",
+      "profile_digest": "sha256:bfb5c06c5d5a4023d5e3530a3d547ee851ed9c2a73366d9e6521492c16e1af86",
+      "launch_profile_id": "fiction_narration_vi_v1",
+      "local_only": true,
+      "routes": [
+        {
+          "role": "writer",
+          "provider_id": "custom-1",
+          "model_id": "qwen3.5-vimax:9b",
+          "model_identity": "ollama/qwen3.5-vimax:9b@sha256:079e71a587e3dd0c00fb189521886d4b4513531ff0bf4b92708b1c21854bbca2",
+          "config_digest": "sha256:54f8b79b612bb6ec918413f1da4bf38f28d600a89863f3f8c5addeecdc6e7438",
+          "local": true,
+          "paid": false,
+          "currency": "USD",
+          "max_cost_per_call": null
+        },
+        {
+          "role": "script",
+          "provider_id": "custom-1",
+          "model_id": "qwen3.5-vimax:9b",
+          "model_identity": "ollama/qwen3.5-vimax:9b@sha256:079e71a587e3dd0c00fb189521886d4b4513531ff0bf4b92708b1c21854bbca2",
+          "config_digest": "sha256:54f8b79b612bb6ec918413f1da4bf38f28d600a89863f3f8c5addeecdc6e7438",
+          "local": true,
+          "paid": false,
+          "currency": "USD",
+          "max_cost_per_call": null
+        },
+        {
+          "role": "reviewer_a",
+          "provider_id": "custom-1",
+          "model_id": "qwen2.5vl:7b",
+          "model_identity": "ollama/qwen2.5vl:7b@sha256:5ced39dfa4bac325dc183dd1e4febaa1c46b3ea28bce48896c8e69c1e79611cc",
+          "config_digest": "sha256:186c0091ffe336380d5b7d781d04d1343d13f87e036c9bff873c94de4d0ee3b1",
+          "local": true,
+          "paid": false,
+          "currency": "USD",
+          "max_cost_per_call": null
+        },
+        {
+          "role": "reviewer_b",
+          "provider_id": "custom-1",
+          "model_id": "gemma3:4b",
+          "model_identity": "ollama/gemma3:4b@sha256:68ceab7e468a31c988b44d5a4984a0e21f58c4f7158c6ce29c1804babac38df7",
+          "config_digest": "sha256:56a93bd08a23c46aa3e0cc3925ce0743bff364de615bddd3a207f800cd8651f3",
+          "local": true,
+          "paid": false,
+          "currency": "USD",
+          "max_cost_per_call": null
+        },
+        {
+          "role": "image",
+          "provider_id": "custom-3",
+          "model_id": "flux2-klein-4b-gguf",
+          "model_identity": "comfyui/flux2-klein-4b-Q4_K_M",
+          "config_digest": "sha256:792bf08b8d1ee52bcc51e8f232fcf076f2c0ef3fa5b395c6de498da887b2eccb",
+          "local": true,
+          "paid": false,
+          "currency": "USD",
+          "max_cost_per_call": null
+        },
+        {
+          "role": "video",
+          "provider_id": "custom-3",
+          "model_id": "still-clip-local",
+          "model_identity": "comfyui/still-clip-local",
+          "config_digest": "sha256:a9469e6cff5419b3e65c3a2d31a1e067f23f4c39032984a1237c64723f750cc2",
+          "local": true,
+          "paid": false,
+          "currency": "USD",
+          "max_cost_per_call": null
+        },
+        {
+          "role": "audio",
+          "provider_id": "custom-2",
+          "model_id": "vieneu-tts-v3-turbo",
+          "model_identity": "vieneu/tts-v3-turbo",
+          "config_digest": "sha256:ee3bd7d99ae504470ea4155a4b44165faff75c8b0e637648e9e9e98862c8199d",
+          "local": true,
+          "paid": false,
+          "currency": "USD",
+          "max_cost_per_call": null
+        }
+      ],
+      "checkpoints": [],
+      "currency": "USD",
+      "max_cost_minor_units": 500,
+      "max_model_calls": 1500,
+      "max_tasks": 600,
+      "max_runtime_seconds": 64800,
+      "max_target_episodes": 1,
+      "unit_repair_limit": 2,
+      "final_evaluation_limit": 3,
+      "route_digests": [
+        "sha256:1430d78c25f77f0e613a84da63d72a6cd8463959ed1243dddeb2870f7df9744a",
+        "sha256:d43a485fde894849d0d17ff8ff4e66525344884b8bfa72eeb65fc753b833982c",
+        "sha256:260623dab5e25cfd79d7fe150aeb76572e9dec55b924a58e618e02eeb63571e4",
+        "sha256:88414aabe6abe19aa86aafc1cb369fd9490bd23ac4d1111149fd48346e638373",
+        "sha256:6a7b1018c98e5646d74b721b947c7c55c002d675cf4d83316a8346caf32c0859",
+        "sha256:868aaf3977166e420944983af61220693cddb51b667fb1d626c5b808b78ffd58",
+        "sha256:0477b92ee5409fb4694f483ff0fffccb5f6ee4f0c17efb368a24c7efa7acee30"
+      ],
+      "target_duration_seconds": 45,
+      "width": 576,
+      "height": 1024,
+      "fps": 24,
+      "language": "vi"
+    },
+    "input_digest": "sha256:e823be88670a5272fc1b649db19c6d763f5b40ba9d7e317a159d51562e0c50a7",
+    "status": "BLOCKED_CONFIGURATION",
+    "stage": "SCRIPT_PLAN",
+    "generation": 1,
+    "version": 1487,
+    "fencing_epoch": 743,
+    "targets": [
+      "episode:1"
+    ],
+    "completed_targets": [],
+    "repair_counts": [],
+    "final_evaluations": 0,
+    "final_evaluation_receipts": [],
+    "pending_review": null,
+    "review_approvals": [],
+    "reason": "WORKFLOW_SCRIPT_PLAN_QUARANTINED",
+    "created_at": "2026-11-03T11:50:07.255869Z",
+    "policy_digest": "sha256:c7c43209c5c7b1fdc34925689c8d3ed5cedf89ca4f0d9d1beb878a4d417ac444",
+    "mode_policy_digests": {
+      "auto": "sha256:c7c43209c5c7b1fdc34925689c8d3ed5cedf89ca4f0d9d1beb878a4d417ac444",
+      "semi": "sha256:193ab4ed987fa02d4f4e7eaa25ef6fe942f8417249563fbf7a33ac1a35519e8e"
+    }
+  },
+  "elapsed_seconds": 11091.3
+}

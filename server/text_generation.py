@@ -1327,6 +1327,8 @@ def _covers_source_verbatim(parts: list[str], source: str) -> bool:
 
 REALIGN_MIN_KEPT = 0.98
 REALIGN_MIN_COVERED = 0.9
+#: 短集按比例卡得过严：漏抄一句引语前的提示语就超过一成，故另许至多这么多字符未被覆盖。
+REALIGN_MAX_UNCOVERED_CHARS = 160
 REALIGN_MIN_SEGMENT_KEPT = 0.9
 
 
@@ -1339,7 +1341,8 @@ def _realign_segments_to_source(segments: list[dict[str, Any]], source: str) -> 
 
     只含标点 / 空白、没有任何字母数字的分镜先被移除；其余分镜的边界按 ``difflib`` 对齐映射到源文
     坐标，每段取源文对应区间（漏抄的句子因此落回所在切片）。分镜正文至少 ``REALIGN_MIN_KEPT`` 按序
-    出现在源文里、源文至少 ``REALIGN_MIN_COVERED`` 被分镜覆盖、且每段正文至少 ``REALIGN_MIN_SEGMENT_KEPT``
+    出现在源文里、源文至少 ``REALIGN_MIN_COVERED`` 被分镜覆盖（或未覆盖不超过
+    ``REALIGN_MAX_UNCOVERED_CHARS`` 个字符）、且每段正文至少 ``REALIGN_MIN_SEGMENT_KEPT``
     出现在其源文切片里时才改写；改写或重排的正文在源文里找不到出处，保持原样，由覆盖校验照常报违约。
     已逐字覆盖时不做任何改动。
     """
@@ -1355,7 +1358,10 @@ def _realign_segments_to_source(segments: list[dict[str, Any]], source: str) -> 
     joined = " ".join(parts)
     matcher = difflib.SequenceMatcher(None, joined, target, autojunk=False)
     matched = _matched(matcher)
-    if matched < REALIGN_MIN_KEPT * len(joined) or matched < REALIGN_MIN_COVERED * len(target):
+    uncovered = len(target) - matched
+    if matched < REALIGN_MIN_KEPT * len(joined) or (
+        matched < REALIGN_MIN_COVERED * len(target) and uncovered > REALIGN_MAX_UNCOVERED_CHARS
+    ):
         return
     blocks = matcher.get_opcodes()
 
