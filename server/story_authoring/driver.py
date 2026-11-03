@@ -771,17 +771,43 @@ class StoryRunDriver:
         earlier: Sequence[str],
     ) -> tuple[str, tuple[Finding, ...]]:
         bounds = drafting.paragraph_bounds(target)
-        prose = await self._step(
-            node,
-            epoch,
-            kind=StoryStepKind.SCENE_DRAFT,
-            system=drafting.DRAFT_SYSTEM,
-            prompt=prompt,
-            decoding=DRAFT,
-            paragraphs=bounds,
-            paragraph_chars=drafting.paragraph_min_chars(target),
-            paragraph_max_chars=drafting.paragraph_max_chars(target),
-        )
+        try:
+            prose = await self._step(
+                node,
+                epoch,
+                kind=StoryStepKind.SCENE_DRAFT,
+                system=drafting.DRAFT_SYSTEM,
+                prompt=prompt,
+                decoding=DRAFT,
+                paragraphs=bounds,
+                paragraph_chars=drafting.paragraph_min_chars(target),
+                paragraph_max_chars=drafting.paragraph_max_chars(target),
+            )
+        except Blocked:
+            # The round's calls are spent before this contract got a draft (an earlier scene changed after this
+            # scene's own repairs): Shenbi keeps the best version written so far and marks it for the Human.
+            state = await self._store.load()
+            if state.node(node).head_revision_id is None:
+                raise
+            kept = json.loads(await self._head(node))["prose"]
+            checked = check_scene_prose(
+                kept,
+                node_id=node,
+                window=self._window,
+                allowed_names=allowed,
+                requires_dialogue=dialogue,
+                earlier=earlier,
+            )
+            note = Finding(
+                "BEST_VERSION_KEPT",
+                Severity.NARRATIVE_CRITICAL,
+                node,
+                ESCALATED_MARK + "cảnh trước đã đổi sau khi cảnh này hết lượt viết lại; giữ bản đã viết, cần đọc lại",
+            )
+            findings, blocking = escalate_or_block((*checked, note))
+            if blocking:
+                raise
+            return kept, tuple(findings)
         history: list[str] = []
         best: tuple[str, tuple[Finding, ...]] | None = None
         while True:

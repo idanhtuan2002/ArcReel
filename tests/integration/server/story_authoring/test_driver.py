@@ -419,6 +419,37 @@ async def test_a_scene_revision_regenerates_that_scene_and_everything_after_it(
     assert "Cho Lan nói nhiều hơn." in next(p for k, p in revised.prompts if k == "prose")
 
 
+async def test_a_scene_whose_calls_are_spent_keeps_its_best_version_when_an_earlier_scene_changes(
+    concurrent_session_factory: Factory, tmp_path
+):
+    store = await _store(concurrent_session_factory)
+    blobs = StoryBlobStore(tmp_path)
+    first = ScriptedModel()
+    full = first._prose
+
+    def code_mixed(prompt: str, schema: dict[str, Any]) -> dict[str, Any]:
+        count = schema["properties"]["paragraphs"]["minItems"]
+        answer = full(count)
+        if "Viết cảnh 2 của chương 1." in prompt:
+            opening = answer["paragraphs"][0].rsplit(". ", 1)[0] + ". Minh lướt smartphone suốt weekend, shopping thật nhiều."
+            answer["paragraphs"][0] = first.paragraphs[-count] = opening
+        return answer
+
+    first.overrides["prose"] = code_mixed
+    drafted = await _driver(concurrent_session_factory, store, first, blobs).run()
+    assert drafted.phase is RunPhase.READY_FOR_APPROVAL, drafted.block_reason
+    assert first.calls["patches"] == 5
+
+    await _rerun(store, intent=(scene_draft(1, 1), "Cho Lan nói nhiều hơn."))
+    revised = ScriptedModel()
+    state = await _driver(concurrent_session_factory, store, revised, blobs).run()
+
+    assert state.phase is RunPhase.READY_FOR_APPROVAL, state.block_reason
+    assert not any("Viết cảnh 2 của chương 1." in p for k, p in revised.prompts if k == "prose")
+    kept = [f for f in _exceptions(blobs, state) if f["code"] == "BEST_VERSION_KEPT"]
+    assert [(f["node_id"], f["severity"]) for f in kept] == [(scene_draft(1, 2), "NARRATIVE_CRITICAL")]
+
+
 async def test_a_quoted_continuity_error_is_repaired_before_the_chapter_is_sealed(
     concurrent_session_factory: Factory, tmp_path
 ):
