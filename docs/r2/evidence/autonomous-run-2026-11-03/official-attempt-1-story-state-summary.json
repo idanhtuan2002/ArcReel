@@ -1,0 +1,76 @@
+{
+ "story_run_id": "story-92d9fe8c861345de9b9b1770",
+ "phase": "BLOCKED_QUALITY",
+ "block_reason": "scene_draft[3,2]: call cap 6 reached without an acceptable output",
+ "limits": {
+  "chapters": 3,
+  "max_input_tokens": 24576,
+  "max_output_tokens": 4096,
+  "server_context_tokens": 32768,
+  "generate_calls_max": 292,
+  "count_calls_max": 292,
+  "input_tokens_max": 7176192,
+  "output_tokens_max": 1196032,
+  "wall_clock_max_seconds": 32400,
+  "max_repairs": 2,
+  "max_scene_attempts": 6,
+  "max_cost_minor_units": 0,
+  "currency": "LOCAL"
+ },
+ "usage": {
+  "count_calls": 222,
+  "generate_calls": 222,
+  "input_tokens": 1422476,
+  "output_tokens": 156489,
+  "model_milliseconds": 13672357
+ },
+ "generate_calls": 222,
+ "scene_draft_3_2_heads": [
+  {
+   "created_at": "2026-11-03T10:28:13.713793Z",
+   "fingerprint": "sha256:cdd39d1229a047b5234c53ed1d0d162cb1d49b64d85c2dc012564ce964b5a454"
+  },
+  {
+   "created_at": "2026-11-03T10:36:30.349167Z",
+   "fingerprint": "sha256:cdd39d1229a047b5234c53ed1d0d162cb1d49b64d85c2dc012564ce964b5a454"
+  },
+  {
+   "created_at": "2026-11-03T10:37:43.794909Z",
+   "fingerprint": "sha256:9ce6a3eda0995a5026690bda24abf1aa37b630fcaba93ab6f2c7087c1d369226"
+  },
+  {
+   "created_at": "2026-11-03T10:45:06.404753Z",
+   "fingerprint": "sha256:9ce6a3eda0995a5026690bda24abf1aa37b630fcaba93ab6f2c7087c1d369226"
+  },
+  {
+   "created_at": "2026-11-03T10:47:34.442366Z",
+   "fingerprint": "sha256:f9458564f32566ea3859d05f62cc67c6f4cbc023e458ee051e0fce5620e2be96"
+  },
+  {
+   "created_at": "2026-11-03T10:59:05.846580Z",
+   "fingerprint": "sha256:a2a6fc14b9e3778ad51eaa9836ae8e5a20bbb827ebf44b0e421bea6397a4ed73"
+  },
+  {
+   "created_at": "2026-11-03T11:09:23.100917Z",
+   "fingerprint": "sha256:a2a6fc14b9e3778ad51eaa9836ae8e5a20bbb827ebf44b0e421bea6397a4ed73"
+  },
+  {
+   "created_at": "2026-11-03T11:11:03.236497Z",
+   "fingerprint": "sha256:6ccaf890114bd44e1bdf90188fab980338e4cf43af0d7e43dd9a2f9391811679"
+  },
+  {
+   "created_at": "2026-11-03T11:19:01.929541Z",
+   "fingerprint": "sha256:6ccaf890114bd44e1bdf90188fab980338e4cf43af0d7e43dd9a2f9391811679"
+  },
+  {
+   "created_at": "2026-11-03T11:20:42.735061Z",
+   "fingerprint": "sha256:bf023ecc9b23c9aced262d1bff26efd6d6b07a853aac175a9f3a2519a8965226"
+  },
+  {
+   "created_at": "2026-11-03T11:38:26.327810Z",
+   "fingerprint": "sha256:bf023ecc9b23c9aced262d1bff26efd6d6b07a853aac175a9f3a2519a8965226"
+  }
+ ],
+ "scene_draft_3_2_required_fingerprint": "sha256:5f598745a9347e2a4f2f0a23d6b44007658445adc77f7558b0c55456f410c30e",
+ "note": "chapter_review[3] repaired scene_draft[3,1] at 11:37:51Z after scene_draft[3,2] had spent its 6 calls; 3,2's contract changed and its first draft call hit the cap. Fixed in ab544c4a7."
+}
