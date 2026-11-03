@@ -233,8 +233,20 @@ async def test_a_review_asked_with_an_unqualified_prompt_cannot_pass(quality_hos
     assert (blocked.stage, blocked.reason) == (RunStage.QUALITY, "REVIEWER_PROMPT_NOT_QUALIFIED")
 
 
-async def test_both_rejecting_rework_exactly_the_named_stage(quality_host):
+def _quality_gate(monkeypatch, gate: str) -> None:
+    import server.production_run.quality_adapter as quality_adapter
+    from r2.automation.profiles import resolve_launch_profile
+
+    monkeypatch.setattr(
+        quality_adapter,
+        "resolve_launch_profile",
+        lambda profile_id: resolve_launch_profile(profile_id).model_copy(update={"quality_gate": gate}),
+    )
+
+
+async def test_both_rejecting_rework_exactly_the_named_stage(quality_host, monkeypatch):
     host, controller, render, quality, reviewer = quality_host
+    _quality_gate(monkeypatch, "enforce")
     await _qualify(host)
     finding = AssessmentFinding(code="AUDIO_DRIFT", severity="MAJOR", unit_key="episode:1", repair_stage=RunStage.MEDIA)
     for role in ("reviewer_a", "reviewer_b"):
@@ -294,3 +306,41 @@ async def test_a_substituted_archive_prevents_run_success(quality_host):
 
     assert blocked.status is not RunStatus.SUCCEEDED
     assert (blocked.stage, blocked.reason) == (RunStage.EXPORT, "ARCHIVE_CHANGED")
+
+
+async def test_a_recording_gate_exports_a_rejected_final_with_its_rework_disposition(quality_host, monkeypatch):
+    import json
+    import zipfile
+
+    host, controller, render, quality, reviewer = quality_host
+    _quality_gate(monkeypatch, "record")
+    await _qualify(host)
+    finding = AssessmentFinding(code="AUDIO_DRIFT", severity="MAJOR", unit_key="episode:1", repair_stage=RunStage.MEDIA)
+    for role in ("reviewer_a", "reviewer_b"):
+        reviewer.answers[role] = {"scores": {**GOOD, "audio": 2}, "findings": [finding.model_dump()]}
+    await _to_quality(host, controller, render)
+
+    reviewed = await _review(host, controller, quality)
+    packaged = await _tick(host, controller)
+    assert packaged.stage is RunStage.EXPORT
+    succeeded = await _tick(host, controller)
+
+    assert (reviewed.stage, reviewed.generation) == (RunStage.PACKAGE, 1)
+    assert succeeded.status is RunStatus.SUCCEEDED
+    [output] = succeeded.completed_targets
+    assert output.quality_decision == "REWORK"
+    archive = host.projects.get_project_path("project") / output.export.receipt_ref.partition("@")[2]
+    with zipfile.ZipFile(archive) as opened:
+        assert json.loads(opened.read("lineage.json"))["quality_decision"] == "REWORK"
+
+
+async def test_a_recording_gate_still_blocks_missing_evidence(quality_host, monkeypatch):
+    host, controller, render, quality, _reviewer = quality_host
+    _quality_gate(monkeypatch, "record")
+    await _to_quality(host, controller, render)
+
+    blocked = await _review(host, controller, quality)
+
+    assert blocked.status is not RunStatus.SUCCEEDED
+    assert blocked.stage is RunStage.QUALITY
+    assert blocked.reason == "REVIEWER_NOT_QUALIFIED"

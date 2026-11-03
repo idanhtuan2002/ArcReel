@@ -16,7 +16,9 @@ import json
 import os
 import zipfile
 from pathlib import Path
+from typing import Literal
 
+from lib.db.repositories.quality_dispositions import QualityDispositionRepository
 from lib.presentation_renderer import sha256_file
 from lib.project_manager import ProjectManager
 from r2.automation.identity import digest_value, policy_digest
@@ -78,6 +80,9 @@ def _place(path: Path, data: bytes) -> None:
     os.replace(staged, path)
 
 
+type QualityDecision = Literal["PASS", "REWORK"]
+
+
 class _Upstream:
     async def _stages(self, sessions: Sessions, run: RunSnapshot) -> tuple[dict, dict, dict]:
         render = _by_episode((await required_outcome(sessions, run, RunStage.RENDER)).receipts)
@@ -87,6 +92,27 @@ class _Upstream:
         if not (set(render) == set(master) == set(quality) == targets):
             raise OwnerBlocked("OUTPUTS_INCOMPLETE")
         return render, master, quality
+
+    async def _decisions(
+        self, sessions: Sessions, run: RunSnapshot, quality: dict[int, OwnerReceipt]
+    ) -> dict[int, QualityDecision]:
+        """Each target's recorded M10 disposition decision (PASS, or REWORK under a recording quality gate)."""
+        decisions: dict[int, QualityDecision] = {}
+        async with sessions() as session:
+            repository = QualityDispositionRepository(session)
+            for episode, receipt in quality.items():
+                disposition = await repository.disposition(
+                    user_id=run.user_id,
+                    project_name=run.project_name,
+                    disposition_id=receipt.receipt_ref.rpartition("@")[2],
+                )
+                if disposition is None:
+                    raise OwnerBlocked("QUALITY_DISPOSITION_MISSING")
+                decision = disposition.decision.value
+                if decision not in ("PASS", "REWORK"):
+                    raise OwnerBlocked("QUALITY_DISPOSITION_NOT_AUTOMATIC")
+                decisions[episode] = decision
+        return decisions
 
 
 class PackagingAdapter(_Upstream):
@@ -115,7 +141,8 @@ class PackagingAdapter(_Upstream):
         async with self._sessions() as session, session.begin():
             await self._authority.require_locked(session, subject=subject)
         run = await current_run(self._sessions, intent)
-        self._package(run, intent)
+        quality = _by_episode(tuple(r for r in intent.input_refs if r.owner == "quality"))
+        self._package(run, intent, await self._decisions(self._sessions, run, quality))
         return OwnerReceipt(owner=self.owner, receipt_ref=intent.identity.command_id, digest=digest)
 
     async def inspect(self, *, intent: DispatchIntent, receipt: OwnerReceipt) -> StageOutcome:
@@ -140,7 +167,7 @@ class PackagingAdapter(_Upstream):
     async def usage(self, *, receipt: OwnerReceipt, reservation: BudgetReservation) -> UsageReceipt | None:
         return usage_receipt(receipt, reservation)
 
-    def _package(self, run: RunSnapshot, intent: DispatchIntent) -> None:
+    def _package(self, run: RunSnapshot, intent: DispatchIntent, decisions: dict[int, QualityDecision]) -> None:
         project = self._projects.get_project_path(run.project_name)
         refs: dict[str, dict[int, OwnerReceipt]] = {"renderer": {}, "gate-c": {}, "quality": {}}
         for ref in intent.input_refs:
@@ -165,6 +192,7 @@ class PackagingAdapter(_Upstream):
                 "render": render.model_dump(mode="json"),
                 "master": refs["gate-c"][episode].model_dump(mode="json"),
                 "quality": refs["quality"][episode].model_dump(mode="json"),
+                "quality_decision": decisions[episode],
             }
             members = {
                 f"episode_{episode}.mp4": final.read_bytes(),
@@ -194,6 +222,7 @@ def verify_run_outputs(
     masters: dict[int, OwnerReceipt],
     qualities: dict[int, OwnerReceipt],
     renders: dict[int, OwnerReceipt],
+    decisions: dict[int, QualityDecision],
 ) -> tuple[TargetOutput, ...]:
     """Every target's verified output, or ``OwnerBlocked`` naming the first target that cannot be verified."""
     outputs = []
@@ -210,7 +239,11 @@ def verify_run_outputs(
             final_bytes = opened.read(f"episode_{episode}.mp4")
             lineage = json.loads(opened.read("lineage.json"))
         final_sha = hashlib.sha256(final_bytes).hexdigest()
-        if final_sha != manifest["final_sha256"] or lineage.get("master", {}).get("digest") != masters[episode].digest:
+        if (
+            final_sha != manifest["final_sha256"]
+            or lineage.get("master", {}).get("digest") != masters[episode].digest
+            or lineage.get("quality_decision") != decisions[episode]
+        ):
             raise OwnerBlocked("ARCHIVE_CHANGED")
         outputs.append(
             TargetOutput(
@@ -220,7 +253,7 @@ def verify_run_outputs(
                 policy_digest=policy_digest(run.policy),
                 master_digest=masters[episode].digest,
                 quality_run=qualities[episode],
-                quality_decision="PASS",
+                quality_decision=decisions[episode],
                 export=packages[episode].model_copy(update={"owner": EXPORT_OWNER}),
                 final_digest="sha256:" + final_sha,
                 archive_digest=packages[episode].digest,
@@ -268,6 +301,7 @@ class ExportAdapter(_Upstream):
             masters=master,
             qualities=quality,
             renders=render,
+            decisions=await self._decisions(self._sessions, run, quality),
         )
         verified = outcome(intent, "PASS", receipts=intent.input_refs or (receipt,), owner_state="EXPORTED")
         return verified.model_copy(update={"outputs": outputs})

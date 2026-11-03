@@ -24,6 +24,9 @@ class LaunchProfile(AutomationContract):
     audio_route: tuple[ExactIdentity, ExactIdentity]
     requires_lip_sync: bool
     support_status: Literal["CANDIDATE"]
+    #: ``enforce`` exports only a final both reviewers pass; ``record`` (local plumbing profiles, whose models do not
+    #: reach release quality) records the quality verdict as the final's disposition and still exports it.
+    quality_gate: Literal["enforce", "record"] = "enforce"
 
 
 def resolve_launch_profile(profile_id: str) -> LaunchProfile:

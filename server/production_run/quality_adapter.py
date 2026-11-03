@@ -20,6 +20,7 @@ from lib.db.repositories.reviewer_qualifications import ReviewerQualificationRep
 from lib.project_manager import ProjectManager
 from r2.automation.assessment import AssessmentVerdict, ModelAssessment, combine
 from r2.automation.identity import digest_value
+from r2.automation.profiles import resolve_launch_profile
 from r2.contracts.automation import (
     BudgetReservation,
     DispatchIntent,
@@ -125,6 +126,15 @@ class QualityAdapter:
                 writer_identities=writers,
                 qualified_identities=identities,
             )
+        recording = resolve_launch_profile(run.policy.launch_profile_id).quality_gate == "record"
+        if recording:
+            # A judged rejection becomes a recorded REWORK disposition; evidence and integrity failures still block.
+            verdicts = {
+                episode: AssessmentVerdict(kind="REWORK", unit_key=f"episode:{episode}")
+                if verdict.kind == "BLOCK" and verdict.reason in QUALITY_JUDGEMENTS
+                else verdict
+                for episode, verdict in verdicts.items()
+            }
         blocked = [v for v in verdicts.values() if v.kind == "BLOCK"]
         if blocked:
             raise OwnerBlocked(blocked[0].reason or "REQUIRED_EVIDENCE_MISSING")
@@ -135,6 +145,9 @@ class QualityAdapter:
             raise OwnerBlocked("QUALITY_EVIDENCE_REFUSED") from None
         reworks = [v for v in verdicts.values() if v.kind == "REWORK"]
         identity = intent.identity
+        if reworks and recording:
+            evidence = tuple(dispositions[episode] for episode in sorted(targets))
+            return outcome(intent, "PASS", receipts=evidence, owner_state="QUALITY_RECORDED_REWORK")
         if reworks:
             if any(_unchanged_since_last_generation(evidence.final_path) for evidence in targets.values()):
                 # Reworking again would review the same final; the reviewers' rejection stands.
@@ -296,6 +309,10 @@ class QualityAdapter:
                 staged = path.with_suffix(".tmp")
                 staged.write_text(review.model_dump_json(), encoding="utf-8")
                 staged.replace(path)
+
+
+#: Verdicts that are the reviewers' judgement of the final, as opposed to missing, stale or unqualified evidence.
+QUALITY_JUDGEMENTS = frozenset({"REVIEWER_DISAGREEMENT", "FAILED_QUALITY"})
 
 
 def _unchanged_since_last_generation(final: Path) -> bool:

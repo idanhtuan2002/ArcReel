@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from r2.automation.identity import digest_value, policy_digest
 from r2.automation.policy import checkpoint_for, review_binding
+from r2.automation.profiles import resolve_launch_profile
 from r2.contracts.automation import PendingReview, RepairCount, RunSnapshot, RunStage, RunStatus, StageOutcome
 
 _STAGES = tuple(RunStage)
@@ -13,6 +14,13 @@ _STORY_BLOCKS = {
     "BLOCKED_BUDGET": RunStatus.BLOCKED_BUDGET,
     "RECOVERY_INCONSISTENT": RunStatus.BLOCKED_UNKNOWN,
 }
+
+
+def _passing_quality_states(run: RunSnapshot) -> frozenset[str]:
+    """Quality owner states that let a run continue: a PASS, and under a recording quality gate a recorded REWORK."""
+    if resolve_launch_profile(run.policy.launch_profile_id).quality_gate == "record":
+        return frozenset({"PASS", "QUALITY_RECORDED_REWORK"})
+    return frozenset({"PASS"})
 
 
 def _updated(run: RunSnapshot, **changes: object) -> RunSnapshot:
@@ -104,7 +112,7 @@ def advance(*, run: RunSnapshot, outcome: StageOutcome) -> RunSnapshot:
             reason=None,
             completed_targets=tuple(o for o in run.completed_targets if o.target not in affected),
         )
-    if run.stage is RunStage.QUALITY and outcome.owner_state != "PASS":
+    if run.stage is RunStage.QUALITY and outcome.owner_state not in _passing_quality_states(run):
         return _blocked(run, RunStatus.FAILED_QUALITY, "CURRENT_QUALITY_PASS_REQUIRED")
     checkpoint = checkpoint_for(policy=run.policy, stage=run.stage)
     if checkpoint is not None:

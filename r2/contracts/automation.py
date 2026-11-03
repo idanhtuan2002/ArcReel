@@ -190,7 +190,7 @@ class TargetOutput(AutomationContract):
     policy_digest: Digest
     master_digest: Digest
     quality_run: OwnerReceipt
-    quality_decision: Literal["PASS"]
+    quality_decision: Literal["PASS", "REWORK"]
     export: OwnerReceipt
     final_digest: Digest
     archive_digest: Digest
