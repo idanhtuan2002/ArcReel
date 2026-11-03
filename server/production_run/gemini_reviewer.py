@@ -36,6 +36,9 @@ from server.production_run.final_checks import picture_findings, subtitle_findin
 DEFAULT_BASE_URL = "https://generativelanguage.googleapis.com"
 #: Inline request data limit of the Gemini API; larger finals would need the Files API.
 MAX_INLINE_BYTES = 20 * 1024 * 1024
+#: Overload and rate-limit answers are retried with exponential backoff before the review fails.
+TRANSIENT_STATUSES = frozenset({429, 500, 502, 503, 504})
+TRANSIENT_ATTEMPTS = 3
 
 type Credentials = Callable[[str], Awaitable[tuple[str, str]]]
 
@@ -48,9 +51,11 @@ class GeminiReviewer:
         *,
         credentials_for: Credentials,
         timeout_seconds: float = 600,
+        backoff_seconds: float = 5,
         transport: httpx.AsyncBaseTransport | None = None,
     ) -> None:
         self._credentials_for = credentials_for
+        self._backoff = backoff_seconds
         self._timeout = timeout_seconds
         self._transport = transport
 
@@ -98,6 +103,11 @@ class GeminiReviewer:
             url = f"{(base_url or DEFAULT_BASE_URL).rstrip('/')}/v1beta/models/{route.model_id}:generateContent"
             async with httpx.AsyncClient(timeout=self._timeout, transport=self._transport) as client:
                 response = await client.post(url, json=body, headers={"x-goog-api-key": api_key})
+                for attempt in range(1, TRANSIENT_ATTEMPTS):
+                    if response.status_code not in TRANSIENT_STATUSES:
+                        break
+                    await asyncio.sleep(self._backoff * 2 ** (attempt - 1))
+                    response = await client.post(url, json=body, headers={"x-goog-api-key": api_key})
             response.raise_for_status()
             parts = response.json()["candidates"][0]["content"]["parts"]
             answer = json.loads("".join(str(part.get("text", "")) for part in parts))

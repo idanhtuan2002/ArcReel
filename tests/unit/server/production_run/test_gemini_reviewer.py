@@ -35,7 +35,7 @@ async def _credentials(provider_id: str) -> tuple[str, str]:
 
 
 def _reviewer(handler) -> GeminiReviewer:
-    return GeminiReviewer(credentials_for=_credentials, transport=httpx.MockTransport(handler))
+    return GeminiReviewer(credentials_for=_credentials, backoff_seconds=0, transport=httpx.MockTransport(handler))
 
 
 async def test_the_final_is_sent_inline_and_the_answer_becomes_the_assessment(tmp_path):
@@ -86,3 +86,19 @@ async def test_gemini_routes_are_watched_and_local_routes_keep_their_method():
     assert await routed.assess(route=GEMINI, evidence=None) == "gemini"
     assert await routed.assess(route=ROUTE, evidence=None) == "local"
     assert review_method(GEMINI) == WATCH
+
+
+async def test_an_overloaded_model_is_asked_again_before_the_review_fails(tmp_path):
+    answers = iter(
+        [
+            httpx.Response(503, json={"error": "high demand"}),
+            httpx.Response(200, json={"candidates": [{"content": {"parts": [{"text": json.dumps(ANSWER)}]}}]}),
+        ]
+    )
+    reviewer = GeminiReviewer(
+        credentials_for=_credentials, backoff_seconds=0, transport=httpx.MockTransport(lambda request: next(answers))
+    )
+
+    review = await reviewer.assess(route=GEMINI, evidence=_evidence(tmp_path))
+
+    assert review.outcome == "COMPLETED"
