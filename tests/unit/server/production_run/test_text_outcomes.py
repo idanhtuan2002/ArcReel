@@ -299,3 +299,36 @@ async def test_a_stale_rebuild_is_not_regenerated_automatically(tasks, monkeypat
 
     with pytest.raises(OwnerBlocked, match="SCRIPT_PLAN_REBUILD_REQUIRED"):
         await adapter.inspect(intent=_intent(RunStage.SCRIPT_PLAN), receipt=_intent(RunStage.SCRIPT_PLAN).input_refs[0])
+
+
+def _quarantined(tmp_path, monkeypatch):
+    draft = tmp_path / "script_plan_segments.invalid.json"
+    draft.write_text("{}", encoding="utf-8")
+    monkeypatch.setattr(text_adapter, "script_plan_quarantine_path", lambda path, project, episode: draft)
+    blocked = _status(A.NONE, blockers=[WorkflowBlocker(code="script_plan_quarantined", path="p", reason="r")])
+    return draft, Statuses({1: [blocked, _status(A.PREPARE_SCRIPT_PLAN)]})
+
+
+async def test_a_script_plan_this_run_had_quarantined_is_set_aside_and_generated_again(tasks, monkeypatch, tmp_path):
+    draft, statuses = _quarantined(tmp_path, monkeypatch)
+    adapter = _adapter(ScriptPlanAdapter, statuses, monkeypatch)
+    intent = _intent(RunStage.SCRIPT_PLAN)
+    tasks.tasks["script-plan:1"] = {"status": "failed"}
+
+    waiting = await adapter.inspect(intent=intent, receipt=intent.input_refs[0])
+
+    assert waiting.kind == "WAIT"
+    assert [sub for sub, *_ in tasks.submitted] == ["script-plan:1#attempt-2"]
+    assert not draft.exists()
+    assert (tmp_path / "script_plan_segments.invalid.json.rejected-1").exists()
+
+
+async def test_a_quarantined_draft_no_failed_task_of_the_run_left_stays_for_the_human(tasks, monkeypatch, tmp_path):
+    draft, statuses = _quarantined(tmp_path, monkeypatch)
+    adapter = _adapter(ScriptPlanAdapter, statuses, monkeypatch)
+    intent = _intent(RunStage.SCRIPT_PLAN)
+
+    with pytest.raises(OwnerBlocked, match="WORKFLOW_SCRIPT_PLAN_QUARANTINED"):
+        await adapter.inspect(intent=intent, receipt=intent.input_refs[0])
+    assert draft.exists()
+    assert tasks.submitted == []

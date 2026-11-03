@@ -27,7 +27,7 @@ from typing import Any
 from lib.config.resolver import ConfigResolver
 from lib.project_manager import ProjectManager
 from lib.script_batch_edit import script_revision as batch_script_revision
-from lib.script_review import content_fingerprint, script_plan_path
+from lib.script_review import content_fingerprint, script_plan_path, script_plan_quarantine_path
 from lib.speech_composition import SpeechProblemCode, admit_script_unit
 from lib.text_backends.base import TextTaskType
 from lib.workflow_state import WorkflowActionType, WorkflowStateService, WorkflowStatus
@@ -205,6 +205,8 @@ class WorkflowStageAdapter:
                 if action.type is A.WAIT_FOR_TASK:
                     return None
                 if status.blockers:
+                    if await self._set_aside_rejected(intent, status, episode):
+                        continue
                     raise OwnerBlocked("WORKFLOW_" + status.blockers[0].code.upper())
                 raise OwnerBlocked("WORKFLOW_" + action.type.value.upper())
             if rank > self.done_rank:
@@ -218,6 +220,22 @@ class WorkflowStageAdapter:
 
     async def _settle(self, intent: DispatchIntent, status: WorkflowStatus) -> None:
         """Last owner edits before the stage's output is pinned; none by default."""
+
+    async def _set_aside_rejected(self, intent: DispatchIntent, status: WorkflowStatus, episode: int | None) -> bool:
+        """Clear a blocker left by this run's own rejected output so the next attempt can run; none by default."""
+        return False
+
+    async def _failed_attempt(self, intent: DispatchIntent, sub_key: str) -> int | None:
+        """The attempt number of the sub-command's latest task when that task failed, else ``None``."""
+        latest: tuple[int, dict[str, Any]] | None = None
+        for attempt in range(1, self.max_task_attempts + 1):
+            task = await find_task(self._sessions, intent, sub_key if attempt == 1 else f"{sub_key}#attempt-{attempt}")
+            if task is None:
+                break
+            latest = (attempt, task)
+        if latest is None or latest[1]["status"] != "failed":
+            return None
+        return latest[0]
 
     async def _submit_once(
         self,
@@ -400,6 +418,21 @@ class ScriptPlanAdapter(WorkflowStageAdapter):
         if (current := self._plan_revision(project_path, intent.scope.project_name, episode)) != revision:
             raise OwnerBlocked("EXTERNAL_INPUT_CHANGED" if current is not None else "OWNER_OUTPUT_MISSING")
         await self._confirm_plan(intent.scope.project_name, episode)
+
+    async def _set_aside_rejected(self, intent: DispatchIntent, status: WorkflowStatus, episode: int | None) -> bool:
+        """A script plan this run generated and the owner quarantined is renamed beside it (kept as evidence) and
+        generated again under the next attempt; a draft no failed task of this run left is the Human's."""
+        if episode is None or status.blockers[0].code != "script_plan_quarantined":
+            return False
+        attempt = await self._failed_attempt(intent, f"script-plan:{episode}")
+        if attempt is None or attempt >= self.max_task_attempts:
+            return False
+        project_path = self._projects.get_project_path(intent.scope.project_name)
+        path = script_plan_quarantine_path(project_path, self._project(intent.scope.project_name), episode)
+        if path is None or not path.exists():
+            return False
+        path.rename(path.with_name(f"{path.name}.rejected-{attempt}"))
+        return True
 
     def _plan_revision(self, project_path: Path, project_name: str, episode: int) -> str | None:
         path = script_plan_path(project_path, self._project(project_name), episode)
