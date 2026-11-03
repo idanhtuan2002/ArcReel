@@ -243,3 +243,26 @@ def test_first_token_probability_normalises_between_the_two_answers() -> None:
     assert first_token_probability(None, yes="yes", no="no") is None
     assert illustration_findings([0.1, 0.1, None], unit_key="e")[0].code == "FRAMES_NOT_ILLUSTRATING_NARRATION"
     assert illustration_findings([0.2, 0.1], unit_key="e") == []
+
+
+def test_the_questions_method_needs_most_frames_upside_down():
+    from server.production_run.evaluators import (
+        MIN_FLIPPED_FRAMES_QUESTIONS,
+        PROBABILITIES,
+        QUESTIONS,
+        _min_flipped,
+        frame_answer_findings,
+    )
+
+    reflections = [False, False, True, False, True, True, False, False]
+    flipped_final = [False, True, True, True, True, True, True, True]
+    illustrated = [True] * 8
+
+    def codes(flipped: list[bool | None], method: str) -> list[str]:
+        found = frame_answer_findings(flipped, illustrated, unit_key="episode:1", min_flipped=_min_flipped(method))
+        return [f.code for f in found]
+
+    assert MIN_FLIPPED_FRAMES_QUESTIONS == 5
+    assert codes(reflections, QUESTIONS) == []
+    assert codes(flipped_final, QUESTIONS) == ["FRAME_UPSIDE_DOWN"]
+    assert codes(reflections, PROBABILITIES) == ["FRAME_UPSIDE_DOWN"]

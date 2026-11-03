@@ -58,6 +58,9 @@ ORIENTATION_QUESTION = (
     "Which one is upright, A or B? Answer with exactly one letter: A or B."
 )
 MIN_FLIPPED_FRAMES = 2
+#: The questions method asks "upside down?" of each frame alone; a reflection or an aerial shot draws a few false
+#: yes answers, while a really flipped final draws one on nearly every frame, so it needs more than half of them.
+MIN_FLIPPED_FRAMES_QUESTIONS = 5
 MIN_BROKEN_FRAMES = 2
 MIN_MISMATCHED_FRAMES = 2
 
@@ -158,6 +161,7 @@ def frame_answer_findings(
     broken: list[bool | None] | None = None,
     *,
     unit_key: str,
+    min_flipped: int = MIN_FLIPPED_FRAMES,
 ) -> list[AssessmentFinding]:
     """Findings from the reviewer's one-picture answers: broken, upside-down and non-illustrating frames."""
     found: list[AssessmentFinding] = []
@@ -174,7 +178,7 @@ def frame_answer_findings(
                 detail=f"{damaged} frames black, noisy or a test pattern",
             )
         )
-    if upside_down >= MIN_FLIPPED_FRAMES:
+    if upside_down >= min_flipped:
         found.append(
             AssessmentFinding(
                 code="FRAME_UPSIDE_DOWN",
@@ -274,6 +278,10 @@ class QualifiedEvaluator(Protocol):
     async def assess(self, *, route: ModelRoute, evidence: FinalEvidence) -> ModelAssessment: ...
 
 
+def _min_flipped(method: str) -> int:
+    return MIN_FLIPPED_FRAMES_QUESTIONS if method == QUESTIONS else MIN_FLIPPED_FRAMES
+
+
 def prompt_digest(method: str = QUESTIONS) -> str:
     """The digest of everything a reviewer of ``method`` is asked and the fixed rules applied to its answers."""
     questions = (
@@ -289,7 +297,7 @@ def prompt_digest(method: str = QUESTIONS) -> str:
                 "prompt": PROMPT,
                 "schema": SCHEMA,
                 "questions": questions,
-                "thresholds": [MIN_BROKEN_FRAMES, MIN_FLIPPED_FRAMES, MIN_MISMATCHED_FRAMES],
+                "thresholds": [MIN_BROKEN_FRAMES, _min_flipped(method), MIN_MISMATCHED_FRAMES],
                 "probabilities": [PROBABILITY_CUT, MAX_MEAN_ILLUSTRATES] if method == PROBABILITIES else None,
                 "frames": [FRAME_COUNT, FRAME_WIDTH],
             }
@@ -475,7 +483,9 @@ class OllamaReviewer:
                 response = await client.post(url + "/api/chat", json=body)
             response.raise_for_status()
             answer = json.loads(response.json()["message"]["content"])
-            checks += frame_answer_findings(flipped, illustrates, broken, unit_key=evidence.unit_key)
+            checks += frame_answer_findings(
+                flipped, illustrates, broken, unit_key=evidence.unit_key, min_flipped=_min_flipped(method)
+            )
             if method == PROBABILITIES:
                 checks += illustration_findings(illustrating, unit_key=evidence.unit_key)
             return ModelAssessment.model_validate(
