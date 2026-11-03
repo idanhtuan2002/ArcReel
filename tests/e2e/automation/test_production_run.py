@@ -36,6 +36,7 @@ from r2.contracts.automation import ModelRoute
 from server import auth
 from server.production_run.composition import ProjectPolicyResolver, device_admission_from_env
 from server.production_run.evaluators import OllamaReviewer, provider_base_url
+from server.production_run.gemini_reviewer import GeminiReviewer, RoutedReviewer, provider_credentials
 from tests.integration.server.services.test_automation_grants import interactive_env as interactive_env
 
 pytestmark = [
@@ -51,7 +52,19 @@ OLLAMA = "http://127.0.0.1:11434"
 COMFYUI = "http://127.0.0.1:8188"
 TTS = "http://127.0.0.1:23340/v1"
 WRITER = "qwen3.5-vimax:9b"
-REVIEWERS = {"reviewer_a": "qwen2.5vl:7b", "reviewer_b": "gemma3:4b"}
+LOCAL_REVIEWERS = {"reviewer_a": "qwen2.5vl:7b", "reviewer_b": "gemma3:4b"}
+GEMINI_REVIEWERS = {"reviewer_a": "gemini-3.8-flash", "reviewer_b": "gemini-3.6-flash"}
+GEMINI_KEY_FILE = os.environ.get("ARCREEL_E2E_GEMINI_KEY_FILE")
+#: Reviewers watch the final on Gemini when a key file is given, otherwise run locally on Ollama.
+REVIEWERS = GEMINI_REVIEWERS if GEMINI_KEY_FILE else LOCAL_REVIEWERS
+GEMINI_BASE_URL = "https://generativelanguage.googleapis.com"
+
+
+def _gemini_key() -> str:
+    assert GEMINI_KEY_FILE
+    return Path(GEMINI_KEY_FILE).read_text(encoding="utf-8").strip()
+
+
 ACTIVE = {"PENDING", "RUNNING", "WAITING_TASK", "CANCELLING"}
 IDEA = "Một cậu bé ở làng chài miền Trung nhặt được chiếc chai có lá thư của người cha đã mất tích ngoài biển."
 
@@ -109,8 +122,23 @@ async def _configure_providers(sessions) -> None:
             ]
         )
         await session.flush()
-        for model in (WRITER, *REVIEWERS.values()):
+        for model in (WRITER, *LOCAL_REVIEWERS.values()):
             session.add(CustomProviderModel(provider_id=1, model_id=model, display_name=model, endpoint="ollama-chat"))
+        if GEMINI_KEY_FILE:
+            session.add(
+                CustomProvider(
+                    id=4,
+                    display_name="Gemini AI Studio",
+                    discovery_format="google",
+                    base_url=GEMINI_BASE_URL,
+                    api_key=_gemini_key(),
+                )
+            )
+            await session.flush()
+            for model in GEMINI_REVIEWERS.values():
+                session.add(
+                    CustomProviderModel(provider_id=4, model_id=model, display_name=model, endpoint="gemini-generate")
+                )
         session.add(
             CustomProviderModel(
                 provider_id=2,
@@ -167,7 +195,24 @@ def _automation_settings(profile: dict) -> dict:
         {"role": "writer", "provider_id": "custom-1", "model_id": WRITER, "model_identity": _ollama_identity(WRITER)},
         {"role": "script", "provider_id": "custom-1", "model_id": WRITER, "model_identity": _ollama_identity(WRITER)},
         *(
-            {"role": role, "provider_id": "custom-1", "model_id": model, "model_identity": _ollama_identity(model)}
+            (
+                {
+                    "role": role,
+                    "provider_id": "custom-4",
+                    "model_id": model,
+                    "model_identity": f"gemini/{model}",
+                    "local": False,
+                    "paid": True,
+                    "max_cost_per_call": 5,
+                }
+                if GEMINI_KEY_FILE
+                else {
+                    "role": role,
+                    "provider_id": "custom-1",
+                    "model_id": model,
+                    "model_identity": _ollama_identity(model),
+                }
+            )
             for role, model in REVIEWERS.items()
         ),
         {
@@ -192,9 +237,9 @@ def _automation_settings(profile: dict) -> dict:
     return {
         **profile,
         "launch_profile_id": "fiction_narration_vi_v1",
-        "local_only": True,
-        "paid": False,
-        "routes": [{**route, "local": True, "paid": False} for route in routes],
+        "local_only": not GEMINI_KEY_FILE,
+        "paid": bool(GEMINI_KEY_FILE),
+        "routes": [{"local": True, "paid": False, **route} for route in routes],
         "voice_available": True,
         "required_disk_bytes": 8 * 1024**3,
         "required_gpu_bytes": 7 * 1024**3,
@@ -217,7 +262,10 @@ async def _qualify_reviewers(sessions, projects: ProjectManager, corpus: Path, o
         record = await qualify(
             corpus=corpus,
             route=ModelRoute.model_validate(route),
-            evaluator=OllamaReviewer(base_url_for=provider_base_url(sessions)),
+            evaluator=RoutedReviewer(
+                local=OllamaReviewer(base_url_for=provider_base_url(sessions)),
+                gemini=GeminiReviewer(credentials_for=provider_credentials(sessions)),
+            ),
             output=output / route.role,
             profile_digest=settings["profile_digest"],
             launch_profile_id=settings["launch_profile_id"],
@@ -273,7 +321,7 @@ async def e2e_sessions():
 def _require_services(corpus: Path) -> None:
     """Fail before any long step when a provider, a model or the corpus is missing."""
     names = {item["name"] for item in httpx.get(f"{OLLAMA}/api/tags", timeout=10).json()["models"]}
-    missing = {WRITER, *REVIEWERS.values()} - names
+    missing = {WRITER, *(() if GEMINI_KEY_FILE else REVIEWERS.values())} - names
     assert not missing, f"Ollama models missing: {sorted(missing)}"
     httpx.get(f"{COMFYUI}/system_stats", timeout=10).raise_for_status()
     httpx.get(TTS.removesuffix("/v1") + "/health", timeout=10).raise_for_status()
