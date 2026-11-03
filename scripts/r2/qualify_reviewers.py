@@ -24,6 +24,7 @@ from lib.config.resolver import ConfigResolver
 from lib.db import async_session_factory
 from lib.db.repositories.reviewer_qualifications import ReviewerQualificationRepository
 from lib.project_manager import get_project_manager
+from r2.automation.assessment import ModelAssessment
 from r2.automation.profiles import reviewer_is_qualified
 from r2.contracts.automation import ModelRoute, QualificationCase, ReviewerQualification
 from server.production_run.composition import ProjectPolicyResolver
@@ -70,6 +71,26 @@ def _receipt(output: Path, name: str, body: str) -> tuple[str, str]:
     return receipt.name, _digest(receipt)
 
 
+def _reusable_review(
+    receipt: Path, *, route: ModelRoute, evidence: FinalEvidence, method_digest: str
+) -> ModelAssessment | None:
+    """A review stored by an earlier qualification of the same model, review method and case evidence; such a review
+    is the answer this reviewer gives (reviews run at temperature 0), so it is not asked again."""
+    if not receipt.is_file():
+        return None
+    try:
+        review = ModelAssessment.model_validate_json(receipt.read_text(encoding="utf-8"))
+    except ValueError:
+        return None
+    if (review.model_identity, review.prompt_digest, review.evidence_digest) != (
+        route.model_identity,
+        method_digest,
+        evidence_digest(evidence),
+    ):
+        return None
+    return review
+
+
 def cannot_qualify(cases: list[QualificationCase], clean_totals: dict[str, int]) -> bool:
     """True once the answers so far already break the rule: an accepted defect, or too many rejected clean cases."""
     for case in cases:
@@ -95,6 +116,7 @@ async def qualify(
 ) -> ReviewerQualification:
     """The reviewer's record over the corpus; with ``stop_early`` it ends at the first answer that rules it out."""
     cases: list[QualificationCase] = []
+    method_digest = prompt_digest(review_method(route))
     prepared = _evidence(corpus, output)
     clean_totals: dict[str, int] = {}
     for case, _ in prepared:
@@ -103,10 +125,11 @@ async def qualify(
     for case, evidence in prepared:
         if stop_early and cannot_qualify(cases, clean_totals):
             break
-        review = await evaluator.assess(route=route, evidence=evidence)
-        name, digest = _receipt(
-            output, f"{case['case_id']}.{route.model_identity.replace('/', '_')}.json", review.model_dump_json()
-        )
+        receipt_name = f"{case['case_id']}.{route.model_identity.replace('/', '_')}.json"
+        review = _reusable_review(output / receipt_name, route=route, evidence=evidence, method_digest=method_digest)
+        if review is None:
+            review = await evaluator.assess(route=route, evidence=evidence)
+        name, digest = _receipt(output, receipt_name, review.model_dump_json())
         cases.append(
             QualificationCase(
                 split=case["split"],
@@ -125,7 +148,7 @@ async def qualify(
         model_id=route.model_id,
         model_identity=route.model_identity,
         config_digest=route.config_digest,
-        prompt_digest=prompt_digest(review_method(route)),
+        prompt_digest=method_digest,
         cases=tuple(cases),
     )
 

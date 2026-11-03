@@ -5,7 +5,8 @@ klein and Wan 2.2) and the VieNeu TTS shim running, and ``ARCREEL_E2E_REVIEWER_C
 manifest, and ``ARCREEL_DATA_DIR`` naming an empty projects directory. The host is the real app lifespan with run delegation activated over fixture governance custody. Setup
 does what a release owner does once per project: configure the launch profile's routes, publish the automatic
 Quality profile, qualify both reviewers on the blind corpus and record the launch qualification. The run itself is
-driven only through the public API. A record of the run is written to ``ARCREEL_E2E_EVIDENCE`` when set.
+driven only through the public API. A record of the run is written to ``ARCREEL_E2E_EVIDENCE`` when set; review receipts
+go to ``ARCREEL_E2E_REVIEW_DIR`` when set, where a later run reuses those of the same model, method and case.
 """
 
 from __future__ import annotations
@@ -345,7 +346,8 @@ async def test_new_idea_reaches_current_quality_pass_and_export(e2e_sessions, tm
         project["speech_rate_units_per_second"] = 3.6
 
     projects.update_project("project", configure)
-    evidence["reviewer_qualification"] = await _qualify_reviewers(sessions, projects, corpus, tmp_path / "reviews")
+    reviews = Path(os.environ.get("ARCREEL_E2E_REVIEW_DIR") or tmp_path / "reviews")
+    evidence["reviewer_qualification"] = await _qualify_reviewers(sessions, projects, corpus, reviews)
     assert all(item["qualified"] for item in evidence["reviewer_qualification"].values()), "reviewers not qualified"
 
     monkeypatch.setenv("ARCREEL_GPU_ADMISSION_PROBES", f"ollama={OLLAMA},comfyui={COMFYUI}")

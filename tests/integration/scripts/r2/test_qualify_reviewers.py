@@ -170,3 +170,39 @@ def test_too_many_rejected_clean_cases_rule_a_route_out():
 
     assert not cannot_qualify([case(0, False), case(1, False)], {"HOLDOUT": 10})
     assert cannot_qualify([case(0, False), case(1, False), case(2, False)], {"HOLDOUT": 10})
+
+
+class FaithfulReviewer(Reviewer):
+    """Stamps the review with the real review-method and evidence digests, as the production evaluators do."""
+
+    async def assess(self, *, route, evidence):
+        from server.production_run.evaluators import evidence_digest, prompt_digest, review_method
+
+        review = await super().assess(route=route, evidence=evidence)
+        return review.model_copy(
+            update={
+                "prompt_digest": prompt_digest(review_method(route)),
+                "evidence_digest": evidence_digest(evidence),
+            }
+        )
+
+
+async def test_a_stored_review_of_the_same_model_method_and_evidence_is_reused(tmp_path: Path):
+    first = FaithfulReviewer()
+    await _run(tmp_path, first)
+    again = FaithfulReviewer()
+
+    record = await _run(tmp_path, again)
+
+    assert len(first.seen) == 40
+    assert again.seen == []
+    assert reviewer_is_qualified(record)
+
+
+async def test_a_stored_review_of_another_method_is_asked_again(tmp_path: Path):
+    await _run(tmp_path, Reviewer())
+    again = FaithfulReviewer()
+
+    await _run(tmp_path, again)
+
+    assert len(again.seen) == 40
