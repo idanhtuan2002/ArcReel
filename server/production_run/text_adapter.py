@@ -18,7 +18,8 @@ current revision is an external input change.
 from __future__ import annotations
 
 import asyncio
-from collections.abc import Awaitable, Callable
+import re
+from collections.abc import Awaitable, Callable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -411,9 +412,32 @@ class ScriptPlanAdapter(WorkflowStageAdapter):
         return revision_receipt(self.owner, f"episode:{episode}:script-plan", revision)
 
 
-def _narration_segment_fixes(segment: dict[str, Any]) -> dict[str, Any]:
-    """The prompt fields to replace on one narration segment (see ``ScriptAdapter._settle``); empty when none."""
+def _named_characters(text: str, characters: Sequence[str]) -> list[str]:
+    """Registered character names that occur in ``text`` as whole, case-sensitive words; a name inside a longer
+    matched name ("Nam" in "Mẹ Nam") does not count."""
+    taken: list[tuple[int, int]] = []
+    found: list[str] = []
+    for name in sorted(characters, key=len, reverse=True):
+        pattern = re.compile(rf"(?<!\w){re.escape(name)}(?!\w)")
+        spans = [
+            m.span()
+            for m in pattern.finditer(text)
+            if not any(start <= m.start() and m.end() <= end for start, end in taken)
+        ]
+        if spans:
+            taken.extend(spans)
+            found.append(name)
+    return found
+
+
+def _narration_segment_fixes(segment: dict[str, Any], characters: Sequence[str] = ()) -> dict[str, Any]:
+    """The fields to replace on one narration segment (see ``ScriptAdapter._settle``); empty when none."""
     fields: dict[str, Any] = {}
+    listed = segment.get("characters_in_segment")
+    if isinstance(listed, list):
+        named = [n for n in _named_characters(str(segment.get("novel_text") or ""), characters) if n not in listed]
+        if named:
+            fields["characters_in_segment"] = [*listed, *named]
     novel_text = str(segment.get("novel_text") or "").strip()
     image_prompt = segment.get("image_prompt")
     scene = ""
@@ -461,6 +485,8 @@ class ScriptAdapter(WorkflowStageAdapter):
 
         - a segment whose only speech problem is a character line also written into ``video_prompt`` loses that
           line; the narrator already reads it in ``novel_text``;
+        - a registered character named in ``novel_text`` but missing from ``characters_in_segment`` is added, so the
+          storyboard receives its reference sheet;
         - an empty ``image_prompt.scene`` or ``video_prompt.action`` is filled from the segment's own text
           (``novel_text``, or the scene for the action), since media refuses empty prompts.
 
@@ -469,10 +495,13 @@ class ScriptAdapter(WorkflowStageAdapter):
             return
         name = intent.scope.project_name
         script = await asyncio.to_thread(self._projects.load_script, name, status.target.script_filename)
+        project = await asyncio.to_thread(self._projects.load_project, name)
+        registered = project.get("characters")
+        characters = [str(n) for n in registered] if isinstance(registered, dict) else []
         operations = []
         for segment in script.get("segments") or []:
             if isinstance(segment, dict):
-                fields = _narration_segment_fixes(segment)
+                fields = _narration_segment_fixes(segment, characters)
                 if fields:
                     operations.append({"op": "update", "id": segment["segment_id"], "fields": fields})
         if not operations:

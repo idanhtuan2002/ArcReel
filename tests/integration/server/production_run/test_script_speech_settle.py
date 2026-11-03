@@ -99,3 +99,15 @@ async def test_empty_prompts_are_filled_from_the_segments_own_text(tmp_path):
     [segment] = projects.load_script("project", "episode_1.json")["segments"]
     assert segment["image_prompt"]["scene"] == SEGMENT["novel_text"]
     assert segment["video_prompt"]["action"] == SEGMENT["novel_text"]
+
+
+async def test_a_registered_character_named_in_the_text_is_added_to_the_segment(tmp_path):
+    unlisted = {**copy.deepcopy(SEGMENT), "needs_replan": False, "characters_in_segment": []}
+    unlisted["video_prompt"]["dialogue"] = []
+    projects = await _project(tmp_path, [unlisted])
+    adapter = ScriptAdapter(None, authority=None, projects=projects, resolver=None)
+
+    await adapter._settle(_intent(), _status(projects))
+
+    [segment] = projects.load_script("project", "episode_1.json")["segments"]
+    assert segment["characters_in_segment"] == ["Nam"]
