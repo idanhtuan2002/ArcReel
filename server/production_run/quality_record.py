@@ -187,7 +187,7 @@ async def record_quality(
     )
     async with sessions() as session, session.begin():
         await authority.require_locked(session, subject=principal_subject)
-        for observation in observations:
+        observations = [
             await ModelObservationRepository(session).record(
                 user_id=scope.user_id,
                 project_name=scope.project_name,
@@ -195,6 +195,8 @@ async def record_quality(
                 profile=profile,
                 observation=observation,
             )
+            for observation in observations
+        ]
 
     async def guard(session) -> None:
         if session is None:

@@ -9,6 +9,7 @@ import sqlalchemy as sa
 
 from lib.db.models.production_run import ModelObservationModel
 from lib.db.models.quality_dispositions import QualityDispositionModel
+from lib.db.repositories.model_observations import ModelObservationRepository
 from lib.db.repositories.production_runs import ProductionRunRepository
 from lib.db.repositories.quality_dispositions import QualityDispositionRepository
 from lib.db.repositories.reviewer_qualifications import ReviewerQualificationRepository
@@ -199,6 +200,48 @@ async def test_two_qualified_accepting_reviews_pass_the_final(quality_host):
     assert (disposition.decision, disposition.issuer_id) == ("PASS", automation_principal(host.run.run_id))
     assert disposition.waiver_bindings == ()
     assert len(observations) == 4
+
+
+async def test_a_replayed_observation_keeps_its_first_recording_and_other_changes_conflict(quality_host):
+    from datetime import UTC, datetime
+
+    import r2.contracts.quality as q
+
+    host, controller, render, quality, _reviewer = quality_host
+    await _qualify(host)
+    await _to_quality(host, controller, render)
+    await _review(host, controller, quality)
+    async with host.sessions() as session:
+        row = (await session.execute(sa.select(ModelObservationModel))).scalars().first()
+        assert row is not None
+        stored = q.NarrativeObservation.model_validate_json(row.observation_json)
+        profile = await _profile(host, row)
+    replay = stored.model_copy(update={"observed_at": datetime.now(UTC)})
+    changed = replay.model_copy(update={"status": q.ObservationStatus.FAIL})
+
+    async with host.sessions() as session, session.begin():
+        repository = ModelObservationRepository(session)
+        kept = await repository.record(
+            user_id="default", project_name="project", run_id=row.run_id, profile=profile, observation=replay
+        )
+        with pytest.raises(ValueError, match="MODEL_OBSERVATION_REPLAY_CONFLICT"):
+            await repository.record(
+                user_id="default", project_name="project", run_id=row.run_id, profile=profile, observation=changed
+            )
+
+    assert kept == stored
+
+
+async def _profile(host, row):
+    from server.production_run.quality_record import published_profile
+
+    return await published_profile(
+        host.sessions,
+        user_id="default",
+        project_name="project",
+        profile_id=row.profile_id,
+        profile_digest=row.profile_digest,
+    )
 
 
 async def test_reviewer_exception_never_passes_quality(quality_host):

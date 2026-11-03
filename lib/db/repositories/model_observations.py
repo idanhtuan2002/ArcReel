@@ -1,4 +1,7 @@
-"""MODEL observations of qualified reviewer routes: append-only and replay-exact."""
+"""MODEL observations of qualified reviewer routes: append-only and replay-exact.
+
+A replay of a recorded observation keeps the first recording's ``observed_at``; any other difference conflicts.
+"""
 
 from __future__ import annotations
 
@@ -37,14 +40,17 @@ class ModelObservationRepository:
         run_id: str,
         profile: q.QualityProfileRevision,
         observation: q.NarrativeObservation,
-    ) -> str:
+    ) -> q.NarrativeObservation:
+        """The observation as stored: the new one, or the first recording when this one replays it."""
         observation = q.NarrativeObservation.model_validate(observation)
-        digest = compute_digest(DOMAIN, observation)
         prior = await self.session.get(ModelObservationModel, (user_id, project_name, observation.observation_id))
         if prior is not None:
-            if prior.observation_digest != digest:
+            stored = q.NarrativeObservation.model_validate_json(prior.observation_json)
+            replay = observation.model_copy(update={"observed_at": stored.observed_at})
+            if compute_digest(DOMAIN, replay) != prior.observation_digest:
                 raise ValueError("MODEL_OBSERVATION_REPLAY_CONFLICT")
-            return digest
+            return stored
+        digest = compute_digest(DOMAIN, observation)
         self.session.add(
             ModelObservationModel(
                 user_id=user_id,
@@ -61,7 +67,7 @@ class ModelObservationRepository:
             )
         )
         await self.session.flush()
-        return digest
+        return observation
 
     async def get(self, *, user_id: str, project_name: str, observation_id: str) -> StoredModelObservation | None:
         row = await self.session.get(ModelObservationModel, (user_id, project_name, observation_id))
