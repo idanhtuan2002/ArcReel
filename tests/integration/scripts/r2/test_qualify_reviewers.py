@@ -8,7 +8,7 @@ from pathlib import Path
 from r2.automation.assessment import ModelAssessment
 from r2.automation.profiles import reviewer_is_qualified
 from r2.contracts.automation import ModelRoute, QualificationCase
-from scripts.r2.qualify_reviewers import cannot_qualify, qualify
+from server.production_run.qualification import cannot_qualify, qualify
 
 ROUTE = ModelRoute(
     role="reviewer_a",

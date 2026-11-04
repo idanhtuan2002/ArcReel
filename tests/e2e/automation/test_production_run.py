@@ -248,7 +248,7 @@ def _automation_settings(profile: dict) -> dict:
 
 async def _qualify_reviewers(sessions, projects: ProjectManager, corpus: Path, output: Path) -> dict:
     from lib.config.resolver import ConfigResolver
-    from scripts.r2.qualify_reviewers import qualify
+    from server.production_run.qualification import qualify
 
     routes = await ProjectPolicyResolver(sessions, projects=projects, resolver=ConfigResolver(sessions)).routes(
         "project"
@@ -347,7 +347,7 @@ def _write_evidence(record: dict) -> None:
 
 async def test_new_idea_reaches_current_quality_pass_and_export(e2e_sessions, tmp_path, interactive_env, monkeypatch):
     import server.app as app_module
-    from scripts.r2.record_launch_qualification import build_record
+    from server.production_run.qualification import build_record
     from server.services.governance_attestation import serve_governance_attestor
     from server.tool_runtime import CallerContext, CreateProjectToolRequest, Services, ToolRequest, create_project
     from tests.integration.r2.governance.test_activated_governance_startup import _configure_lifespan
