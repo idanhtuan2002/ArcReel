@@ -80,7 +80,7 @@ class Host:
     def headers(self) -> dict[str, str]:
         return {"Authorization": f"Bearer {auth.create_token('actor')}"}
 
-    async def start(self, *, command_id="start-command-1", mode="auto", idea="Chuyến đò cuối."):
+    async def start(self, *, command_id="start-command-1", mode="auto", idea="Chuyến đò cuối.", targets=None):
         offer = (await self.http.get(BASE, headers=self.headers)).json()["start"]
         body = {
             "command_id": command_id,
@@ -89,6 +89,8 @@ class Host:
             "expected_input_digest": offer["input_digest"],
             "policy_digest": offer["policy_digests"][mode],
         }
+        if targets is not None:
+            body["targets"] = targets
         return await self.http.post(BASE, json=body, headers=self.headers)
 
     async def command(self, run: dict, action: str, *, command_id: str, **changes):
@@ -153,6 +155,16 @@ async def test_double_start_and_lost_response_retry_return_one_run_and_one_grant
     assert grant.principal != "actor"
     runs = (await host.http.get(BASE, headers=host.headers)).json()["runs"]
     assert [run["run_id"] for run in runs] == [first.json()["run_id"]]
+
+
+async def test_the_offer_names_the_episode_limit_and_a_start_beyond_it_is_refused(host):
+    offer = (await host.http.get(BASE, headers=host.headers)).json()["start"]
+
+    refused = await host.start(targets=["episode:1", "episode:2"])
+
+    assert offer["max_target_episodes"] == 1
+    assert refused.status_code == 422, refused.text
+    assert (await host.http.get(BASE, headers=host.headers)).json()["runs"] == []
 
 
 async def test_same_start_command_with_a_changed_idea_conflicts(host):

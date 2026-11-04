@@ -286,6 +286,8 @@ export class ApiRequestError extends Error {
     public readonly status?: number,
     /** 后端 detail 为 `{code, ...}` 时的稳定错误码，供调用方映射本地化文案。 */
     public readonly code?: string,
+    /** 后端 detail 原样保留（如 `{code, reasons}`），供调用方读取错误码以外的字段。 */
+    public readonly detail?: unknown,
   ) {
     super(message);
     this.name = "ApiRequestError";
@@ -597,6 +599,7 @@ async function throwIfNotOk(response: Response, fallbackMsg: string): Promise<vo
       error.diagnostic,
       response.status,
       codeFromDetail(detail),
+      detail,
     );
   }
 }
@@ -983,6 +986,7 @@ class API {
         error.diagnostic,
         response.status,
         codeFromDetail(error.detail),
+        error.detail,
       );
     }
 

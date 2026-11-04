@@ -16,6 +16,7 @@ export interface StartCommand {
   command_id: string;
   mode: AutomationMode;
   idea: string;
+  targets: string[];
   expected_input_digest: string;
   policy_digest: string;
 }

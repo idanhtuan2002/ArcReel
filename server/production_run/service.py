@@ -126,16 +126,15 @@ class ProductionRunService:
         """The digests a Start command must carry; nothing is resolved while activation is disabled."""
         if not self.activation.enabled:
             return {"enabled": False, "reason": self.activation.reason}
-        policies = {
-            mode.value: policy_digest(
-                await self._policies.resolve(user_id=user_id, project_name=project_name, mode=mode)
-            )
+        resolved = {
+            mode: await self._policies.resolve(user_id=user_id, project_name=project_name, mode=mode)
             for mode in AutomationMode
         }
         return {
             "enabled": True,
             "input_digest": await self._witness.digest(user_id=user_id, project_name=project_name),
-            "policy_digests": policies,
+            "policy_digests": {mode.value: policy_digest(policy) for mode, policy in resolved.items()},
+            "max_target_episodes": resolved[AutomationMode.AUTO].max_target_episodes,
         }
 
     # Commands ------------------------------------------------------------------------------------------------
@@ -187,6 +186,8 @@ class ProductionRunService:
             )
             if policy_digest(policy) != command.policy_digest:
                 raise ProductionRunRefused("POLICY_MOVED")
+            if len(set(command.targets)) != len(command.targets) or len(command.targets) > policy.max_target_episodes:
+                raise ProductionRunRefused("TARGETS_OVER_LIMIT", 422, (str(policy.max_target_episodes),))
             current_input = await self._witness.digest(user_id=command.user_id, project_name=command.project_name)
             if current_input != command.expected_input_digest:
                 raise ProductionRunRefused("INPUT_MOVED")

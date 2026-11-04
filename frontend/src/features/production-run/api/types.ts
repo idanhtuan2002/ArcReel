@@ -95,6 +95,8 @@ export interface StartOffer {
   reason?: string;
   input_digest?: string;
   policy_digests?: Record<AutomationMode, string>;
+  /** Episodes one run of this project may produce (1 unless the project's settings allow more). */
+  max_target_episodes?: number;
 }
 
 export interface RunList {

@@ -59,6 +59,8 @@ from server.story_authoring.service import StoryAuthoringService
 
 type Sessions = async_sessionmaker[AsyncSession]
 ACTIVATION_ENV = "ARCREEL_AUTOMATIC_PRODUCTION"
+#: Ceiling on the episodes one automatic run may produce, whatever a project's settings ask for.
+MAX_TARGET_EPISODES = 12
 
 
 def activation_from_env() -> ProductionActivation:
@@ -122,6 +124,7 @@ class ProjectPolicyResolver:
                 "max_model_calls": int(settings.get("max_model_calls", 1500)),
                 "max_tasks": int(settings.get("max_tasks", 600)),
                 "max_runtime_seconds": int(settings.get("max_runtime_seconds", 64800)),
+                "max_target_episodes": min(int(settings.get("max_target_episodes", 1)), MAX_TARGET_EPISODES),
                 "route_digests": tuple(route_digest(route) for route in routes) or ("sha256:" + "0" * 64,),
                 "target_duration_seconds": launch.target_duration_seconds,
                 "width": launch.width,

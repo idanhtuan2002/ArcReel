@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { ApiRequestError } from "@/api";
 import {
+  changeProductionRunMode,
   controlProductionRun,
   downloadProductionOutput,
   listProductionRuns,
@@ -52,11 +54,25 @@ interface Props {
 export function ProductionRunPanel({ projectName }: Props) {
   const { t } = useTranslation("workflow");
   // A reason code the panel has no words for is shown as the code itself, never dropped.
-  const reasonText = (code: string) => t(`auto_reason_${code}`, { defaultValue: code });
+  const reasonText = useCallback((code: string) => t(`auto_reason_${code}`, { defaultValue: code }), [t]);
+  // A refused command names its code and reasons in words; anything else keeps its own message.
+  const errorText = useCallback(
+    (cause: unknown): string => {
+      if (cause instanceof ApiRequestError && cause.code) {
+        const detail = cause.detail as { reasons?: unknown } | undefined;
+        const reasons = Array.isArray(detail?.reasons) ? detail.reasons.map((r) => reasonText(String(r))) : [];
+        const head = t(`auto_error_${cause.code}`, { defaultValue: cause.code });
+        return reasons.length ? `${head} (${reasons.join(", ")})` : head;
+      }
+      return cause instanceof Error ? cause.message : String(cause);
+    },
+    [reasonText, t],
+  );
   const [offer, setOffer] = useState<StartOffer | null>(null);
   const [run, setRun] = useState<RunSnapshot | null>(null);
   const [idea, setIdea] = useState("");
   const [mode, setMode] = useState<AutomationMode>("auto");
+  const [episodes, setEpisodes] = useState(1);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   // The parent keys this panel by project, so a mounted panel serves one project; responses that land after it
@@ -72,10 +88,10 @@ export function ProductionRunPanel({ projectName }: Props) {
         setRun(list.runs.find((item) => item.project_name === projectName) ?? null);
       } catch (cause) {
         if (signal?.aborted || !mounted.current) return;
-        setError(cause instanceof Error ? cause.message : String(cause));
+        setError(errorText(cause));
       }
     },
-    [projectName],
+    [errorText, projectName],
   );
 
   useEffect(() => {
@@ -100,12 +116,12 @@ export function ProductionRunPanel({ projectName }: Props) {
         const updated = await call();
         if (mounted.current) setRun(updated);
       } catch (cause) {
-        if (mounted.current) setError(cause instanceof Error ? cause.message : String(cause));
+        if (mounted.current) setError(errorText(cause));
       } finally {
         if (mounted.current) setBusy(false);
       }
     },
-    [busy],
+    [busy, errorText],
   );
 
   const start = () => {
@@ -114,6 +130,7 @@ export function ProductionRunPanel({ projectName }: Props) {
       command_id: newCommandId(),
       mode,
       idea: idea.trim(),
+      targets: Array.from({ length: episodes }, (_, index) => `episode:${index + 1}`),
       expected_input_digest: offer.input_digest,
       policy_digest: offer.policy_digests[mode],
     };
@@ -128,6 +145,20 @@ export function ProductionRunPanel({ projectName }: Props) {
         expected_version: run.version,
         expected_input_digest: run.input_digest,
         policy_digest: run.policy_digest,
+      }),
+    );
+  };
+
+  const switchMode = () => {
+    if (!run) return;
+    const target: AutomationMode = run.policy.mode === "auto" ? "semi" : "auto";
+    void act(() =>
+      changeProductionRunMode(projectName, run.run_id, {
+        command_id: newCommandId(),
+        expected_version: run.version,
+        expected_input_digest: run.input_digest,
+        policy_digest: run.mode_policy_digests[target],
+        mode: target,
       }),
     );
   };
@@ -148,7 +179,13 @@ export function ProductionRunPanel({ projectName }: Props) {
 
   const download = async (episode: number) => {
     if (!run) return;
-    const blob = await downloadProductionOutput(projectName, run.run_id, episode);
+    let blob: Blob;
+    try {
+      blob = await downloadProductionOutput(projectName, run.run_id, episode);
+    } catch (cause) {
+      if (mounted.current) setError(errorText(cause));
+      return;
+    }
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
@@ -209,6 +246,23 @@ export function ProductionRunPanel({ projectName }: Props) {
             </label>
             {mode === "semi" && <small style={{ color: "var(--color-text-3)" }}>{t("auto_mode_semi_hint")}</small>}
           </fieldset>
+          {(offer.max_target_episodes ?? 1) > 1 && (
+            <label className="flex items-center gap-2 text-[12px]" style={{ color: "var(--color-text-2)" }}>
+              {t("auto_episodes_label")}
+              <select
+                className="focus-ring rounded-md px-1.5 py-0.5"
+                style={{ border: "1px solid var(--color-hairline-strong)", background: "transparent" }}
+                value={episodes}
+                onChange={(event) => setEpisodes(Number(event.target.value))}
+              >
+                {Array.from({ length: offer.max_target_episodes ?? 1 }, (_, index) => (
+                  <option key={index + 1} value={index + 1}>
+                    {index + 1}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
           <button type="submit" className={BUTTON_CLS} style={PRIMARY_STYLE} disabled={busy || !idea.trim()}>
             {busy ? t("auto_starting") : t("auto_start")}
           </button>
@@ -301,6 +355,11 @@ export function ProductionRunPanel({ projectName }: Props) {
                 onClick={() => control("resume")}
               >
                 {t("auto_resume")}
+              </button>
+            )}
+            {active && STOPPED.has(run.status) && (
+              <button type="button" className={BUTTON_CLS} style={BUTTON_STYLE} disabled={busy} onClick={switchMode}>
+                {run.policy.mode === "auto" ? t("auto_switch_to_semi") : t("auto_switch_to_auto")}
               </button>
             )}
             {active && (

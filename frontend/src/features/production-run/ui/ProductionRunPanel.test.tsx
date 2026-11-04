@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
+import { ApiRequestError } from "@/api";
 import i18n from "@/i18n";
 
 import * as client from "../api/productionRunClient";
@@ -62,6 +63,7 @@ describe("ProductionRunPanel", () => {
     expect(startProductionRun.mock.calls[0][1]).toMatchObject({
       mode: "auto",
       idea: "Chuyến đò cuối.",
+      targets: ["episode:1"],
       expected_input_digest: "sha256:in",
       policy_digest: "sha256:auto",
     });
@@ -116,7 +118,7 @@ describe("ProductionRunPanel", () => {
     });
     render(<ProductionRunPanel projectName="alpha" />);
 
-    expect(await screen.findByText("Reason: BUDGET_EXHAUSTED")).toBeInTheDocument();
+    expect(await screen.findByText("Reason: the budget is used up")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Resume" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Pause" })).not.toBeInTheDocument();
   });
@@ -183,5 +185,55 @@ describe("ProductionRunPanel", () => {
     expect(steps.querySelectorAll("li")).toHaveLength(14);
     expect(steps.querySelector("[aria-current='step']")?.textContent).toBe("Pictures & voice");
     expect(screen.getByText("Status: Working")).toBeInTheDocument();
+  });
+
+  it("starts the chosen number of episodes when the project allows more than one", async () => {
+    vi.spyOn(client, "listProductionRuns").mockResolvedValue({
+      start: { ...OFFER, max_target_episodes: 3 },
+      runs: [],
+    });
+    const start = vi.spyOn(client, "startProductionRun").mockResolvedValue(snapshot());
+    render(<ProductionRunPanel projectName="alpha" />);
+    fireEvent.change(await screen.findByPlaceholderText("One or two sentences about the story"), {
+      target: { value: "Chuyến đò cuối." },
+    });
+    fireEvent.change(screen.getByRole("combobox", { name: "Episodes" }), { target: { value: "2" } });
+    fireEvent.click(screen.getByRole("button", { name: "Start" }));
+
+    await waitFor(() => expect(start).toHaveBeenCalledTimes(1));
+    expect(start.mock.calls[0][1].targets).toEqual(["episode:1", "episode:2"]);
+  });
+
+  it("switches a stopped run to the other mode with that mode's policy digest", async () => {
+    vi.spyOn(client, "listProductionRuns").mockResolvedValue({
+      start: OFFER,
+      runs: [snapshot({ status: "PAUSED" })],
+    });
+    const change = vi.spyOn(client, "changeProductionRunMode").mockResolvedValue(snapshot({ status: "PAUSED" }));
+    render(<ProductionRunPanel projectName="alpha" />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "Switch to semi-automatic" }));
+
+    await waitFor(() => expect(change).toHaveBeenCalledTimes(1));
+    expect(change.mock.calls[0][2]).toMatchObject({ mode: "semi", policy_digest: "sha256:semi", expected_version: 3 });
+  });
+
+  it("names a refused command and its reasons", async () => {
+    vi.spyOn(client, "listProductionRuns").mockResolvedValue({ start: OFFER, runs: [] });
+    vi.spyOn(client, "startProductionRun").mockRejectedValue(
+      new ApiRequestError("failed", undefined, 409, "PREFLIGHT_BLOCKED", {
+        code: "PREFLIGHT_BLOCKED",
+        reasons: ["REVIEWER_NOT_QUALIFIED"],
+      }),
+    );
+    render(<ProductionRunPanel projectName="alpha" />);
+    fireEvent.change(await screen.findByPlaceholderText("One or two sentences about the story"), {
+      target: { value: "Chuyến đò cuối." },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Start" }));
+
+    expect(
+      await screen.findByText("The request failed: The run cannot start yet (a reviewer model is not qualified)"),
+    ).toBeInTheDocument();
   });
 });
