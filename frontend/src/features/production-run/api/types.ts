@@ -35,6 +35,24 @@ export type RunStage =
   | "PACKAGE"
   | "EXPORT";
 
+/** The run's stages in order; the stage list in the panel follows it. */
+export const STAGES: readonly RunStage[] = [
+  "BRIEF",
+  "STORY",
+  "STORY_COMMIT",
+  "HANDOFF",
+  "ASSET_ANALYSIS",
+  "EPISODE_PLAN",
+  "SCRIPT_PLAN",
+  "SCRIPT",
+  "MEDIA",
+  "RENDER",
+  "MASTER",
+  "QUALITY",
+  "PACKAGE",
+  "EXPORT",
+];
+
 export type Checkpoint = "STORY_MANUSCRIPT" | "SCRIPT_PACKAGE" | "FINAL_FILM";
 
 export interface PendingReview {
@@ -42,11 +60,15 @@ export interface PendingReview {
   binding_digest: string;
 }
 
+/** PASS, or REWORK when a recording quality gate exported the best version the reviewers rejected. */
+export type QualityDecision = "PASS" | "REWORK";
+
 export interface TargetOutput {
   target: string;
   archive_digest: string;
   archive_size: number;
   final_digest: string;
+  quality_decision: QualityDecision;
 }
 
 export interface RunSnapshot {

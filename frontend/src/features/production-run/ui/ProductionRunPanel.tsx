@@ -9,9 +9,34 @@ import {
   startProductionRun,
   type ControlAction,
 } from "../api/productionRunClient";
-import { STOPPED, TERMINAL, type AutomationMode, type RunSnapshot, type StartOffer } from "../api/types";
+import { SEVERITY_TONES } from "@/utils/severity-tone";
+import {
+  STAGES,
+  STOPPED,
+  TERMINAL,
+  type AutomationMode,
+  type RunSnapshot,
+  type RunStatus,
+  type StartOffer,
+} from "../api/types";
 
 const POLL_MS = 5000;
+
+const BUTTON_CLS =
+  "focus-ring rounded-md px-2.5 py-1 text-[12px] disabled:opacity-50 hover:opacity-90";
+const BUTTON_STYLE = { border: "1px solid var(--color-hairline-strong)", color: "var(--color-text-2)" };
+const PRIMARY_STYLE = {
+  background: "var(--color-accent-dim)",
+  border: "1px solid var(--color-accent-soft)",
+  color: "var(--color-accent-2)",
+};
+
+function statusTone(status: RunStatus): string {
+  if (status === "SUCCEEDED") return "var(--color-accent-2)";
+  if (status === "FAILED" || status === "FAILED_QUALITY") return SEVERITY_TONES.blocking.color;
+  if (STOPPED.has(status)) return SEVERITY_TONES.warnings.color;
+  return "var(--color-text-2)";
+}
 
 interface Props {
   projectName: string;
@@ -26,6 +51,8 @@ interface Props {
  */
 export function ProductionRunPanel({ projectName }: Props) {
   const { t } = useTranslation("workflow");
+  // A reason code the panel has no words for is shown as the code itself, never dropped.
+  const reasonText = (code: string) => t(`auto_reason_${code}`, { defaultValue: code });
   const [offer, setOffer] = useState<StartOffer | null>(null);
   const [run, setRun] = useState<RunSnapshot | null>(null);
   const [idea, setIdea] = useState("");
@@ -131,84 +158,189 @@ export function ProductionRunPanel({ projectName }: Props) {
   };
 
   const active = run !== null && !TERMINAL.has(run.status);
+  const reached = run ? STAGES.indexOf(run.stage) : -1;
   return (
-    <section aria-label={t("auto_title")} data-testid="production-run-panel">
-      <h3>{t("auto_title")}</h3>
-      {error && <p role="alert">{t("auto_error", { message: error })}</p>}
-      {!active && offer && !offer.enabled && <p>{t("auto_unavailable", { reason: offer.reason ?? "" })}</p>}
+    <section
+      aria-label={t("auto_title")}
+      data-testid="production-run-panel"
+      className="space-y-2 rounded-lg px-3 py-2"
+      style={{ border: "1px solid var(--color-hairline-strong)" }}
+    >
+      <h3 className="text-[12.5px] font-medium" style={{ color: "var(--color-text)" }}>
+        {t("auto_title")}
+      </h3>
+      {error && (
+        <p role="alert" className="text-[12px]" style={{ color: SEVERITY_TONES.blocking.color }}>
+          {t("auto_error", { message: error })}
+        </p>
+      )}
+      {!active && offer && !offer.enabled && (
+        <p className="text-[12px]" style={{ color: "var(--color-text-3)" }}>
+          {t("auto_unavailable", { reason: reasonText(offer.reason ?? "") })}
+        </p>
+      )}
       {!active && offer?.enabled && (
         <form
+          className="space-y-2"
           onSubmit={(event) => {
             event.preventDefault();
             start();
           }}
         >
-          <label>
+          <label className="block text-[12px]" style={{ color: "var(--color-text-2)" }}>
             {t("auto_idea_label")}
             <textarea
+              className="focus-ring mt-1 block w-full rounded-md px-2 py-1.5 text-[12.5px]"
+              style={{ border: "1px solid var(--color-hairline-strong)", background: "transparent" }}
+              rows={3}
               value={idea}
               placeholder={t("auto_idea_placeholder")}
               onChange={(event) => setIdea(event.target.value)}
             />
           </label>
-          <fieldset>
-            <label>
+          <fieldset className="flex flex-wrap items-center gap-3 text-[12px]" style={{ color: "var(--color-text-2)" }}>
+            <label className="flex items-center gap-1">
               <input type="radio" checked={mode === "auto"} onChange={() => setMode("auto")} />
               {t("auto_mode_auto")}
             </label>
-            <label>
+            <label className="flex items-center gap-1">
               <input type="radio" checked={mode === "semi"} onChange={() => setMode("semi")} />
               {t("auto_mode_semi")}
             </label>
-            {mode === "semi" && <small>{t("auto_mode_semi_hint")}</small>}
+            {mode === "semi" && <small style={{ color: "var(--color-text-3)" }}>{t("auto_mode_semi_hint")}</small>}
           </fieldset>
-          <button type="submit" disabled={busy || !idea.trim()}>
+          <button type="submit" className={BUTTON_CLS} style={PRIMARY_STYLE} disabled={busy || !idea.trim()}>
             {busy ? t("auto_starting") : t("auto_start")}
           </button>
         </form>
       )}
       {run && (
-        <div data-run-id={run.run_id}>
-          <p>{t("auto_stage", { stage: run.stage })}</p>
-          <p>{t("auto_status", { status: run.status })}</p>
-          {run.reason && <p>{t("auto_reason", { reason: run.reason })}</p>}
+        <div data-run-id={run.run_id} className="space-y-2">
+          <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 text-[12px]">
+            <span style={{ color: "var(--color-text-2)" }}>
+              {t("auto_stage", { stage: t(`auto_stage_${run.stage}`) })}
+            </span>
+            <span style={{ color: statusTone(run.status) }}>
+              {t("auto_status", { status: t(`auto_status_${run.status}`) })}
+            </span>
+          </div>
+          <ol aria-label={t("auto_steps")} className="m-0 flex list-none flex-wrap gap-1 p-0">
+            {STAGES.map((stage, index) => {
+              const done = index < reached || run.status === "SUCCEEDED";
+              const current = index === reached && run.status !== "SUCCEEDED";
+              return (
+                <li
+                  key={stage}
+                  aria-current={current ? "step" : undefined}
+                  className="rounded-full px-2 py-0.5 text-[11px]"
+                  style={{
+                    border: `1px ${done || current ? "solid" : "dashed"} ${
+                      current ? statusTone(run.status) : "var(--color-hairline-strong)"
+                    }`,
+                    color: done ? "var(--color-text-2)" : current ? statusTone(run.status) : "var(--color-text-3)",
+                    background: done ? "var(--color-accent-dim)" : "transparent",
+                  }}
+                >
+                  {t(`auto_stage_${stage}`)}
+                </li>
+              );
+            })}
+          </ol>
+          {run.reason && (
+            <p className="text-[12px]" style={{ color: statusTone(run.status) }}>
+              {t("auto_reason", { reason: reasonText(run.reason) })}
+            </p>
+          )}
           {run.pending_review && (
-            <div role="group" aria-label={t("auto_review_title", { checkpoint: run.pending_review.checkpoint })}>
-              <p>
+            <div
+              role="group"
+              className="flex flex-wrap items-center gap-2"
+              aria-label={t("auto_review_title", { checkpoint: run.pending_review.checkpoint })}
+            >
+              <p className="text-[12px]" style={{ color: SEVERITY_TONES.warnings.color }}>
                 {t("auto_review_title", { checkpoint: t(`auto_checkpoint_${run.pending_review.checkpoint}`) })}
               </p>
-              <button type="button" disabled={busy} onClick={() => review("APPROVE")}>
+              <button
+                type="button"
+                className={BUTTON_CLS}
+                style={PRIMARY_STYLE}
+                disabled={busy}
+                onClick={() => review("APPROVE")}
+              >
                 {t("auto_review_approve")}
               </button>
-              <button type="button" disabled={busy} onClick={() => review("REJECT")}>
+              <button
+                type="button"
+                className={BUTTON_CLS}
+                style={BUTTON_STYLE}
+                disabled={busy}
+                onClick={() => review("REJECT")}
+              >
                 {t("auto_review_reject")}
               </button>
             </div>
           )}
-          {active && !STOPPED.has(run.status) && (
-            <button type="button" disabled={busy} onClick={() => control("pause")}>
-              {t("auto_pause")}
-            </button>
+          <div className="flex flex-wrap gap-2">
+            {active && !STOPPED.has(run.status) && (
+              <button
+                type="button"
+                className={BUTTON_CLS}
+                style={BUTTON_STYLE}
+                disabled={busy}
+                onClick={() => control("pause")}
+              >
+                {t("auto_pause")}
+              </button>
+            )}
+            {active && STOPPED.has(run.status) && (
+              <button
+                type="button"
+                className={BUTTON_CLS}
+                style={PRIMARY_STYLE}
+                disabled={busy}
+                onClick={() => control("resume")}
+              >
+                {t("auto_resume")}
+              </button>
+            )}
+            {active && (
+              <button
+                type="button"
+                className={BUTTON_CLS}
+                style={BUTTON_STYLE}
+                disabled={busy}
+                onClick={() => control("cancel")}
+              >
+                {t("auto_cancel")}
+              </button>
+            )}
+          </div>
+          {run.status === "SUCCEEDED" && (
+            <ul className="m-0 list-none space-y-1 p-0">
+              {run.completed_targets.map((output) => {
+                const episode = Number(output.target.split(":")[1]);
+                const passed = output.quality_decision === "PASS";
+                return (
+                  <li key={output.target} className="flex flex-wrap items-center gap-2 text-[12px]">
+                    <button
+                      type="button"
+                      className={BUTTON_CLS}
+                      style={PRIMARY_STYLE}
+                      onClick={() => void download(episode)}
+                    >
+                      {t("auto_download", { episode })}
+                    </button>
+                    <span style={{ color: passed ? "var(--color-accent-2)" : SEVERITY_TONES.warnings.color }}>
+                      {t(`auto_quality_${output.quality_decision}`)}
+                    </span>
+                    <span style={{ color: "var(--color-text-3)" }}>
+                      {t("auto_size", { size: (output.archive_size / 1_000_000).toFixed(1) })}
+                    </span>
+                  </li>
+                );
+              })}
+            </ul>
           )}
-          {active && STOPPED.has(run.status) && (
-            <button type="button" disabled={busy} onClick={() => control("resume")}>
-              {t("auto_resume")}
-            </button>
-          )}
-          {active && (
-            <button type="button" disabled={busy} onClick={() => control("cancel")}>
-              {t("auto_cancel")}
-            </button>
-          )}
-          {run.status === "SUCCEEDED" &&
-            run.completed_targets.map((output) => {
-              const episode = Number(output.target.split(":")[1]);
-              return (
-                <button key={output.target} type="button" onClick={() => void download(episode)}>
-                  {t("auto_download", { episode })}
-                </button>
-              );
-            })}
         </div>
       )}
     </section>

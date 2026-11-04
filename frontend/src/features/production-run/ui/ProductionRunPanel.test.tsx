@@ -66,7 +66,7 @@ describe("ProductionRunPanel", () => {
       policy_digest: "sha256:auto",
     });
     resolve(snapshot());
-    expect(await screen.findByText("Stage: STORY")).toBeInTheDocument();
+    expect(await screen.findByText("Stage: Story")).toBeInTheDocument();
   });
 
   it("shows exactly the pending semi checkpoint and sends its binding", async () => {
@@ -129,7 +129,13 @@ describe("ProductionRunPanel", () => {
           status: "SUCCEEDED",
           stage: "EXPORT",
           completed_targets: [
-            { target: "episode:1", archive_digest: "sha256:a", archive_size: 10, final_digest: "sha256:f" },
+            {
+              target: "episode:1",
+              archive_digest: "sha256:a",
+              archive_size: 1_000_000,
+              final_digest: "sha256:f",
+              quality_decision: "PASS",
+            },
           ],
         }),
       ],
@@ -137,6 +143,45 @@ describe("ProductionRunPanel", () => {
     render(<ProductionRunPanel projectName="alpha" />);
 
     expect(await screen.findByRole("button", { name: "Download episode 1" })).toBeInTheDocument();
+    expect(screen.getByText("Passed quality review")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Cancel" })).not.toBeInTheDocument();
+  });
+
+  it("marks an exported final the reviewers rejected as not passed", async () => {
+    vi.spyOn(client, "listProductionRuns").mockResolvedValue({
+      start: OFFER,
+      runs: [
+        snapshot({
+          status: "SUCCEEDED",
+          stage: "EXPORT",
+          completed_targets: [
+            {
+              target: "episode:1",
+              archive_digest: "sha256:a",
+              archive_size: 2_500_000,
+              final_digest: "sha256:f",
+              quality_decision: "REWORK",
+            },
+          ],
+        }),
+      ],
+    });
+    render(<ProductionRunPanel projectName="alpha" />);
+
+    expect(await screen.findByText("Not passed: best version exported")).toBeInTheDocument();
+    expect(screen.getByText("2.5 MB")).toBeInTheDocument();
+  });
+
+  it("names the stages and marks the current one", async () => {
+    vi.spyOn(client, "listProductionRuns").mockResolvedValue({
+      start: { enabled: false, reason: "RELEASE_GATE_PENDING" },
+      runs: [snapshot({ status: "WAITING_TASK", stage: "MEDIA" })],
+    });
+    render(<ProductionRunPanel projectName="alpha" />);
+
+    const steps = await screen.findByRole("list", { name: "Steps" });
+    expect(steps.querySelectorAll("li")).toHaveLength(14);
+    expect(steps.querySelector("[aria-current='step']")?.textContent).toBe("Pictures & voice");
+    expect(screen.getByText("Status: Working")).toBeInTheDocument();
   });
 });
