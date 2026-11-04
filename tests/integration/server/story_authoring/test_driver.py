@@ -431,7 +431,9 @@ async def test_a_scene_whose_calls_are_spent_keeps_its_best_version_when_an_earl
         count = schema["properties"]["paragraphs"]["minItems"]
         answer = full(count)
         if "Viết cảnh 2 của chương 1." in prompt:
-            opening = answer["paragraphs"][0].rsplit(". ", 1)[0] + ". Minh lướt smartphone suốt weekend, shopping thật nhiều."
+            opening = (
+                answer["paragraphs"][0].rsplit(". ", 1)[0] + ". Minh lướt smartphone suốt weekend, shopping thật nhiều."
+            )
             answer["paragraphs"][0] = first.paragraphs[-count] = opening
         return answer
 

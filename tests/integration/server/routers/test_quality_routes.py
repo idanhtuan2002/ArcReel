@@ -526,5 +526,6 @@ async def test_the_automatic_template_asks_two_qualified_model_reviewers_and_no_
         for requirement in automatic.json()["policy"]["assessment_requirements"]
         for slot in requirement["slots"]
     ]
-    assert slots and set(slots) == {"MODEL"}
+    assert slots
+    assert set(slots) == {"MODEL"}
     assert review.json()["policy"] != automatic.json()["policy"]
