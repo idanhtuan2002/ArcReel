@@ -56,4 +56,20 @@ describe("RunReportDetails", () => {
     await vi.waitFor(() => expect(report).toHaveBeenCalledTimes(1));
     expect(container).toBeEmptyDOMElement();
   });
+
+  it("previews each verified final", async () => {
+    vi.spyOn(client, "getProductionRunReport").mockResolvedValue({
+      run_id: "run-1",
+      quality: [],
+      story_exceptions: [],
+      previews: [{ target: "episode:1", path: "production/automation/run-1/g1/episode_1/episode_1.mp4" }],
+    });
+    render(<RunReportDetails projectName="alpha" runId="run-1" version={4} />);
+
+    const video = await screen.findByLabelText("Final of episode 1");
+    expect(video).toHaveAttribute(
+      "src",
+      expect.stringContaining("/files/alpha/production/automation/run-1/g1/episode_1/episode_1.mp4"),
+    );
+  });
 });

@@ -146,6 +146,15 @@ export interface RunReport {
   run_id: string;
   quality: { target: string; reviews: TargetReview[] }[];
   story_exceptions: StoryException[];
+  /** Project-relative finals of completed targets whose bytes still match the verified digest. */
+  previews?: { target: string; path: string }[];
+}
+
+/** The owner tasks of the run's current stage by status (queued, running, succeeded, failed, cancelled). */
+export interface RunProgress {
+  run_id: string;
+  stage: RunStage;
+  tasks: Record<string, number>;
 }
 
 export interface ReadinessRoute {

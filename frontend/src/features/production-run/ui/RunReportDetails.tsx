@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { API } from "@/api";
 import { SEVERITY_TONES } from "@/utils/severity-tone";
 import { getProductionRunReport } from "../api/productionRunClient";
 import type { ReviewScore, RunReport } from "../api/types";
@@ -36,6 +37,18 @@ export function RunReportDetails({ projectName, runId, version }: Props) {
   if (!report || report.run_id !== runId) return null;
   return (
     <div className="space-y-1.5 text-[12px]">
+      {(report.previews ?? []).map((preview) => (
+        <figure key={preview.target} className="m-0">
+          {/* eslint-disable-next-line jsx-a11y/media-has-caption -- the final has its subtitles burned into the picture */}
+          <video
+            className="max-h-80 rounded-md"
+            controls
+            preload="metadata"
+            aria-label={t("auto_report_preview", { episode: Number(preview.target.split(":")[1]) })}
+            src={API.getFileUrl(projectName, preview.path)}
+          />
+        </figure>
+      ))}
       {report.quality.length > 0 && (
         <details>
           <summary className="cursor-pointer" style={{ color: "var(--color-text-2)" }}>

@@ -42,6 +42,7 @@ beforeAll(async () => {
 
 beforeEach(() => {
   vi.spyOn(client, "getProductionRunReport").mockResolvedValue({ run_id: "run-1", quality: [], story_exceptions: [] });
+  vi.spyOn(client, "getProductionRunProgress").mockResolvedValue({ run_id: "run-1", stage: "STORY", tasks: {} });
 });
 
 afterEach(() => {
@@ -264,5 +265,52 @@ describe("ProductionRunPanel", () => {
 
     expect(container.querySelector("[data-run-id='run-1']")).toBeTruthy();
     expect(screen.getByText(/Generation 2 · Quality reviews 2\/3 · Pictures & voice redone 1×/)).toBeInTheDocument();
+  });
+
+  it("counts the current stage's tasks while the run is active", async () => {
+    vi.spyOn(client, "listProductionRuns").mockResolvedValue({
+      start: OFFER,
+      runs: [snapshot({ status: "WAITING_TASK", stage: "MEDIA" })],
+    });
+    vi.spyOn(client, "getProductionRunProgress").mockResolvedValue({
+      run_id: "run-1",
+      stage: "MEDIA",
+      tasks: { running: 1, queued: 4, succeeded: 12, failed: 1 },
+    });
+    render(<ProductionRunPanel projectName="alpha" />);
+
+    expect(
+      await screen.findByText("Tasks of this stage: 1 running · 4 queued · 12 done · 1 failed"),
+    ).toBeInTheDocument();
+  });
+
+  it("filters earlier runs by status and names a stop in an alert with a copy action", async () => {
+    vi.spyOn(client, "listProductionRuns").mockResolvedValue({
+      start: OFFER,
+      runs: [
+        snapshot({ run_id: "run-3", status: "BLOCKED_BUDGET", reason: "BUDGET_EXHAUSTED" }),
+        snapshot({ run_id: "run-2", status: "SUCCEEDED", stage: "EXPORT" }),
+        snapshot({ run_id: "run-1", status: "FAILED_QUALITY", stage: "QUALITY" }),
+      ],
+    });
+    render(<ProductionRunPanel projectName="alpha" />);
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("Reason: the budget is used up");
+    expect(screen.getByRole("button", { name: "Copy error" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Failed (1)" }));
+
+    const options = screen.getAllByRole("option").map((option) => option.getAttribute("value"));
+    expect(options).toEqual(["run-3", "run-1"]);
+  });
+
+  it("fills the idea from an example", async () => {
+    vi.spyOn(client, "listProductionRuns").mockResolvedValue({ start: OFFER, runs: [] });
+    render(<ProductionRunPanel projectName="alpha" />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "Last ferry" }));
+
+    expect(screen.getByPlaceholderText("One or two sentences about the story")).toHaveValue(
+      "On the last ferry before the bridge opens, an old boatman takes one more passenger across the river.",
+    );
   });
 });

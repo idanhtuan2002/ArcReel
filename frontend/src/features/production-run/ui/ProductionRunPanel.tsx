@@ -4,6 +4,7 @@ import { ApiRequestError } from "@/api";
 import {
   changeProductionRunMode,
   controlProductionRun,
+  getProductionRunProgress,
   downloadProductionOutput,
   listProductionRuns,
   newCommandId,
@@ -17,6 +18,7 @@ import {
   STOPPED,
   TERMINAL,
   type AutomationMode,
+  type RunProgress,
   type RunSnapshot,
   type RunStatus,
   type StartOffer,
@@ -27,6 +29,16 @@ import { AutomationSettingsEditor } from "./AutomationSettingsEditor";
 import { RunReportDetails } from "./RunReportDetails";
 
 const POLL_MS = 5000;
+const EXAMPLE_IDEAS = ["auto_example_1", "auto_example_2", "auto_example_3"] as const;
+type HistoryFilter = "all" | "active" | "done" | "failed";
+const FAILED: ReadonlySet<RunStatus> = new Set(["FAILED", "FAILED_QUALITY", "CANCELLED"]);
+
+function inFilter(status: RunStatus, filter: HistoryFilter): boolean {
+  if (filter === "active") return !TERMINAL.has(status);
+  if (filter === "done") return status === "SUCCEEDED";
+  if (filter === "failed") return FAILED.has(status);
+  return true;
+}
 
 const BUTTON_CLS =
   "focus-ring rounded-md px-2.5 py-1 text-[12px] disabled:opacity-50 hover:opacity-90";
@@ -89,6 +101,8 @@ export function ProductionRunPanel({ projectName }: Props) {
   const [idea, setIdea] = useState("");
   const [mode, setMode] = useState<AutomationMode>("auto");
   const [episodes, setEpisodes] = useState(1);
+  const [historyFilter, setHistoryFilter] = useState<HistoryFilter>("all");
+  const [progress, setProgress] = useState<RunProgress | null>(null);
   // Bumped after a settings save so readiness is checked again against the new settings.
   const [setupVersion, setSetupVersion] = useState(0);
   const [busy, setBusy] = useState(false);
@@ -124,6 +138,27 @@ export function ProductionRunPanel({ projectName }: Props) {
       window.clearInterval(timer);
     };
   }, [refresh]);
+
+  // The current stage's owner tasks, like a queue's running and queued counts; read only while the run is active.
+  const progressRunId = run && !TERMINAL.has(run.status) ? run.run_id : null;
+  useEffect(() => {
+    if (!progressRunId) return;
+    const controller = new AbortController();
+    const read = () =>
+      getProductionRunProgress(projectName, progressRunId, { signal: controller.signal })
+        .then((loaded) => {
+          if (!controller.signal.aborted) setProgress(loaded);
+        })
+        .catch(() => {
+          // Progress is supplementary; the stage and status stay authoritative.
+        });
+    void read();
+    const timer = window.setInterval(() => void read(), POLL_MS);
+    return () => {
+      controller.abort();
+      window.clearInterval(timer);
+    };
+  }, [projectName, progressRunId]);
 
   const act = useCallback(
     async (call: () => Promise<RunSnapshot>) => {
@@ -214,6 +249,7 @@ export function ProductionRunPanel({ projectName }: Props) {
   };
 
   const latest = runs[0] ?? null;
+  const shownRuns = runs.filter((item) => item.run_id === run?.run_id || inFilter(item.status, historyFilter));
   const active = run !== null && !TERMINAL.has(run.status);
   const startable = latest === null || TERMINAL.has(latest.status);
   const reached = run ? STAGES.indexOf(run.stage) : -1;
@@ -272,6 +308,20 @@ export function ProductionRunPanel({ projectName }: Props) {
               onChange={(event) => setIdea(event.target.value)}
             />
           </label>
+          <div className="flex flex-wrap items-center gap-1.5 text-[11.5px]">
+            <span style={{ color: "var(--color-text-3)" }}>{t("auto_examples")}</span>
+            {EXAMPLE_IDEAS.map((key) => (
+              <button
+                key={key}
+                type="button"
+                className="focus-ring rounded-full px-2 py-0.5 hover:opacity-80"
+                style={{ border: "1px dashed var(--color-hairline-strong)", color: "var(--color-text-2)" }}
+                onClick={() => setIdea(t(key))}
+              >
+                {t(`${key}_label`)}
+              </button>
+            ))}
+          </div>
           <fieldset className="flex flex-wrap items-center gap-3 text-[12px]" style={{ color: "var(--color-text-2)" }}>
             <label className="flex items-center gap-1">
               <input type="radio" checked={mode === "auto"} onChange={() => setMode("auto")} />
@@ -306,6 +356,26 @@ export function ProductionRunPanel({ projectName }: Props) {
         </form>
       )}
       {runs.length > 1 && (
+        <div role="group" aria-label={t("auto_history_filter")} className="flex flex-wrap gap-1 text-[11.5px]">
+          {(["all", "active", "done", "failed"] as const).map((filter) => (
+            <button
+              key={filter}
+              type="button"
+              aria-pressed={historyFilter === filter}
+              className="focus-ring rounded-full px-2 py-0.5"
+              style={{
+                border: "1px solid var(--color-hairline-strong)",
+                background: historyFilter === filter ? "var(--color-accent-dim)" : "transparent",
+                color: historyFilter === filter ? "var(--color-accent-2)" : "var(--color-text-3)",
+              }}
+              onClick={() => setHistoryFilter(filter)}
+            >
+              {t(`auto_history_${filter}`, { count: runs.filter((item) => inFilter(item.status, filter)).length })}
+            </button>
+          ))}
+        </div>
+      )}
+      {runs.length > 1 && (
         <label className="flex items-center gap-2 text-[12px]" style={{ color: "var(--color-text-2)" }}>
           {t("auto_history_label")}
           <select
@@ -314,7 +384,7 @@ export function ProductionRunPanel({ projectName }: Props) {
             value={run?.run_id ?? ""}
             onChange={(event) => setSelected(event.target.value)}
           >
-            {runs.map((item) => (
+            {shownRuns.map((item) => (
               <option key={item.run_id} value={item.run_id}>
                 {t("auto_history_item", {
                   time: new Date(item.created_at).toLocaleString(),
@@ -370,10 +440,31 @@ export function ProductionRunPanel({ projectName }: Props) {
               );
             })}
           </ol>
-          {run.reason && (
-            <p className="text-[12px]" style={{ color: statusTone(run.status) }}>
-              {t("auto_reason", { reason: reasonText(run.reason) })}
+          {active && progress?.run_id === run.run_id && Object.keys(progress.tasks).length > 0 && (
+            <p className="text-[11.5px]" style={{ color: "var(--color-text-3)" }}>
+              {t("auto_progress_tasks", {
+                running: progress.tasks.running ?? 0,
+                queued: progress.tasks.queued ?? 0,
+                done: progress.tasks.succeeded ?? 0,
+                failed: progress.tasks.failed ?? 0,
+              })}
             </p>
+          )}
+          {run.reason && (
+            <div
+              role={STOPPED.has(run.status) || FAILED.has(run.status) ? "alert" : undefined}
+              className="flex flex-wrap items-center gap-2 rounded-md px-2 py-1.5 text-[12px]"
+              style={{ border: `1px solid ${statusTone(run.status)}`, color: statusTone(run.status) }}
+            >
+              <span>{t("auto_reason", { reason: reasonText(run.reason) })}</span>
+              <button
+                type="button"
+                className="focus-ring rounded text-[11.5px] underline underline-offset-2 hover:opacity-80"
+                onClick={() => void navigator.clipboard?.writeText(`${run.run_id} ${run.stage} ${run.reason}`)}
+              >
+                {t("auto_copy_error")}
+              </button>
+            </div>
           )}
           {run.pending_review && (
             <div

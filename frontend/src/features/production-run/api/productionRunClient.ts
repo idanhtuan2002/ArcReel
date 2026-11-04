@@ -13,6 +13,7 @@ import type {
   QualificationStatus,
   Readiness,
   RunList,
+  RunProgress,
   RunReport,
   RunSnapshot,
 } from "./types";
@@ -107,6 +108,16 @@ export function recordLaunchQualification(projectName: string): Promise<{ record
     `/projects/${encodeURIComponent(projectName)}/automation/qualification/launch`,
     { method: "POST" },
   );
+}
+
+export function getProductionRunProgress(
+  projectName: string,
+  runId: string,
+  options: CallOptions = {},
+): Promise<RunProgress> {
+  return API.request<RunProgress>(`${base(projectName)}/${encodeURIComponent(runId)}/progress`, {
+    signal: options.signal,
+  });
 }
 
 export function getProductionRunReport(
