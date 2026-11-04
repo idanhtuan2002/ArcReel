@@ -116,6 +116,15 @@ async def list_runs(project_name: str, user: CurrentUser, service: Service) -> d
     return {"start": start, "runs": [_view(run) for run in runs]}
 
 
+@router.get("/projects/{project_name}/automation/readiness")
+async def get_readiness(project_name: str, user: CurrentUser, service: Service) -> dict[str, Any]:
+    """Whether automatic production could start for this project now, and why not."""
+    try:
+        return await _require(service).readiness(user_id=user.id, project_name=project_name)
+    except _REFUSALS as error:
+        raise _http(error) from error
+
+
 @router.post("/projects/{project_name}/production-runs")
 async def start_run(
     project_name: str, body: StartBody, user: InteractiveUser, token: Token, service: Service

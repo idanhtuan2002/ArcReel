@@ -21,6 +21,7 @@ import {
   type RunStatus,
   type StartOffer,
 } from "../api/types";
+import { AutomationReadiness } from "./AutomationReadiness";
 import { RunReportDetails } from "./RunReportDetails";
 
 const POLL_MS = 5000;
@@ -232,6 +233,7 @@ export function ProductionRunPanel({ projectName }: Props) {
           {t("auto_unavailable", { reason: reasonText(offer.reason ?? "") })}
         </p>
       )}
+      {offer?.enabled && <AutomationReadiness projectName={projectName} />}
       {startable && offer?.enabled && (
         <form
           className="space-y-2"

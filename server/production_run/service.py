@@ -142,6 +142,41 @@ class ProductionRunService:
             "max_target_episodes": resolved[AutomationMode.AUTO].max_target_episodes,
         }
 
+    async def readiness(self, *, user_id: str, project_name: str) -> dict[str, object]:
+        """Whether a Start would pass preflight now, with the reasons it would not and the policy it would freeze."""
+        try:
+            policy = await self._policies.resolve(user_id=user_id, project_name=project_name, mode=AutomationMode.AUTO)
+        except ProductionRunRefused as refused:
+            return {"ready": False, "reasons": [refused.code, *refused.reasons], "routes": [], "limits": None}
+        report = await self._preflight.check(user_id=user_id, project_name=project_name, policy=policy)
+        return {
+            "ready": report.dispatch_allowed,
+            "reasons": list(report.blocking_reasons),
+            "launch_profile_id": policy.launch_profile_id,
+            "quality_gate": policy.quality_gate,
+            "local_only": policy.local_only,
+            "routes": [
+                {
+                    "role": route.role,
+                    "provider_id": route.provider_id,
+                    "model_id": route.model_id,
+                    "model_identity": route.model_identity,
+                    "local": route.local,
+                    "paid": route.paid,
+                    "max_cost_per_call": route.max_cost_per_call,
+                }
+                for route in policy.routes
+            ],
+            "limits": {
+                "currency": policy.currency,
+                "max_cost_minor_units": policy.max_cost_minor_units,
+                "max_model_calls": policy.max_model_calls,
+                "max_tasks": policy.max_tasks,
+                "max_runtime_seconds": policy.max_runtime_seconds,
+                "max_target_episodes": policy.max_target_episodes,
+            },
+        }
+
     # Commands ------------------------------------------------------------------------------------------------
 
     def _require_activated(self) -> None:

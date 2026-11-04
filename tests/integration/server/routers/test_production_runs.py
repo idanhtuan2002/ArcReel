@@ -180,6 +180,16 @@ async def test_a_runs_report_is_empty_before_quality_and_story_and_unknown_runs_
     assert missing.status_code == 404
 
 
+async def test_readiness_names_preflight_reasons_and_the_policy_a_start_would_freeze(host):
+    ready = (await host.http.get("/api/v1/projects/project/automation/readiness", headers=host.headers)).json()
+    host.preflight.reasons = ("MISSING_QUALIFIED_REVIEWER",)
+    blocked = (await host.http.get("/api/v1/projects/project/automation/readiness", headers=host.headers)).json()
+
+    assert (ready["ready"], ready["reasons"]) == (True, [])
+    assert ready["limits"]["max_target_episodes"] == 1
+    assert (blocked["ready"], blocked["reasons"]) == (False, ["MISSING_QUALIFIED_REVIEWER"])
+
+
 async def test_same_start_command_with_a_changed_idea_conflicts(host):
     assert (await host.start()).status_code == 200
 

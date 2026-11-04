@@ -147,3 +147,31 @@ export interface RunReport {
   quality: { target: string; reviews: TargetReview[] }[];
   story_exceptions: StoryException[];
 }
+
+export interface ReadinessRoute {
+  role: string;
+  provider_id: string;
+  model_id: string;
+  model_identity: string;
+  local: boolean;
+  paid: boolean;
+  max_cost_per_call: number | null;
+}
+
+/** Whether a Start would pass preflight now, with its reasons and the policy it would freeze. */
+export interface Readiness {
+  ready: boolean;
+  reasons: string[];
+  launch_profile_id?: string;
+  quality_gate?: "enforce" | "record";
+  local_only?: boolean;
+  routes: ReadinessRoute[];
+  limits: {
+    currency: string;
+    max_cost_minor_units: number;
+    max_model_calls: number;
+    max_tasks: number;
+    max_runtime_seconds: number;
+    max_target_episodes: number;
+  } | null;
+}
