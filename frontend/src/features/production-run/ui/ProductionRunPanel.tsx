@@ -70,7 +70,19 @@ export function ProductionRunPanel({ projectName }: Props) {
     [reasonText, t],
   );
   const [offer, setOffer] = useState<StartOffer | null>(null);
-  const [run, setRun] = useState<RunSnapshot | null>(null);
+  // Newest first, as the server lists them; the panel follows the newest unless the user picks an earlier run.
+  const [runs, setRuns] = useState<RunSnapshot[]>([]);
+  const [selected, setSelected] = useState<string | null>(null);
+  const run = runs.find((item) => item.run_id === selected) ?? runs[0] ?? null;
+  const setRun = useCallback(
+    (updated: RunSnapshot) =>
+      setRuns((current) =>
+        current.some((item) => item.run_id === updated.run_id)
+          ? current.map((item) => (item.run_id === updated.run_id ? updated : item))
+          : [updated, ...current],
+      ),
+    [],
+  );
   const [idea, setIdea] = useState("");
   const [mode, setMode] = useState<AutomationMode>("auto");
   const [episodes, setEpisodes] = useState(1);
@@ -86,7 +98,7 @@ export function ProductionRunPanel({ projectName }: Props) {
         const list = await listProductionRuns(projectName, { signal });
         if (signal?.aborted || !mounted.current) return;
         setOffer(list.start);
-        setRun(list.runs.find((item) => item.project_name === projectName) ?? null);
+        setRuns(list.runs.filter((item) => item.project_name === projectName));
       } catch (cause) {
         if (signal?.aborted || !mounted.current) return;
         setError(errorText(cause));
@@ -122,7 +134,7 @@ export function ProductionRunPanel({ projectName }: Props) {
         if (mounted.current) setBusy(false);
       }
     },
-    [busy, errorText],
+    [busy, errorText, setRun],
   );
 
   const start = () => {
@@ -135,6 +147,7 @@ export function ProductionRunPanel({ projectName }: Props) {
       expected_input_digest: offer.input_digest,
       policy_digest: offer.policy_digests[mode],
     };
+    setSelected(null);
     void act(() => startProductionRun(projectName, command));
   };
 
@@ -195,7 +208,9 @@ export function ProductionRunPanel({ projectName }: Props) {
     URL.revokeObjectURL(url);
   };
 
+  const latest = runs[0] ?? null;
   const active = run !== null && !TERMINAL.has(run.status);
+  const startable = latest === null || TERMINAL.has(latest.status);
   const reached = run ? STAGES.indexOf(run.stage) : -1;
   return (
     <section
@@ -212,12 +227,12 @@ export function ProductionRunPanel({ projectName }: Props) {
           {t("auto_error", { message: error })}
         </p>
       )}
-      {!active && offer && !offer.enabled && (
+      {startable && offer && !offer.enabled && (
         <p className="text-[12px]" style={{ color: "var(--color-text-3)" }}>
           {t("auto_unavailable", { reason: reasonText(offer.reason ?? "") })}
         </p>
       )}
-      {!active && offer?.enabled && (
+      {startable && offer?.enabled && (
         <form
           className="space-y-2"
           onSubmit={(event) => {
@@ -269,6 +284,26 @@ export function ProductionRunPanel({ projectName }: Props) {
           </button>
         </form>
       )}
+      {runs.length > 1 && (
+        <label className="flex items-center gap-2 text-[12px]" style={{ color: "var(--color-text-2)" }}>
+          {t("auto_history_label")}
+          <select
+            className="focus-ring rounded-md px-1.5 py-0.5"
+            style={{ border: "1px solid var(--color-hairline-strong)", background: "transparent" }}
+            value={run?.run_id ?? ""}
+            onChange={(event) => setSelected(event.target.value)}
+          >
+            {runs.map((item) => (
+              <option key={item.run_id} value={item.run_id}>
+                {t("auto_history_item", {
+                  time: new Date(item.created_at).toLocaleString(),
+                  status: t(`auto_status_${item.status}`),
+                })}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
       {run && (
         <div data-run-id={run.run_id} className="space-y-2">
           <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 text-[12px]">
@@ -279,6 +314,19 @@ export function ProductionRunPanel({ projectName }: Props) {
               {t("auto_status", { status: t(`auto_status_${run.status}`) })}
             </span>
           </div>
+          <p className="text-[11.5px]" style={{ color: "var(--color-text-3)" }}>
+            {[
+              t("auto_detail_started", { time: new Date(run.created_at).toLocaleString() }),
+              t("auto_detail_generation", { generation: run.generation }),
+              t("auto_detail_evaluations", {
+                count: run.final_evaluations ?? 0,
+                limit: run.policy.final_evaluation_limit ?? 3,
+              }),
+              ...(run.repair_counts ?? []).map((repair) =>
+                t("auto_detail_repairs", { stage: t(`auto_stage_${repair.stage}`), count: repair.count }),
+              ),
+            ].join(" · ")}
+          </p>
           <ol aria-label={t("auto_steps")} className="m-0 flex list-none flex-wrap gap-1 p-0">
             {STAGES.map((stage, index) => {
               const done = index < reached || run.status === "SUCCEEDED";

@@ -82,9 +82,11 @@ export interface RunSnapshot {
   input_digest: string;
   policy_digest: string;
   mode_policy_digests: Record<AutomationMode, string>;
-  policy: { mode: AutomationMode };
+  policy: { mode: AutomationMode; final_evaluation_limit?: number };
   targets: string[];
   completed_targets: TargetOutput[];
+  repair_counts?: { stage: RunStage; unit_key: string; count: number }[];
+  final_evaluations?: number;
   pending_review: PendingReview | null;
   reason: string | null;
   created_at: string;

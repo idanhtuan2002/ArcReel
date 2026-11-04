@@ -240,4 +240,29 @@ describe("ProductionRunPanel", () => {
       await screen.findByText("The request failed: The run cannot start yet (a reviewer model is not qualified)"),
     ).toBeInTheDocument();
   });
+
+  it("follows the newest run and lets an earlier one be opened with its details", async () => {
+    vi.spyOn(client, "listProductionRuns").mockResolvedValue({
+      start: OFFER,
+      runs: [
+        snapshot({ run_id: "run-2", status: "RUNNING", stage: "MEDIA", created_at: "2026-11-03T00:00:00Z" }),
+        snapshot({
+          run_id: "run-1",
+          status: "FAILED_QUALITY",
+          stage: "QUALITY",
+          generation: 2,
+          final_evaluations: 2,
+          repair_counts: [{ stage: "MEDIA", unit_key: "episode:1", count: 1 }],
+        }),
+      ],
+    });
+    const { container } = render(<ProductionRunPanel projectName="alpha" />);
+
+    await waitFor(() => expect(container.querySelector("[data-run-id='run-2']")).toBeTruthy());
+    expect(screen.queryByRole("button", { name: "Start" })).not.toBeInTheDocument();
+    fireEvent.change(screen.getByRole("combobox", { name: "Run" }), { target: { value: "run-1" } });
+
+    expect(container.querySelector("[data-run-id='run-1']")).toBeTruthy();
+    expect(screen.getByText(/Generation 2 · Quality reviews 2\/3 · Pictures & voice redone 1×/)).toBeInTheDocument();
+  });
 });
