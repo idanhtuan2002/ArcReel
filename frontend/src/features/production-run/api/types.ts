@@ -230,3 +230,22 @@ export interface AutomationSettingsUpdate {
   max_runtime_seconds: number;
   max_target_episodes: number;
 }
+
+export interface ReviewerJob {
+  role: string;
+  model_identity: string;
+  state: "running" | "done" | "failed";
+  done: number;
+  total: number;
+  qualified: boolean | null;
+  error: string | null;
+  started_at: string;
+}
+
+/** Whether each reviewer route and the launch are qualified, and reviewer jobs running on this host. */
+export interface QualificationStatus {
+  corpus_configured: boolean;
+  evidence_configured: boolean;
+  reviewers: { role: string; model_identity: string; qualified: boolean; job: ReviewerJob | null }[];
+  launch_recorded: boolean;
+}

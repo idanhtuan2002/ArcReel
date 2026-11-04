@@ -21,6 +21,7 @@ import {
   type RunStatus,
   type StartOffer,
 } from "../api/types";
+import { AutomationQualification } from "./AutomationQualification";
 import { AutomationReadiness } from "./AutomationReadiness";
 import { AutomationSettingsEditor } from "./AutomationSettingsEditor";
 import { RunReportDetails } from "./RunReportDetails";
@@ -237,6 +238,12 @@ export function ProductionRunPanel({ projectName }: Props) {
         </p>
       )}
       {offer?.enabled && <AutomationReadiness key={setupVersion} projectName={projectName} />}
+      {offer?.enabled && (
+        <AutomationQualification
+          projectName={projectName}
+          onChanged={() => setSetupVersion((version) => version + 1)}
+        />
+      )}
       {offer && (
         <AutomationSettingsEditor
           projectName={projectName}

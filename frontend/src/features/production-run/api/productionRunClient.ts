@@ -10,6 +10,7 @@ import type {
   AutomationSettingsUpdate,
   AutomationSettingsView,
   Checkpoint,
+  QualificationStatus,
   Readiness,
   RunList,
   RunReport,
@@ -86,6 +87,26 @@ export function saveAutomationSettings(
     body: JSON.stringify(update),
     signal: options.signal,
   });
+}
+
+export function getQualification(projectName: string, options: CallOptions = {}): Promise<QualificationStatus> {
+  return API.request<QualificationStatus>(`/projects/${encodeURIComponent(projectName)}/automation/qualification`, {
+    signal: options.signal,
+  });
+}
+
+export function startReviewerQualification(projectName: string): Promise<QualificationStatus> {
+  return API.request<QualificationStatus>(
+    `/projects/${encodeURIComponent(projectName)}/automation/qualification/reviewers`,
+    { method: "POST" },
+  );
+}
+
+export function recordLaunchQualification(projectName: string): Promise<{ recorded: boolean; reasons: string[] }> {
+  return API.request<{ recorded: boolean; reasons: string[] }>(
+    `/projects/${encodeURIComponent(projectName)}/automation/qualification/launch`,
+    { method: "POST" },
+  );
 }
 
 export function getProductionRunReport(
