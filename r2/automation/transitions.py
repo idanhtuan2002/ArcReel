@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from r2.automation.identity import digest_value, policy_digest
 from r2.automation.policy import checkpoint_for, review_binding
-from r2.automation.profiles import resolve_launch_profile
 from r2.contracts.automation import PendingReview, RepairCount, RunSnapshot, RunStage, RunStatus, StageOutcome
 
 _STAGES = tuple(RunStage)
@@ -18,7 +17,7 @@ _STORY_BLOCKS = {
 
 def _passing_quality_states(run: RunSnapshot) -> frozenset[str]:
     """Quality owner states that let a run continue: a PASS, and under a recording quality gate a recorded REWORK."""
-    if resolve_launch_profile(run.policy.launch_profile_id).quality_gate == "record":
+    if run.policy.quality_gate == "record":
         return frozenset({"PASS", "QUALITY_RECORDED_REWORK"})
     return frozenset({"PASS"})
 

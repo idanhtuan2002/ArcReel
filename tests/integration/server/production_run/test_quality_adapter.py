@@ -34,9 +34,18 @@ from tests.integration.server.production_run.test_story_adapter import story_hos
 
 
 @pytest.fixture
-def story_policy():
-    """Publish the automatic quality profile the run's policy names before the run exists."""
-    return _publish_profile
+def story_policy(request):
+    """Publish the automatic quality profile the run's policy names before the run exists; a test parametrizes this
+    fixture indirectly with the run's quality gate (``enforce`` by default)."""
+    gate = getattr(request, "param", "enforce")
+
+    async def publish(sessions) -> dict:
+        return {**await _publish_profile(sessions), "quality_gate": gate}
+
+    return publish
+
+
+RECORDING = pytest.mark.parametrize("story_policy", ["record"], indirect=True)
 
 
 async def _publish_profile(sessions) -> dict:
@@ -276,20 +285,8 @@ async def test_a_review_asked_with_an_unqualified_prompt_cannot_pass(quality_hos
     assert (blocked.stage, blocked.reason) == (RunStage.QUALITY, "REVIEWER_PROMPT_NOT_QUALIFIED")
 
 
-def _quality_gate(monkeypatch, gate: str) -> None:
-    import server.production_run.quality_adapter as quality_adapter
-    from r2.automation.profiles import resolve_launch_profile
-
-    monkeypatch.setattr(
-        quality_adapter,
-        "resolve_launch_profile",
-        lambda profile_id: resolve_launch_profile(profile_id).model_copy(update={"quality_gate": gate}),
-    )
-
-
 async def test_both_rejecting_rework_exactly_the_named_stage(quality_host, monkeypatch):
     host, controller, render, quality, reviewer = quality_host
-    _quality_gate(monkeypatch, "enforce")
     await _qualify(host)
     finding = AssessmentFinding(code="AUDIO_DRIFT", severity="MAJOR", unit_key="episode:1", repair_stage=RunStage.MEDIA)
     for role in ("reviewer_a", "reviewer_b"):
@@ -351,12 +348,12 @@ async def test_a_substituted_archive_prevents_run_success(quality_host):
     assert (blocked.stage, blocked.reason) == (RunStage.EXPORT, "ARCHIVE_CHANGED")
 
 
+@RECORDING
 async def test_a_recording_gate_exports_a_rejected_final_with_its_rework_disposition(quality_host, monkeypatch):
     import json
     import zipfile
 
     host, controller, render, quality, reviewer = quality_host
-    _quality_gate(monkeypatch, "record")
     await _qualify(host)
     finding = AssessmentFinding(code="AUDIO_DRIFT", severity="MAJOR", unit_key="episode:1", repair_stage=RunStage.MEDIA)
     for role in ("reviewer_a", "reviewer_b"):
@@ -377,9 +374,9 @@ async def test_a_recording_gate_exports_a_rejected_final_with_its_rework_disposi
         assert json.loads(opened.read("lineage.json"))["quality_decision"] == "REWORK"
 
 
+@RECORDING
 async def test_a_recording_gate_still_blocks_missing_evidence(quality_host, monkeypatch):
     host, controller, render, quality, _reviewer = quality_host
-    _quality_gate(monkeypatch, "record")
     await _to_quality(host, controller, render)
 
     blocked = await _review(host, controller, quality)

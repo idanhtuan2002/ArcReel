@@ -130,6 +130,8 @@ class RunPolicy(AutomationContract):
     height: PositiveInt = 1024
     fps: PositiveInt = 24
     language: ExactIdentity = "vi"
+    #: Frozen from the launch profile: ``record`` exports a rejected final with its REWORK disposition.
+    quality_gate: Literal["enforce", "record"] = "enforce"
 
     @model_validator(mode="after")
     def checkpoint_policy(self) -> Self:

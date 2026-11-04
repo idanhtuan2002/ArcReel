@@ -20,7 +20,6 @@ from lib.db.repositories.reviewer_qualifications import ReviewerQualificationRep
 from lib.project_manager import ProjectManager
 from r2.automation.assessment import AssessmentVerdict, ModelAssessment, combine
 from r2.automation.identity import digest_value
-from r2.automation.profiles import resolve_launch_profile
 from r2.contracts.automation import (
     BudgetReservation,
     DispatchIntent,
@@ -126,7 +125,7 @@ class QualityAdapter:
                 writer_identities=writers,
                 qualified_identities=identities,
             )
-        recording = resolve_launch_profile(run.policy.launch_profile_id).quality_gate == "record"
+        recording = run.policy.quality_gate == "record"
         if recording:
             # A judged rejection becomes a recorded REWORK disposition; evidence and integrity failures still block.
             verdicts = {

@@ -473,11 +473,7 @@ async def test_new_idea_reaches_current_quality_pass_and_export(e2e_sessions, tm
     evidence["disposition"] = disposition.model_dump(mode="json") if disposition else None
     _write_evidence(evidence)
     assert disposition is not None
-    from r2.automation.profiles import resolve_launch_profile
-
-    allowed = (
-        {"PASS", "REWORK"} if resolve_launch_profile("fiction_narration_vi_v1").quality_gate == "record" else {"PASS"}
-    )
+    allowed = {"PASS", "REWORK"} if run["policy"]["quality_gate"] == "record" else {"PASS"}
     assert disposition.decision.value in allowed
     assert target["quality_decision"] == disposition.decision.value
     assert downloaded == target["archive_digest"]

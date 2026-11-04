@@ -43,3 +43,19 @@ async def test_a_project_without_automation_settings_resolves_no_policy():
     resolver = composition.ProjectPolicyResolver(None, projects=Projects({"content_mode": "narration"}), resolver=None)
     with pytest.raises(ProductionRunRefused, match="AUTOMATION_NOT_CONFIGURED"):
         await resolver.resolve(user_id="u", project_name="p", mode=AutomationMode.AUTO)
+
+
+async def test_the_launch_profiles_quality_gate_is_frozen_into_the_policy(monkeypatch):
+    settings = {"profile_id": "auto-review", "profile_digest": "sha256:" + "a" * 64}
+    resolver = composition.ProjectPolicyResolver(
+        None, projects=Projects({"content_mode": "narration", "automation": settings}), resolver=None
+    )
+
+    async def no_routes(project_name: str) -> tuple:
+        return ()
+
+    monkeypatch.setattr(resolver, "routes", no_routes)
+
+    policy = await resolver.resolve(user_id="u", project_name="p", mode=AutomationMode.AUTO)
+
+    assert policy.quality_gate == "record"

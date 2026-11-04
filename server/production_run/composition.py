@@ -128,6 +128,7 @@ class ProjectPolicyResolver:
                 "height": launch.height,
                 "fps": launch.fps,
                 "language": launch.language,
+                "quality_gate": launch.quality_gate,
             }
         )
 
