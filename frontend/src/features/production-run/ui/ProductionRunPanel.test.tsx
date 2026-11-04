@@ -1,5 +1,5 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ApiRequestError } from "@/api";
 import i18n from "@/i18n";
@@ -38,6 +38,10 @@ function snapshot(changes: Partial<RunSnapshot> = {}): RunSnapshot {
 
 beforeAll(async () => {
   await i18n.changeLanguage("en");
+});
+
+beforeEach(() => {
+  vi.spyOn(client, "getProductionRunReport").mockResolvedValue({ run_id: "run-1", quality: [], story_exceptions: [] });
 });
 
 afterEach(() => {

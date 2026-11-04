@@ -21,6 +21,7 @@ import {
   type RunStatus,
   type StartOffer,
 } from "../api/types";
+import { RunReportDetails } from "./RunReportDetails";
 
 const POLL_MS = 5000;
 
@@ -374,6 +375,7 @@ export function ProductionRunPanel({ projectName }: Props) {
               </button>
             )}
           </div>
+          <RunReportDetails projectName={projectName} runId={run.run_id} version={run.version} />
           {run.status === "SUCCEEDED" && (
             <ul className="m-0 list-none space-y-1 p-0">
               {run.completed_targets.map((output) => {

@@ -4,7 +4,7 @@
  */
 
 import { API } from "@/api";
-import type { AutomationMode, Checkpoint, RunList, RunSnapshot } from "./types";
+import type { AutomationMode, Checkpoint, RunList, RunReport, RunSnapshot } from "./types";
 
 interface CallOptions {
   signal?: AbortSignal;
@@ -52,6 +52,16 @@ export function startProductionRun(
 
 export function getProductionRun(projectName: string, runId: string, options: CallOptions = {}): Promise<RunSnapshot> {
   return API.request<RunSnapshot>(`${base(projectName)}/${encodeURIComponent(runId)}`, { signal: options.signal });
+}
+
+export function getProductionRunReport(
+  projectName: string,
+  runId: string,
+  options: CallOptions = {},
+): Promise<RunReport> {
+  return API.request<RunReport>(`${base(projectName)}/${encodeURIComponent(runId)}/report`, {
+    signal: options.signal,
+  });
 }
 
 export function controlProductionRun(

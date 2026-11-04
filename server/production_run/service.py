@@ -122,6 +122,11 @@ class ProductionRunService:
             raise ProductionRunRefused("RUN_NOT_FOUND", 404)
         return run
 
+    @property
+    def sessions(self) -> async_sessionmaker[AsyncSession]:
+        """The session factory runs are read and written through."""
+        return self._sessions
+
     async def start_offer(self, *, user_id: str, project_name: str) -> dict[str, object]:
         """The digests a Start command must carry; nothing is resolved while activation is disabled."""
         if not self.activation.enabled:

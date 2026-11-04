@@ -113,3 +113,35 @@ export const STOPPED: ReadonlySet<RunStatus> = new Set([
   "BLOCKED_RESOURCE",
   "BLOCKED_UNKNOWN",
 ]);
+
+export type ReviewScore = "story" | "visual" | "audio" | "continuity" | "pacing";
+
+export interface ReviewFinding {
+  code: string;
+  severity: string;
+  detail: string;
+}
+
+export interface TargetReview {
+  role: string;
+  model_identity: string;
+  outcome: string;
+  accepted: boolean;
+  scores: Partial<Record<ReviewScore, number>>;
+  findings: ReviewFinding[];
+}
+
+export interface StoryException {
+  code: string;
+  severity: string;
+  node_id: string;
+  message: string;
+  quote: string;
+}
+
+/** What the run decided on its own: reviewer verdicts per target and the story exceptions it accepted. */
+export interface RunReport {
+  run_id: string;
+  quality: { target: string; reviews: TargetReview[] }[];
+  story_exceptions: StoryException[];
+}

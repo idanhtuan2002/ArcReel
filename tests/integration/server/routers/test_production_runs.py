@@ -167,6 +167,19 @@ async def test_the_offer_names_the_episode_limit_and_a_start_beyond_it_is_refuse
     assert (await host.http.get(BASE, headers=host.headers)).json()["runs"] == []
 
 
+async def test_a_runs_report_is_empty_before_quality_and_story_and_unknown_runs_are_not_found(host):
+    response = await host.start()
+    assert response.status_code == 200, response.text
+    started = response.json()
+
+    report = await host.http.get(f"{BASE}/{started['run_id']}/report", headers=host.headers)
+    missing = await host.http.get(f"{BASE}/no-such-run/report", headers=host.headers)
+
+    assert report.status_code == 200, report.text
+    assert report.json() == {"run_id": started["run_id"], "quality": [], "story_exceptions": []}
+    assert missing.status_code == 404
+
+
 async def test_same_start_command_with_a_changed_idea_conflicts(host):
     assert (await host.start()).status_code == 200
 
