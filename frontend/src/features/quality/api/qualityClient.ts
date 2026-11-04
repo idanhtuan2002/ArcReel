@@ -61,6 +61,8 @@ export interface TemplateQuery {
   min_duration_ms: number;
   max_duration_ms: number;
   locales: string;
+  /** `automatic`: the automatic production profile, two qualified model reviewers and no Human slot. */
+  kind?: "review" | "automatic";
 }
 
 function base(projectName: string): string {

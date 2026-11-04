@@ -511,3 +511,20 @@ async def test_the_session_names_the_actor_requests_are_sealed_for(http) -> None
     response = await http["client"].get(f"{BASE}/session", headers=_headers())
     assert response.status_code == 200, response.text
     assert response.json() == {"actor_id": ACTOR}
+
+
+async def test_the_automatic_template_asks_two_qualified_model_reviewers_and_no_human(http) -> None:
+    params = {"platform_profile_id": "vertical-short", "width": 576, "height": 1024}
+    params |= {"min_duration_ms": 10000, "max_duration_ms": 600000, "locales": "vi"}
+
+    review = await http["client"].get(f"{BASE}/template", params=params, headers=_headers())
+    automatic = await http["client"].get(f"{BASE}/template", params={**params, "kind": "automatic"}, headers=_headers())
+
+    assert automatic.status_code == 200, automatic.text
+    slots = [
+        slot["assessor_class"]
+        for requirement in automatic.json()["policy"]["assessment_requirements"]
+        for slot in requirement["slots"]
+    ]
+    assert slots and set(slots) == {"MODEL"}
+    assert review.json()["policy"] != automatic.json()["policy"]

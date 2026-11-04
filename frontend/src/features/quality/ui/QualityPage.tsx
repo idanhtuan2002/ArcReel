@@ -314,6 +314,7 @@ function QualityWorkspace({ projectName, actor }: QualityPageProps & { actor: st
     min_duration_ms: 5000,
     max_duration_ms: 900000,
     locales: "en",
+    kind: "review" as "review" | "automatic",
   });
   const [policyJson, setPolicyJson] = useState("");
   const [cohort, setCohort] = useState("cohort");
@@ -618,6 +619,31 @@ function QualityWorkspace({ projectName, actor }: QualityPageProps & { actor: st
               <p className="text-sm text-text-3">{t("quality_no_profiles")}</p>
             )}
             <div className="fm-grid mt-3">
+              <label className="text-xs text-text-2">
+                {t("quality_template_kind")}
+                <select
+                  className="fm-input"
+                  value={template.kind}
+                  onChange={(event) =>
+                    setTemplate(
+                      event.target.value === "automatic"
+                        ? {
+                            platform_profile_id: "vertical-short",
+                            width: 576,
+                            height: 1024,
+                            min_duration_ms: 10000,
+                            max_duration_ms: 600000,
+                            locales: "vi",
+                            kind: "automatic",
+                          }
+                        : { ...template, kind: "review" },
+                    )
+                  }
+                >
+                  <option value="review">{t("quality_template_review")}</option>
+                  <option value="automatic">{t("quality_template_automatic")}</option>
+                </select>
+              </label>
               <label className="text-xs text-text-2">
                 {t("quality_platform")}
                 <input className="fm-input" value={template.platform_profile_id} onChange={(event) => setTemplate({ ...template, platform_profile_id: event.target.value })} />

@@ -62,7 +62,7 @@ from server.services.quality_requests import (
 )
 from server.services.quality_runs import HumanObservationService, QualityRunService, run_validity
 from server.services.quality_subjects import manifest_bodies, resolve_assessed_subject
-from server.services.quality_template import default_platform_constraints, quality_policy
+from server.services.quality_template import automatic_quality_policy, default_platform_constraints, quality_policy
 
 MAX_BODY_BYTES = 1 << 20
 _QUALITY_PATH = re.compile(r"^/api/v1/projects/[^/]+/quality(?:/|$)")
@@ -262,6 +262,7 @@ async def profile_template(
     min_duration_ms: int = Query(ge=0),
     max_duration_ms: int = Query(gt=0),
     locales: str = Query(default="", max_length=256),
+    kind: Literal["review", "automatic"] = Query(default="review"),
 ) -> dict[str, Any]:
     _available(deps)
     constraints = default_platform_constraints(
@@ -272,12 +273,13 @@ async def profile_template(
         max_duration_ms=max_duration_ms,
         required_locales=tuple(item for item in locales.split(",") if item),
     )
-    policy = await _run(lambda: _policy(constraints))
+    policy = await _run(lambda: _policy(constraints, kind))
     return {"policy": policy.model_dump(mode="json")}
 
 
-async def _policy(constraints: dict[str, Any]) -> q.QualityPolicyV2:
-    return quality_policy(constraints)
+async def _policy(constraints: dict[str, Any], kind: str = "review") -> q.QualityPolicyV2:
+    """The Human review template, or the automatic production profile (two qualified MODEL reviewers)."""
+    return automatic_quality_policy(constraints) if kind == "automatic" else quality_policy(constraints)
 
 
 @router.get("/projects/{project_name}/quality/profiles")

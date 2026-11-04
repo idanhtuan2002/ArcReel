@@ -106,6 +106,27 @@ async function preparePublication(): Promise<void> {
 }
 
 describe("Quality page", () => {
+  it("asks for the automatic production template with the vertical narration preset", async () => {
+    const fetched = vi.mocked(globalThis.fetch);
+    render(<QualityPage projectName="demo" />);
+    fireEvent.change(await screen.findByLabelText(/^Profile kind$|^Loại hồ sơ$|^档案类型$/), { target: { value: "automatic" } });
+    fireEvent.click(screen.getByRole("button", { name: /Load template|Nạp mẫu|加载模板/ }));
+
+    await waitFor(() =>
+      expect(fetched.mock.calls.some(([input]) => String(input).includes("/quality/template?"))).toBe(true),
+    );
+    const url = new URL(
+      String(fetched.mock.calls.find(([input]) => String(input).includes("/quality/template?"))?.[0]),
+      "http://test",
+    );
+    expect(Object.fromEntries(url.searchParams)).toMatchObject({
+      kind: "automatic",
+      width: "576",
+      height: "1024",
+      locales: "vi",
+    });
+  });
+
   it("keeps the probes locked until a video and a profile revision are chosen", async () => {
     render(<QualityPage projectName="demo" />);
     await screen.findByLabelText(/Approved video|Video đã duyệt|已批准的视频/);
