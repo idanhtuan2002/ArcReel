@@ -7,7 +7,6 @@ import copy
 import pytest
 
 from lib.db.repositories.custom_provider_repo import CustomProviderRepository
-from server.production_run import settings as automation_settings
 from server.production_run.settings import SettingsRefused, SettingsUpdate, save_settings, settings_options
 
 TEXT = ("qwen3.5-vimax:9b", "qwen2.5vl:7b", "gemma3:4b")
@@ -83,7 +82,7 @@ async def test_options_list_enabled_models_per_role_and_mark_local_ones(session_
     assert options["settings"]["configured"] is False
 
 
-async def test_a_saved_edit_keeps_governance_fields_and_registered_identities(session_factory, monkeypatch):
+async def test_a_saved_edit_keeps_governance_fields_and_registered_identities(session_factory):
     await _providers(session_factory)
     pinned = "ollama/qwen2.5vl:7b@sha256:" + "5" * 64
     projects = Projects(
@@ -102,9 +101,7 @@ async def test_a_saved_edit_keeps_governance_fields_and_registered_identities(se
         looked_up.append(model_id)
         return f"ollama/{model_id}@sha256:" + "9" * 64
 
-    monkeypatch.setattr(automation_settings, "_ollama_identity", digest)
-
-    saved = await save_settings(session_factory, projects, "p", _update())
+    saved = await save_settings(session_factory, projects, "p", _update(), identify_ollama=digest)
 
     stored = projects.project["automation"]
     identities = {route["role"]: route["model_identity"] for route in stored["routes"]}
@@ -121,19 +118,18 @@ async def test_a_saved_edit_keeps_governance_fields_and_registered_identities(se
     assert saved["has_quality_profile"] is True
 
 
-async def test_a_cloud_model_needs_a_per_call_ceiling_and_is_marked_paid(session_factory, monkeypatch):
+async def test_a_cloud_model_needs_a_per_call_ceiling_and_is_marked_paid(session_factory):
     await _providers(session_factory)
 
     async def digest(base_url: str, model_id: str) -> str:
         return f"ollama/{model_id}@sha256:" + "9" * 64
 
-    monkeypatch.setattr(automation_settings, "_ollama_identity", digest)
     projects = Projects({})
     cloud = {"provider_id": "custom-2", "model_id": "gemini-3.6-flash"}
 
     with pytest.raises(SettingsRefused, match="UNBOUNDED_PAID_ROUTE"):
-        await save_settings(session_factory, projects, "p", _update(**cloud))
-    await save_settings(session_factory, projects, "p", _update(**cloud, max_cost_per_call=5))
+        await save_settings(session_factory, projects, "p", _update(**cloud), identify_ollama=digest)
+    await save_settings(session_factory, projects, "p", _update(**cloud, max_cost_per_call=5), identify_ollama=digest)
 
     reviewer = next(r for r in projects.project["automation"]["routes"] if r["role"] == "reviewer_b")
     assert (reviewer["model_identity"], reviewer["paid"], reviewer["max_cost_per_call"]) == (

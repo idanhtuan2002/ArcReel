@@ -9,6 +9,7 @@ qualification covers is then refused by preflight, so an edit can never make an 
 
 from __future__ import annotations
 
+from collections.abc import Awaitable, Callable
 from ipaddress import ip_address
 from pathlib import Path
 from typing import Annotated, Any, Literal
@@ -115,7 +116,8 @@ async def settings_options(
     return {"settings": _view(current), "options": options, "launch_profiles": launch_profile_ids()}
 
 
-async def _ollama_identity(base_url: str, model_id: str) -> str:
+async def ollama_identity(base_url: str, model_id: str) -> str:
+    """The model pinned to the digest the Ollama server reports for it."""
     root = base_url.rstrip("/").removesuffix("/v1")
     try:
         async with httpx.AsyncClient(timeout=5) as client:
@@ -129,7 +131,12 @@ async def _ollama_identity(base_url: str, model_id: str) -> str:
 
 
 async def save_settings(
-    sessions: async_sessionmaker[AsyncSession], projects: ProjectManager, project_name: str, update: SettingsUpdate
+    sessions: async_sessionmaker[AsyncSession],
+    projects: ProjectManager,
+    project_name: str,
+    update: SettingsUpdate,
+    *,
+    identify_ollama: Callable[[str, str], Awaitable[str]] = ollama_identity,
 ) -> dict[str, Any]:
     """Write the edited settings; refuses an unknown profile, a missing role, a disabled or mistyped model, and a
     cloud model without a per-call cost ceiling."""
@@ -158,7 +165,7 @@ async def save_settings(
             identity = registered.get((choice.role, choice.provider_id, choice.model_id))
             if identity is None:
                 if model.endpoint == OLLAMA_ENDPOINT:
-                    identity = await _ollama_identity(provider.base_url, choice.model_id)
+                    identity = await identify_ollama(provider.base_url, choice.model_id)
                 elif provider.discovery_format == "google":
                     identity = f"gemini/{choice.model_id}"
                 else:
@@ -190,4 +197,4 @@ async def save_settings(
     return _view(settings)
 
 
-__all__ = ["SettingsRefused", "SettingsUpdate", "save_settings", "settings_options"]
+__all__ = ["SettingsRefused", "SettingsUpdate", "ollama_identity", "save_settings", "settings_options"]
