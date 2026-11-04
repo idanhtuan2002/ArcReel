@@ -7,7 +7,9 @@ are. A stage the run has not reached, or a project folder that is gone, contribu
 
 from __future__ import annotations
 
+import hashlib
 import json
+from collections import Counter
 from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
@@ -16,6 +18,7 @@ from lib.db.repositories.production_runs import ProductionRunRepository
 from lib.project_manager import ProjectManager
 from r2.automation.assessment import ModelAssessment
 from r2.contracts.automation import RunSnapshot, RunStage
+from server.production_run.owner_tasks import attempt_window_tasks, step_tasks
 from server.production_run.render_adapter import render_dir
 from server.story_authoring.artifacts import StoryBlobStore
 from server.story_authoring.commit import load_offered_manifest
@@ -52,6 +55,30 @@ def _reviews(projects: ProjectManager, run: RunSnapshot) -> list[dict[str, Any]]
     return episodes
 
 
+def _previews(projects: ProjectManager, run: RunSnapshot) -> list[dict[str, str]]:
+    """Project-relative paths of each completed target's final, only while its bytes are the verified ones."""
+    project = projects.get_project_path(run.project_name)
+    previews = []
+    for output in run.completed_targets:
+        episode = int(output.target.split(":")[1])
+        relative = render_dir(run, episode) / f"episode_{episode}.mp4"
+        final = project / relative
+        if final.is_file() and "sha256:" + hashlib.sha256(final.read_bytes()).hexdigest() == output.final_digest:
+            previews.append({"target": output.target, "path": relative.as_posix()})
+    return previews
+
+
+async def run_progress(sessions: async_sessionmaker[AsyncSession], run: RunSnapshot) -> dict[str, Any]:
+    """The owner tasks of the run's current stage by status, like a queue's running/queued counts."""
+    async with sessions() as session:
+        current = await ProductionRunRepository(session).current_step(run=run)
+    if current is None:
+        return {"run_id": run.run_id, "stage": run.stage.value, "tasks": {}}
+    intent, _ = current
+    tasks = await step_tasks(sessions, intent) or await attempt_window_tasks(sessions, intent)
+    return {"run_id": run.run_id, "stage": run.stage.value, "tasks": dict(Counter(task.status for task in tasks))}
+
+
 async def _story_exceptions(
     sessions: async_sessionmaker[AsyncSession], projects: ProjectManager, run: RunSnapshot
 ) -> list[dict[str, Any]]:
@@ -82,12 +109,13 @@ async def run_report(
         projects.get_project_path(run.project_name)
     except FileNotFoundError:
         # The project folder is gone; there is nothing stored to read.
-        return {"run_id": run.run_id, "quality": [], "story_exceptions": []}
+        return {"run_id": run.run_id, "quality": [], "story_exceptions": [], "previews": []}
     return {
         "run_id": run.run_id,
         "quality": _reviews(projects, run),
+        "previews": _previews(projects, run),
         "story_exceptions": await _story_exceptions(sessions, projects, run),
     }
 
 
-__all__ = ["run_report"]
+__all__ = ["run_progress", "run_report"]

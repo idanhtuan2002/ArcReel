@@ -21,7 +21,7 @@ from r2.automation.identity import policy_digest
 from r2.contracts.automation import AutomationMode, Checkpoint, ReviewCommand, RunCommand, RunSnapshot, RunStatus
 from server.auth import CurrentUser, InteractiveUser, oauth2_scheme_optional
 from server.production_run.qualification_jobs import QualificationJobs, QualificationRefused
-from server.production_run.report import run_report
+from server.production_run.report import run_progress, run_report
 from server.production_run.service import (
     ProductionRunRefused,
     ProductionRunService,
@@ -326,6 +326,17 @@ async def get_report(project_name: str, run_id: str, user: CurrentUser, service:
     if run is None:
         raise HTTPException(status_code=404, detail={"code": "RUN_NOT_FOUND", "reasons": []})
     return await run_report(sessions, get_project_manager(), run)
+
+
+@router.get("/projects/{project_name}/production-runs/{run_id}/progress")
+async def get_progress(project_name: str, run_id: str, user: CurrentUser, service: Service) -> dict[str, Any]:
+    """The owner tasks of the run's current stage by status."""
+    sessions = async_session_factory if service is None else service.sessions
+    async with sessions() as session:
+        run = await ProductionRunRepository(session).get(user_id=user.id, project_name=project_name, run_id=run_id)
+    if run is None:
+        raise HTTPException(status_code=404, detail={"code": "RUN_NOT_FOUND", "reasons": []})
+    return await run_progress(sessions, run)
 
 
 @router.get("/projects/{project_name}/production-runs/{run_id}/outputs/{episode}")
