@@ -20,6 +20,7 @@ from lib.project_manager import get_project_manager
 from r2.automation.identity import policy_digest
 from r2.contracts.automation import AutomationMode, Checkpoint, ReviewCommand, RunCommand, RunSnapshot, RunStatus
 from server.auth import CurrentUser, InteractiveUser, oauth2_scheme_optional
+from server.production_run.qualification_jobs import QualificationJobs, QualificationRefused
 from server.production_run.report import run_report
 from server.production_run.service import (
     ProductionRunRefused,
@@ -122,6 +123,46 @@ async def get_readiness(project_name: str, user: CurrentUser, service: Service) 
     """Whether automatic production could start for this project now, and why not."""
     try:
         return await _require(service).readiness(user_id=user.id, project_name=project_name)
+    except _REFUSALS as error:
+        raise _http(error) from error
+
+
+_QUALIFICATIONS: dict[int, QualificationJobs] = {}
+
+
+def _qualifications(service: ProductionRunService | None) -> QualificationJobs:
+    """This process's qualification jobs over the session factory runs use."""
+    sessions = async_session_factory if service is None else service.sessions
+    return _QUALIFICATIONS.setdefault(id(sessions), QualificationJobs(sessions, get_project_manager()))
+
+
+@router.get("/projects/{project_name}/automation/qualification")
+async def get_qualification(project_name: str, user: CurrentUser, service: Service) -> dict[str, Any]:
+    """Whether each reviewer route and the launch are qualified, and any reviewer job running on this host."""
+    try:
+        return await _qualifications(service).status(user_id=user.id, project_name=project_name)
+    except _REFUSALS as error:
+        raise _http(error) from error
+
+
+@router.post("/projects/{project_name}/automation/qualification/reviewers")
+async def start_reviewer_qualification(project_name: str, user: InteractiveUser, service: Service) -> dict[str, Any]:
+    """Qualify both reviewer routes on this host's labeled corpus; a qualifying result is recorded."""
+    try:
+        return await _qualifications(service).start_reviewers(user_id=user.id, project_name=project_name)
+    except QualificationRefused as refused:
+        raise HTTPException(status_code=409, detail={"code": str(refused), "reasons": []}) from None
+    except _REFUSALS as error:
+        raise _http(error) from error
+
+
+@router.post("/projects/{project_name}/automation/qualification/launch")
+async def record_launch_qualification(project_name: str, user: InteractiveUser, service: Service) -> dict[str, Any]:
+    """Record the launch qualification when the real preflight's only blocking reason is its absence."""
+    try:
+        return await _qualifications(service).record_launch(user_id=user.id, project_name=project_name)
+    except QualificationRefused as refused:
+        raise HTTPException(status_code=409, detail={"code": str(refused), "reasons": []}) from None
     except _REFUSALS as error:
         raise _http(error) from error
 

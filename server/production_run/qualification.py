@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+from collections.abc import Callable
 from pathlib import Path
 
 from lib.config.resolver import ConfigResolver
@@ -108,8 +109,10 @@ async def qualify(
     launch_profile_id: str,
     language: str,
     stop_early: bool = False,
+    progress: Callable[[int, int], None] | None = None,
 ) -> ReviewerQualification:
-    """The reviewer's record over the corpus; with ``stop_early`` it ends at the first answer that rules it out."""
+    """The reviewer's record over the corpus; with ``stop_early`` it ends at the first answer that rules it out.
+    ``progress`` is told the cases reviewed so far and the corpus size after every case."""
     cases: list[QualificationCase] = []
     method_digest = prompt_digest(review_method(route))
     prepared = _evidence(corpus, output)
@@ -135,6 +138,8 @@ async def qualify(
                 receipt_digest=digest,
             )
         )
+        if progress is not None:
+            progress(len(cases), len(prepared))
     return ReviewerQualification(
         profile_digest=profile_digest,
         launch_profile_id=launch_profile_id,
