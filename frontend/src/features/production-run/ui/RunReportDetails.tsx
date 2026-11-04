@@ -84,7 +84,7 @@ export function RunReportDetails({ projectName, runId, version }: Props) {
           <summary className="cursor-pointer" style={{ color: SEVERITY_TONES.warnings.color }}>
             {t("auto_report_story_exceptions", { count: report.story_exceptions.length })}
           </summary>
-          <ul className="m-0 mt-1 list-none space-y-1.5 p-0">
+          <ul className="m-0 mt-1 max-h-72 list-none space-y-1.5 overflow-y-auto p-0 pr-1">
             {report.story_exceptions.map((finding, index) => (
               <li key={index} style={{ color: "var(--color-text-3)" }}>
                 <span className="font-mono text-[11px]" style={{ color: "var(--color-text-2)" }}>
