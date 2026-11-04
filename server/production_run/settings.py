@@ -17,11 +17,15 @@ from urllib.parse import urlsplit
 
 import httpx
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 import r2.automation.profiles as launch_profiles
+import r2.contracts.quality as q
 from lib.custom_provider import parse_provider_id
+from lib.db.models.quality import QualityProfileHeadModel
 from lib.db.repositories.custom_provider_repo import CustomProviderRepository
+from lib.db.repositories.quality import QualityProfileRepository
 from lib.project_manager import ProjectManager
 from server.production_run.composition import MAX_TARGET_EPISODES
 
@@ -64,6 +68,37 @@ class SettingsUpdate(BaseModel):
     max_model_calls: Annotated[int, Field(ge=1, le=5000)] = 1500
     max_runtime_seconds: Annotated[int, Field(ge=600, le=172_800)] = 64_800
     max_target_episodes: Annotated[int, Field(ge=1, le=MAX_TARGET_EPISODES)] = 1
+    #: A published quality profile of the project; its current revision's digest is pinned. ``None`` keeps the
+    #: profile the settings already name.
+    profile_id: Annotated[str, StringConstraints(min_length=1, max_length=128)] | None = None
+
+
+async def published_profiles(session: AsyncSession, *, user_id: str, project_name: str) -> list[dict[str, Any]]:
+    """The current revision of every published quality profile; ``automatic`` when every slot is a model slot."""
+    heads = (
+        (await session.execute(select(QualityProfileHeadModel).filter_by(user_id=user_id, project_name=project_name)))
+        .scalars()
+        .all()
+    )
+    profiles = []
+    for head in sorted(heads, key=lambda row: row.profile_id):
+        if head.current_revision is None:
+            continue
+        profile = await QualityProfileRepository(session).get_revision(
+            user_id=user_id, project_name=project_name, profile_id=head.profile_id, revision=head.current_revision
+        )
+        if profile is None:
+            continue
+        slots = [slot for requirement in profile.policy.assessment_requirements for slot in requirement.slots]
+        profiles.append(
+            {
+                "profile_id": profile.profile_id,
+                "revision": profile.revision,
+                "profile_digest": profile.profile_digest,
+                "automatic": bool(slots) and all(slot.assessor_class is q.AssessorClass.MODEL for slot in slots),
+            }
+        )
+    return profiles
 
 
 def launch_profile_ids() -> list[str]:
@@ -84,6 +119,7 @@ def _view(settings: dict[str, Any]) -> dict[str, Any]:
     return {
         "configured": bool(settings),
         "has_quality_profile": bool(settings.get("profile_id") and settings.get("profile_digest")),
+        "profile_id": settings.get("profile_id"),
         "launch_profile_id": settings.get("launch_profile_id", "fiction_narration_vi_v1"),
         "routes": [
             {key: route.get(key) for key in ("role", "provider_id", "model_id", "max_cost_per_call")}
@@ -94,11 +130,12 @@ def _view(settings: dict[str, Any]) -> dict[str, Any]:
 
 
 async def settings_options(
-    sessions: async_sessionmaker[AsyncSession], projects: ProjectManager, project_name: str
+    sessions: async_sessionmaker[AsyncSession], projects: ProjectManager, project_name: str, *, user_id: str
 ) -> dict[str, Any]:
-    """The current settings and, per role, the enabled models of the matching media type."""
+    """The current settings, the published quality profiles and, per role, the enabled models of its media type."""
     current = projects.load_project(project_name).get("automation") or {}
     async with sessions() as session:
+        profiles = await published_profiles(session, user_id=user_id, project_name=project_name)
         repository = CustomProviderRepository(session)
         providers = {provider.id: provider for provider in await repository.list_providers()}
         options: dict[str, list[dict[str, Any]]] = {}
@@ -113,7 +150,12 @@ async def settings_options(
                 for model in await repository.list_enabled_models_by_media_type(media)
                 if model.provider_id in providers
             ]
-    return {"settings": _view(current), "options": options, "launch_profiles": launch_profile_ids()}
+    return {
+        "settings": _view(current),
+        "options": options,
+        "launch_profiles": launch_profile_ids(),
+        "quality_profiles": profiles,
+    }
 
 
 async def ollama_identity(base_url: str, model_id: str) -> str:
@@ -136,6 +178,7 @@ async def save_settings(
     project_name: str,
     update: SettingsUpdate,
     *,
+    user_id: str,
     identify_ollama: Callable[[str, str], Awaitable[str]] = ollama_identity,
 ) -> dict[str, Any]:
     """Write the edited settings; refuses an unknown profile, a missing role, a disabled or mistyped model, and a
@@ -151,7 +194,20 @@ async def save_settings(
         for route in current.get("routes") or []
     }
     routes = []
+    profile_fields: dict[str, str] = {}
     async with sessions() as session:
+        if update.profile_id is not None:
+            chosen = next(
+                (
+                    profile
+                    for profile in await published_profiles(session, user_id=user_id, project_name=project_name)
+                    if profile["profile_id"] == update.profile_id
+                ),
+                None,
+            )
+            if chosen is None:
+                raise SettingsRefused("MISSING_PUBLISHED_PROFILE")
+            profile_fields = {"profile_id": chosen["profile_id"], "profile_digest": chosen["profile_digest"]}
         repository = CustomProviderRepository(session)
         for choice in update.routes:
             provider = await repository.get_provider(parse_provider_id(choice.provider_id))
@@ -183,6 +239,7 @@ async def save_settings(
             )
     settings = {
         **current,
+        **profile_fields,
         "launch_profile_id": update.launch_profile_id,
         "routes": routes,
         "local_only": all(route["local"] for route in routes),

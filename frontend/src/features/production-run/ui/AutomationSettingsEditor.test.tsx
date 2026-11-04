@@ -23,6 +23,10 @@ function loaded(): AutomationSettings {
     },
     options: Object.fromEntries(ROLES.map((role) => [role, [LOCAL, CLOUD]])) as AutomationSettings["options"],
     launch_profiles: ["fiction_narration_vi_v1"],
+    quality_profiles: [
+      { profile_id: "auto-review", revision: 2, profile_digest: "sha256:p", automatic: true },
+      { profile_id: "human-review", revision: 1, profile_digest: "sha256:h", automatic: false },
+    ],
   };
 }
 
@@ -56,6 +60,7 @@ describe("AutomationSettingsEditor", () => {
       target: { value: "5" },
     });
     fireEvent.change(screen.getByRole("spinbutton", { name: "Episodes per run" }), { target: { value: "2" } });
+    fireEvent.change(screen.getByRole("combobox", { name: "Quality profile" }), { target: { value: "auto-review" } });
     fireEvent.click(button);
 
     await waitFor(() => expect(save).toHaveBeenCalledTimes(1));
@@ -67,6 +72,7 @@ describe("AutomationSettingsEditor", () => {
       max_cost_per_call: 5,
     });
     expect(update.max_target_episodes).toBe(2);
+    expect(update.profile_id).toBe("auto-review");
     expect(await screen.findByRole("status")).toHaveTextContent("Saved.");
   });
 

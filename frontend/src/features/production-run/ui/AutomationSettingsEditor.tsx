@@ -10,6 +10,7 @@ const FIELD_CLS = "focus-ring rounded-md px-1.5 py-0.5";
 const FIELD_STYLE = { border: "1px solid var(--color-hairline-strong)", background: "transparent" };
 
 interface Draft {
+  profile_id: string;
   launch_profile_id: string;
   routes: Record<AutomationRole, RouteSetting | null>;
   currency: string;
@@ -25,6 +26,7 @@ function draftOf(loaded: AutomationSettings): Draft {
     ROLES.map((role) => [role, settings.routes.find((route) => route.role === role) ?? null]),
   ) as Record<AutomationRole, RouteSetting | null>;
   return {
+    profile_id: settings.profile_id ?? "",
     launch_profile_id: settings.launch_profile_id,
     routes,
     currency: settings.currency ?? "USD",
@@ -80,6 +82,7 @@ export function AutomationSettingsEditor({ projectName, onSaved }: Props) {
     setMessage(null);
     try {
       await saveAutomationSettings(projectName, {
+        profile_id: draft.profile_id || null,
         launch_profile_id: draft.launch_profile_id,
         routes: routes.filter((route): route is RouteSetting => route !== null),
         currency: draft.currency,
@@ -154,9 +157,28 @@ export function AutomationSettingsEditor({ projectName, onSaved }: Props) {
             void save();
           }}
         >
-          {!loaded.settings.has_quality_profile && (
+          {loaded.quality_profiles.length === 0 && (
             <p style={{ color: SEVERITY_TONES.warnings.color }}>{t("auto_settings_no_profile")}</p>
           )}
+          <label className="flex items-center gap-2">
+            <span className="w-40" style={{ color: "var(--color-text-2)" }}>
+              {t("auto_settings_quality_profile")}
+            </span>
+            <select
+              className={FIELD_CLS}
+              style={FIELD_STYLE}
+              value={draft.profile_id}
+              onChange={(event) => setDraft({ ...draft, profile_id: event.target.value })}
+            >
+              <option value="">{t("auto_settings_choose")}</option>
+              {loaded.quality_profiles.map((profile) => (
+                <option key={profile.profile_id} value={profile.profile_id}>
+                  {profile.profile_id} r{profile.revision}
+                  {profile.automatic ? "" : ` · ${t("auto_settings_profile_not_automatic")}`}
+                </option>
+              ))}
+            </select>
+          </label>
           <label className="flex items-center gap-2">
             <span className="w-40" style={{ color: "var(--color-text-2)" }}>
               {t("auto_settings_launch_profile")}

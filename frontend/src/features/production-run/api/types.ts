@@ -188,6 +188,7 @@ export interface RouteSetting {
 export interface AutomationSettingsView {
   configured: boolean;
   has_quality_profile: boolean;
+  profile_id?: string | null;
   launch_profile_id: string;
   routes: RouteSetting[];
   currency?: string;
@@ -204,13 +205,23 @@ export interface ModelOption {
   local: boolean;
 }
 
+export interface PublishedProfile {
+  profile_id: string;
+  revision: number;
+  profile_digest: string;
+  /** Every slot is a model slot: the profile an automatic run can use. */
+  automatic: boolean;
+}
+
 export interface AutomationSettings {
   settings: AutomationSettingsView;
   options: Record<AutomationRole, ModelOption[]>;
   launch_profiles: string[];
+  quality_profiles: PublishedProfile[];
 }
 
 export interface AutomationSettingsUpdate {
+  profile_id?: string | null;
   launch_profile_id: string;
   routes: RouteSetting[];
   currency: string;

@@ -129,9 +129,8 @@ async def get_readiness(project_name: str, user: CurrentUser, service: Service) 
 @router.get("/projects/{project_name}/automation/settings")
 async def get_settings(project_name: str, user: CurrentUser, service: Service) -> dict[str, Any]:
     """The project's automatic production settings and the models each role may use."""
-    del user
     sessions = async_session_factory if service is None else service.sessions
-    return await settings_options(sessions, get_project_manager(), project_name)
+    return await settings_options(sessions, get_project_manager(), project_name, user_id=user.id)
 
 
 @router.put("/projects/{project_name}/automation/settings")
@@ -139,10 +138,9 @@ async def put_settings(
     project_name: str, body: SettingsUpdate, user: InteractiveUser, service: Service
 ) -> dict[str, Any]:
     """Replace the project's model per role and run limits; a later Start freezes them into its policy."""
-    del user
     sessions = async_session_factory if service is None else service.sessions
     try:
-        return await save_settings(sessions, get_project_manager(), project_name, body)
+        return await save_settings(sessions, get_project_manager(), project_name, body, user_id=user.id)
     except SettingsRefused as refused:
         raise HTTPException(status_code=422, detail={"code": str(refused), "reasons": []}) from None
 

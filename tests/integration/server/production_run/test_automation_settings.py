@@ -73,7 +73,7 @@ def _update(**reviewer_b) -> SettingsUpdate:
 async def test_options_list_enabled_models_per_role_and_mark_local_ones(session_factory):
     await _providers(session_factory)
 
-    options = await settings_options(session_factory, Projects(None), "p")
+    options = await settings_options(session_factory, Projects(None), "p", user_id="default")
 
     writers = {(o["model_id"], o["local"]) for o in options["options"]["writer"]}
     assert writers == {(m, True) for m in TEXT} | {("gemini-3.6-flash", False)}
@@ -101,7 +101,7 @@ async def test_a_saved_edit_keeps_governance_fields_and_registered_identities(se
         looked_up.append(model_id)
         return f"ollama/{model_id}@sha256:" + "9" * 64
 
-    saved = await save_settings(session_factory, projects, "p", _update(), identify_ollama=digest)
+    saved = await save_settings(session_factory, projects, "p", _update(), user_id="default", identify_ollama=digest)
 
     stored = projects.project["automation"]
     identities = {route["role"]: route["model_identity"] for route in stored["routes"]}
@@ -128,8 +128,10 @@ async def test_a_cloud_model_needs_a_per_call_ceiling_and_is_marked_paid(session
     cloud = {"provider_id": "custom-2", "model_id": "gemini-3.6-flash"}
 
     with pytest.raises(SettingsRefused, match="UNBOUNDED_PAID_ROUTE"):
-        await save_settings(session_factory, projects, "p", _update(**cloud), identify_ollama=digest)
-    await save_settings(session_factory, projects, "p", _update(**cloud, max_cost_per_call=5), identify_ollama=digest)
+        await save_settings(session_factory, projects, "p", _update(**cloud), user_id="default", identify_ollama=digest)
+    await save_settings(
+        session_factory, projects, "p", _update(**cloud, max_cost_per_call=5), user_id="default", identify_ollama=digest
+    )
 
     reviewer = next(r for r in projects.project["automation"]["routes"] if r["role"] == "reviewer_b")
     assert (reviewer["model_identity"], reviewer["paid"], reviewer["max_cost_per_call"]) == (
@@ -148,6 +150,14 @@ async def test_a_model_of_another_media_type_or_a_missing_role_is_refused(sessio
     missing.routes[6] = missing.routes[6].model_copy(update={"role": "image"})
 
     with pytest.raises(SettingsRefused, match="PINNED_MODEL_UNAVAILABLE"):
-        await save_settings(session_factory, Projects({}), "p", wrong)
+        await save_settings(session_factory, Projects({}), "p", wrong, user_id="default")
     with pytest.raises(SettingsRefused, match="MISSING_MODEL_ROLE"):
-        await save_settings(session_factory, Projects({}), "p", missing)
+        await save_settings(session_factory, Projects({}), "p", missing, user_id="default")
+
+
+async def test_an_unpublished_quality_profile_is_refused(session_factory):
+    await _providers(session_factory)
+    update = _update().model_copy(update={"profile_id": "never-published"})
+
+    with pytest.raises(SettingsRefused, match="MISSING_PUBLISHED_PROFILE"):
+        await save_settings(session_factory, Projects({}), "p", update, user_id="default")
