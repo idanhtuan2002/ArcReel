@@ -1,5 +1,6 @@
 
 import { PipelineBoard } from "./pipeline/PipelineBoard";
+import { ProductionRunPanel } from "@/features/production-run/ui/ProductionRunPanel";
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Pencil, RefreshCw, Sparkles, Users, Landmark, Package } from "lucide-react";
@@ -327,6 +328,7 @@ export function OverviewCanvas({
         </header>
 
         {!readOnly ? <PipelineBoard projectName={projectName} /> : null}
+        {!readOnly ? <ProductionRunPanel key={projectName} projectName={projectName} /> : null}
 
         {showAdInit ? (
           <AdInitCanvas projectName={projectName} onDone={refreshProject} />

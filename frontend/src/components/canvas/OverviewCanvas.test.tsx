@@ -19,6 +19,13 @@ vi.mock("./AdInitCanvas", () => ({
   AdInitCanvas: () => <div data-testid="ad-init-canvas">ad-init</div>,
 }));
 
+// The run panel polls the server; the overview only decides whether it is shown.
+vi.mock("@/features/production-run/ui/ProductionRunPanel", () => ({
+  ProductionRunPanel: ({ projectName }: { projectName: string }) => (
+    <div data-testid="production-run-panel">{projectName}</div>
+  ),
+}));
+
 function makeProjectData(overrides: Partial<ProjectData> = {}): ProjectData {
   return {
     title: "Demo",
@@ -51,6 +58,14 @@ describe("OverviewCanvas", () => {
   it("renders the project title and content mode", () => {
     render(<OverviewCanvas projectName="demo" projectData={makeProjectData()} />);
     expect(screen.getByText("Demo")).toBeInTheDocument();
+  });
+
+  it("offers automatic production on an editable project only", () => {
+    const { rerender } = render(<OverviewCanvas projectName="demo" projectData={makeProjectData()} />);
+    expect(screen.getByTestId("production-run-panel")).toHaveTextContent("demo");
+
+    rerender(<OverviewCanvas projectName="demo" projectData={makeProjectData()} readOnly />);
+    expect(screen.queryByTestId("production-run-panel")).not.toBeInTheDocument();
   });
 
   it("reports the storyboard count per episode on the storyboard route", () => {
