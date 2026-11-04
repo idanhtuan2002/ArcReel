@@ -10,6 +10,7 @@ from __future__ import annotations
 import hashlib
 import json
 from collections import Counter
+from pathlib import Path
 from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
@@ -55,17 +56,24 @@ def _reviews(projects: ProjectManager, run: RunSnapshot) -> list[dict[str, Any]]
     return episodes
 
 
+def verified_final(projects: ProjectManager, run: RunSnapshot, episode: int) -> Path | None:
+    """The completed target's final while its bytes are still the verified ones; otherwise ``None``."""
+    output = next((o for o in run.completed_targets if o.target == f"episode:{episode}"), None)
+    if output is None:
+        return None
+    final = projects.get_project_path(run.project_name) / render_dir(run, episode) / f"episode_{episode}.mp4"
+    if not final.is_file() or "sha256:" + hashlib.sha256(final.read_bytes()).hexdigest() != output.final_digest:
+        return None
+    return final
+
+
 def _previews(projects: ProjectManager, run: RunSnapshot) -> list[dict[str, str]]:
-    """Project-relative paths of each completed target's final, only while its bytes are the verified ones."""
-    project = projects.get_project_path(run.project_name)
-    previews = []
-    for output in run.completed_targets:
-        episode = int(output.target.split(":")[1])
-        relative = render_dir(run, episode) / f"episode_{episode}.mp4"
-        final = project / relative
-        if final.is_file() and "sha256:" + hashlib.sha256(final.read_bytes()).hexdigest() == output.final_digest:
-            previews.append({"target": output.target, "path": relative.as_posix()})
-    return previews
+    """The completed targets whose verified final can be previewed (served only to the authenticated owner)."""
+    return [
+        {"target": output.target}
+        for output in run.completed_targets
+        if verified_final(projects, run, int(output.target.split(":")[1])) is not None
+    ]
 
 
 async def run_progress(sessions: async_sessionmaker[AsyncSession], run: RunSnapshot) -> dict[str, Any]:
@@ -118,4 +126,4 @@ async def run_report(
     }
 
 
-__all__ = ["run_progress", "run_report"]
+__all__ = ["run_progress", "run_report", "verified_final"]

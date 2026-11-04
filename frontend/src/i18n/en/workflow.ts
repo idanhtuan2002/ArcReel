@@ -182,6 +182,8 @@ export default {
   'auto_checkpoint_STORY_MANUSCRIPT': 'story manuscript',
   'auto_checkpoint_SCRIPT_PACKAGE': 'script package',
   'auto_checkpoint_FINAL_FILM': 'final film',
+  'auto_report_watch': "Watch the final of episode {{episode}}",
+  'auto_report_preview_failed': "Could not load the final.",
   'auto_examples': "Examples:",
   'auto_example_1_label': "Letter in a bottle",
   'auto_example_1': "A fisherman's son finds a letter in a bottle from the father who left the village years ago.",

@@ -1,8 +1,7 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { API } from "@/api";
 import { SEVERITY_TONES } from "@/utils/severity-tone";
-import { getProductionRunReport } from "../api/productionRunClient";
+import { getProductionRunReport, previewProductionFinal } from "../api/productionRunClient";
 import type { ReviewScore, RunReport } from "../api/types";
 
 const SCORES: readonly ReviewScore[] = ["story", "visual", "audio", "continuity", "pacing"];
@@ -21,6 +20,23 @@ interface Props {
 export function RunReportDetails({ projectName, runId, version }: Props) {
   const { t } = useTranslation("workflow");
   const [report, setReport] = useState<RunReport | null>(null);
+  // Object URLs of the finals the owner opened; the final is fetched with the session, never from a public path.
+  const [previews, setPreviews] = useState<Record<string, string>>({});
+  const [previewFailed, setPreviewFailed] = useState(false);
+  const opened = useRef<string[]>([]);
+  useEffect(() => () => opened.current.forEach((url) => URL.revokeObjectURL(url)), []);
+
+  const openPreview = async (target: string) => {
+    setPreviewFailed(false);
+    try {
+      const blob = await previewProductionFinal(projectName, runId, Number(target.split(":")[1]));
+      const url = URL.createObjectURL(blob);
+      opened.current.push(url);
+      setPreviews((current) => ({ ...current, [target]: url }));
+    } catch {
+      setPreviewFailed(true);
+    }
+  };
 
   useEffect(() => {
     const controller = new AbortController();
@@ -37,18 +53,31 @@ export function RunReportDetails({ projectName, runId, version }: Props) {
   if (!report || report.run_id !== runId) return null;
   return (
     <div className="space-y-1.5 text-[12px]">
-      {(report.previews ?? []).map((preview) => (
-        <figure key={preview.target} className="m-0">
-          {/* eslint-disable-next-line jsx-a11y/media-has-caption -- the final has its subtitles burned into the picture */}
-          <video
-            className="max-h-80 rounded-md"
-            controls
-            preload="metadata"
-            aria-label={t("auto_report_preview", { episode: Number(preview.target.split(":")[1]) })}
-            src={API.getFileUrl(projectName, preview.path)}
-          />
-        </figure>
-      ))}
+      {(report.previews ?? []).map((preview) => {
+        const episode = Number(preview.target.split(":")[1]);
+        const url = previews[preview.target];
+        return url ? (
+          <figure key={preview.target} className="m-0">
+            {/* eslint-disable-next-line jsx-a11y/media-has-caption -- the final has its subtitles burned into the picture */}
+            <video
+              className="max-h-80 rounded-md"
+              controls
+              aria-label={t("auto_report_preview", { episode })}
+              src={url}
+            />
+          </figure>
+        ) : (
+          <button
+            key={preview.target}
+            type="button"
+            className="focus-ring rounded text-[11.5px] underline underline-offset-2 hover:opacity-80"
+            onClick={() => void openPreview(preview.target)}
+          >
+            {t("auto_report_watch", { episode })}
+          </button>
+        );
+      })}
+      {previewFailed && <p style={{ color: SEVERITY_TONES.blocking.color }}>{t("auto_report_preview_failed")}</p>}
       {report.quality.length > 0 && (
         <details>
           <summary className="cursor-pointer" style={{ color: "var(--color-text-2)" }}>

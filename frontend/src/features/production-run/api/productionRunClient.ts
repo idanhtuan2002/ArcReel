@@ -176,6 +176,19 @@ export function reviewProductionRun(
   });
 }
 
+export async function previewProductionFinal(
+  projectName: string,
+  runId: string,
+  episode: number,
+  options: CallOptions = {},
+): Promise<Blob> {
+  const response = await API.requestBinary(
+    `${base(projectName)}/${encodeURIComponent(runId)}/outputs/${episode}/final`,
+    { signal: options.signal },
+  );
+  return response.blob();
+}
+
 export async function downloadProductionOutput(
   projectName: string,
   runId: string,

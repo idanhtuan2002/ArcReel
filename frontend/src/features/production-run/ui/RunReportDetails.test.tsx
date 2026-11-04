@@ -62,14 +62,16 @@ describe("RunReportDetails", () => {
       run_id: "run-1",
       quality: [],
       story_exceptions: [],
-      previews: [{ target: "episode:1", path: "production/automation/run-1/g1/episode_1/episode_1.mp4" }],
+      previews: [{ target: "episode:1" }],
     });
+    const preview = vi.spyOn(client, "previewProductionFinal").mockResolvedValue(new Blob(["mp4"]));
+    vi.stubGlobal("URL", { ...URL, createObjectURL: () => "blob:final", revokeObjectURL: () => undefined });
     render(<RunReportDetails projectName="alpha" runId="run-1" version={4} />);
 
-    const video = await screen.findByLabelText("Final of episode 1");
-    expect(video).toHaveAttribute(
-      "src",
-      expect.stringContaining("/files/alpha/production/automation/run-1/g1/episode_1/episode_1.mp4"),
-    );
+    fireEvent.click(await screen.findByRole("button", { name: "Watch the final of episode 1" }));
+
+    expect(await screen.findByLabelText("Final of episode 1")).toHaveAttribute("src", "blob:final");
+    expect(preview).toHaveBeenCalledWith("alpha", "run-1", 1);
+    vi.unstubAllGlobals();
   });
 });

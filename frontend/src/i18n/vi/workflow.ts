@@ -184,6 +184,8 @@ export default {
   'auto_checkpoint_STORY_MANUSCRIPT': 'bản thảo truyện',
   'auto_checkpoint_SCRIPT_PACKAGE': 'gói kịch bản',
   'auto_checkpoint_FINAL_FILM': 'phim cuối',
+  'auto_report_watch': "Xem bản dựng cuối tập {{episode}}",
+  'auto_report_preview_failed': "Không tải được bản dựng cuối.",
   'auto_examples': "Ví dụ:",
   'auto_example_1_label': "Lá thư trong chai",
   'auto_example_1': "Con trai một ngư dân nhặt được lá thư trong chai của người cha đã rời làng nhiều năm trước.",

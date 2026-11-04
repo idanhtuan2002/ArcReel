@@ -184,6 +184,8 @@ export default {
   'auto_checkpoint_STORY_MANUSCRIPT': '故事稿',
   'auto_checkpoint_SCRIPT_PACKAGE': '剧本包',
   'auto_checkpoint_FINAL_FILM': '成片',
+  'auto_report_watch': "观看第 {{episode}} 集成片",
+  'auto_report_preview_failed': "无法加载成片。",
   'auto_examples': "示例：",
   'auto_example_1_label': "瓶中信",
   'auto_example_1': "渔夫的儿子捡到一封瓶中信，来自多年前离开村子的父亲。",
