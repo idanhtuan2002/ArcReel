@@ -4,7 +4,17 @@
  */
 
 import { API } from "@/api";
-import type { AutomationMode, Checkpoint, Readiness, RunList, RunReport, RunSnapshot } from "./types";
+import type {
+  AutomationMode,
+  AutomationSettings,
+  AutomationSettingsUpdate,
+  AutomationSettingsView,
+  Checkpoint,
+  Readiness,
+  RunList,
+  RunReport,
+  RunSnapshot,
+} from "./types";
 
 interface CallOptions {
   signal?: AbortSignal;
@@ -56,6 +66,24 @@ export function getProductionRun(projectName: string, runId: string, options: Ca
 
 export function getAutomationReadiness(projectName: string, options: CallOptions = {}): Promise<Readiness> {
   return API.request<Readiness>(`/projects/${encodeURIComponent(projectName)}/automation/readiness`, {
+    signal: options.signal,
+  });
+}
+
+export function getAutomationSettings(projectName: string, options: CallOptions = {}): Promise<AutomationSettings> {
+  return API.request<AutomationSettings>(`/projects/${encodeURIComponent(projectName)}/automation/settings`, {
+    signal: options.signal,
+  });
+}
+
+export function saveAutomationSettings(
+  projectName: string,
+  update: AutomationSettingsUpdate,
+  options: CallOptions = {},
+): Promise<AutomationSettingsView> {
+  return API.request<AutomationSettingsView>(`/projects/${encodeURIComponent(projectName)}/automation/settings`, {
+    method: "PUT",
+    body: JSON.stringify(update),
     signal: options.signal,
   });
 }

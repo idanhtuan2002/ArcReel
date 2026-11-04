@@ -27,6 +27,7 @@ from server.production_run.service import (
     policy_for_mode,
     refusal,
 )
+from server.production_run.settings import SettingsRefused, SettingsUpdate, save_settings, settings_options
 from server.services.governance_startup import GovernanceStartupUnavailable
 
 router = APIRouter()
@@ -123,6 +124,27 @@ async def get_readiness(project_name: str, user: CurrentUser, service: Service) 
         return await _require(service).readiness(user_id=user.id, project_name=project_name)
     except _REFUSALS as error:
         raise _http(error) from error
+
+
+@router.get("/projects/{project_name}/automation/settings")
+async def get_settings(project_name: str, user: CurrentUser, service: Service) -> dict[str, Any]:
+    """The project's automatic production settings and the models each role may use."""
+    del user
+    sessions = async_session_factory if service is None else service.sessions
+    return await settings_options(sessions, get_project_manager(), project_name)
+
+
+@router.put("/projects/{project_name}/automation/settings")
+async def put_settings(
+    project_name: str, body: SettingsUpdate, user: InteractiveUser, service: Service
+) -> dict[str, Any]:
+    """Replace the project's model per role and run limits; a later Start freezes them into its policy."""
+    del user
+    sessions = async_session_factory if service is None else service.sessions
+    try:
+        return await save_settings(sessions, get_project_manager(), project_name, body)
+    except SettingsRefused as refused:
+        raise HTTPException(status_code=422, detail={"code": str(refused), "reasons": []}) from None
 
 
 @router.post("/projects/{project_name}/production-runs")

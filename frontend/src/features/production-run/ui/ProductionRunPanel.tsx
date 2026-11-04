@@ -22,6 +22,7 @@ import {
   type StartOffer,
 } from "../api/types";
 import { AutomationReadiness } from "./AutomationReadiness";
+import { AutomationSettingsEditor } from "./AutomationSettingsEditor";
 import { RunReportDetails } from "./RunReportDetails";
 
 const POLL_MS = 5000;
@@ -87,6 +88,8 @@ export function ProductionRunPanel({ projectName }: Props) {
   const [idea, setIdea] = useState("");
   const [mode, setMode] = useState<AutomationMode>("auto");
   const [episodes, setEpisodes] = useState(1);
+  // Bumped after a settings save so readiness is checked again against the new settings.
+  const [setupVersion, setSetupVersion] = useState(0);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   // The parent keys this panel by project, so a mounted panel serves one project; responses that land after it
@@ -233,7 +236,16 @@ export function ProductionRunPanel({ projectName }: Props) {
           {t("auto_unavailable", { reason: reasonText(offer.reason ?? "") })}
         </p>
       )}
-      {offer?.enabled && <AutomationReadiness projectName={projectName} />}
+      {offer?.enabled && <AutomationReadiness key={setupVersion} projectName={projectName} />}
+      {offer && (
+        <AutomationSettingsEditor
+          projectName={projectName}
+          onSaved={() => {
+            setSetupVersion((version) => version + 1);
+            void refresh();
+          }}
+        />
+      )}
       {startable && offer?.enabled && (
         <form
           className="space-y-2"

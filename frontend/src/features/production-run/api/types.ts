@@ -175,3 +175,47 @@ export interface Readiness {
     max_target_episodes: number;
   } | null;
 }
+
+export type AutomationRole = "writer" | "script" | "reviewer_a" | "reviewer_b" | "image" | "video" | "audio";
+
+export interface RouteSetting {
+  role: AutomationRole;
+  provider_id: string;
+  model_id: string;
+  max_cost_per_call?: number | null;
+}
+
+export interface AutomationSettingsView {
+  configured: boolean;
+  has_quality_profile: boolean;
+  launch_profile_id: string;
+  routes: RouteSetting[];
+  currency?: string;
+  max_cost_minor_units?: number;
+  max_model_calls?: number;
+  max_runtime_seconds?: number;
+  max_target_episodes?: number;
+}
+
+export interface ModelOption {
+  provider_id: string;
+  model_id: string;
+  label: string;
+  local: boolean;
+}
+
+export interface AutomationSettings {
+  settings: AutomationSettingsView;
+  options: Record<AutomationRole, ModelOption[]>;
+  launch_profiles: string[];
+}
+
+export interface AutomationSettingsUpdate {
+  launch_profile_id: string;
+  routes: RouteSetting[];
+  currency: string;
+  max_cost_minor_units: number;
+  max_model_calls: number;
+  max_runtime_seconds: number;
+  max_target_episodes: number;
+}
