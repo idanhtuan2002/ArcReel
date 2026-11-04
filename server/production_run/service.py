@@ -131,10 +131,14 @@ class ProductionRunService:
         """The digests a Start command must carry; nothing is resolved while activation is disabled."""
         if not self.activation.enabled:
             return {"enabled": False, "reason": self.activation.reason}
-        resolved = {
-            mode: await self._policies.resolve(user_id=user_id, project_name=project_name, mode=mode)
-            for mode in AutomationMode
-        }
+        try:
+            resolved = {
+                mode: await self._policies.resolve(user_id=user_id, project_name=project_name, mode=mode)
+                for mode in AutomationMode
+            }
+        except ProductionRunRefused as refused:
+            # A project without (valid) automation settings cannot start yet; its setup stays reachable.
+            return {"enabled": False, "reason": refused.code, "reasons": list(refused.reasons)}
         return {
             "enabled": True,
             "input_digest": await self._witness.digest(user_id=user_id, project_name=project_name),

@@ -28,7 +28,12 @@ from server import auth
 from server.error_handlers import register_error_handlers
 from server.production_run.controller import ProductionController
 from server.production_run.scheduler import ProductionScheduler
-from server.production_run.service import ProductionActivation, ProductionRunService, policy_for_mode
+from server.production_run.service import (
+    ProductionActivation,
+    ProductionRunRefused,
+    ProductionRunService,
+    policy_for_mode,
+)
 from server.routers import production_runs
 from tests.auth_deps import AUTH_DEPENDENCIES
 from tests.integration.lib.db.repositories.test_production_runs import policy
@@ -42,7 +47,12 @@ BASE = "/api/v1/projects/project/production-runs"
 
 
 class Policies:
+    def __init__(self) -> None:
+        self.refusal: ProductionRunRefused | None = None
+
     async def resolve(self, *, user_id, project_name, mode):
+        if self.refusal is not None:
+            raise self.refusal
         if mode is AutomationMode.SEMI:
             return RunPolicy.model_validate(
                 {**policy().model_dump(), "mode": mode, "checkpoints": frozenset({Checkpoint.STORY_MANUSCRIPT})}
@@ -75,6 +85,7 @@ class Host:
     owner: FakeOwner
     witness: Witness
     preflight: Preflight
+    policies: Policies
 
     @property
     def headers(self) -> dict[str, str]:
@@ -122,7 +133,7 @@ async def host(concurrent_session_factory, tmp_path, interactive_env):
     async with serve_governance_attestor(
         root, runtime, session_factory=sessions, expected_uid=os.getuid(), expected_gid=os.getgid()
     ):
-        owner, witness, preflight = FakeOwner(), Witness(), Preflight()
+        owner, witness, preflight, policies = FakeOwner(), Witness(), Preflight(), Policies()
         controller = ProductionController(
             sessions, adapters=dict.fromkeys(RunStage, owner), witness=witness, poll_seconds=0
         )
@@ -131,7 +142,7 @@ async def host(concurrent_session_factory, tmp_path, interactive_env):
         app.state.production_run_service = ProductionRunService(
             sessions,
             custodian=custodian(sessions, root, runtime),
-            policies=Policies(),
+            policies=policies,
             witness=witness,
             preflight=preflight,
             activation=ProductionActivation(enabled=True),
@@ -140,7 +151,7 @@ async def host(concurrent_session_factory, tmp_path, interactive_env):
         app.include_router(production_runs.router, prefix="/api/v1", dependencies=AUTH_DEPENDENCIES)
         register_error_handlers(app)
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as http:
-            yield Host(http, sessions, scheduler, owner, witness, preflight)
+            yield Host(http, sessions, scheduler, owner, witness, preflight, policies)
 
 
 async def test_double_start_and_lost_response_retry_return_one_run_and_one_grant(host):
@@ -192,6 +203,21 @@ async def test_readiness_names_preflight_reasons_and_the_policy_a_start_would_fr
     assert (ready["ready"], ready["reasons"]) == (True, [])
     assert ready["limits"]["max_target_episodes"] == 1
     assert (blocked["ready"], blocked["reasons"]) == (False, ["MISSING_QUALIFIED_REVIEWER"])
+
+
+async def test_a_project_without_automation_settings_is_offered_nothing_instead_of_failing(host):
+    host.policies.refusal = ProductionRunRefused(
+        "AUTOMATION_NOT_CONFIGURED", 409, ("PROJECT_AUTOMATION_SETTINGS_MISSING",)
+    )
+
+    listed = await host.http.get(BASE, headers=host.headers)
+
+    assert listed.status_code == 200, listed.text
+    assert listed.json()["start"] == {
+        "enabled": False,
+        "reason": "AUTOMATION_NOT_CONFIGURED",
+        "reasons": ["PROJECT_AUTOMATION_SETTINGS_MISSING"],
+    }
 
 
 async def test_same_start_command_with_a_changed_idea_conflicts(host):
