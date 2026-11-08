@@ -55,7 +55,7 @@ from server.media_tools.context import ToolContext
 from server.media_tools.narration_audio import handle_generate_narration_audio
 from server.media_tools.storyboards import handle_generate_storyboards
 from server.media_tools.videos import handle_generate_videos
-from server.production_run.image_judge import OllamaImageJudge
+from server.production_run.image_judge import ImageJudge
 from server.production_run.owner_support import (
     OwnerBlocked,
     Sessions,
@@ -118,7 +118,7 @@ class MediaAdapter:
         queue: GenerationQueue | None = None,
         tools: dict[WorkflowActionType, MediaTool] | None = None,
         max_attempts: int = 2,
-        judge: OllamaImageJudge | None = None,
+        judge: ImageJudge | None = None,
         restore: Callable[[str, str, str, int], Awaitable[Any]] | None = None,
     ) -> None:
         self._sessions, self._authority, self._projects, self._resolver = sessions, authority, projects, resolver
@@ -323,7 +323,9 @@ class MediaAdapter:
             decision: dict[str, Any] = {"candidates": [v["version"] for v in usable], "chosen_version": None}
             if route is not None and self._judge_client is not None and len(usable) >= 2:
                 pictures = [await asyncio.to_thread((root / v["file"]).read_bytes) for v in usable]
-                choice = await self._judge_client.choose(route, lines.get(unit, ""), pictures)
+                choice = await self._judge_client.choose(
+                    route, lines.get(unit, ""), pictures, prompt_digest=run.policy.image_judge_prompt_digest
+                )
                 decision.update(chosen_version=usable[choice.index]["version"], scores=choice.scores)
             decisions[unit] = decision
         return decisions

@@ -37,11 +37,11 @@ from r2.contracts.quality import QualityProfileRevision
 from server.production_run.assets_adapter import AssetsAdapter
 from server.production_run.configuration import inspect_model_route
 from server.production_run.controller import ProductionController
-from server.production_run.evaluators import QualifiedEvaluator, provider_base_url
+from server.production_run.evaluators import QualifiedEvaluator
 from server.production_run.execution_guard import configure_run_task_authority
 from server.production_run.final_master_adapter import FinalMasterAdapter
 from server.production_run.gemini_reviewer import routed_reviewer
-from server.production_run.image_judge import OllamaImageJudge
+from server.production_run.image_judge import ImageJudge
 from server.production_run.inputs import ProjectInputWitness
 from server.production_run.media_adapter import MediaAdapter
 from server.production_run.packaging_adapter import ExportAdapter, PackagingAdapter
@@ -54,6 +54,7 @@ from server.production_run.scheduler import ProductionScheduler
 from server.production_run.service import ProductionActivation, ProductionRunRefused, ProductionRunService
 from server.production_run.story_adapter import BriefAdapter, HandoffAdapter, StoryAdapter, StoryCommitAdapter
 from server.production_run.text_adapter import EpisodePlanAdapter, ScriptAdapter, ScriptPlanAdapter
+from server.production_run.vision_chat import model_access
 from server.services.automation_grants import AutomationGrantCustodian, RunAutomationAuthority
 from server.services.governance_grants import CurrentShowrunnerGrantReader
 from server.story_authoring.handoff import SourceUpload
@@ -263,9 +264,7 @@ def build_adapters(
         RunStage.EPISODE_PLAN: EpisodePlanAdapter(sessions, **text),
         RunStage.SCRIPT_PLAN: ScriptPlanAdapter(sessions, **text),
         RunStage.SCRIPT: ScriptAdapter(sessions, **text),
-        RunStage.MEDIA: MediaAdapter(
-            sessions, **text, judge=OllamaImageJudge(base_url_for=provider_base_url(sessions))
-        ),
+        RunStage.MEDIA: MediaAdapter(sessions, **text, judge=ImageJudge(access_for=model_access(sessions))),
         RunStage.RENDER: RenderAdapter(sessions, **owners),
         RunStage.MASTER: FinalMasterAdapter(sessions, **owners),
         RunStage.QUALITY: QualityAdapter(sessions, **owners, evaluator=evaluator),

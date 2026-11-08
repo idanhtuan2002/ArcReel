@@ -462,10 +462,11 @@ class Judge:
     """A ranking judge that prefers each segment's listed candidate index."""
 
     def __init__(self, prefer: dict[str, int]) -> None:
-        self.prefer, self.calls = prefer, []
+        self.prefer, self.calls, self.digests = prefer, [], []
 
-    async def choose(self, route, line, pictures):
+    async def choose(self, route, line, pictures, *, prompt_digest=None):
         self.calls.append((route.role, line, len(pictures)))
+        self.digests.append(prompt_digest)
         index = self.prefer[line]
         return Choice(index=index, scores=[0.9, 0.1] if index == 0 else [0.2, 0.7])
 
@@ -540,6 +541,7 @@ async def test_extra_storyboard_versions_are_made_judged_and_the_winner_restored
         (A.GENERATE_TTS, {"script": "episode_1.json"}),
     ]
     assert judge.calls == [("reviewer_b", "E1S01", 2), ("reviewer_b", "E1S02", 2)]
+    assert judge.digests == ["sha256:" + "3" * 64] * 2
     assert restored == [("storyboards", "E1S01", 1)]
     evidence = json.loads(
         (

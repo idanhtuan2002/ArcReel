@@ -15,8 +15,18 @@ import json
 from datetime import UTC, datetime
 from pathlib import Path
 
+from lib.db import async_session_factory
 from r2.contracts.automation import ModelRoute
-from server.production_run.image_judge import OllamaImageJudge, judge_prompt_digest, judge_view, qualify_judge
+from server.production_run.image_judge import (
+    JUDGE_METHODS,
+    YES_PROBABILITY,
+    ImageJudge,
+    OllamaImageJudge,
+    judge_prompt_digest,
+    judge_view,
+    qualify_judge,
+)
+from server.production_run.vision_chat import model_access
 
 
 async def _main(args: argparse.Namespace) -> int:
@@ -33,27 +43,34 @@ async def _main(args: argparse.Namespace) -> int:
     route = ModelRoute.model_validate(
         {
             "role": "reviewer_a",
-            "provider_id": "qualification",
+            "provider_id": args.provider or "qualification",
             "model_id": args.model,
             "model_identity": args.model_identity,
             "config_digest": "sha256:" + "0" * 64,
-            "local": True,
-            "paid": False,
+            "local": not args.provider,
+            "paid": bool(args.provider),
             "currency": "USD",
             "max_cost_per_call": None,
         }
     )
 
-    async def base_url(_provider: str) -> str:
-        return args.base_url
+    if args.provider:
+        # The provider's endpoint decides the API (Ollama, OpenAI-compatible or Gemini) and its stored key is used.
+        judge: ImageJudge = ImageJudge(access_for=model_access(async_session_factory))
+    else:
 
-    async with OllamaImageJudge(base_url_for=base_url).scorer(route) as score:
+        async def base_url(_provider: str) -> str:
+            return args.base_url
+
+        judge = OllamaImageJudge(base_url_for=base_url)
+    async with judge.scorer(route, method=args.method) as score:
         report = await qualify_judge(score, pairs)
     evidence = {
         "schema": "r2.image-judge-qualification.v1",
         "recorded_at": datetime.now(UTC).isoformat(),
         "model_identity": args.model_identity,
-        "prompt_digest": judge_prompt_digest(),
+        "method": args.method,
+        "prompt_digest": judge_prompt_digest(args.method),
         "corpus_digest": manifest["corpus_digest"],
         **report,
     }
@@ -65,7 +82,9 @@ async def _main(args: argparse.Namespace) -> int:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--corpus", required=True, type=Path, help="directory holding pairs.json and its images")
-    parser.add_argument("--base-url", default="http://localhost:11434")
+    parser.add_argument("--base-url", default="http://localhost:11434", help="an Ollama, when --provider is not given")
+    parser.add_argument("--provider", help="a configured provider id (custom-<n>, gemini-aistudio, openai)")
+    parser.add_argument("--method", choices=JUDGE_METHODS, default=YES_PROBABILITY)
     parser.add_argument("--model", default="qwen2.5vl:7b")
     parser.add_argument("--model-identity", required=True, help="the judging reviewer route's exact model identity")
     parser.add_argument("--out", required=True, type=Path, help="evidence JSON to write")
