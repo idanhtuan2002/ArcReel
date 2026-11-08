@@ -345,6 +345,22 @@ describe("ProductionRunPanel", () => {
     expect(screen.getByText("Made so far: 2 pictures and clips · 1 voice files")).toBeInTheDocument();
   });
 
+  it("shows the run as a read-only graph only once the owner opens it", async () => {
+    vi.spyOn(client, "listProductionRuns").mockResolvedValue({
+      start: OFFER,
+      runs: [snapshot({ status: "WAITING_TASK", stage: "MEDIA" })],
+    });
+    render(<ProductionRunPanel projectName="alpha" />);
+
+    const summary = await screen.findByText("Show as a graph");
+    expect(screen.queryByLabelText("Run graph")).not.toBeInTheDocument();
+    const details = summary.closest("details") as HTMLDetailsElement;
+    details.open = true;
+    fireEvent(details, new Event("toggle"));
+
+    expect(await screen.findByLabelText("Run graph")).toBeInTheDocument();
+  });
+
   it("shows how far the story is written while the run is in STORY", async () => {
     vi.spyOn(client, "listProductionRuns").mockResolvedValue({ start: OFFER, runs: [snapshot()] });
     vi.spyOn(client, "getProductionRunProgress").mockResolvedValue({

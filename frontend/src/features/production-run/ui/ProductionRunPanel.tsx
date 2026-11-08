@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ApiRequestError } from "@/api";
 import {
@@ -31,6 +31,8 @@ import { RunReportDetails } from "./RunReportDetails";
 import { formatDuration, stageTimes, totalTime } from "./runTimeline";
 
 const POLL_MS = 5000;
+// React Flow loads only when the owner opens the graph.
+const RunGraph = lazy(() => import("./RunGraph"));
 const EXAMPLE_IDEAS = ["auto_example_1", "auto_example_2", "auto_example_3"] as const;
 type HistoryFilter = "all" | "active" | "done" | "failed";
 const FAILED: ReadonlySet<RunStatus> = new Set(["FAILED", "FAILED_QUALITY", "CANCELLED"]);
@@ -107,6 +109,7 @@ export function ProductionRunPanel({ projectName }: Props) {
   const [progress, setProgress] = useState<RunProgress | null>(null);
   // The time the progress was read; the current stage's elapsed time counts to it.
   const [readAt, setReadAt] = useState(() => Date.now());
+  const [graphOpen, setGraphOpen] = useState(false);
   // Bumped after a settings save so readiness is checked again against the new settings.
   const [setupVersion, setSetupVersion] = useState(0);
   const [busy, setBusy] = useState(false);
@@ -460,6 +463,16 @@ export function ProductionRunPanel({ projectName }: Props) {
               );
             })}
           </ol>
+          <details onToggle={(event) => setGraphOpen(event.currentTarget.open)}>
+            <summary className="cursor-pointer text-[11.5px]" style={{ color: "var(--color-text-3)" }}>
+              {t("auto_graph_show")}
+            </summary>
+            {graphOpen && (
+              <Suspense fallback={null}>
+                <RunGraph run={run} times={times} />
+              </Suspense>
+            )}
+          </details>
           {story && (
             <p className="text-[11.5px]" style={{ color: "var(--color-text-3)" }}>
               {t("auto_progress_story", {
