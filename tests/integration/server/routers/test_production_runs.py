@@ -6,6 +6,7 @@ import asyncio
 import os
 from dataclasses import dataclass
 from datetime import UTC, datetime
+from typing import Any
 
 import pytest
 import sqlalchemy as sa
@@ -86,6 +87,7 @@ class Host:
     witness: Witness
     preflight: Preflight
     policies: Policies
+    custodian: Any = None
 
     @property
     def headers(self) -> dict[str, str]:
@@ -139,9 +141,10 @@ async def host(concurrent_session_factory, tmp_path, interactive_env):
         )
         scheduler = ProductionScheduler(sessions, controller, owner_id="host", max_runs_per_scan=1)
         app = FastAPI()
+        grants = custodian(sessions, root, runtime)
         app.state.production_run_service = ProductionRunService(
             sessions,
-            custodian=custodian(sessions, root, runtime),
+            custodian=grants,
             policies=policies,
             witness=witness,
             preflight=preflight,
@@ -151,7 +154,7 @@ async def host(concurrent_session_factory, tmp_path, interactive_env):
         app.include_router(production_runs.router, prefix="/api/v1", dependencies=AUTH_DEPENDENCIES)
         register_error_handlers(app)
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as http:
-            yield Host(http, sessions, scheduler, owner, witness, preflight, policies)
+            yield Host(http, sessions, scheduler, owner, witness, preflight, policies, grants)
 
 
 async def test_double_start_and_lost_response_retry_return_one_run_and_one_grant(host):
@@ -541,7 +544,11 @@ async def test_setup_and_qualification_need_the_projects_showrunner(host, method
 
 async def test_a_queued_task_of_a_run_executes_only_while_the_run_may_still_act(host):
     from lib.db.repositories.task_repo import TaskRepository
-    from server.production_run.execution_guard import RunTaskRefused, require_run_task_authorized
+    from server.production_run.execution_guard import (
+        RunTaskRefused,
+        configure_run_task_authority,
+        require_run_task_authorized,
+    )
 
     run = (await host.start()).json()
     async with host.sessions() as session:
@@ -557,12 +564,24 @@ async def test_a_queued_task_of_a_run_executes_only_while_the_run_may_still_act(
             command_digest="sha256:" + "d" * 64,
         )
         await session.commit()
-        await require_run_task_authorized(session, queued)
-        await require_run_task_authorized(session, {"task_id": "a-task-no-run-submitted"})
 
-    paused = await host.command(run, "pause", command_id="pause-command-1")
-    assert paused.status_code == 200, paused.text
-
+    configure_run_task_authority(None)
     async with host.sessions() as session:
-        with pytest.raises(RunTaskRefused, match="AUTOMATION_RUN_STOPPED"):
+        with pytest.raises(RunTaskRefused, match="AUTOMATION_GOVERNANCE_NOT_ACTIVATED"):
             await require_run_task_authorized(session, queued)
+
+    configure_run_task_authority(host.custodian.authority())
+    try:
+        async with host.sessions() as session:
+            await require_run_task_authorized(session, queued)
+        async with host.sessions() as session:
+            await require_run_task_authorized(session, {"task_id": "a-task-no-run-submitted"})
+
+        paused = await host.command(run, "pause", command_id="pause-command-1")
+        assert paused.status_code == 200, paused.text
+
+        async with host.sessions() as session:
+            with pytest.raises(RunTaskRefused, match="AUTOMATION_AUTHORITY_NOT_CURRENT"):
+                await require_run_task_authorized(session, queued)
+    finally:
+        configure_run_task_authority(None)

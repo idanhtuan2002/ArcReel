@@ -97,6 +97,31 @@ class RunAutomationAuthority:
         """The activated signed grant reader owners re-verify Human evidence with."""
         return self._reader
 
+    async def require_queued_task_current(self, session: AsyncSession, *, scope: RunScope) -> None:
+        """A queued task of the run may execute: the run is active, its grant unexpired and still bound to the
+        issuer's current, unexpired signed parent and to the run's input and policy."""
+        observed = await AutomationGrantRepository(session).head(scope)
+        if observed is None:
+            raise PermissionError("AUTOMATION_GRANT_UNAVAILABLE")
+        parent = await self._reader.require_current_locked(
+            session, scope=GrantScopeV1(scope.user_id, scope.project_name, observed.issuer_id)
+        )
+        grant = await AutomationGrantRepository(session).head(scope, lock=True)
+        if grant is None or grant != observed:
+            raise PermissionError("AUTOMATION_GRANT_MOVED")
+        _row, run = await _run_locked(session, scope)
+        now = await _now(session)
+        if (
+            grant.state != "ACTIVE"
+            or not grant.issued_at <= now < grant.expires_at
+            or parent.body.expires_at is None
+            or now >= datetime.fromisoformat(parent.body.expires_at)
+            or (parent.body.sequence, parent.event_digest) != (grant.parent_sequence, grant.parent_event_digest)
+            or (grant.input_digest, grant.policy_digest) != (run.input_digest, policy_digest(run.policy))
+            or run.status not in {RunStatus.PENDING, RunStatus.RUNNING, RunStatus.WAITING_TASK}
+        ):
+            raise PermissionError("AUTOMATION_AUTHORITY_NOT_CURRENT")
+
     async def require_locked(
         self, session: AsyncSession, *, subject: AuthorizationSubject
     ) -> AutomationAuthorizationV1:

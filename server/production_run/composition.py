@@ -38,6 +38,7 @@ from server.production_run.assets_adapter import AssetsAdapter
 from server.production_run.configuration import inspect_model_route
 from server.production_run.controller import ProductionController
 from server.production_run.evaluators import OllamaReviewer, QualifiedEvaluator, provider_base_url
+from server.production_run.execution_guard import configure_run_task_authority
 from server.production_run.final_master_adapter import FinalMasterAdapter
 from server.production_run.gemini_reviewer import GeminiReviewer, RoutedReviewer, provider_credentials
 from server.production_run.inputs import ProjectInputWitness
@@ -279,11 +280,13 @@ def compose_production(
     preflight = ProductionPreflight(
         HostPreflightReader(sessions, projects=projects, policies=policies, witness=witness)
     )
+    authority = custodian.authority()
+    configure_run_task_authority(authority)
     controller = ProductionController(
         sessions,
         adapters=build_adapters(
             sessions,
-            authority=custodian.authority(),
+            authority=authority,
             projects=projects,
             resolver=resolver,
             stories=stories,
