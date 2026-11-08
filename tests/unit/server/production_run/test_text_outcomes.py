@@ -391,3 +391,13 @@ async def test_script_planning_after_a_stale_adaptation_is_an_external_change(ta
     intent = _intent(RunStage.SCRIPT_PLAN)
     with pytest.raises(OwnerBlocked, match="EXTERNAL_INPUT_CHANGED"):
         await adapter.inspect(intent=intent, receipt=intent.input_refs[0])
+
+
+def test_a_renewed_grant_covers_the_adaptation_stage_of_a_run_started_before_it():
+    from r2.contracts.automation import AutomationOperation as Op
+    from server.production_run.service import covering_later_stages
+
+    old = frozenset(Op) - {Op.ADAPTATION}
+    assert Op.ADAPTATION in covering_later_stages(old)
+    narrow = frozenset({Op.MEDIA, Op.RENDER})
+    assert covering_later_stages(narrow) == narrow

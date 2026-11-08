@@ -25,6 +25,7 @@ from lib.episode_adaptation import (
 )
 from lib.episode_paths import episode_source_relpath
 from lib.json_io import atomic_write_bytes, atomic_write_json
+from lib.path_safety import PathTraversalError, safe_join
 from lib.text_backends.base import TextGenerationRequest, TextGenerationResult
 
 type Generate = Callable[[TextGenerationRequest], Awaitable[TextGenerationResult]]
@@ -64,10 +65,15 @@ async def adapt_episode(project_path: Path, project: Mapping[str, Any], episode:
             "draft": draft.model_dump(mode="json"),
             "attempts": attempts,
         }
-        directory = project_path / ADAPTATIONS_DIR
-        directory.mkdir(parents=True, exist_ok=True)
-        atomic_write_bytes(project_path / adaptation_text_relpath(episode), data)
-        atomic_write_json(project_path / adaptation_record_relpath(episode), record)
+        # Every path is resolved inside the project, so a symlinked ``adaptations`` never writes elsewhere.
+        try:
+            safe_join(project_path, ADAPTATIONS_DIR).mkdir(parents=True, exist_ok=True)
+            text_path = safe_join(project_path, adaptation_text_relpath(episode))
+            record_path = safe_join(project_path, adaptation_record_relpath(episode))
+        except PathTraversalError as error:
+            raise AdaptationError(f"adaptation path leaves the project: {error}") from None
+        atomic_write_bytes(text_path, data)
+        atomic_write_json(record_path, record)
         return {"episode": episode, "spoken_seconds": record["spoken_seconds"], "attempts": attempt}
     raise AdaptationError(
         f"episode {episode} adaptation failed its checks after {MAX_ATTEMPTS} attempts: " + "; ".join(problems or [])

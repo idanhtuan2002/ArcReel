@@ -35,6 +35,7 @@ from lib.cjk_ranges import CJK_RANGES
 from lib.episode_ledger import episode_outline_context
 from lib.episode_paths import episode_source_path, episode_source_relpath
 from lib.episode_target_volume import resolve_episode_target_volume
+from lib.path_safety import PathTraversalError, safe_join
 from lib.speech_rate import estimate_spoken_seconds, project_speech_rate_override, speech_rate_units_per_second
 
 type AdaptationMode = Literal["screen", "verbatim"]
@@ -226,6 +227,21 @@ def _cjk(text: str) -> bool:
     return False
 
 
+def _words(text: str) -> str:
+    """Lower-case words of ``text`` separated by single spaces, with spaces at both ends."""
+    words = "".join(char.lower() if char.isalnum() else " " for char in unicodedata.normalize("NFC", text)).split()
+    return " " + " ".join(words) + " "
+
+
+def _named_in(name: str, source: str) -> bool:
+    """Whether ``source`` writes ``name`` as whole words (``Ann`` is not named by ``annual``); scripts without spaces
+    between words (CJK) are matched as text."""
+    if _cjk(source):
+        return _skeleton(name)[0] in _skeleton(source)[0]
+    words = _words(name)
+    return words.strip() != "" and words in _words(source)
+
+
 def spoken_text(draft: EpisodeAdaptationDraft) -> list[str]:
     return [line.text for scene in draft.scenes for line in scene.lines if line.kind in SPOKEN]
 
@@ -267,7 +283,7 @@ def check_adaptation(draft: EpisodeAdaptationDraft, inputs: AdaptationInputs) ->
     problems.extend(
         f"cast member {name!r} is neither a registered character nor named in the source"
         for name in sorted(cast)
-        if name not in inputs.characters and _skeleton(name)[0] not in source_skeleton
+        if name not in inputs.characters and not _named_in(name, inputs.source)
     )
     for number, scene in enumerate(draft.scenes, start=1):
         for line in scene.lines:
@@ -441,8 +457,11 @@ def adaptation_state(
     project_path: Path, project: Mapping[str, Any], episode: int
 ) -> Literal["current", "stale", "missing"]:
     """Whether ``episode`` has an accepted adaptation of exactly what it would read now."""
-    record_path = project_path / adaptation_record_relpath(episode)
-    text_path = project_path / adaptation_text_relpath(episode)
+    try:
+        record_path = safe_join(project_path, adaptation_record_relpath(episode))
+        text_path = safe_join(project_path, adaptation_text_relpath(episode))
+    except PathTraversalError:
+        return "stale"
     if not record_path.is_file() or not text_path.is_file():
         return "missing"
     try:

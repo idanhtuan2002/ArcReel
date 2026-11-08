@@ -42,6 +42,7 @@ def _project(mode: str = "narration", **extra) -> dict:
 
 
 def _write(tmp_path: Path, text: str = SOURCE) -> Path:
+    tmp_path.mkdir(parents=True, exist_ok=True)
     (tmp_path / "source").mkdir(exist_ok=True)
     (tmp_path / "source" / "episode_1.txt").write_text(text, encoding="utf-8")
     return tmp_path
@@ -243,3 +244,22 @@ async def test_the_prompt_carries_the_episode_plan_and_its_neighbours(tmp_path: 
     assert "Người tên Minh xuất hiện" in model.prompts[0]
     second = read_inputs(project_path, project, 2)
     assert second.previous_tail.endswith("phong thư nằm trên quầy.")
+
+
+def test_a_cast_name_must_be_written_as_a_whole_word(tmp_path: Path):
+    inputs = read_inputs(_write(tmp_path), _project(), 1)
+    # "Lụ" is inside "lục" but never written as a name; "Minh" is.
+    problems = check_adaptation(EpisodeAdaptationDraft.model_validate(_narration(cast=["Lan", "Lụ", "Minh"])), inputs)
+    assert any("'Lụ'" in p for p in problems)
+    assert not any("'Minh'" in p for p in problems)
+
+
+async def test_a_symlinked_adaptations_folder_is_never_written_through(tmp_path: Path):
+    project_path = _write(tmp_path / "project")
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    (project_path / "adaptations").symlink_to(outside, target_is_directory=True)
+    with pytest.raises(AdaptationError, match="leaves the project"):
+        await adapt_episode(project_path, _project(), 1, generate=_Model(_narration()))
+    assert list(outside.iterdir()) == []
+    assert adaptation_state(project_path, _project(), 1) == "stale"

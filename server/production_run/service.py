@@ -54,6 +54,14 @@ _RESUMABLE = {
 REVIEW_OWNER = "production-review"
 
 
+def covering_later_stages(granted: frozenset[AutomationOperation]) -> frozenset[AutomationOperation]:
+    """A grant issued before a stage existed covers it on renewal when it covers the stages around it: ``ADAPTATION``
+    (ADR-0114) sits between ``EPISODE_PLAN`` and ``SCRIPT_PLAN``, so a run started before it can resume past it."""
+    if {AutomationOperation.EPISODE_PLAN, AutomationOperation.SCRIPT_PLAN} <= granted:
+        return granted | {AutomationOperation.ADAPTATION}
+    return granted
+
+
 class ProductionRunRefused(Exception):
     def __init__(self, code: str, status: int = 409, reasons: tuple[str, ...] = ()) -> None:
         super().__init__(code)
@@ -333,7 +341,7 @@ class ProductionRunService:
                 issuer_id=issuer_id,
                 command_id=command.command_id,
                 parent_expiry=parent_expiry,
-                operations=grant.operations,
+                operations=covering_later_stages(grant.operations),
             )
             await self._custodian.renew_locked(session, interactive_token=interactive_token, request=request)
         self._on_change()
