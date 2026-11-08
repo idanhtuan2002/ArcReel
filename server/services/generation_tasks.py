@@ -3613,6 +3613,12 @@ async def execute_generation_task(task: dict[str, Any], *, claimed_provider_id: 
     if not task_type:
         raise ValueError("task.task_type is required")
 
+    from lib.db import async_session_factory
+    from server.production_run.execution_guard import require_run_task_authorized
+
+    async with async_session_factory() as session:
+        await require_run_task_authorized(session, task)
+
     executor = _TASK_EXECUTORS.get(task_type)
     if task_type.startswith("text_"):
         from server.tool_runtime import execute_queued_text_task

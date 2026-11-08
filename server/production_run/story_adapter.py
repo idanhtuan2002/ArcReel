@@ -45,6 +45,7 @@ from server.production_run.owner_support import (
     start_command,
     usage_receipt,
 )
+from server.production_run.owner_tasks import actor_scope, sub_command
 from server.production_run.ports import StepPlan
 from server.services.automation_grants import RunAutomationAuthority
 from server.story_authoring.artifacts import StoryBlobStore
@@ -201,6 +202,7 @@ class StoryAdapter:
                 project_name=intent.scope.project_name,
                 brief=brief,
                 gate_a_decision_id=greenlight.receipt_ref,
+                command=(actor_scope(intent), sub_command(intent, "story")),
             )
         except StoryActionRefused as refused:
             raise OwnerBlocked(refused.code) from None

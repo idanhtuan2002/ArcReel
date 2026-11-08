@@ -209,10 +209,17 @@ class StoryAuthoringService:
         )
 
     async def start_greenlit(
-        self, *, user_id: str, project_name: str, brief: StoryBrief, gate_a_decision_id: str
+        self,
+        *,
+        user_id: str,
+        project_name: str,
+        brief: StoryBrief,
+        gate_a_decision_id: str,
+        command: tuple[str, str] | None = None,
     ) -> StoryRunRef:
         """Start once the caller's own authority is proven; the Gate A, route and replay checks are the same for
-        every actor."""
+        every actor. ``command`` (actor scope, command id) records the task under the caller's command, so a worker
+        can check the caller's authority again before the story runs."""
         draft = brief.model_copy(update={"gate_a_decision_id": None})
         await self._require_greenlight(user_id, project_name, draft.digest(), gate_a_decision_id)
         try:
@@ -232,6 +239,9 @@ class StoryAuthoringService:
                 resource_id=run_id,
                 payload={"brief": started.model_dump(mode="json")},
                 user_id=user_id,
+                actor_scope=command[0] if command is not None else None,
+                command_id=command[1] if command is not None else None,
+                command_digest=started.digest() if command is not None else None,
             )
         store = RunStateStore(self._factory, task_id=task["task_id"])
         await store.initialize(new_run_state(run_id=run_id, limits=started.limits, now=self._clock()))

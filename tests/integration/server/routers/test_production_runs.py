@@ -537,3 +537,32 @@ async def test_setup_and_qualification_need_the_projects_showrunner(host, method
 
     assert response.status_code == 403, response.text
     assert response.json()["detail"]["code"] == "NOT_AUTHORIZED"
+
+
+async def test_a_queued_task_of_a_run_executes_only_while_the_run_may_still_act(host):
+    from lib.db.repositories.task_repo import TaskRepository
+    from server.production_run.execution_guard import RunTaskRefused, require_run_task_authorized
+
+    run = (await host.start()).json()
+    async with host.sessions() as session:
+        queued = await TaskRepository(session).enqueue(
+            project_name=run["project_name"],
+            task_type="text_script_plan",
+            media_type="text",
+            resource_id="episode-1",
+            payload={},
+            user_id=run["user_id"],
+            actor_scope=f"production-run:{run['run_id']}",
+            command_id="step-1:script-plan:1",
+            command_digest="sha256:" + "d" * 64,
+        )
+        await session.commit()
+        await require_run_task_authorized(session, queued)
+        await require_run_task_authorized(session, {"task_id": "a-task-no-run-submitted"})
+
+    paused = await host.command(run, "pause", command_id="pause-command-1")
+    assert paused.status_code == 200, paused.text
+
+    async with host.sessions() as session:
+        with pytest.raises(RunTaskRefused, match="AUTOMATION_RUN_STOPPED"):
+            await require_run_task_authorized(session, queued)
