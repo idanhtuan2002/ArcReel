@@ -2,8 +2,13 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ApiRequestError } from "@/api";
 import { SEVERITY_TONES } from "@/utils/severity-tone";
-import { getQualification, recordLaunchQualification, startReviewerQualification } from "../api/productionRunClient";
-import type { QualificationStatus } from "../api/types";
+import {
+  getQualification,
+  recordLaunchQualification,
+  startMediaProbes,
+  startReviewerQualification,
+} from "../api/productionRunClient";
+import type { MediaRouteStatus, QualificationStatus } from "../api/types";
 
 const POLL_MS = 5000;
 const LINK_CLS =
@@ -42,7 +47,11 @@ export function AutomationQualification({ projectName, onChanged }: Props) {
     }
   }, [projectName, refusal]);
 
-  const running = status?.reviewers.some((reviewer) => reviewer.job?.state === "running") ?? false;
+  const media = status?.media ?? [];
+  const running =
+    (status?.reviewers.some((reviewer) => reviewer.job?.state === "running") ?? false) ||
+    media.some((route) => route.job?.state === "running");
+  const unprobed = media.some((route) => !route.profile_route && route.probe?.passed !== true);
   useEffect(() => {
     if (!open || !running) return;
     const timer = window.setInterval(() => void load(), POLL_MS);
@@ -65,6 +74,28 @@ export function AutomationQualification({ projectName, onChanged }: Props) {
     } finally {
       setBusy(false);
     }
+  };
+
+  const probeMedia = async () => {
+    setBusy(true);
+    setMessage(null);
+    try {
+      setStatus(await startMediaProbes(projectName));
+    } catch (cause) {
+      setMessage({ ok: false, text: refusal(cause) });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const mediaState = (route: MediaRouteStatus): { ok: boolean; text: string } => {
+    if (route.job?.state === "running") return { ok: false, text: t("auto_qual_media_running") };
+    if (route.profile_route) return { ok: true, text: t("auto_qual_media_profile") };
+    if (route.probe?.passed) return { ok: true, text: t("auto_qual_media_passed") };
+    if (route.probe) {
+      return { ok: false, text: t("auto_qual_media_failed", { problem: route.probe.error ?? route.probe.problem ?? "" }) };
+    }
+    return { ok: false, text: t("auto_qual_media_missing") };
   };
 
   const recordLaunch = async () => {
@@ -135,6 +166,26 @@ export function AutomationQualification({ projectName, onChanged }: Props) {
                 </li>
               ))}
             </ul>
+            {media.length > 0 && (
+              <ul className="m-0 list-none space-y-1 p-0">
+                {media.map((route) => {
+                  const state = mediaState(route);
+                  return (
+                    <li key={route.role}>
+                      <span style={{ color: "var(--color-text-2)" }}>
+                        {t(`auto_role_${route.role}`, { defaultValue: route.role })}
+                      </span>{" "}
+                      <span className="font-mono text-[11px]" style={{ color: "var(--color-text-3)" }}>
+                        {route.model_id}
+                      </span>{" "}
+                      <span style={{ color: state.ok ? "var(--color-accent-2)" : SEVERITY_TONES.warnings.color }}>
+                        {state.text}
+                      </span>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
             <p style={{ color: status.launch_recorded ? "var(--color-accent-2)" : "var(--color-text-3)" }}>
               {status.launch_recorded ? t("auto_qual_launch_ok") : t("auto_qual_launch_missing")}
             </p>
@@ -150,6 +201,16 @@ export function AutomationQualification({ projectName, onChanged }: Props) {
               >
                 {t("auto_qual_start_reviewers")}
               </button>
+              {unprobed && (
+                <button
+                  type="button"
+                  className={LINK_CLS}
+                  disabled={busy || running || !status.corpus_configured}
+                  onClick={() => void probeMedia()}
+                >
+                  {t("auto_qual_start_media")}
+                </button>
+              )}
               <button
                 type="button"
                 className={LINK_CLS}
@@ -160,6 +221,7 @@ export function AutomationQualification({ projectName, onChanged }: Props) {
               </button>
             </div>
             <p style={{ color: "var(--color-text-3)" }}>{t("auto_qual_hint")}</p>
+            {unprobed && <p style={{ color: "var(--color-text-3)" }}>{t("auto_qual_media_hint")}</p>}
           </>
         )}
         {message && (

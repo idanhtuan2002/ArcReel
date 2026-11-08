@@ -480,6 +480,8 @@ class PreflightSnapshot(AutomationContract):
     profile: QualityProfileRevision | None
     qualifications: tuple[ReviewerQualification, ...]
     launch_qualification: LaunchQualification | None = None
+    #: Route digests of image, video and audio routes whose host media probe passed (``media_probe``).
+    media_route_probes: frozenset[Digest] = frozenset()
     voice_available: StrictBool
     disk_free_bytes: NonnegativeInt
     required_disk_bytes: NonnegativeInt

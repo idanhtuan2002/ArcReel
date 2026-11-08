@@ -23,7 +23,7 @@ from lib.config.resolver import ConfigResolver
 from lib.db.repositories.launch_qualifications import LaunchQualificationRepository
 from lib.db.repositories.reviewer_qualifications import ReviewerQualificationRepository
 from lib.project_manager import ProjectManager
-from r2.automation.profiles import reviewer_is_qualified
+from r2.automation.profiles import resolve_launch_profile, reviewer_is_qualified
 from r2.contracts.automation import ModelRoute
 from server.production_run.composition import ProjectPolicyResolver
 from server.production_run.evaluators import (
@@ -32,10 +32,10 @@ from server.production_run.evaluators import (
     review_method,
 )
 from server.production_run.gemini_reviewer import routed_reviewer
+from server.production_run.media_probe import MEDIA_ROLES, RECEIPTS_ENV, probe_evidence, probe_media_route
 from server.production_run.qualification import build_record, qualify
 
 CORPUS_ENV = "ARCREEL_REVIEWER_CORPUS"
-RECEIPTS_ENV = "ARCREEL_REVIEWER_RECEIPTS"
 EVIDENCE_ENV = "ARCREEL_LAUNCH_EVIDENCE"
 REVIEWER_ROLES = ("reviewer_a", "reviewer_b")
 LANGUAGE = "vi"
@@ -140,7 +140,90 @@ class QualificationJobs:
             "evidence_configured": _path(EVIDENCE_ENV) is not None,
             "reviewers": reviewers,
             "launch_recorded": launch_recorded,
+            "media": await self._media_status(user_id, project_name) if settings else [],
         }
+
+    async def _media_routes(self, project_name: str) -> tuple[list[ModelRoute], tuple[str, ...]]:
+        """The project's image/video/audio routes and the ``(provider, model)`` pairs its launch profile names."""
+        _, launch_profile_id = self._scope(project_name)
+        launch = resolve_launch_profile(launch_profile_id)
+        pinned = {"image": launch.image_route, "video": launch.video_route, "audio": launch.audio_route}
+        routes = [route for route in await self._project_routes(project_name) if route.role in MEDIA_ROLES]
+        return routes, tuple(r.role for r in routes if (r.provider_id, r.model_id) == pinned[r.role])
+
+    async def _media_status(self, user_id: str, project_name: str) -> list[dict[str, Any]]:
+        try:
+            routes, pinned = await self._media_routes(project_name)
+        except QualificationRefused:
+            return []
+        receipts = _path(RECEIPTS_ENV)
+        rows = []
+        for route in routes:
+            evidence = probe_evidence(receipts, route)
+            job = self._jobs.get((user_id, project_name, route.role))
+            rows.append(
+                {
+                    "role": route.role,
+                    "provider_id": route.provider_id,
+                    "model_id": route.model_id,
+                    "profile_route": route.role in pinned,
+                    "probe": None
+                    if evidence is None
+                    else {key: evidence.get(key) for key in ("passed", "problem", "error", "recorded_at")},
+                    "job": None if job is None else job.__dict__.copy(),
+                }
+            )
+        return rows
+
+    async def start_media_probes(self, *, user_id: str, project_name: str) -> dict[str, Any]:
+        """Probe every media route that is neither the launch profile's own nor already probed, one after another."""
+        receipts = _path(RECEIPTS_ENV)
+        if receipts is None:
+            raise QualificationRefused("QUALIFICATION_CORPUS_NOT_CONFIGURED")
+        _, launch_profile_id = self._scope(project_name)
+        launch = resolve_launch_profile(launch_profile_id)
+        routes, pinned = await self._media_routes(project_name)
+
+        def needed(route: ModelRoute) -> bool:
+            evidence = probe_evidence(receipts, route)
+            current = self._jobs.get((user_id, project_name, route.role))
+            return (
+                route.role not in pinned
+                and (evidence is None or evidence.get("passed") is not True)
+                and (current is None or current.state != "running")
+            )
+
+        pending = [route for route in routes if needed(route)]
+        if not pending:
+            return await self.status(user_id=user_id, project_name=project_name)
+        voice = await ConfigResolver(self._sessions).resolve_narration_voice(self._projects.load_project(project_name))
+        jobs = []
+        for route in pending:
+            job = ReviewerJob(role=route.role, model_identity=route.model_identity, total=1)
+            self._jobs[(user_id, project_name, route.role)] = job
+            jobs.append((job, route))
+
+        async def run() -> None:
+            for job, route in jobs:
+                try:
+                    evidence = await probe_media_route(
+                        self._sessions,
+                        route=route,
+                        receipts=receipts,
+                        voice=voice,
+                        width=launch.width,
+                        height=launch.height,
+                        user_id=user_id,
+                    )
+                    job.qualified, job.done, job.state = bool(evidence["passed"]), 1, "done"
+                    job.error = evidence.get("problem")
+                except Exception as error:
+                    job.state, job.error = "failed", type(error).__name__
+
+        task = asyncio.create_task(run())
+        self._tasks.add(task)
+        task.add_done_callback(self._tasks.discard)
+        return await self.status(user_id=user_id, project_name=project_name)
 
     async def start_reviewers(self, *, user_id: str, project_name: str) -> dict[str, Any]:
         corpus, receipts = _path(CORPUS_ENV), _path(RECEIPTS_ENV)

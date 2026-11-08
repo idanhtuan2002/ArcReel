@@ -159,6 +159,20 @@ async def start_reviewer_qualification(
         raise _http(error) from error
 
 
+@router.post("/projects/{project_name}/automation/qualification/media")
+async def start_media_probes(
+    project_name: str, user: InteractiveUser, token: Token, service: Service
+) -> dict[str, Any]:
+    """Make one checked sample through each image, video or audio route the launch profile does not name."""
+    try:
+        await _require(service).require_showrunner(interactive_token=token, user_id=user.id, project_name=project_name)
+        return await _qualifications(service).start_media_probes(user_id=user.id, project_name=project_name)
+    except QualificationRefused as refused:
+        raise HTTPException(status_code=409, detail={"code": str(refused), "reasons": []}) from None
+    except _REFUSALS as error:
+        raise _http(error) from error
+
+
 @router.post("/projects/{project_name}/automation/qualification/launch")
 async def record_launch_qualification(
     project_name: str, user: InteractiveUser, token: Token, service: Service

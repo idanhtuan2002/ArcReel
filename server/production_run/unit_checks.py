@@ -83,4 +83,48 @@ def narration_problem(path: Path, *, ffmpeg: str = "ffmpeg") -> str | None:
     return None
 
 
-__all__ = ["narration_problem", "storyboard_problem"]
+MIN_CLIP_SECONDS = 1.0
+
+
+def clip_problem(path: Path, *, portrait: bool, ffprobe: str = "ffprobe") -> str | None:
+    """Why the video clip at ``path`` is unusable, or ``None``: it must decode as video of the project's orientation,
+    at least the storyboard's short side, lasting at least ``MIN_CLIP_SECONDS``."""
+    if not path.is_file():
+        return "VIDEO_UNREADABLE"
+    completed = subprocess.run(
+        [
+            ffprobe,
+            "-v",
+            "error",
+            "-select_streams",
+            "v:0",
+            "-count_packets",
+            "-show_entries",
+            "stream=width,height,nb_read_packets:format=duration",
+            "-of",
+            "default=noprint_wrappers=1",
+            str(path),
+        ],
+        capture_output=True,
+        text=True,
+        timeout=120,
+        check=False,
+    )
+    fields = dict(line.split("=", 1) for line in completed.stdout.splitlines() if "=" in line)
+    try:
+        width, height = int(fields["width"]), int(fields["height"])
+        duration, packets = float(fields["duration"]), int(fields["nb_read_packets"])
+    except (KeyError, ValueError):
+        return "VIDEO_UNREADABLE"
+    if completed.returncode != 0 or packets < 1:
+        return "VIDEO_UNREADABLE"
+    if min(width, height) < MIN_SHORT_SIDE:
+        return "VIDEO_TOO_SMALL"
+    if (height >= width) != portrait:
+        return "VIDEO_WRONG_ORIENTATION"
+    if duration < MIN_CLIP_SECONDS:
+        return "VIDEO_TOO_SHORT"
+    return None
+
+
+__all__ = ["clip_problem", "narration_problem", "storyboard_problem"]

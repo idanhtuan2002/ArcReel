@@ -44,6 +44,7 @@ from server.production_run.gemini_reviewer import routed_reviewer
 from server.production_run.image_judge import ImageJudge
 from server.production_run.inputs import ProjectInputWitness
 from server.production_run.media_adapter import MediaAdapter
+from server.production_run.media_probe import passed_probes, receipts_dir
 from server.production_run.packaging_adapter import ExportAdapter, PackagingAdapter
 from server.production_run.ports import OwnerAdapter
 from server.production_run.preflight import ProductionPreflight
@@ -222,6 +223,7 @@ class HostPreflightReader:
         profile = await self._profile_reader(user_id, project_name, policy.profile_id)
         mode = str(project.get("content_mode", ""))
         launch_profile = resolve_launch_profile(policy.launch_profile_id)
+        routes = await self._policies.routes(project_name)
         return PreflightSnapshot(
             user_id=user_id,
             project_name=project_name,
@@ -229,10 +231,11 @@ class HostPreflightReader:
             content_mode=f"fiction_{mode}" if mode in {"narration", "drama"} else mode or "unknown",
             generation_mode=str(project.get("generation_mode", "unknown")),
             language=policy.language,
-            routes=await self._policies.routes(project_name),
+            routes=routes,
             profile=profile,
             qualifications=qualifications,
             launch_qualification=launch,
+            media_route_probes=passed_probes(receipts_dir(), routes),
             voice_available=await self._policies.voice_available(project_name),
             disk_free_bytes=shutil.disk_usage(self._projects.projects_root).free,
             required_disk_bytes=launch_profile.required_disk_bytes,

@@ -1,0 +1,18 @@
+---
+status: accepted
+---
+
+# Automatic-run models follow their provider's endpoint and earn trust by qualification, not by a code list
+
+Decided 2026-11-08 by the main agent under the sponsor's instruction to make the switch from local to cloud models easy, including models not known when the code was written, reusing what exists ("ưu tiên quy tắc tận dụng những gì có sẵn, đảm bảo tính linh hoạt, dễ dàng thay đổi model"). Research: [donor model-provider flexibility](../research/2026-11-08-r2-donor-model-provider-flexibility.md). It extends [ADR-0111](0111-autonomous-production-run-authority.md) and [ADR-0112](0112-automatic-media-is-checked-per-unit.md); no Human contract changes.
+
+Before this decision the story writer accepted only four Gemini model ids in code, a reviewer was sent to Gemini or Ollama by the prefix of its model name, the image judge spoke only Ollama, and image, video and audio routes had to equal the pair the launch profile names. Every donor that supports new models without code (ViMax, DramaClaw, Jellyfish) routes text through one OpenAI-compatible protocol chosen by configuration; none gates a model by qualification.
+
+1. **The endpoint decides the API.** A route reaches its model through what its provider declares: a custom-provider model's endpoint (`ollama-chat`, `openai-chat` for any OpenAI-compatible server, `gemini-generate`) or the built-in `gemini-aistudio` / `openai` provider. The model name never selects a transport. This reuses the custom-provider registry the UI already manages, so adding a provider and a model from the UI is enough.
+2. **Writer.** Any text model on a cloud endpoint with USD token prices is a story route (`server/story_authoring/routes.py`); the model list is gone. An OpenAI-compatible request has no count endpoint, so its input is bounded locally at half its UTF-8 bytes; a reply reporting more fails the step `COUNT_MISMATCH` instead of passing unbounded. The release paid-route qualification of the exact configuration still applies.
+3. **Reviewers and judge.** Frame reviewers and the image judge share one transport (`server/production_run/vision_chat.py`) for all three protocols, with logprobs read in one shape and cloud 429/5xx retried with capped backoff. Questions, answers and prompt digests do not depend on the endpoint, so existing qualifications stay valid. Gemini models still watch the final. The judge gains a `rating` method (0–10, DramaClaw's shape) for endpoints without log probabilities; each method has its own digest (ADR-0112 amendment).
+4. **Media routes earn trust by a probe.** The launch profile's own media routes stay qualified as before. Any other image, video or audio route is admitted by preflight only when a host media probe of exactly that route digest passed: one sample made through the app's backend assembly (paid-route gate) inside the usage ledger, checked by the same deterministic unit checks a run uses (storyboard, narration, and a new clip check for decode, orientation and at least one second). Evidence lives in the host receipts directory with the sample digest; a changed model, endpoint or key needs a new probe. The run panel lists each media route and starts the probes.
+
+Trust is still never implied by configuration alone: a writer route needs its paid-route qualification in release mode, a reviewer its corpus qualification, a judge its pair qualification, a media route its probe or the profile. Each of those can be run for a new model without code changes.
+
+Not done: lip-sync and drama routes stay unqualified (unchanged); a video probe uses a drawn start frame and the shortest common duration (5 s), so it proves the route works, not its quality, which QUALITY still judges per run.

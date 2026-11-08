@@ -242,6 +242,26 @@ async def test_frozen_policy_still_cannot_admit_unqualified_or_unbounded_routes(
     assert reader.provider_submit_count == 0
 
 
+async def test_a_media_route_outside_the_profile_is_admitted_by_its_passed_probe_only():
+    from r2.automation.profiles import route_digest
+    from server.production_run.preflight import ProductionPreflight
+
+    frozen, snapshot = complete_snapshot()
+    routes = list(snapshot.routes)
+    routes[5] = routes[5].model_copy(update={"provider_id": "custom-42", "model_id": "cloud-video-model"})
+    frozen, snapshot = freeze_routes(frozen, snapshot, tuple(routes))
+    probed = snapshot.model_copy(update={"media_route_probes": frozenset({route_digest(routes[5])})})
+    report = await ProductionPreflight(SnapshotReader(probed)).check(
+        user_id=snapshot.user_id, project_name=snapshot.project_name, policy=frozen
+    )
+    assert "MEDIA_ROUTE_NOT_QUALIFIED" not in report.blocking_reasons
+    other = snapshot.model_copy(update={"media_route_probes": frozenset({"sha256:" + "e" * 64})})
+    report = await ProductionPreflight(SnapshotReader(other)).check(
+        user_id=snapshot.user_id, project_name=snapshot.project_name, policy=frozen
+    )
+    assert "MEDIA_ROUTE_NOT_QUALIFIED" in report.blocking_reasons
+
+
 async def test_corrupt_profile_is_reported_as_blocking_instead_of_trusted():
     from server.production_run.preflight import ProductionPreflight
 

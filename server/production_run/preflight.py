@@ -54,7 +54,12 @@ class ProductionPreflight:
                 ("audio", launch.audio_route),
             ):
                 route = roles.get(role)
-                if route is not None and (route.provider_id, route.model_id) != expected:
+                # The profile's own route, or any route of the role whose host media probe passed.
+                if (
+                    route is not None
+                    and (route.provider_id, route.model_id) != expected
+                    and route_digest(route) not in snapshot.media_route_probes
+                ):
                     reasons.append("MEDIA_ROUTE_NOT_QUALIFIED")
         if len(roles) != len(snapshot.routes) or not roles.keys() >= _REQUIRED_ROLES:
             reasons.append("MISSING_MODEL_ROLE")

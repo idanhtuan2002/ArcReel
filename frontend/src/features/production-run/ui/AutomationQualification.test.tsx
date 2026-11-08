@@ -95,4 +95,28 @@ describe("AutomationQualification", () => {
     expect(await screen.findByRole("button", { name: "Qualify reviewers" })).toBeDisabled();
     expect(screen.getByText(/no labeled reviewer corpus/)).toBeInTheDocument();
   });
+
+  it("lists media routes and probes the ones outside the profile", async () => {
+    const media = [
+      { role: "image", provider_id: "custom-3", model_id: "flux2", profile_route: true, probe: null, job: null },
+      { role: "video", provider_id: "custom-8", model_id: "cloud-video", profile_route: false, probe: null, job: null },
+      {
+        role: "audio",
+        provider_id: "custom-9",
+        model_id: "cloud-voice",
+        profile_route: false,
+        probe: { passed: false, problem: "AUDIO_SILENT", error: null, recorded_at: "2026-11-08T00:00:00Z" },
+        job: null,
+      },
+    ];
+    vi.spyOn(client, "getQualification").mockResolvedValue(status({ media }));
+    const probe = vi.spyOn(client, "startMediaProbes").mockResolvedValue(status({ media }));
+    await open();
+
+    expect(await screen.findByText("tested profile route")).toBeInTheDocument();
+    expect(screen.getByText("not tried yet")).toBeInTheDocument();
+    expect(screen.getByText("sample failed: AUDIO_SILENT")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Try media routes" }));
+    await waitFor(() => expect(probe).toHaveBeenCalledWith("alpha"));
+  });
 });

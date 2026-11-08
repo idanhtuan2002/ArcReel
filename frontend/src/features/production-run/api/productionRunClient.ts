@@ -103,6 +103,13 @@ export function startReviewerQualification(projectName: string): Promise<Qualifi
   );
 }
 
+export function startMediaProbes(projectName: string): Promise<QualificationStatus> {
+  return API.request<QualificationStatus>(
+    `/projects/${encodeURIComponent(projectName)}/automation/qualification/media`,
+    { method: "POST" },
+  );
+}
+
 export function recordLaunchQualification(projectName: string): Promise<{ recorded: boolean; reasons: string[] }> {
   return API.request<{ recorded: boolean; reasons: string[] }>(
     `/projects/${encodeURIComponent(projectName)}/automation/qualification/launch`,

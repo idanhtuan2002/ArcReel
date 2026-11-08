@@ -286,4 +286,15 @@ export interface QualificationStatus {
   evidence_configured: boolean;
   reviewers: { role: string; model_identity: string; qualified: boolean; job: ReviewerJob | null }[];
   launch_recorded: boolean;
+  /** Image, video and audio routes: the launch profile's own, or admitted by a passed host probe. */
+  media?: MediaRouteStatus[];
+}
+
+export interface MediaRouteStatus {
+  role: string;
+  provider_id: string;
+  model_id: string;
+  profile_route: boolean;
+  probe: { passed: boolean; problem: string | null; error: string | null; recorded_at: string } | null;
+  job: ReviewerJob | null;
 }
