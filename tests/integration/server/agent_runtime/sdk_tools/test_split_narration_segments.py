@@ -297,12 +297,29 @@ async def _nr_source_and_call(fake_ctx: ToolContext, monkeypatch, source_text: s
     return await call(tool_obj, {"episode": 1})
 
 
-async def test_split_narration_segments_rejects_truncated_novel_text(fake_ctx: ToolContext, monkeypatch) -> None:
-    """分镜合并后比源文短（模型删减）：novel_text 完整性校验拦截，不落盘。"""
+async def test_split_narration_segments_restores_a_skipped_short_sentence_from_the_source(
+    fake_ctx: ToolContext, monkeypatch
+) -> None:
+    """漏抄的短句（未覆盖不超过对齐上限）：落盘的分镜正文取回源文原样。"""
     out = await _nr_source_and_call(
         fake_ctx,
         monkeypatch,
         "张三走向村口。他停下脚步，久久凝望。",
+        [nr_segment("E1S01", 4, "张三走向村口。")],
+    )
+    assert out.get("is_error") is not True, out
+    saved = json.loads(
+        (fake_ctx.project_path / "drafts" / "episode_1" / "script_plan_segments.json").read_text(encoding="utf-8")
+    )
+    assert [segment["novel_text"] for segment in saved["segments"]] == ["张三走向村口。他停下脚步，久久凝望。"]
+
+
+async def test_split_narration_segments_rejects_truncated_novel_text(fake_ctx: ToolContext, monkeypatch) -> None:
+    """分镜合并后远短于源文（模型删去大段，超出对齐上限）：novel_text 完整性校验拦截，不落盘。"""
+    out = await _nr_source_and_call(
+        fake_ctx,
+        monkeypatch,
+        "张三走向村口。" + "他停下脚步，久久凝望远方的山路。" * 20,
         [nr_segment("E1S01", 4, "张三走向村口。")],
     )
     assert out.get("is_error") is True
