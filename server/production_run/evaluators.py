@@ -140,10 +140,14 @@ MAX_MEAN_ILLUSTRATES = 0.15
 REVIEW_METHODS: dict[str, str] = {"qwen2.5vl:7b": PROBABILITIES, "gemma3:4b": QUESTIONS}
 
 
-def review_method(route: ModelRoute) -> str:
-    if route.model_id.startswith("gemini-"):
+def review_method(route: ModelRoute, protocol: str | None = None) -> str:
+    """The review method of a route: a model's calibrated method, else watching the final for a Gemini model
+    served by the Gemini API (``protocol`` from its provider endpoint; ``None`` when unknown), else questions."""
+    if route.model_id in REVIEW_METHODS:
+        return REVIEW_METHODS[route.model_id]
+    if route.model_id.startswith("gemini-") and protocol in {None, "gemini"}:
         return WATCH
-    return REVIEW_METHODS.get(route.model_id, QUESTIONS)
+    return QUESTIONS
 
 
 def _offending_keys(
@@ -428,12 +432,15 @@ class FrameReviewer:
         base = {
             "reviewer_route_digest": route_digest(route),
             "model_identity": route.model_identity,
-            "prompt_digest": prompt_digest(review_method(route)),
             "subject_digest": evidence.subject_digest,
             "evidence_digest": evidence_digest(evidence),
         }
-        method = review_method(route)
+        method = QUESTIONS
         try:
+            access = await self._access_for(route.provider_id, route.model_id)
+            method = review_method(route, access.protocol)
+            if method == WATCH:
+                raise ValueError("a watching reviewer cannot review frames")
             subtitles = evidence.subtitle_path.read_text(encoding="utf-8")
             duration = await asyncio.to_thread(final_duration, evidence.final_path)
             frames = await asyncio.to_thread(sample_frames, evidence.final_path)
@@ -444,7 +451,6 @@ class FrameReviewer:
                 f"Khung {index + 1} ({seconds:.1f}s): «{cue_at(subtitles, seconds) or '—'}»"
                 for index, seconds in enumerate(frame_times(duration, len(frames)))
             )
-            access = await self._access_for(route.provider_id, route.model_id)
             prompt = PROMPT.format(
                 frame_count=len(frames),
                 frame_cues=cues,
@@ -507,6 +513,7 @@ class FrameReviewer:
             return ModelAssessment.model_validate(
                 {
                     **base,
+                    "prompt_digest": prompt_digest(method),
                     "outcome": "COMPLETED",
                     "language": str(answer["language"]).strip().lower()[:8],
                     "scores": answer["scores"],
@@ -526,7 +533,7 @@ class FrameReviewer:
                 }
             )
         except (httpx.HTTPError, KeyError, TypeError, ValueError, subprocess.SubprocessError):
-            return ModelAssessment.model_validate({**base, "outcome": "FAILED"})
+            return ModelAssessment.model_validate({**base, "prompt_digest": prompt_digest(method), "outcome": "FAILED"})
 
 
 class OllamaReviewer(FrameReviewer):

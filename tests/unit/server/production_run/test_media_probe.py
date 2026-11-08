@@ -149,3 +149,52 @@ def test_a_clip_must_decode_in_the_projects_orientation_and_last_a_second(tmp_pa
     assert clip_problem(_clip(tmp_path / "wide.mp4", "1024x576", 2), portrait=True) == "VIDEO_WRONG_ORIENTATION"
     assert clip_problem(_clip(tmp_path / "short.mp4", "576x1024", 0.5), portrait=True) == "VIDEO_TOO_SHORT"
     assert clip_problem(tmp_path / "missing.mp4", portrait=True) == "VIDEO_UNREADABLE"
+
+
+async def test_overlapping_starts_probe_each_route_once(monkeypatch, tmp_path: Path) -> None:
+    import asyncio
+
+    from server.production_run import qualification_jobs
+    from server.production_run.qualification_jobs import QualificationJobs
+
+    monkeypatch.setenv("ARCREEL_REVIEWER_RECEIPTS", str(tmp_path))
+    video = ROUTE.model_copy(update={"role": "video", "model_id": "cloud-video"})
+    release = asyncio.Event()
+    probed: list[str] = []
+
+    async def probe(_sessions, *, route, **_kwargs):
+        probed.append(route.model_id)
+        await release.wait()
+        return {"passed": True, "problem": None}
+
+    class Voice:
+        def __init__(self, _sessions) -> None:
+            pass
+
+        async def resolve_narration_voice(self, _project) -> str:
+            return "voice"
+
+    class Projects:
+        def load_project(self, _name):
+            return {"automation": {"profile_digest": "sha256:" + "1" * 64}}
+
+    async def routes(_project):
+        return [video]
+
+    monkeypatch.setattr(qualification_jobs, "probe_media_route", probe)
+    monkeypatch.setattr(qualification_jobs, "ConfigResolver", Voice)
+    monkeypatch.setattr(qualification_jobs, "probe_evidence", lambda _receipts, _route: None)
+
+    async def status(_self, **_kwargs):
+        return {}
+
+    monkeypatch.setattr(QualificationJobs, "status", status)
+    jobs = QualificationJobs(None, Projects(), evaluator=object(), routes=routes)
+    await asyncio.gather(
+        jobs.start_media_probes(user_id="a", project_name="p"),
+        jobs.start_media_probes(user_id="b", project_name="p"),
+    )
+    await asyncio.sleep(0)
+    release.set()
+    await jobs.wait()
+    assert probed == ["cloud-video"]

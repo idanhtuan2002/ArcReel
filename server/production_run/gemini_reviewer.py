@@ -34,7 +34,7 @@ from server.production_run.evaluators import (
     review_method,
 )
 from server.production_run.final_checks import picture_findings, subtitle_findings
-from server.production_run.vision_chat import model_access
+from server.production_run.vision_chat import AccessFor, model_access
 
 DEFAULT_BASE_URL = "https://generativelanguage.googleapis.com"
 #: Inline request data limit of the Gemini API; larger finals would need the Files API.
@@ -144,11 +144,23 @@ class GeminiReviewer:
 class RoutedReviewer:
     """Sends each review to the reviewer that serves the route's review method."""
 
-    def __init__(self, *, local: QualifiedEvaluator, gemini: QualifiedEvaluator) -> None:
-        self._local, self._gemini = local, gemini
+    def __init__(
+        self, *, local: QualifiedEvaluator, gemini: QualifiedEvaluator, access_for: AccessFor | None = None
+    ) -> None:
+        self._local, self._gemini, self._access_for = local, gemini, access_for
+
+    async def protocol(self, route: ModelRoute) -> str | None:
+        """The API the route's provider endpoint speaks; ``None`` when no lookup is configured or it fails."""
+        if self._access_for is None:
+            return None
+        try:
+            return (await self._access_for(route.provider_id, route.model_id)).protocol
+        except KeyError:
+            return None
 
     async def assess(self, *, route: ModelRoute, evidence: FinalEvidence) -> ModelAssessment:
-        reviewer = self._gemini if review_method(route) == WATCH else self._local
+        method = review_method(route, await self.protocol(route))
+        reviewer = self._gemini if method == WATCH else self._local
         return await reviewer.assess(route=route, evidence=evidence)
 
 
@@ -173,9 +185,11 @@ def provider_credentials(sessions: async_sessionmaker[AsyncSession]) -> Credenti
 
 def routed_reviewer(sessions: async_sessionmaker[AsyncSession]) -> RoutedReviewer:
     """The host's reviewers: Gemini models watch the final; every other model reviews frames on its own endpoint."""
+    access = model_access(sessions)
     return RoutedReviewer(
-        local=FrameReviewer(access_for=model_access(sessions)),
+        local=FrameReviewer(access_for=access),
         gemini=GeminiReviewer(credentials_for=provider_credentials(sessions)),
+        access_for=access,
     )
 
 

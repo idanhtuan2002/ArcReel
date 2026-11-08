@@ -9,7 +9,17 @@ from pathlib import Path
 import httpx
 
 from r2.contracts.automation import ModelRoute
-from server.production_run.evaluators import FRAME_COUNT, FrameReviewer, first_token_probability, strip_fence
+from server.production_run.evaluators import (
+    FRAME_COUNT,
+    QUESTIONS,
+    WATCH,
+    FrameReviewer,
+    first_token_probability,
+    prompt_digest,
+    review_method,
+    strip_fence,
+)
+from server.production_run.gemini_reviewer import RoutedReviewer
 from server.production_run.vision_chat import ModelAccess, vision_chat
 from tests.unit.server.production_run.test_evaluators import ANSWER, _evidence
 
@@ -81,6 +91,42 @@ async def test_a_cloud_reviewer_that_keeps_failing_is_a_failed_review(tmp_path: 
     review = await reviewer.assess(route=CLOUD, evidence=_evidence(tmp_path))
     assert review.outcome == "FAILED"
     assert len(calls) == 6
+
+
+async def test_a_server_error_that_may_be_billed_is_never_retried(tmp_path: Path) -> None:
+    async def access(_provider_id: str, _model_id: str) -> ModelAccess:
+        return ModelAccess("openai", "https://vision.example.test/v1", "k")
+
+    calls = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        calls.append(request)
+        return httpx.Response(500)
+
+    reviewer = FrameReviewer(access_for=access, transport=httpx.MockTransport(handler), backoff_seconds=0)
+    assert (await reviewer.assess(route=CLOUD, evidence=_evidence(tmp_path))).outcome == "FAILED"
+    assert len(calls) == 1
+
+
+async def test_a_gemini_named_model_on_an_openai_endpoint_is_reviewed_on_that_endpoint(tmp_path: Path) -> None:
+    sent: list[dict] = []
+    route = CLOUD.model_copy(update={"model_id": "gemini-via-proxy"})
+
+    async def access(_provider_id: str, _model_id: str) -> ModelAccess:
+        return ModelAccess("openai", "https://proxy.example.test/v1", "k")
+
+    class Watcher:
+        async def assess(self, *, route, evidence):
+            raise AssertionError("the Gemini API must not be called for an openai-chat route")
+
+    frames = FrameReviewer(access_for=access, transport=httpx.MockTransport(_openai(sent)))
+    routed = RoutedReviewer(local=frames, gemini=Watcher(), access_for=access)
+    review = await routed.assess(route=route, evidence=_evidence(tmp_path))
+    assert review.outcome == "COMPLETED"
+    assert review.prompt_digest == prompt_digest(QUESTIONS) != prompt_digest(WATCH)
+    assert review_method(route, "openai") == QUESTIONS
+    assert review_method(route, "gemini") == review_method(route) == WATCH
+    assert {call["url"] for call in sent} == {"https://proxy.example.test/v1/chat/completions"}
 
 
 async def test_gemini_and_openai_logprobs_read_as_one_shape() -> None:

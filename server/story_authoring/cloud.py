@@ -182,11 +182,14 @@ class GeminiStoryClient:
         self._client.close()
 
 
-#: Bytes per token assumed when no count endpoint exists. Byte-level BPE vocabularies average well above two bytes
-#: per token for Vietnamese, English and CJK text, so half the UTF-8 size bounds the real count in practice; a
-#: provider reporting more fails the step ``COUNT_MISMATCH`` rather than passing unbounded.
-OPENAI_BYTES_PER_TOKEN = 2
-OPENAI_MESSAGE_OVERHEAD = 64
+#: An OpenAI-compatible server has no count endpoint, so the input is bounded before dispatch by its UTF-8 size: every
+#: token of a byte-level BPE or byte-fallback SentencePiece vocabulary covers at least one byte, so the byte count
+#: never undercounts the text. The chat template adds a bounded number of tokens per message and per request.
+OPENAI_MESSAGE_OVERHEAD = 16
+OPENAI_REQUEST_OVERHEAD = 64
+#: Per-step input cap of a brief with an OpenAI-compatible route, in the byte-bound units above (four times the
+#: default token cap, since UTF-8 Vietnamese text runs several bytes per token).
+OPENAI_MAX_INPUT_BOUND = 4 * 24576
 
 
 class OpenAIStoryClient:
@@ -216,8 +219,9 @@ class OpenAIStoryClient:
         return [{"role": "system", "content": request.system_prompt}, {"role": "user", "content": request.prompt}]
 
     async def count(self, request: StoryStepRequest) -> int:
-        size = sum(len(message["content"].encode("utf-8")) for message in self.messages(request))
-        return math.ceil(size / OPENAI_BYTES_PER_TOKEN) + OPENAI_MESSAGE_OVERHEAD
+        messages = self.messages(request)
+        size = sum(len(message["content"].encode("utf-8")) for message in messages)
+        return size + OPENAI_MESSAGE_OVERHEAD * len(messages) + OPENAI_REQUEST_OVERHEAD
 
     async def generate(self, request: StoryStepRequest) -> CloudReply:
         body: dict[str, Any] = {

@@ -23,7 +23,7 @@ from lib.config.resolver import ConfigResolver
 from lib.db.repositories.launch_qualifications import LaunchQualificationRepository
 from lib.db.repositories.reviewer_qualifications import ReviewerQualificationRepository
 from lib.project_manager import ProjectManager
-from r2.automation.profiles import resolve_launch_profile, reviewer_is_qualified
+from r2.automation.profiles import resolve_launch_profile, reviewer_is_qualified, route_digest
 from r2.contracts.automation import ModelRoute
 from server.production_run.composition import ProjectPolicyResolver
 from server.production_run.evaluators import (
@@ -34,6 +34,7 @@ from server.production_run.evaluators import (
 from server.production_run.gemini_reviewer import routed_reviewer
 from server.production_run.media_probe import MEDIA_ROLES, RECEIPTS_ENV, probe_evidence, probe_media_route
 from server.production_run.qualification import build_record, qualify
+from server.production_run.vision_chat import model_access
 
 CORPUS_ENV = "ARCREEL_REVIEWER_CORPUS"
 EVIDENCE_ENV = "ARCREEL_LAUNCH_EVIDENCE"
@@ -79,7 +80,16 @@ class QualificationJobs:
         self._evaluator = evaluator or routed_reviewer(sessions)
         self._project_routes = routes or self._policy_routes
         self._jobs: dict[tuple[str, str, str], ReviewerJob] = {}
+        #: Route digests with a media probe in flight on this host, whoever started it.
+        self._probing: set[str] = set()
         self._tasks: set[asyncio.Task[None]] = set()
+
+    async def _protocol(self, route: ModelRoute) -> str | None:
+        """The API the route's provider endpoint speaks, or ``None`` when it cannot be read."""
+        try:
+            return (await model_access(self._sessions)(route.provider_id, route.model_id)).protocol
+        except KeyError:
+            return None
 
     async def wait(self) -> None:
         """Until every running job has ended."""
@@ -123,7 +133,7 @@ class QualificationJobs:
                 )
             launch_recorded = launch is not None and launch.profile_digest == digest
             for route in routes:
-                method = prompt_digest(review_method(route))
+                method = prompt_digest(review_method(route, await self._protocol(route)))
                 job = self._jobs.get((user_id, project_name, route.role))
                 reviewers.append(
                     {
@@ -186,24 +196,33 @@ class QualificationJobs:
 
         def needed(route: ModelRoute) -> bool:
             evidence = probe_evidence(receipts, route)
-            current = self._jobs.get((user_id, project_name, route.role))
             return (
                 route.role not in pinned
                 and (evidence is None or evidence.get("passed") is not True)
-                and (current is None or current.state != "running")
+                and route_digest(route) not in self._probing
             )
 
         pending = [route for route in routes if needed(route)]
-        if not pending:
-            return await self.status(user_id=user_id, project_name=project_name)
-        voice = await ConfigResolver(self._sessions).resolve_narration_voice(self._projects.load_project(project_name))
+        # Jobs are registered before any await, so a second start sees them running and probes nothing twice.
         jobs = []
         for route in pending:
             job = ReviewerJob(role=route.role, model_identity=route.model_identity, total=1)
             self._jobs[(user_id, project_name, route.role)] = job
+            self._probing.add(route_digest(route))
             jobs.append((job, route))
+        if not jobs:
+            return await self.status(user_id=user_id, project_name=project_name)
 
         async def run() -> None:
+            try:
+                voice = await ConfigResolver(self._sessions).resolve_narration_voice(
+                    self._projects.load_project(project_name)
+                )
+            except Exception as error:
+                for job, route in jobs:
+                    job.state, job.error = "failed", type(error).__name__
+                    self._probing.discard(route_digest(route))
+                return
             for job, route in jobs:
                 try:
                     evidence = await probe_media_route(
@@ -219,6 +238,8 @@ class QualificationJobs:
                     job.error = evidence.get("problem")
                 except Exception as error:
                     job.state, job.error = "failed", type(error).__name__
+                finally:
+                    self._probing.discard(route_digest(route))
 
         task = asyncio.create_task(run())
         self._tasks.add(task)
@@ -277,6 +298,7 @@ class QualificationJobs:
                 language=LANGUAGE,
                 stop_early=True,
                 progress=progress,
+                protocol=await self._protocol(route),
             )
             job.qualified = reviewer_is_qualified(record)
             if job.qualified:

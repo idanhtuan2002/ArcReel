@@ -54,7 +54,20 @@ async def test_both_reviewers_are_qualified_on_the_host_corpus_and_recorded(sess
 async def test_a_reviewer_that_accepts_a_defect_is_not_recorded(session_factory, tmp_path, monkeypatch):
     monkeypatch.setenv(qualification_jobs.CORPUS_ENV, str(_corpus(tmp_path)))
     monkeypatch.setenv(qualification_jobs.RECEIPTS_ENV, str(tmp_path / "receipts"))
-    jobs = _jobs(session_factory, Reviewer(miss_defects=1), "reviewer_a", "reviewer_b")
+    missing, sound = Reviewer(miss_defects=1), Reviewer()
+
+    class OneMisses:
+        """reviewer_a accepts one defect; reviewer_b sees every defect, whichever job runs first."""
+
+        async def assess(self, *, route, evidence):
+            return await (missing if route.role == "reviewer_a" else sound).assess(route=route, evidence=evidence)
+
+    jobs = QualificationJobs(
+        session_factory,
+        Projects({"profile_digest": PROFILE, "launch_profile_id": "fiction_narration_vi_v1"}),
+        evaluator=OneMisses(),
+        routes=_routes("reviewer_a", "reviewer_b"),
+    )
 
     await jobs.start_reviewers(user_id="default", project_name="p")
     await jobs.wait()

@@ -5,7 +5,7 @@ endpoint (``ollama-chat``, ``openai-chat`` for any OpenAI-compatible server, ``g
 ``gemini-aistudio`` and ``openai`` providers speak Gemini and OpenAI. Every protocol takes one user message with
 text and pictures and returns the reply text and, when asked and served, the first tokens' top log probabilities in
 one shape (``[{"token", "logprob", "top_logprobs": [{"token", "logprob"}]}]``). Requests are temperature 0. A cloud
-answer of 429 or 5xx is retried with capped exponential backoff; anything else fails the call.
+answer of 429 or 503 (not processed) is retried with capped exponential backoff; anything else fails the call.
 """
 
 from __future__ import annotations
@@ -40,7 +40,9 @@ DEFAULT_BASE_URLS: dict[Protocol, str] = {
     "openai": "https://api.openai.com/v1",
     "gemini": "https://generativelanguage.googleapis.com",
 }
-TRANSIENT_STATUSES = frozenset({429, 500, 502, 503, 504})
+#: Answers that mean the request was not processed (rate limited, overloaded), so a retry cannot bill twice. Other
+#: 5xx answers may come after the provider did the work; the call fails instead (the review is then FAILED).
+TRANSIENT_STATUSES = frozenset({429, 503})
 TRANSIENT_ATTEMPTS = 6
 MAX_BACKOFF_SECONDS = 120
 #: OpenAI's Chat Completions accepts at most 20 alternatives per token.

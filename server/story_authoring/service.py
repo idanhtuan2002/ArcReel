@@ -35,7 +35,7 @@ from r2.host_hardening.paid_routes import PaidRouteUnqualifiedError
 from r2.narrative_lifecycle.errors import NarrativeDecisionAuthorizationError
 from server.story_authoring.artifacts import StoryBlobStore
 from server.story_authoring.authority import GrantNarrativeShowrunnerAuthority
-from server.story_authoring.cloud import CLOUD_ADAPTERS
+from server.story_authoring.cloud import CLOUD_ADAPTERS, OPENAI_ENDPOINT, OPENAI_MAX_INPUT_BOUND
 from server.story_authoring.commit import ManuscriptCommitter, load_offered_manifest
 from server.story_authoring.contracts import OLLAMA_CHAT_ENDPOINT, StoryLimits, StoryModelSelection
 from server.story_authoring.driver import CHAPTERS, StoryBrief, run_call_bound, story_bible_input
@@ -154,9 +154,17 @@ class StoryAuthoringService:
                 raise StoryActionRefused(
                     "CLOUD_BUDGET_INVALID", "cloud USD cap must be between 1 and 10000 cents", status=422
                 )
+            bounded = {}
+            if any(profile.adapter_version == CLOUD_ADAPTERS[OPENAI_ENDPOINT] for profile in profiles):
+                # OpenAI-compatible input is bounded by bytes, not counted in tokens (cloud.OPENAI_MAX_INPUT_BOUND).
+                bounded = {
+                    "max_input_tokens": OPENAI_MAX_INPUT_BOUND,
+                    "server_context_tokens": OPENAI_MAX_INPUT_BOUND + DEFAULT_LIMITS.max_output_tokens,
+                }
             limits = StoryLimits.model_validate(
                 {
                     **DEFAULT_LIMITS.model_dump(),
+                    **bounded,
                     "currency": "USD",
                     "max_cost_minor_units": max_cost_minor_units,
                     "cloud_prices": max_prices(tuple(profiles)),

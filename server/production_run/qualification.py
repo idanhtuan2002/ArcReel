@@ -111,11 +111,12 @@ async def qualify(
     language: str,
     stop_early: bool = False,
     progress: Callable[[int, int], None] | None = None,
+    protocol: str | None = None,
 ) -> ReviewerQualification:
     """The reviewer's record over the corpus; with ``stop_early`` it ends at the first answer that rules it out.
     ``progress`` is told the cases reviewed so far and the corpus size after every case."""
     cases: list[QualificationCase] = []
-    method_digest = prompt_digest(review_method(route))
+    method_digest = prompt_digest(review_method(route, protocol))
     prepared = _evidence(corpus, output)
     clean_totals: dict[str, int] = {}
     for case, _ in prepared:
