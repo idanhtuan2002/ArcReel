@@ -43,6 +43,12 @@ _BLOCK_STATUS = {
 }
 
 
+def _paid_call_ceiling(run: RunSnapshot) -> int:
+    """The most one model call may cost on the run's paid routes; a step reserves its calls at this ceiling, so no
+    owner can dispatch paid work its reservation does not cover."""
+    return max((route.max_cost_per_call or 0 for route in run.policy.routes if route.paid), default=0)
+
+
 class ProductionController:
     def __init__(
         self,
@@ -141,7 +147,9 @@ class ProductionController:
             ),
             owner=owner,
             input_refs=plan.input_refs,
-            estimated_cost_minor_units=plan.estimated_cost_minor_units,
+            estimated_cost_minor_units=max(
+                plan.estimated_cost_minor_units, plan.estimated_model_calls * _paid_call_ceiling(run)
+            ),
             estimated_model_calls=plan.estimated_model_calls,
             estimated_tasks=plan.estimated_tasks,
             estimated_runtime_seconds=plan.estimated_runtime_seconds,
