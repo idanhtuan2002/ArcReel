@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { RunSnapshot } from "../api/types";
-import { STAGES_PER_ROW, runGraph } from "./runGraph";
+import { STAGES_PER_ROW, runGraph } from "./runGraphModel";
 
 function run(changes: Partial<RunSnapshot> = {}): RunSnapshot {
   return {

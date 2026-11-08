@@ -4,7 +4,7 @@ import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { Handle, Position, ReactFlow, type NodeProps } from "@xyflow/react";
 import type { RunSnapshot, RunStage } from "../api/types";
-import { runGraph, type RunGraphNode, type StageNodeData, type TargetNodeData } from "./runGraph";
+import { runGraph, type RunGraphNode, type StageNodeData, type TargetNodeData } from "./runGraphModel";
 import type { StageTime } from "./runTimeline";
 
 const HIDDEN_HANDLE = { opacity: 0, pointerEvents: "none" } as const;
