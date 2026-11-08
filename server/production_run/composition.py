@@ -37,10 +37,10 @@ from r2.contracts.quality import QualityProfileRevision
 from server.production_run.assets_adapter import AssetsAdapter
 from server.production_run.configuration import inspect_model_route
 from server.production_run.controller import ProductionController
-from server.production_run.evaluators import OllamaReviewer, QualifiedEvaluator, provider_base_url
+from server.production_run.evaluators import QualifiedEvaluator, provider_base_url
 from server.production_run.execution_guard import configure_run_task_authority
 from server.production_run.final_master_adapter import FinalMasterAdapter
-from server.production_run.gemini_reviewer import GeminiReviewer, RoutedReviewer, provider_credentials
+from server.production_run.gemini_reviewer import routed_reviewer
 from server.production_run.image_judge import OllamaImageJudge
 from server.production_run.inputs import ProjectInputWitness
 from server.production_run.media_adapter import MediaAdapter
@@ -413,9 +413,6 @@ async def wire_production(
         resolver=resolver,
         stories=stories,
         upload_for=upload_for,
-        evaluator=RoutedReviewer(
-            local=OllamaReviewer(base_url_for=provider_base_url(sessions)),
-            gemini=GeminiReviewer(credentials_for=provider_credentials(sessions)),
-        ),
+        evaluator=routed_reviewer(sessions),
         activation=ProductionActivation(enabled=True),
     )

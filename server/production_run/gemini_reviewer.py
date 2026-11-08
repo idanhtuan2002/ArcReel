@@ -16,6 +16,7 @@ from collections.abc import Awaitable, Callable
 import httpx
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from lib.config.resolver import ConfigResolver
 from lib.custom_provider import parse_provider_id
 from lib.db.repositories.custom_provider_repo import CustomProviderRepository
 from r2.automation.assessment import AssessmentFinding, ModelAssessment
@@ -26,12 +27,14 @@ from server.production_run.evaluators import (
     WATCH,
     WATCH_PROMPT,
     FinalEvidence,
+    FrameReviewer,
     QualifiedEvaluator,
     evidence_digest,
     prompt_digest,
     review_method,
 )
 from server.production_run.final_checks import picture_findings, subtitle_findings
+from server.production_run.vision_chat import model_access
 
 DEFAULT_BASE_URL = "https://generativelanguage.googleapis.com"
 #: Inline request data limit of the Gemini API; larger finals would need the Files API.
@@ -150,9 +153,15 @@ class RoutedReviewer:
 
 
 def provider_credentials(sessions: async_sessionmaker[AsyncSession]) -> Credentials:
-    """The base URL and API key of a custom provider, read at the moment a review is sent."""
+    """The base URL and API key of a custom provider or of the built-in Gemini provider, read when a review is sent."""
 
     async def credentials(provider_id: str) -> tuple[str, str]:
+        if provider_id == "gemini-aistudio":
+            async with ConfigResolver(sessions).session() as resolver:
+                config = await resolver.provider_config(provider_id)
+            if not config.get("api_key"):
+                raise KeyError(provider_id)
+            return str(config.get("base_url") or ""), str(config["api_key"])
         async with sessions() as session:
             provider = await CustomProviderRepository(session).get_provider(parse_provider_id(provider_id))
         if provider is None or not provider.api_key:
@@ -162,4 +171,12 @@ def provider_credentials(sessions: async_sessionmaker[AsyncSession]) -> Credenti
     return credentials
 
 
-__all__ = ["GeminiReviewer", "RoutedReviewer", "provider_credentials"]
+def routed_reviewer(sessions: async_sessionmaker[AsyncSession]) -> RoutedReviewer:
+    """The host's reviewers: Gemini models watch the final; every other model reviews frames on its own endpoint."""
+    return RoutedReviewer(
+        local=FrameReviewer(access_for=model_access(sessions)),
+        gemini=GeminiReviewer(credentials_for=provider_credentials(sessions)),
+    )
+
+
+__all__ = ["GeminiReviewer", "RoutedReviewer", "provider_credentials", "routed_reviewer"]

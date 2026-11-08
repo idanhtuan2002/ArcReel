@@ -35,8 +35,7 @@ from r2.automation.profiles import reviewer_is_qualified
 from r2.contracts.automation import ModelRoute
 from server import auth
 from server.production_run.composition import ProjectPolicyResolver, device_admission_from_env
-from server.production_run.evaluators import OllamaReviewer, provider_base_url
-from server.production_run.gemini_reviewer import GeminiReviewer, RoutedReviewer, provider_credentials
+from server.production_run.gemini_reviewer import routed_reviewer
 from tests.integration.server.services.test_automation_grants import interactive_env as interactive_env
 
 pytestmark = [
@@ -262,10 +261,7 @@ async def _qualify_reviewers(sessions, projects: ProjectManager, corpus: Path, o
         record = await qualify(
             corpus=corpus,
             route=ModelRoute.model_validate(route),
-            evaluator=RoutedReviewer(
-                local=OllamaReviewer(base_url_for=provider_base_url(sessions)),
-                gemini=GeminiReviewer(credentials_for=provider_credentials(sessions)),
-            ),
+            evaluator=routed_reviewer(sessions),
             output=output / route.role,
             profile_digest=settings["profile_digest"],
             launch_profile_id=settings["launch_profile_id"],

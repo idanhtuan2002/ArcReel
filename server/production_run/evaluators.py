@@ -16,7 +16,6 @@ or a response outside the schema is a FAILED assessment, never a pass.
 from __future__ import annotations
 
 import asyncio
-import base64
 import json
 import math
 import subprocess
@@ -31,14 +30,13 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from lib.custom_provider import parse_provider_id
 from lib.db.repositories.custom_provider_repo import CustomProviderRepository
-from lib.generation_resources import device_job, local_job
-from lib.text_backends.ollama import normalize_ollama_base_url
 from r2.automation.assessment import CREATIVE_DIMENSIONS, AssessmentFinding, ModelAssessment
 from r2.automation.identity import digest_value
 from r2.automation.profiles import route_digest
 from r2.contracts.automation import ModelRoute, RunStage
 from r2.contracts.common import ensure_json_value
 from server.production_run.final_checks import picture_findings, subtitle_findings
+from server.production_run.vision_chat import AccessFor, ollama_access, vision_chat
 
 FRAME_COUNT = 8
 CONTEXT_TOKENS = 16384
@@ -409,19 +407,22 @@ def sample_frames(final: Path, *, count: int = FRAME_COUNT, ffmpeg: str = "ffmpe
         return frames
 
 
-class OllamaReviewer:
-    """A reviewer route served by an Ollama chat endpoint that accepts images."""
+class FrameReviewer:
+    """A reviewer route that looks at sampled frames, served by any vision chat endpoint (Ollama, OpenAI-compatible,
+    Gemini); the questions, answers and their digests do not depend on the endpoint."""
 
     def __init__(
         self,
         *,
-        base_url_for: Callable[[str], Awaitable[str]],
+        access_for: AccessFor,
         timeout_seconds: float = 600,
         transport: httpx.AsyncBaseTransport | None = None,
+        backoff_seconds: float = 10,
     ) -> None:
-        self._base_url_for = base_url_for
+        self._access_for = access_for
         self._timeout = timeout_seconds
         self._transport = transport
+        self._backoff = backoff_seconds
 
     async def assess(self, *, route: ModelRoute, evidence: FinalEvidence) -> ModelAssessment:
         base = {
@@ -443,76 +444,31 @@ class OllamaReviewer:
                 f"Khung {index + 1} ({seconds:.1f}s): «{cue_at(subtitles, seconds) or '—'}»"
                 for index, seconds in enumerate(frame_times(duration, len(frames)))
             )
-            url = normalize_ollama_base_url(await self._base_url_for(route.provider_id))
-            body = {
-                "model": route.model_id,
-                "stream": False,
-                "truncate": False,
-                "shift": False,
-                "format": SCHEMA,
-                "messages": [
-                    {
-                        "role": "user",
-                        "content": PROMPT.format(
-                            frame_count=len(frames),
-                            frame_cues=cues,
-                            subtitles=subtitles[:6000],
-                            narration=evidence.narration_text[:6000],
-                        ),
-                        "images": [base64.b64encode(frame).decode("ascii") for frame in frames],
-                    }
-                ],
-                "options": {"temperature": 0, "num_ctx": CONTEXT_TOKENS},
-            }
+            access = await self._access_for(route.provider_id, route.model_id)
+            prompt = PROMPT.format(
+                frame_count=len(frames),
+                frame_cues=cues,
+                subtitles=subtitles[:6000],
+                narration=evidence.narration_text[:6000],
+            )
             times = frame_times(duration, len(frames))
-            async with (
-                device_job(local_job(url, route.model_id)),
-                httpx.AsyncClient(timeout=self._timeout, transport=self._transport) as client,
-            ):
+            async with vision_chat(
+                access,
+                route.model_id,
+                timeout_seconds=self._timeout,
+                transport=self._transport,
+                backoff_seconds=self._backoff,
+            ) as chat:
 
                 async def ask(question: str, frame: bytes, parse: Callable[[str], bool | None] = yes_no) -> bool | None:
-                    reply = await client.post(
-                        url + "/api/chat",
-                        json={
-                            "model": route.model_id,
-                            "stream": False,
-                            "think": False,
-                            "truncate": False,
-                            "messages": [
-                                {
-                                    "role": "user",
-                                    "content": question,
-                                    "images": [base64.b64encode(frame).decode("ascii")],
-                                }
-                            ],
-                            "options": {"temperature": 0, "num_predict": 8, "num_ctx": CONTEXT_TOKENS},
-                        },
-                    )
-                    reply.raise_for_status()
-                    return parse(str(reply.json()["message"].get("content") or ""))
+                    reply = await chat.ask(question, [frame], max_tokens=8, context_tokens=CONTEXT_TOKENS)
+                    return parse(reply.text)
 
                 async def probability(question: str, frame: bytes, yes: str, no: str) -> float | None:
-                    reply = await client.post(
-                        url + "/api/chat",
-                        json={
-                            "model": route.model_id,
-                            "stream": False,
-                            "think": False,
-                            "truncate": False,
-                            "logprobs": True,
-                            "top_logprobs": 10,
-                            "messages": [
-                                {
-                                    "role": "user",
-                                    "content": question,
-                                    "images": [base64.b64encode(frame).decode("ascii")],
-                                }
-                            ],
-                            "options": {"temperature": 0, "num_predict": 1, "num_ctx": CONTEXT_TOKENS},
-                        },
+                    reply = await chat.ask(
+                        question, [frame], max_tokens=1, top_logprobs=10, context_tokens=CONTEXT_TOKENS
                     )
-                    reply.raise_for_status()
-                    return first_token_probability(reply.json().get("logprobs"), yes=yes, no=no)
+                    return first_token_probability(reply.logprobs, yes=yes, no=no)
 
                 def above(value: float | None) -> bool | None:
                     return None if value is None else value > PROBABILITY_CUT
@@ -533,9 +489,10 @@ class OllamaReviewer:
                     alone = await ask(UPRIGHT_QUESTION, frame)
                     flipped.append(True if True in (alone, compared) else None if None in (alone, compared) else False)
                     illustrates.append(await ask(MATCH_QUESTION.format(cue=cue_at(subtitles, seconds) or "—"), frame))
-                response = await client.post(url + "/api/chat", json=body)
-            response.raise_for_status()
-            answer = json.loads(response.json()["message"]["content"])
+                final = await chat.ask(
+                    prompt, frames, schema=SCHEMA, context_tokens=CONTEXT_TOKENS, think=None, shift=False
+                )
+            answer = json.loads(strip_fence(final.text))
             frame_keys = segment_keys(evidence, times)
             checks += frame_answer_findings(
                 flipped,
@@ -572,6 +529,28 @@ class OllamaReviewer:
             return ModelAssessment.model_validate({**base, "outcome": "FAILED"})
 
 
+class OllamaReviewer(FrameReviewer):
+    """A frame reviewer whose every route is served by the Ollama at its provider's base URL."""
+
+    def __init__(
+        self,
+        *,
+        base_url_for: Callable[[str], Awaitable[str]],
+        timeout_seconds: float = 600,
+        transport: httpx.AsyncBaseTransport | None = None,
+    ) -> None:
+        super().__init__(access_for=ollama_access(base_url_for), timeout_seconds=timeout_seconds, transport=transport)
+
+
+def strip_fence(text: str) -> str:
+    """A JSON answer without the Markdown code fence some chat endpoints wrap it in."""
+    stripped = text.strip()
+    if stripped.startswith("```"):
+        stripped = stripped.split("\n", 1)[1] if "\n" in stripped else ""
+        stripped = stripped.rsplit("```", 1)[0]
+    return stripped.strip()
+
+
 def provider_base_url(sessions: async_sessionmaker[AsyncSession]) -> Callable[[str], Awaitable[str]]:
     """The configured base URL of a custom provider, read at the moment a review is sent."""
 
@@ -587,6 +566,7 @@ def provider_base_url(sessions: async_sessionmaker[AsyncSession]) -> Callable[[s
 
 __all__ = [
     "FinalEvidence",
+    "FrameReviewer",
     "OllamaReviewer",
     "QualifiedEvaluator",
     "evidence_digest",

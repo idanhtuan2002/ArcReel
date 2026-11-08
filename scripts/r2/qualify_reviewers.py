@@ -26,7 +26,8 @@ from lib.project_manager import get_project_manager
 from r2.automation.profiles import reviewer_is_qualified
 from r2.contracts.automation import ModelRoute
 from server.production_run.composition import ProjectPolicyResolver
-from server.production_run.evaluators import OllamaReviewer, provider_base_url
+from server.production_run.evaluators import OllamaReviewer
+from server.production_run.gemini_reviewer import routed_reviewer
 from server.production_run.qualification import qualify
 
 
@@ -61,11 +62,14 @@ async def _main(args: argparse.Namespace) -> int:
         if not (args.route and args.base_url and args.profile_digest):
             raise SystemExit("give --project and --role, or --route, --base-url and --profile-digest")
         route, profile_digest = _route(args.route), args.profile_digest
-    base_url_for = _fixed(args.base_url) if args.base_url else provider_base_url(async_session_factory)
+    # --base-url points at an Ollama; otherwise the route's provider says which endpoint to call.
+    evaluator = (
+        OllamaReviewer(base_url_for=_fixed(args.base_url)) if args.base_url else routed_reviewer(async_session_factory)
+    )
     record = await qualify(
         corpus=Path(args.corpus),
         route=route,
-        evaluator=OllamaReviewer(base_url_for=base_url_for),
+        evaluator=evaluator,
         output=Path(args.output),
         profile_digest=profile_digest,
         launch_profile_id=args.launch_profile_id,

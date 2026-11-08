@@ -27,13 +27,11 @@ from r2.automation.profiles import reviewer_is_qualified
 from r2.contracts.automation import ModelRoute
 from server.production_run.composition import ProjectPolicyResolver
 from server.production_run.evaluators import (
-    OllamaReviewer,
     QualifiedEvaluator,
     prompt_digest,
-    provider_base_url,
     review_method,
 )
-from server.production_run.gemini_reviewer import GeminiReviewer, RoutedReviewer, provider_credentials
+from server.production_run.gemini_reviewer import routed_reviewer
 from server.production_run.qualification import build_record, qualify
 
 CORPUS_ENV = "ARCREEL_REVIEWER_CORPUS"
@@ -78,10 +76,7 @@ class QualificationJobs:
         routes: Callable[[str], Awaitable[list[ModelRoute]]] | None = None,
     ) -> None:
         self._sessions, self._projects = sessions, projects
-        self._evaluator = evaluator or RoutedReviewer(
-            local=OllamaReviewer(base_url_for=provider_base_url(sessions)),
-            gemini=GeminiReviewer(credentials_for=provider_credentials(sessions)),
-        )
+        self._evaluator = evaluator or routed_reviewer(sessions)
         self._project_routes = routes or self._policy_routes
         self._jobs: dict[tuple[str, str, str], ReviewerJob] = {}
         self._tasks: set[asyncio.Task[None]] = set()
