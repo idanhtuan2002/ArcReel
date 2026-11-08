@@ -112,6 +112,7 @@ class WorkflowPlan(BaseModel):
 _ARTIFACT_BY_STEP: dict[str, str] = {
     "asset_inventory": "asset_inventory",
     "asset_sheets": "asset_sheets",
+    "episode_adaptation": "adaptation",
     "script_plan_content": "script_plan",
     "script_plan_review": "script_plan",
     "final_script": "script",
@@ -123,6 +124,7 @@ _ARTIFACT_BY_STEP: dict[str, str] = {
 _TASK_STEP: dict[str, str] = {
     "text_episode_plan": "episode_plan",
     "text_asset_inventory": "asset_inventory",
+    "text_episode_adaptation": "episode_adaptation",
     "text_drama_script_plan": "script_plan_content",
     "text_narration_script_plan": "script_plan_content",
     "text_reference_script_plan": "script_plan_content",
@@ -240,12 +242,17 @@ def build_workflow_plan(
     admission_problems = _admission_problems(admission)
     steps: list[WorkflowPlanStep] = []
 
+    adapted = (status.artifacts.get("adaptation") or {}).get("mode") == "screen"
     for index, step_rule in enumerate(rules):
         artifact_key = _ARTIFACT_BY_STEP.get(step_rule.id)
+        # Episode adaptation is a project setting, not a mode-pair fact: a verbatim project skips the step.
+        skipped = step_rule.id == "episode_adaptation" and not adapted
         step = WorkflowPlanStep(
             id=step_rule.id,
-            state=_baseline_step_state(step_rule, index=index, current_index=current_index, status=status),
-            required=step_rule.applicable,
+            state=WorkflowStepState.SKIPPED
+            if skipped
+            else _baseline_step_state(step_rule, index=index, current_index=current_index, status=status),
+            required=step_rule.applicable and not skipped,
             action=status.next_action if step_rule.checkpoint == status.state else None,
             requested_ids=(list(status.next_action.requested_ids) if step_rule.checkpoint == status.state else []),
             artifacts=dict(status.artifacts.get(artifact_key, {})) if artifact_key is not None else {},

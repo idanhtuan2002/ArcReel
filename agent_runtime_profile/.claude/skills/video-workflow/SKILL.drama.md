@@ -125,6 +125,12 @@ expected source revision：{next_action.args.expected_source_revision}
 
 ---
 
+## `adapt_episode`：分集改编（ADR-0114）
+
+**触发**：`next_action.type == "adapt_episode"`（项目 `episode_adaptation` 为 `screen`，本集还没有当前的改编稿）。
+
+调用 `mcp__arcreel__adapt_episode({"episode": N})`。服务端用项目的剧本文本模型把 `source/episode_N.txt` 改编为带场景头的分场剧本（对白推动冲突、旁白改为动作与少量画外音），写出 `adaptations/episode_N.txt`（之后的脚本规划读它，而不是原文切片）与 `adaptations/episode_N.json`。改编不改情节与结局、不添事件；机械校验不过会自动带原因重试，最终失败时把工具返回的原因告诉用户，不要手写改编稿绕过。原文、分集规划、人物表或单集目标时长变化后改编稿会变 stale，计划会再次给出本动作。
+
 ## `prepare_script_plan`：单集脚本规划
 
 **触发**：`next_action.type == "prepare_script_plan"`

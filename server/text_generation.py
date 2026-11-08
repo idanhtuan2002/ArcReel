@@ -47,6 +47,7 @@ from lib.draft_quarantine import (
     read_quarantine,
 )
 from lib.draft_violation import DraftViolation, collect_violations
+from lib.episode_adaptation import script_source_relpath
 from lib.episode_paths import (
     REFERENCE_VIDEO_SCRIPT_PLAN_FILENAME,
     REFERENCE_VIDEO_SCRIPT_PLAN_LEGACY_FILENAME,
@@ -499,7 +500,9 @@ def _parse_normalized_content(response_text: str, model: type[BaseModel]) -> dic
     return _parse_script_plan_json(response_text, model, label="script_plan 规范化内容", top_shape="{title, scenes}")
 
 
-def _load_novel_source(project_path: Path, source: str | None, *, episode: int) -> str:
+def _load_novel_source(
+    project_path: Path, source: str | None, *, episode: int, project: dict[str, Any] | None = None
+) -> str:
     """读取 script_plan 工具的源文：指定 source 文件，或缺省时本集派生源文；异常情况抛 ValueError。
 
     normalize / split 两类 script_plan 工具共用：路径越界、文件缺失、内容为空均 fail-fast，
@@ -520,7 +523,8 @@ def _load_novel_source(project_path: Path, source: str | None, *, episode: int) 
         raise ValueError(f"meta.source 类型非法，须为字符串或 null：{source!r}")
     if source == "":
         raise ValueError("源文件路径不能为空")
-    resolved = episode_source_relpath(episode) if source is None else source
+    # ``project`` decides the default: an adapted project's script reads the episode's adaptation (ADR-0114).
+    resolved = script_source_relpath(project, episode) if source is None else source
     try:
         # 缺省路径由集号拼出、并非不可信输入，但仍走 safe_join：派生文件可能是指向项目外的
         # 符号链接，两条分支共用同一道越界校验才不留下只有缺省路径才踩得到的缝。
@@ -533,6 +537,8 @@ def _load_novel_source(project_path: Path, source: str | None, *, episode: int) 
         # 读时重算里会变成未处理的 500。
         if source is not None:
             raise ValueError(f"未找到源文件: {source_path}")
+        if resolved != episode_source_relpath(episode):
+            raise ValueError(f"未找到本集改编稿: {source_path}；请先运行分集改编（adapt_episode），再重试")
         raise ValueError(
             f"未找到本集派生源文: {source_path}；请先运行分集规划工具（plan_episodes）按账本派生该文件，再重试"
         )
@@ -551,7 +557,7 @@ def _load_script_plan_source_with_basis(
 ) -> tuple[str, dict[str, object], ArtifactBasis]:
     """Freeze the exact source text and project semantics consumed by a script_plan request."""
 
-    novel_text = _load_novel_source(project_path, source, episode=episode)
+    novel_text = _load_novel_source(project_path, source, episode=episode, project=project)
     prompt_inputs, basis = build_script_plan_request(
         novel_text,
         episode=episode,
@@ -1296,14 +1302,14 @@ def _normalize_for_coverage(text: str) -> str:
     return re.sub(r"\s+", " ", unicodedata.normalize("NFC", text)).strip()
 
 
-def _coverage_source_scope(source: str | None, *, episode: int) -> str:
+def _coverage_source_scope(source: str | None, *, episode: int, project: dict[str, Any] | None = None) -> str:
     """覆盖判定所依据的源文范围的人话描述，供违约消息指名。
 
     覆盖判定是「分镜拼接 == 整份源文」的全等式，判定结果因此既取决于分镜正文、也取决于源文
     范围本身：范围取错了（如拿别集的源文件判这一集的分镜表），分镜一个字没改也判不过。不把
     范围写进消息，Agent 只会反复去改分镜正文，而问题不在那里。
     """
-    return f"源文件 {source or episode_source_relpath(episode)}"
+    return f"源文件 {source or script_source_relpath(project, episode)}"
 
 
 def _covers_source_verbatim(parts: list[str], source: str) -> bool:
@@ -1763,7 +1769,7 @@ async def generate_narration_script_plan(
             supported_durations=supported_durations,
             catalog=build_reference_catalog(project),
             novel_text=novel_text,
-            source_scope=_coverage_source_scope(request.source, episode=episode),
+            source_scope=_coverage_source_scope(request.source, episode=episode, project=project),
         )
         if violations:
             async with ProjectManager(str(project_path.parent)).async_file_lock(draft_path):

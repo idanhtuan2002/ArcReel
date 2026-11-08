@@ -26,6 +26,7 @@ export type RunStage =
   | "HANDOFF"
   | "ASSET_ANALYSIS"
   | "EPISODE_PLAN"
+  | "ADAPTATION"
   | "SCRIPT_PLAN"
   | "SCRIPT"
   | "MEDIA"
@@ -43,6 +44,7 @@ export const STAGES: readonly RunStage[] = [
   "HANDOFF",
   "ASSET_ANALYSIS",
   "EPISODE_PLAN",
+  "ADAPTATION",
   "SCRIPT_PLAN",
   "SCRIPT",
   "MEDIA",

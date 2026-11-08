@@ -30,13 +30,13 @@ describe("runGraph", () => {
     const { nodes, edges } = runGraph(run(), { BRIEF: { ms: 45_000, running: false } });
 
     const stages = nodes.filter((node) => node.data.kind === "stage");
-    expect(stages).toHaveLength(14);
+    expect(stages).toHaveLength(15);
     expect(stages[0].data).toMatchObject({ stage: "BRIEF", state: "done", duration: "45s" });
     expect(stages.find((node) => node.id === "MEDIA")?.data.state).toBe("current");
     expect(stages.find((node) => node.id === "EXPORT")?.data.state).toBe("pending");
     // The second row runs back from right to left, so its first stage sits under the first row's last one.
     expect(stages[STAGES_PER_ROW].position).toEqual({ x: stages[STAGES_PER_ROW - 1].position.x, y: 110 });
-    expect(edges.filter((edge) => !edge.id.startsWith("repair:") && !edge.id.startsWith("EXPORT->"))).toHaveLength(13);
+    expect(edges.filter((edge) => !edge.id.startsWith("repair:") && !edge.id.startsWith("EXPORT->"))).toHaveLength(14);
   });
 
   it("draws each repair as a loop back from QUALITY and the episodes after EXPORT", () => {

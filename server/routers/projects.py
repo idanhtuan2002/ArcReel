@@ -43,6 +43,7 @@ from lib.character_voice import PROJECT_FIELD as CHARACTER_VOICE_BINDING_FIELD
 from lib.character_voice import VALID_CHARACTER_VOICE_BINDINGS
 from lib.config.resolver import ConfigResolver, VideoBucketCapabilityError
 from lib.db import async_session_factory
+from lib.episode_adaptation import SETTING as ADAPTATION_SETTING
 from lib.episode_target_duration import (
     EPISODE_TARGET_DURATION_FIELD,
     MAX_EPISODE_TARGET_DURATION,
@@ -264,6 +265,8 @@ class UpdateProjectRequest(BaseModel):
     default_duration: int | None = None
     # 单集目标时长（秒）：显式 null 清除该偏好；ad 项目对字段出现本身即拒绝
     episode_target_duration: int | None = None
+    # 分集改编（ADR-0114）：screen 先把每集改编为剧本再做脚本规划；null 清除即回到 verbatim；ad 项目拒绝
+    episode_adaptation: Literal["screen", "verbatim"] | None = None
     # 仅 ad 项目：目标总时长（秒），任意正整数合法，不可清空
     target_duration: int | None = Field(default=None, gt=0)
     # 仅 ad 项目：创作诉求短文本；显式 null 清为空字符串
@@ -1009,6 +1012,13 @@ async def update_project(name: str, req: UpdateProjectRequest, _t: Translator):
                         project[EPISODE_TARGET_DURATION_FIELD] = _validated_episode_target_duration(
                             req.episode_target_duration, _t
                         )
+                if "episode_adaptation" in req.model_fields_set:
+                    if is_ad:
+                        raise HTTPException(status_code=400, detail=_t("ad_no_episode_adaptation"))
+                    if req.episode_adaptation is None:
+                        project.pop(ADAPTATION_SETTING, None)
+                    else:
+                        project[ADAPTATION_SETTING] = req.episode_adaptation
                 if "target_duration" in req.model_fields_set:
                     if not is_ad:
                         raise HTTPException(status_code=400, detail=_t("ad_only_field", field="target_duration"))

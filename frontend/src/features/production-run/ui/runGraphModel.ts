@@ -19,7 +19,7 @@ export interface TargetNodeData extends Record<string, unknown> {
 
 export type RunGraphNode = Node<StageNodeData | TargetNodeData>;
 
-export const STAGES_PER_ROW = 7;
+export const STAGES_PER_ROW = 8;
 const STEP_X = 150;
 const STEP_Y = 110;
 

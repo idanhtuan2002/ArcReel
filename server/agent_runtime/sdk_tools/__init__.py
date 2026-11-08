@@ -40,6 +40,7 @@ from server.agent_runtime.sdk_tools.enqueue_storyboards import generate_storyboa
 from server.agent_runtime.sdk_tools.enqueue_videos import generate_videos_tool
 from server.agent_runtime.sdk_tools.entry import create_project_tool, list_projects_tool, upload_source_tool
 from server.agent_runtime.sdk_tools.episode_planning import (
+    adapt_episode_tool,
     plan_episodes_tool,
     reset_episode_planning_tool,
 )
@@ -114,6 +115,7 @@ ARCREEL_MCP_TOOL_IDS: tuple[str, ...] = (
     "get_video_capabilities",
     "plan_episodes",
     "reset_episode_planning",
+    "adapt_episode",
     "patch_episode_script",
     "patch_episode_meta",
     "patch_project",
@@ -158,6 +160,7 @@ MIGRATION_BLOCKED_TOOL_IDS: frozenset[str] = frozenset(
         "discard_draft",
         "plan_episodes",
         "reset_episode_planning",
+        "adapt_episode",
         "patch_episode_script",
     }
 )
@@ -242,6 +245,7 @@ def build_arcreel_mcp_server(*, project_name: str, projects_root: Path, user_id:
         get_video_capabilities_tool(ctx),
         plan_episodes_tool(ctx),
         reset_episode_planning_tool(ctx),
+        adapt_episode_tool(ctx),
         patch_episode_script_tool(ctx),
         patch_episode_meta_tool(ctx),
         patch_project_tool(ctx),

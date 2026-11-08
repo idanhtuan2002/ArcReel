@@ -2393,3 +2393,77 @@ def test_script_plan_registered_from_read_text_source_stays_current_with_crlf_by
     comparison = ArtifactCurrencyResolver(project_path).compare(key, artifact_path=artifact_path)
 
     assert comparison.status is ArtifactStatus.CURRENT
+
+
+def _adapted_project(tmp_path: Path, setting: str | None) -> tuple[ProjectManager, Path]:
+    from tests.unit.lib.test_episode_adaptation import SOURCE
+
+    pm, project_path = _make_project(tmp_path, "narration")
+
+    def _settings(project: dict) -> None:
+        project["source_language"] = "vi"
+        project["characters"] = {"Lan": {"description": "cô gái"}}
+        if setting is not None:
+            project["episode_adaptation"] = setting
+
+    pm.update_project("demo", _settings)
+    _write_source_and_complete(pm, project_path, SOURCE)
+
+    def _plan(project: dict) -> None:
+        project["episodes"] = [
+            {
+                "episode": 1,
+                "title": "Phong thư",
+                "hook": "Một món nợ cũ",
+                "script_file": "scripts/episode_1.json",
+                "ledger_status": "planned",
+                "source_range": {"source_file": "source/novel.txt", "start": 0, "end": len(SOURCE)},
+            }
+        ]
+
+    pm.update_project("demo", _plan)
+    _write_episode_source(project_path, 1, SOURCE)
+    return pm, project_path
+
+
+async def test_a_screen_project_adapts_each_episode_before_its_script_reads_the_adaptation(tmp_path: Path) -> None:
+    from lib.episode_adaptation_runner import adapt_episode
+    from lib.workflow_plan import build_workflow_plan
+    from tests.unit.lib.test_episode_adaptation import SOURCE, _Model, _narration
+
+    pm, project_path = _adapted_project(tmp_path, "screen")
+    status = WorkflowStateService(pm).get_status("demo")
+    assert (status.state, status.next_action.type) == ("EPISODE_ADAPTATION", "adapt_episode")
+    assert status.next_action.args == {"episode": 1}
+    assert status.artifacts["adaptation"]["state"] == "missing"
+    assert status.target is not None
+    assert status.target.source == "adaptations/episode_1.txt"
+
+    await adapt_episode(project_path, pm.load_project("demo"), 1, generate=_Model(_narration()))
+    status = WorkflowStateService(pm).get_status("demo")
+    assert (status.state, status.next_action.type) == ("SCRIPT_PLAN_CONTENT", "prepare_script_plan")
+    assert status.artifacts["adaptation"] == {
+        "mode": "screen",
+        "state": "current",
+        "path": "adaptations/episode_1.txt",
+    }
+    steps = {step.id: step.state for step in build_workflow_plan(status).steps}
+    assert steps["episode_adaptation"] == "completed"
+
+    (project_path / "source" / "episode_1.txt").write_text(SOURCE + " Lan đóng cửa tiệm.", encoding="utf-8")
+    status = WorkflowStateService(pm).get_status("demo")
+    assert (status.state, status.next_action.type) == ("EPISODE_ADAPTATION", "adapt_episode")
+    assert status.artifacts["adaptation"]["state"] == "stale"
+
+
+def test_a_verbatim_project_skips_adaptation_and_reads_its_source_slice(tmp_path: Path) -> None:
+    from lib.workflow_plan import build_workflow_plan
+
+    pm, _ = _adapted_project(tmp_path, None)
+    status = WorkflowStateService(pm).get_status("demo")
+    assert (status.state, status.next_action.type) == ("SCRIPT_PLAN_CONTENT", "prepare_script_plan")
+    assert status.target is not None
+    assert status.target.source == "source/episode_1.txt"
+    assert status.artifacts["adaptation"] == {"mode": "verbatim"}
+    steps = {step.id: step for step in build_workflow_plan(status).steps}
+    assert (steps["episode_adaptation"].state, steps["episode_adaptation"].required) == ("skipped", False)

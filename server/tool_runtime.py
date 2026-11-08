@@ -36,6 +36,9 @@ from lib.config.resolver import ConfigResolver
 from lib.content_digest import prefixed, prefixed_canonical_json_digest
 from lib.db import async_session_factory
 from lib.db.base import DEFAULT_USER_ID
+from lib.episode_adaptation import SETTING as ADAPTATION_SETTING
+from lib.episode_adaptation import AdaptationError
+from lib.episode_adaptation_runner import adapt_episode as run_episode_adaptation
 from lib.episode_paths import (
     DRAMA_SCRIPT_PLAN_QUARANTINE_FILENAME,
     NARRATION_SCRIPT_PLAN_QUARANTINE_FILENAME,
@@ -412,6 +415,7 @@ _TEXT_NARRATION_SCRIPT_PLAN = "text_narration_script_plan"
 _TEXT_REFERENCE_SCRIPT_PLAN = "text_reference_script_plan"
 _TEXT_EPISODE_PLAN = "text_episode_plan"
 TEXT_ASSET_INVENTORY = "text_asset_inventory"
+TEXT_EPISODE_ADAPTATION = "text_episode_adaptation"
 _TEXT_TASK_SERVICES: dict[str, Services] = {}
 
 
@@ -502,6 +506,8 @@ async def _submit_text_task(
         result = task.get("result") or {}
         if task_type == _TEXT_EPISODE_PLAN:
             return ToolOutcome(value=PlanEpisodesResult.model_validate(result))
+        if task_type == TEXT_EPISODE_ADAPTATION:
+            return ToolOutcome(value=AdaptEpisodeResult.model_validate(result))
         return ToolOutcome(value=TextGenerationResult(**result))
     except BaseException as exc:
         await cleanup_fresh_generation_batch(
@@ -1549,6 +1555,7 @@ PROJECT_SETTINGS = (
     "narration_voice",
     "narration_speed",
     "character_voice_binding",
+    ADAPTATION_SETTING,
 )
 PROJECT_OVERVIEW_FIELDS = ("synopsis", "genre", "theme", "world_setting")
 EPISODE_META_FIELDS = ("title",)
@@ -1559,6 +1566,18 @@ _POSITIVE_INT_SETTINGS = (EPISODE_TARGET_UNITS_FIELD, "planning_window_chars", "
 
 class ToolMessage(BaseModel):
     message: str
+
+
+class AdaptEpisodeRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    episode: int = Field(gt=0)
+
+
+class AdaptEpisodeResult(BaseModel):
+    episode: int
+    spoken_seconds: float
+    attempts: int
 
 
 class PlanEpisodesRequest(BaseModel):
@@ -1877,6 +1896,26 @@ async def plan_episodes(
     )
 
 
+async def adapt_episode(
+    request: ToolRequest[AdaptEpisodeRequest],
+    scope: ProjectScope,
+    caller: CallerContext,
+    services: Services,
+) -> ToolOutcome[Any]:
+    """Adapt one planned episode into its screen script (ADR-0114) as a queued text task."""
+    if problem := await migration_gate(scope, services):
+        return ToolOutcome(problem=problem)
+    return await _submit_text_task(
+        task_type=TEXT_EPISODE_ADAPTATION,
+        operation="adapt_episode",
+        unit_id=f"episode-{request.value.episode}",
+        payload=request.value.model_dump(mode="json"),
+        scope=scope,
+        caller=caller,
+        services=services,
+    )
+
+
 async def execute_queued_text_task(
     task: dict[str, Any], *, planner_cls: type[EpisodePlanner] = EpisodePlanner
 ) -> dict[str, Any]:
@@ -1894,6 +1933,8 @@ async def execute_queued_text_task(
     task_type = task["task_type"]
     if task_type == TEXT_ASSET_INVENTORY:
         return await _execute_asset_inventory(task, scope, services)
+    if task_type == TEXT_EPISODE_ADAPTATION:
+        return await _execute_episode_adaptation(task, scope, services)
     if task_type == _TEXT_EPISODE_PLAN:
         cancellation_receipts: list[FormalWriteReceipt] = []
         outcome = await _execute_plan_episodes(
@@ -1936,6 +1977,27 @@ async def execute_queued_text_task(
     if is_dataclass(value) and not isinstance(value, type):
         return asdict(value)
     raise RuntimeError("text task returned no result")
+
+
+async def _execute_episode_adaptation(task: dict[str, Any], scope: ProjectScope, services: Services) -> dict[str, Any]:
+    """Adapt one episode with the project's script text model; a draft that never passes its checks fails the task."""
+    payload = task.get("payload") or {}
+    if problem := await migration_gate(scope, services):
+        raise RuntimeError(encode_generation_problem(_queued_generation_problem(problem)))
+    generator = await TextGenerator.create(TextTaskType.SCRIPT, scope.project_name)
+    user_id = str(task.get("user_id") or DEFAULT_USER_ID)
+
+    async def generate(request: BackendTextGenerationRequest) -> BackendTextGenerationResult:
+        return await generator.generate(request, scope.project_name, user_id=user_id)
+
+    project_path = services.projects.get_project_path(scope.project_name)
+    project = await asyncio.to_thread(services.projects.load_project, scope.project_name)
+    try:
+        result = await run_episode_adaptation(project_path, project, int(payload["episode"]), generate=generate)
+    except AdaptationError as exc:
+        problem = ToolProblem("adaptation_failed", str(exc), action=GenerationAction.RETRY.value)
+        raise RuntimeError(encode_generation_problem(_queued_generation_problem(problem))) from exc
+    return AdaptEpisodeResult.model_validate(result).model_dump(mode="json")
 
 
 async def _execute_asset_inventory(task: dict[str, Any], scope: ProjectScope, services: Services) -> dict[str, Any]:
@@ -2074,6 +2136,10 @@ def _coerce_setting_value(key: str, value: Any) -> Any:
         if not is_valid_episode_target_duration(value):
             raise ValueError(message)
         return value
+    if key == ADAPTATION_SETTING:
+        if value is not None and value not in ("screen", "verbatim"):
+            raise ValueError(f"{ADAPTATION_SETTING} 必须是 screen / verbatim 之一或 null,收到 {value!r}")
+        return value
     if key == "source_language":
         if value is not None and (not isinstance(value, str) or value not in _SOURCE_LANGUAGE_VALUES):
             raise ValueError(f"source_language 必须是 {list(_SOURCE_LANGUAGE_VALUES)} 之一或 null,收到 {value!r}")
@@ -2207,6 +2273,8 @@ def _patch_project_sync(
                     raise ValueError(
                         f"{EPISODE_TARGET_DURATION_FIELD} 不适用广告/短片项目（整集体量按 target_duration 预算规划）"
                     )
+                if ADAPTATION_SETTING in coerced and project_data.get("content_mode") == "ad":
+                    raise ValueError(f"{ADAPTATION_SETTING} 不适用广告/短片项目（没有分集）")
                 for key, field_value in coerced.items():
                     current = project_data.get(key)
                     if field_value is None:

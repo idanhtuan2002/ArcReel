@@ -206,6 +206,7 @@ class WorkflowPlanner:
                     else f"text_{status.project.content_mode}_script_plan"
                 )
                 text_queries.append((script_plan_type, episode_ids))
+                text_queries.append(("text_episode_adaptation", episode_ids))
         for task_type, resource_ids in text_queries:
             rows.extend(
                 await get_active_tasks_for_resources(

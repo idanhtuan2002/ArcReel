@@ -35,6 +35,7 @@ export const WORKFLOW_ACTION_TYPES = [
   "analyze_assets",
   "plan_episodes",
   "reset_episode_planning",
+  "adapt_episode",
   "prepare_script_plan",
   "confirm_script_plan",
   "generate_script",
@@ -219,6 +220,7 @@ export type WorkflowStateName =
   | "SELLING_POINTS"
   | "ASSET_INVENTORY"
   | "EPISODE_PLAN"
+  | "EPISODE_ADAPTATION"
   | "SCRIPT_PLAN_CONTENT"
   | "SCRIPT_PLAN_REVIEW"
   | "FINAL_SCRIPT"

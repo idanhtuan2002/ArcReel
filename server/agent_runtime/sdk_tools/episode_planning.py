@@ -22,11 +22,13 @@ from server.media_tools.context import (
 )
 from server.tool_runtime import (
     MAX_INSTRUCTIONS_LEN,
+    AdaptEpisodeRequest,
     PlanEpisodesRequest,
     ResetEpisodePlanningRequest,
     ToolOutcome,
     ToolProblem,
     ToolRequest,
+    adapt_episode,
     plan_episodes,
 )
 from server.tool_runtime import (
@@ -129,3 +131,30 @@ def reset_episode_planning_tool(ctx: ToolContext):
 
 
 __all__ = ["plan_episodes_tool", "reset_episode_planning_tool"]
+
+
+def adapt_episode_tool(ctx: ToolContext):
+    @tool(
+        "adapt_episode",
+        "分集改编（ADR-0114）：项目 episode_adaptation 为 screen 时，把一集已规划的原文 source/episode_N.txt 改编为"
+        "竖屏短视频剧本——narration 为解说口播稿（开头钩子、压缩、对白由解说引用），drama 为带场景头的分场剧本"
+        "（对白推动冲突、旁白改为动作与少量画外音）；不改情节与结局、不添事件。产出 adaptations/episode_N.txt"
+        "（之后的脚本规划读取它）与 adaptations/episode_N.json（结构化改编、校验与依据指纹）。机械校验（逐字原文"
+        "摘录覆盖开头与结尾、人物均已登记或见于原文、钩子时长、口播总时长对齐单集目标时长、drama 场数与画外音比例）"
+        "不过时自动带失败原因重试，至多三次。工作流 next_action 为 adapt_episode 时调用。",
+        {
+            "type": "object",
+            "properties": {"episode": {"type": "integer", "minimum": 1, "description": "要改编的集号"}},
+            "required": ["episode"],
+        },
+    )
+    async def _handler(args: dict[str, Any]) -> dict[str, Any]:
+        try:
+            request = AdaptEpisodeRequest.model_validate(args)
+        except ValueError as exc:
+            outcome = ToolOutcome(problem=ToolProblem("invalid_request", f"❌ 参数错误：{exc}"))
+        else:
+            outcome = await adapt_episode(ToolRequest(request), ctx.scope, ctx.caller, tool_services(ctx))
+        return tool_outcome_response("episode_adaptation", outcome)
+
+    return _handler

@@ -282,6 +282,7 @@ MESSAGES = {
     "ad_only_field": "{field} 仅广告/短片项目（content_mode=ad）可用",
     "ad_no_default_duration": "广告/短片项目不支持默认时长，分镜时长按目标总时长规划",
     "ad_no_episode_target_duration": "广告/短片项目不支持单集目标时长，整集体量按目标总时长规划",
+    "ad_no_episode_adaptation": "广告/短片项目没有分集，不支持分集改编",
     "ad_grid_not_supported": "广告/短片项目不支持多宫格分镜",
     "grid_storyboard_not_enabled": "项目未启用多宫格分镜，无法生成多宫格分镜",
     "ad_target_duration_required": "广告/短片项目必须设置目标总时长（正整数秒）",

@@ -332,6 +332,8 @@ export default {
   'episode_target_duration_label': '单集目标时长（可选）',
   'episode_target_duration_unit': '秒',
   'episode_target_duration_hint': '整集成片的期望长度，AI 据此决定每集包含多少原文、以及本集拆多少个分镜或视频单元。软目标：内容不够时会少拆，内容需要时可以超出。留空则由 AI 按内容自行把握。',
+  'episode_adaptation_label': '把每集改编为剧本',
+  'episode_adaptation_hint': '规划脚本前，先把故事的每一集改编为适合屏幕的剧本：开头几秒设钩子、压缩解说（drama 为带对白的分场剧本）、结尾留悬念，不改情节与结局。原故事保持不变。关闭时成片逐字朗读原文。',
   'episode_target_duration_out_of_range': '请输入 {{min}} 到 {{max}} 之间的整数秒',
   'episode_duration_vs_target': '本集合计 {{total}} 秒 / 目标 {{target}} 秒',
   'episode_duration_over_target': '本集合计 {{total}} 秒，比目标 {{target}} 秒多 {{over}} 秒（仅提示，不影响确认）',

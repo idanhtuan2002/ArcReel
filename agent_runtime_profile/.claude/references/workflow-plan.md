@@ -81,6 +81,7 @@ ID 参数时，前者传入，后者必须**省略该参数**，不得把 `[]` �
 | `analyze_assets` | dispatch `analyze-assets` 子智能体 |
 | `reset_episode_planning` | `mcp__arcreel__reset_episode_planning`，按 `next_action.args` 传参 |
 | `plan_episodes` | `mcp__arcreel__plan_episodes` |
+| `adapt_episode` | `mcp__arcreel__adapt_episode`，传 `next_action.args.episode`（项目 `episode_adaptation` 为 `screen` 时出现） |
 | `prepare_script_plan` | dispatch `next_action.args.preprocessor` 指名的子智能体 |
 | `confirm_script_plan` | `mcp__arcreel__confirm_script_review` |
 | `generate_script` | dispatch `create-episode-script` 子智能体（ad 直接调 `mcp__arcreel__generate_episode_script`） |

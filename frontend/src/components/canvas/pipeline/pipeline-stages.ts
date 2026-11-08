@@ -8,6 +8,7 @@ export type StageState = "done" | "active" | "attention" | "ready" | "todo" | "s
 /** 服务端工作流步骤（lib/workflow_plan.py）所属的北极星阶段。 */
 const STEP_STAGE: Record<string, NorthStarStage> = {
   episode_plan: "adapt",
+  episode_adaptation: "adapt",
   script_plan_content: "adapt",
   script_plan_review: "adapt",
   final_script: "adapt",

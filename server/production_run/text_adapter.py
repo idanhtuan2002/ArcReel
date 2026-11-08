@@ -8,6 +8,7 @@ a status that moved backwards, a planning reset, a project blocker or an action 
 
 - ``ASSET_ANALYSIS`` (``AssetsAdapter`` in ``assets_adapter``): schema-bound inventory of the whole source.
 - ``EPISODE_PLAN``: planner windows until every target episode exists in the ledger.
+- ``ADAPTATION``: each target's screen adaptation (ADR-0114) when the project adapts; a verbatim project passes.
 - ``SCRIPT_PLAN``: each target's formal script plan, then its content confirmation under the run's grant.
 - ``SCRIPT``: each target's final script.
 
@@ -18,6 +19,7 @@ current revision is an external input change.
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import re
 from collections.abc import Awaitable, Callable, Sequence
 from dataclasses import dataclass
@@ -26,6 +28,14 @@ from typing import Any
 
 from lib.config.resolver import ConfigResolver
 from lib.draft_quarantine import generated_and_unchanged
+from lib.episode_adaptation import (
+    MAX_ATTEMPTS,
+    AdaptationError,
+    adaptation_mode,
+    adaptation_state,
+    adaptation_text_relpath,
+    read_inputs,
+)
 from lib.project_manager import ProjectManager
 from lib.script_batch_edit import script_revision as batch_script_revision
 from lib.script_review import content_fingerprint, script_plan_path, script_plan_quarantine_path
@@ -60,6 +70,8 @@ from server.services.automation_grants import RunAutomationAuthority
 from server.services.workflow_planner import WorkflowPlanner
 from server.text_generation import TextGenerationRequest
 from server.tool_runtime import (
+    TEXT_EPISODE_ADAPTATION,
+    AdaptEpisodeRequest,
     CallerContext,
     PatchEpisodeScriptRequest,
     ProjectScope,
@@ -77,17 +89,18 @@ RANK: dict[WorkflowActionType, int] = {
     A.ANALYZE_ASSETS: 1,
     A.PLAN_EPISODES: 2,
     A.RESET_EPISODE_PLANNING: 2,
-    A.PREPARE_SCRIPT_PLAN: 3,
-    A.CONFIRM_SCRIPT_PLAN: 4,
-    A.GENERATE_SCRIPT: 5,
-    A.GENERATE_ASSET_SHEETS: 6,
-    A.GENERATE_STORYBOARDS: 6,
-    A.GENERATE_GRID: 6,
-    A.GENERATE_TTS: 6,
-    A.REGENERATE_TTS: 6,
-    A.GENERATE_VIDEOS: 6,
-    A.REPAIR_VIDEO_UNITS: 6,
-    A.EXPORT: 6,
+    A.ADAPT_EPISODE: 3,
+    A.PREPARE_SCRIPT_PLAN: 4,
+    A.CONFIRM_SCRIPT_PLAN: 5,
+    A.GENERATE_SCRIPT: 6,
+    A.GENERATE_ASSET_SHEETS: 7,
+    A.GENERATE_STORYBOARDS: 7,
+    A.GENERATE_GRID: 7,
+    A.GENERATE_TTS: 7,
+    A.REGENERATE_TTS: 7,
+    A.GENERATE_VIDEOS: 7,
+    A.REPAIR_VIDEO_UNITS: 7,
+    A.EXPORT: 7,
 }
 _SCRIPT_PLAN_TASKS = {
     "narration": "text_narration_script_plan",
@@ -356,11 +369,59 @@ class EpisodePlanAdapter(WorkflowStageAdapter):
         )
 
 
+class AdaptationAdapter(WorkflowStageAdapter):
+    """``ADAPTATION``: each target episode's screen adaptation (ADR-0114), one exact task per basis it reads.
+
+    A project that keeps ``verbatim`` episodes has no adaptation action, so the stage passes with that fact as its
+    evidence; an adapted episode's evidence is its adapted script's digest, which script planning then reads."""
+
+    owner = "episode-adapter"
+    stage = RunStage.ADAPTATION
+    first_rank = 3
+    done_rank = 3
+    calls_per_unit = MAX_ATTEMPTS
+    seconds_per_unit = 600
+
+    async def _act(self, intent: DispatchIntent, subject: str, status: WorkflowStatus, episode: int | None) -> bool:
+        assert episode is not None
+        project_path = self._projects.get_project_path(intent.scope.project_name)
+        project = await asyncio.to_thread(self._project, intent.scope.project_name)
+        try:
+            basis = (await asyncio.to_thread(read_inputs, project_path, project, episode)).basis()
+        except AdaptationError:
+            raise OwnerBlocked("ADAPTATION_INPUT_MISSING") from None
+        try:
+            return await self._submit_once(
+                intent,
+                subject,
+                sub_key=f"adaptation:{episode}:{basis.removeprefix('sha256:')[:24]}",
+                task_type=TEXT_EPISODE_ADAPTATION,
+                resource_id=f"episode-{episode}",
+                payload=AdaptEpisodeRequest(episode=episode).model_dump(mode="json"),
+            )
+        except OwnerBlocked as blocked:
+            if blocked.reason == "OWNER_TASK_FAILED":
+                raise OwnerBlocked("ADAPTATION_FAILED") from None
+            raise
+
+    def _evidence(self, intent: DispatchIntent, status: WorkflowStatus, episode: int | None) -> OwnerReceipt:
+        project_path = self._projects.get_project_path(intent.scope.project_name)
+        project = self._project(intent.scope.project_name)
+        if adaptation_mode(project) != "screen":
+            return revision_receipt(self.owner, f"episode:{episode}:adaptation", "verbatim")
+        assert episode is not None
+        text = project_path / adaptation_text_relpath(episode)
+        if adaptation_state(project_path, project, episode) != "current" or not text.is_file():
+            raise OwnerBlocked("OWNER_OUTPUT_MISSING")
+        revision = "sha256:" + hashlib.sha256(text.read_bytes()).hexdigest()
+        return revision_receipt(self.owner, f"episode:{episode}:adaptation", revision)
+
+
 class ScriptPlanAdapter(WorkflowStageAdapter):
     owner = "script-planner"
     stage = RunStage.SCRIPT_PLAN
-    first_rank = 3
-    done_rank = 4
+    first_rank = 4
+    done_rank = 5
 
     def __init__(
         self,
@@ -504,8 +565,8 @@ def _narration_segment_fixes(segment: dict[str, Any], characters: Sequence[str] 
 class ScriptAdapter(WorkflowStageAdapter):
     owner = "script-writer"
     stage = RunStage.SCRIPT
-    first_rank = 5
-    done_rank = 5
+    first_rank = 6
+    done_rank = 6
     calls_per_unit = 12
     seconds_per_unit = 1200
 
@@ -577,6 +638,7 @@ class ScriptAdapter(WorkflowStageAdapter):
 
 __all__ = [
     "RANK",
+    "AdaptationAdapter",
     "EpisodePlanAdapter",
     "ScriptAdapter",
     "ScriptPlanAdapter",

@@ -222,7 +222,7 @@ describe("ProductionRunPanel", () => {
     render(<ProductionRunPanel projectName="alpha" />);
 
     const steps = await screen.findByRole("list", { name: "Steps" });
-    expect(steps.querySelectorAll("li")).toHaveLength(14);
+    expect(steps.querySelectorAll("li")).toHaveLength(15);
     expect(steps.querySelector("[aria-current='step']")?.textContent).toBe("Pictures & voice");
     expect(screen.getByText("Status: Working")).toBeInTheDocument();
   });

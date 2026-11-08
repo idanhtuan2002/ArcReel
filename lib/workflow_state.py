@@ -26,6 +26,7 @@ from lib.artifact_manifest import ArtifactKey, ArtifactManifestError, ArtifactSt
 from lib.asset_types import ASSET_SPECS, asset_name_comparison_key
 from lib.content_digest import prefixed_canonical_json_digest
 from lib.data_validator import DataValidator
+from lib.episode_adaptation import adaptation_mode, adaptation_state, adaptation_text_relpath, script_source_relpath
 from lib.episode_ledger import (
     SOURCE_FINGERPRINTS_KEY,
     SourceDoc,
@@ -37,7 +38,6 @@ from lib.episode_ledger import (
     parse_positive_episode_num,
     register_orphan_episode_entries,
 )
-from lib.episode_paths import episode_source_relpath
 from lib.project_manager import ProjectManager
 from lib.project_migration_failure import (
     MIGRATION_FAILURE_CODE,
@@ -65,6 +65,7 @@ WorkflowStateName = Literal[
     "SELLING_POINTS",
     "ASSET_INVENTORY",
     "EPISODE_PLAN",
+    "EPISODE_ADAPTATION",
     "SCRIPT_PLAN_CONTENT",
     "SCRIPT_PLAN_REVIEW",
     "FINAL_SCRIPT",
@@ -125,6 +126,7 @@ class WorkflowActionType(StrEnum):
     ANALYZE_ASSETS = "analyze_assets"
     PLAN_EPISODES = "plan_episodes"
     RESET_EPISODE_PLANNING = "reset_episode_planning"
+    ADAPT_EPISODE = "adapt_episode"
     PREPARE_SCRIPT_PLAN = "prepare_script_plan"
     CONFIRM_SCRIPT_PLAN = "confirm_script_plan"
     GENERATE_SCRIPT = "generate_script"
@@ -1392,7 +1394,7 @@ class WorkflowStateService:
                     episode=number,
                     script=script_path,
                     script_filename=script_filename,
-                    source=episode_source_relpath(number),
+                    source=script_source_relpath(project, number),
                 )
 
         state: WorkflowStateName
@@ -1449,6 +1451,24 @@ class WorkflowStateService:
                 next_action = self._planning_action(project, "target episode is unavailable")
             else:
                 preprocessor = workflow_rule(str(mode), str(generation_mode)).preprocessor
+                if mode != "ad":
+                    # ADR-0114: a ``screen`` project adapts each episode before its script is planned, and the
+                    # script reads the adaptation; a changed source, plan, cast or target makes it stale.
+                    adapting = adaptation_mode(project) == "screen"
+                    artifacts["adaptation"] = {"mode": "screen" if adapting else "verbatim"}
+                    if adapting:
+                        adaptation = adaptation_state(project_path, project, target.episode)
+                        artifacts["adaptation"].update(state=adaptation, path=adaptation_text_relpath(target.episode))
+                        if adaptation != "current":
+                            state = "EPISODE_ADAPTATION"
+                            next_action = _action(
+                                WorkflowActionType.ADAPT_EPISODE,
+                                f"episode adaptation is {adaptation}",
+                                args={"episode": target.episode},
+                            )
+                            return self._response(
+                                project, source, target, state, blockers, gates, artifacts, next_action
+                            )
                 if mode != "ad" and selected is not None and selected[1].get("ledger_status") == "stale":
                     script_plan_path = script_review.script_plan_path(project_path, project, target.episode)
                     live_revision = (

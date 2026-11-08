@@ -14,6 +14,7 @@ from typing import Any
 from sqlalchemy import select
 
 from lib.db.models.production_run import ProductionStepModel
+from lib.episode_adaptation import SETTING as ADAPTATION_SETTING
 from lib.episode_target_duration import EPISODE_TARGET_DURATION_FIELD
 from lib.episode_target_volume import EPISODE_TARGET_UNITS_FIELD
 from lib.project_manager import ProjectManager
@@ -23,6 +24,8 @@ from r2.contracts.automation import OwnerReceipt, RunStage
 from r2.contracts.common import ensure_json_value
 from server.production_run.owner_support import Sessions
 
+#: Witnessed only when present (ADR-0114's ``episode_adaptation``).
+LATER_WITNESSED_SETTINGS = (ADAPTATION_SETTING,)
 # Production settings the user owns; a run reads them and never writes them.
 WITNESSED_SETTINGS = (
     "content_mode",
@@ -79,7 +82,9 @@ class ProjectInputWitness:
             if doc.rel_path not in handed_off
         ]
         body = {
-            "settings": {key: project.get(key) for key in WITNESSED_SETTINGS},
+            "settings": {key: project.get(key) for key in WITNESSED_SETTINGS}
+            # Settings added later enter the witness only when set, so earlier projects keep their digest.
+            | {key: project[key] for key in LATER_WITNESSED_SETTINGS if project.get(key) is not None},
             "sources": sorted(sources, key=lambda item: item["path"]),
             "source_blockers": sorted(blocker.code + ":" + blocker.path for blocker in revision.blockers),
         }

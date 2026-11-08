@@ -54,7 +54,12 @@ from server.production_run.resource_admission import ComfyuiProbe, ManagedDevice
 from server.production_run.scheduler import ProductionScheduler
 from server.production_run.service import ProductionActivation, ProductionRunRefused, ProductionRunService
 from server.production_run.story_adapter import BriefAdapter, HandoffAdapter, StoryAdapter, StoryCommitAdapter
-from server.production_run.text_adapter import EpisodePlanAdapter, ScriptAdapter, ScriptPlanAdapter
+from server.production_run.text_adapter import (
+    AdaptationAdapter,
+    EpisodePlanAdapter,
+    ScriptAdapter,
+    ScriptPlanAdapter,
+)
 from server.production_run.vision_chat import model_access
 from server.services.automation_grants import AutomationGrantCustodian, RunAutomationAuthority
 from server.services.governance_grants import CurrentShowrunnerGrantReader
@@ -265,6 +270,7 @@ def build_adapters(
         RunStage.HANDOFF: HandoffAdapter(sessions, authority=authority, projects=projects, upload_for=upload_for),
         RunStage.ASSET_ANALYSIS: AssetsAdapter(sessions, **text),
         RunStage.EPISODE_PLAN: EpisodePlanAdapter(sessions, **text),
+        RunStage.ADAPTATION: AdaptationAdapter(sessions, **text),
         RunStage.SCRIPT_PLAN: ScriptPlanAdapter(sessions, **text),
         RunStage.SCRIPT: ScriptAdapter(sessions, **text),
         RunStage.MEDIA: MediaAdapter(sessions, **text, judge=ImageJudge(access_for=model_access(sessions))),
