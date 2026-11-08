@@ -21,7 +21,7 @@ from r2.automation.identity import policy_digest
 from r2.contracts.automation import AutomationMode, Checkpoint, ReviewCommand, RunCommand, RunSnapshot, RunStatus
 from server.auth import CurrentUser, InteractiveUser, oauth2_scheme_optional
 from server.production_run.qualification_jobs import QualificationJobs, QualificationRefused
-from server.production_run.report import run_progress, run_report, verified_final
+from server.production_run.report import pending_final, run_progress, run_report, verified_final
 from server.production_run.service import (
     ProductionRunRefused,
     ProductionRunService,
@@ -73,7 +73,7 @@ class ReviewBody(_Body):
     expected_version: int = Field(ge=1)
     checkpoint: Checkpoint
     binding_digest: str = Field(pattern=_DIGEST)
-    decision: Literal["APPROVE", "REJECT"]
+    decision: Literal["APPROVE", "REJECT", "REWORK"]
 
 
 def _view(run: RunSnapshot) -> dict[str, Any]:
@@ -354,11 +354,15 @@ async def get_progress(project_name: str, run_id: str, user: CurrentUser, servic
 async def preview_final(
     project_name: str, run_id: str, episode: int, user: CurrentUser, service: Service
 ) -> FileResponse:
-    """The verified final of one completed target, for the owner's in-panel preview; never a public file."""
+    """The verified final of one completed target, or the final a FINAL_FILM review is deciding on, for the owner's
+    in-panel preview; never a public file."""
     sessions = async_session_factory if service is None else service.sessions
     async with sessions() as session:
         run = await ProductionRunRepository(session).get(user_id=user.id, project_name=project_name, run_id=run_id)
-    final = await asyncio.to_thread(verified_final, get_project_manager(), run, episode) if run else None
+    projects = get_project_manager()
+    final = await asyncio.to_thread(verified_final, projects, run, episode) if run else None
+    if final is None and run is not None:
+        final = await pending_final(sessions, projects, run, episode)
     if final is None:
         raise HTTPException(status_code=404, detail={"code": "OUTPUT_NOT_FOUND", "reasons": []})
     return FileResponse(final, media_type="video/mp4")

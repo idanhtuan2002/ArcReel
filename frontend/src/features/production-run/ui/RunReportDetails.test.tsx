@@ -74,4 +74,27 @@ describe("RunReportDetails", () => {
     expect(preview).toHaveBeenCalledWith("alpha", "run-1", 1);
     vi.unstubAllGlobals();
   });
+
+  it("names the final a review is deciding on and fetches it anew after a rework", async () => {
+    vi.spyOn(client, "getProductionRunReport").mockResolvedValue({
+      run_id: "run-1",
+      quality: [],
+      story_exceptions: [],
+      previews: [{ target: "episode:1", pending: true }],
+    });
+    const preview = vi.spyOn(client, "previewProductionFinal").mockResolvedValue(new Blob(["mp4"]));
+    vi.stubGlobal("URL", { ...URL, createObjectURL: () => "blob:pending", revokeObjectURL: () => undefined });
+    const { rerender } = render(<RunReportDetails projectName="alpha" runId="run-1" version={7} />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "Watch the final awaiting review (episode 1)" }));
+    expect(await screen.findByLabelText("Final of episode 1")).toHaveAttribute("src", "blob:pending");
+
+    rerender(<RunReportDetails projectName="alpha" runId="run-1" version={9} />);
+
+    expect(
+      await screen.findByRole("button", { name: "Watch the final awaiting review (episode 1)" }),
+    ).toBeInTheDocument();
+    expect(preview).toHaveBeenCalledTimes(1);
+    vi.unstubAllGlobals();
+  });
 });

@@ -2,15 +2,25 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 from datetime import UTC, datetime
 
 from lib.db.models.task import Task
 from r2.automation.assessment import AssessmentFinding, ModelAssessment
-from r2.contracts.automation import RunSnapshot, RunStage
+from r2.contracts.automation import (
+    Checkpoint,
+    OwnerReceipt,
+    PendingReview,
+    RunSnapshot,
+    RunStage,
+    RunStatus,
+    StageOutcome,
+)
+from server.production_run import report as report_module
 from server.production_run.render_adapter import render_dir
-from server.production_run.report import _media, _reviews, _story_counts
+from server.production_run.report import _media, _reviews, _story_counts, pending_final
 from server.story_authoring.artifacts import StoryBlobStore
 from server.story_authoring.runtime import NodeHead, RevisionOutcome, RevisionRecord, StoryLimits, new_run_state
 from tests.unit.server.production_run.test_controller import _policy
@@ -180,3 +190,74 @@ def test_progress_media_lists_the_files_finished_tasks_produced_newest_first():
         ("t2", "video", "videos/scene_E1S02.mp4", 2),
         ("t1", "image", "storyboards/scene_E1S01.png", 1),
     ]
+
+
+def _rendered(tmp_path, *, final_bytes=b"final", recorded_bytes=b"final"):
+    run = _run()
+    folder = tmp_path / "film" / render_dir(run, 1)
+    folder.mkdir(parents=True)
+    (folder / "episode_1.mp4").write_bytes(final_bytes)
+    manifest = json.dumps({"final_sha256": hashlib.sha256(recorded_bytes).hexdigest()}).encode()
+    (folder / "episode_1.manifest.json").write_bytes(manifest)
+    receipt = OwnerReceipt(
+        owner="renderer",
+        receipt_ref=f"episode:1:final@{(render_dir(run, 1) / 'episode_1.mp4').as_posix()}",
+        digest="sha256:" + hashlib.sha256(manifest).hexdigest(),
+    )
+    outcome = StageOutcome(
+        stage=RunStage.RENDER,
+        generation=1,
+        input_digest=DIGEST,
+        policy_digest=DIGEST,
+        kind="PASS",
+        receipts=(receipt,),
+    )
+    return folder / "episode_1.mp4", outcome
+
+
+def _waiting_final(checkpoint: str = "FINAL_FILM") -> RunSnapshot:
+    return _run().model_copy(
+        update={
+            "status": RunStatus.WAITING_REVIEW,
+            "pending_review": PendingReview(checkpoint=Checkpoint(checkpoint), binding_digest=DIGEST),
+        }
+    )
+
+
+class _Sessions:
+    def __call__(self):
+        return self
+
+    async def __aenter__(self):
+        return None
+
+    async def __aexit__(self, *_):
+        return False
+
+
+def _repository_with(monkeypatch, outcome):
+    class Repository:
+        def __init__(self, _session) -> None:
+            pass
+
+        async def stage_outcome(self, *, run, stage):
+            assert stage is RunStage.RENDER
+            return outcome
+
+    monkeypatch.setattr(report_module, "ProductionRunRepository", Repository)
+
+
+async def test_a_final_film_review_previews_the_final_its_render_receipt_names(tmp_path, monkeypatch):
+    final, outcome = _rendered(tmp_path)
+    _repository_with(monkeypatch, outcome)
+
+    assert await pending_final(_Sessions(), Projects(tmp_path), _waiting_final(), 1) == final
+    assert await pending_final(_Sessions(), Projects(tmp_path), _waiting_final("STORY_MANUSCRIPT"), 1) is None
+    assert await pending_final(_Sessions(), Projects(tmp_path), _run(), 1) is None
+
+
+async def test_a_pending_final_whose_bytes_moved_is_not_previewed(tmp_path, monkeypatch):
+    _final, outcome = _rendered(tmp_path, final_bytes=b"replaced", recorded_bytes=b"final")
+    _repository_with(monkeypatch, outcome)
+
+    assert await pending_final(_Sessions(), Projects(tmp_path), _waiting_final(), 1) is None

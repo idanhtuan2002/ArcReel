@@ -147,7 +147,8 @@ export interface RunReport {
   quality: { target: string; reviews: TargetReview[] }[];
   story_exceptions: StoryException[];
   /** Completed targets whose final still matches its verified digest and can be previewed by the owner. */
-  previews?: { target: string }[];
+  /** Finals to watch: completed targets, and (`pending`) the final a FINAL_FILM review is deciding on. */
+  previews?: { target: string; pending?: boolean }[];
 }
 
 /** The owner tasks of the run's current stage by status (queued, running, succeeded, failed, cancelled). */

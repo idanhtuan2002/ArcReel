@@ -50,13 +50,15 @@ BASE = "/api/v1/projects/project/production-runs"
 class Policies:
     def __init__(self) -> None:
         self.refusal: ProductionRunRefused | None = None
+        self.semi_checkpoints = frozenset({Checkpoint.STORY_MANUSCRIPT})
+        self.semi_limits: dict[str, int] = {}
 
     async def resolve(self, *, user_id, project_name, mode):
         if self.refusal is not None:
             raise self.refusal
         if mode is AutomationMode.SEMI:
             return RunPolicy.model_validate(
-                {**policy().model_dump(), "mode": mode, "checkpoints": frozenset({Checkpoint.STORY_MANUSCRIPT})}
+                {**policy().model_dump(), **self.semi_limits, "mode": mode, "checkpoints": self.semi_checkpoints}
             )
         return policy()
 
@@ -386,6 +388,66 @@ async def test_semi_review_approves_only_the_exact_pending_checkpoint(host):
     await host.scheduler.scan_once()
     assert (await host.read(run))["stage"] == "STORY_COMMIT"
     assert host.owner.provider_submit_count == submitted
+
+
+async def _waiting_review(host, run: dict) -> dict:
+    for _ in range(40):
+        current = await host.read(run)
+        if current["status"] == "WAITING_REVIEW":
+            return current
+        await host.scheduler.scan_once()
+    raise AssertionError(await host.read(run))
+
+
+async def test_a_final_film_review_can_send_the_final_back_to_media_as_a_new_generation(host):
+    host.policies.semi_checkpoints = frozenset({Checkpoint.FINAL_FILM})
+    # Two passes through MEDIA..QUALITY plus the stages before them.
+    host.policies.semi_limits = {"max_cost_minor_units": 1000, "max_model_calls": 100, "max_tasks": 100}
+    host.owner.states[RunStage.QUALITY] = "PASS"
+    run = (await host.start(mode="semi")).json()
+    waiting = await _waiting_review(host, run)
+    pending = waiting["pending_review"]
+    assert (waiting["stage"], pending["checkpoint"]) == ("QUALITY", "FINAL_FILM"), waiting
+    body = {
+        "command_id": "review-rework-1",
+        "expected_version": waiting["version"],
+        "checkpoint": pending["checkpoint"],
+        "binding_digest": pending["binding_digest"],
+        "decision": "REWORK",
+    }
+
+    reworked = await host.http.post(f"{BASE}/{run['run_id']}/review", json=body, headers=host.headers)
+
+    assert reworked.status_code == 200, reworked.text
+    view = reworked.json()
+    assert (view["status"], view["stage"], view["generation"]) == ("RUNNING", "MEDIA", waiting["generation"] + 1)
+    assert view["pending_review"] is None
+    assert view["completed_targets"] == []
+    again = await _waiting_review(host, run)
+    assert again["pending_review"]["checkpoint"] == "FINAL_FILM"
+    assert again["pending_review"]["binding_digest"] != pending["binding_digest"]
+
+
+async def test_rework_is_refused_at_a_checkpoint_before_the_final(host):
+    run = (await host.start(mode="semi")).json()
+    waiting = await _waiting_review(host, run)
+    pending = waiting["pending_review"]
+    assert pending["checkpoint"] == "STORY_MANUSCRIPT"
+
+    refused = await host.http.post(
+        f"{BASE}/{run['run_id']}/review",
+        json={
+            "command_id": "review-rework-2",
+            "expected_version": waiting["version"],
+            "checkpoint": pending["checkpoint"],
+            "binding_digest": pending["binding_digest"],
+            "decision": "REWORK",
+        },
+        headers=host.headers,
+    )
+
+    assert refused.status_code == 422, refused.text
+    assert (await host.read(run))["status"] == "WAITING_REVIEW"
 
 
 async def test_external_edit_blocks_and_only_a_digest_bound_resume_starts_a_new_lineage(host):

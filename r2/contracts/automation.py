@@ -323,7 +323,8 @@ class ReviewCommand(AutomationContract):
     expected_version: PositiveInt
     checkpoint: Checkpoint
     binding_digest: Digest
-    decision: Literal["APPROVE", "REJECT"]
+    #: REWORK (FINAL_FILM only) sends the final back to MEDIA as a new generation instead of ending the run.
+    decision: Literal["APPROVE", "REJECT", "REWORK"]
 
 
 class BudgetReservation(AutomationContract):

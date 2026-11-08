@@ -24,6 +24,7 @@ from r2.automation.identity import digest_value, policy_digest
 from r2.contracts.automation import (
     AutomationMode,
     AutomationOperation,
+    Checkpoint,
     GrantRequest,
     OwnerReceipt,
     ReviewApproval,
@@ -365,7 +366,22 @@ class ProductionRunService:
                 or (pending.checkpoint, pending.binding_digest) != (command.checkpoint, command.binding_digest)
             ):
                 raise ProductionRunRefused("STALE_PRODUCTION_RUN")
-            if command.decision == "APPROVE":
+            if command.decision == "REWORK":
+                if command.checkpoint is not Checkpoint.FINAL_FILM:
+                    raise ProductionRunRefused("REWORK_NOT_AVAILABLE", 422)
+                # The final goes back to MEDIA as a new generation: media the Showrunner replaced in the project
+                # is picked up, missing media is made, and the new final needs its own review. The policy's final
+                # evaluation limit still bounds how often QUALITY runs.
+                updated = _changed(
+                    run,
+                    status=RunStatus.RUNNING,
+                    stage=RunStage.MEDIA,
+                    generation=run.generation + 1,
+                    pending_review=None,
+                    reason=None,
+                    completed_targets=(),
+                )
+            elif command.decision == "APPROVE":
                 approval = ReviewApproval(
                     checkpoint=command.checkpoint,
                     binding_digest=command.binding_digest,

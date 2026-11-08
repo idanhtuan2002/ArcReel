@@ -226,7 +226,7 @@ export function ProductionRunPanel({ projectName }: Props) {
     );
   };
 
-  const review = (decision: "APPROVE" | "REJECT") => {
+  const review = (decision: "APPROVE" | "REJECT" | "REWORK") => {
     if (!run?.pending_review) return;
     const pending = run.pending_review;
     void act(() =>
@@ -527,6 +527,22 @@ export function ProductionRunPanel({ projectName }: Props) {
               >
                 {t("auto_review_reject")}
               </button>
+              {run.pending_review.checkpoint === "FINAL_FILM" && (
+                <>
+                  <button
+                    type="button"
+                    className={BUTTON_CLS}
+                    style={BUTTON_STYLE}
+                    disabled={busy}
+                    onClick={() => review("REWORK")}
+                  >
+                    {t("auto_review_rework")}
+                  </button>
+                  <p className="w-full text-[11.5px]" style={{ color: "var(--color-text-3)" }}>
+                    {t("auto_review_rework_hint")}
+                  </p>
+                </>
+              )}
             </div>
           )}
           <div className="flex flex-wrap gap-2">

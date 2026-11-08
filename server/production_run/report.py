@@ -7,6 +7,7 @@ are. A stage the run has not reached, or a project folder that is gone, contribu
 
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import json
 from collections import Counter
@@ -18,9 +19,11 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from lib.db.models.task import Task
 from lib.db.repositories.production_runs import ProductionRunRepository
 from lib.db.repositories.task_repo import StoryRunStateConflict
+from lib.path_safety import safe_join
+from lib.presentation_renderer import sha256_file
 from lib.project_manager import ProjectManager
 from r2.automation.assessment import ModelAssessment
-from r2.contracts.automation import RunSnapshot, RunStage
+from r2.contracts.automation import Checkpoint, RunSnapshot, RunStage, RunStatus
 from server.production_run.owner_tasks import attempt_window_tasks, step_tasks
 from server.production_run.render_adapter import render_dir
 from server.story_authoring.artifacts import BlobCorrupt, BlobMissing, StoryBlobStore
@@ -67,6 +70,38 @@ def verified_final(projects: ProjectManager, run: RunSnapshot, episode: int) -> 
         return None
     final = projects.get_project_path(run.project_name) / render_dir(run, episode) / f"episode_{episode}.mp4"
     if not final.is_file() or "sha256:" + hashlib.sha256(final.read_bytes()).hexdigest() != output.final_digest:
+        return None
+    return final
+
+
+async def pending_final(
+    sessions: async_sessionmaker[AsyncSession], projects: ProjectManager, run: RunSnapshot, episode: int
+) -> Path | None:
+    """The final a FINAL_FILM review is deciding on, while its bytes still hash to the RENDER receipt's manifest;
+    otherwise ``None``. A run not waiting on that checkpoint has no pending final."""
+    pending = run.pending_review
+    if run.status is not RunStatus.WAITING_REVIEW or pending is None or pending.checkpoint is not Checkpoint.FINAL_FILM:
+        return None
+    async with sessions() as session:
+        rendered = await ProductionRunRepository(session).stage_outcome(run=run, stage=RunStage.RENDER)
+    receipt = next(
+        (r for r in (rendered.receipts if rendered else ()) if r.receipt_ref.startswith(f"episode:{episode}:final@")),
+        None,
+    )
+    if receipt is None:
+        return None
+    try:
+        final = safe_join(projects.get_project_path(run.project_name), receipt.receipt_ref.rpartition("@")[2])
+    except ValueError:
+        return None
+    return await asyncio.to_thread(_rendered_as_received, final, episode, receipt.digest)
+
+
+def _rendered_as_received(final: Path, episode: int, manifest_digest: str) -> Path | None:
+    manifest = final.with_name(f"episode_{episode}.manifest.json")
+    if not (final.is_file() and manifest.is_file()) or "sha256:" + sha256_file(manifest) != manifest_digest:
+        return None
+    if json.loads(manifest.read_text(encoding="utf-8")).get("final_sha256") != sha256_file(final):
         return None
     return final
 
@@ -220,12 +255,19 @@ async def run_report(
     except FileNotFoundError:
         # The project folder is gone; there is nothing stored to read.
         return {"run_id": run.run_id, "quality": [], "story_exceptions": [], "previews": []}
+    previews: list[dict[str, Any]] = list(_previews(projects, run))
+    pending = [
+        target
+        for target in run.targets
+        if await pending_final(sessions, projects, run, int(target.split(":")[1])) is not None
+    ]
+    previews.extend({"target": target, "pending": True} for target in pending)
     return {
         "run_id": run.run_id,
         "quality": _reviews(projects, run),
-        "previews": _previews(projects, run),
+        "previews": previews,
         "story_exceptions": await _story_exceptions(sessions, projects, run),
     }
 
 
-__all__ = ["run_progress", "run_report", "verified_final"]
+__all__ = ["pending_final", "run_progress", "run_report", "verified_final"]

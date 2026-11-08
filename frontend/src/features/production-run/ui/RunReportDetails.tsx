@@ -32,7 +32,7 @@ export function RunReportDetails({ projectName, runId, version }: Props) {
       const blob = await previewProductionFinal(projectName, runId, Number(target.split(":")[1]));
       const url = URL.createObjectURL(blob);
       opened.current.push(url);
-      setPreviews((current) => ({ ...current, [target]: url }));
+      setPreviews((current) => ({ ...current, [`${version}:${target}`]: url }));
     } catch {
       setPreviewFailed(true);
     }
@@ -55,7 +55,8 @@ export function RunReportDetails({ projectName, runId, version }: Props) {
     <div className="space-y-1.5 text-[12px]">
       {(report.previews ?? []).map((preview) => {
         const episode = Number(preview.target.split(":")[1]);
-        const url = previews[preview.target];
+        // A reworked run offers a new final for the same target; a URL opened at another version is not it.
+        const url = previews[`${version}:${preview.target}`];
         return url ? (
           <figure key={preview.target} className="m-0">
             {/* eslint-disable-next-line jsx-a11y/media-has-caption -- the final has its subtitles burned into the picture */}
@@ -73,7 +74,7 @@ export function RunReportDetails({ projectName, runId, version }: Props) {
             className="focus-ring rounded text-[11.5px] underline underline-offset-2 hover:opacity-80"
             onClick={() => void openPreview(preview.target)}
           >
-            {t("auto_report_watch", { episode })}
+            {t(preview.pending ? "auto_report_watch_pending" : "auto_report_watch", { episode })}
           </button>
         );
       })}

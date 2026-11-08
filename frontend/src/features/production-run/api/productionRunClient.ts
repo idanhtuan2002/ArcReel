@@ -165,7 +165,7 @@ export function reviewProductionRun(
     expected_version: number;
     checkpoint: Checkpoint;
     binding_digest: string;
-    decision: "APPROVE" | "REJECT";
+    decision: "APPROVE" | "REJECT" | "REWORK";
   },
   options: CallOptions = {},
 ): Promise<RunSnapshot> {

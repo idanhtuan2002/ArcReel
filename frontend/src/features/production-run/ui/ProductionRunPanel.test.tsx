@@ -99,6 +99,41 @@ describe("ProductionRunPanel", () => {
     });
   });
 
+  it("offers rework from pictures and voice only at the final film review", async () => {
+    const pending = snapshot({
+      status: "WAITING_REVIEW",
+      stage: "QUALITY",
+      policy: { mode: "semi" },
+      pending_review: { checkpoint: "FINAL_FILM", binding_digest: "sha256:final" },
+    });
+    vi.spyOn(client, "listProductionRuns").mockResolvedValue({ start: OFFER, runs: [pending] });
+    const review = vi.spyOn(client, "reviewProductionRun").mockResolvedValue(snapshot({ stage: "MEDIA", generation: 2 }));
+    render(<ProductionRunPanel projectName="alpha" />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "Rework from pictures & voice" }));
+
+    await waitFor(() => expect(review).toHaveBeenCalledTimes(1));
+    expect(review.mock.calls[0][2]).toMatchObject({
+      checkpoint: "FINAL_FILM",
+      binding_digest: "sha256:final",
+      decision: "REWORK",
+    });
+  });
+
+  it("does not offer rework before the final film", async () => {
+    const pending = snapshot({
+      status: "WAITING_REVIEW",
+      stage: "SCRIPT",
+      policy: { mode: "semi" },
+      pending_review: { checkpoint: "SCRIPT_PACKAGE", binding_digest: "sha256:bind" },
+    });
+    vi.spyOn(client, "listProductionRuns").mockResolvedValue({ start: OFFER, runs: [pending] });
+    render(<ProductionRunPanel projectName="alpha" />);
+
+    expect(await screen.findByRole("button", { name: "Approve" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Rework from pictures & voice" })).not.toBeInTheDocument();
+  });
+
   it("ignoresPreviousProjectResponse", async () => {
     let late: (value: RunList) => void = () => {};
     vi.spyOn(client, "listProductionRuns").mockImplementation((projectName) =>
