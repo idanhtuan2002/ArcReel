@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+import json
 from datetime import UTC, datetime
 from typing import Any
 
 import pytest
 
+from lib.draft_quarantine import generated_meta
 from lib.workflow_state import (
     WorkflowActionType,
     WorkflowBlocker,
@@ -303,7 +305,8 @@ async def test_a_stale_rebuild_is_not_regenerated_automatically(tasks, monkeypat
 
 def _quarantined(tmp_path, monkeypatch):
     draft = tmp_path / "script_plan_segments.invalid.json"
-    draft.write_text("{}", encoding="utf-8")
+    content = {"segments": [{"text": "generated"}]}
+    draft.write_text(json.dumps({"meta": generated_meta(content), "content": content}), encoding="utf-8")
     monkeypatch.setattr(text_adapter, "script_plan_quarantine_path", lambda path, project, episode: draft)
     blocked = _status(A.NONE, blockers=[WorkflowBlocker(code="script_plan_quarantined", path="p", reason="r")])
     return draft, Statuses({1: [blocked, _status(A.PREPARE_SCRIPT_PLAN)]})
@@ -313,7 +316,7 @@ async def test_a_script_plan_this_run_had_quarantined_is_set_aside_and_generated
     draft, statuses = _quarantined(tmp_path, monkeypatch)
     adapter = _adapter(ScriptPlanAdapter, statuses, monkeypatch)
     intent = _intent(RunStage.SCRIPT_PLAN)
-    tasks.tasks["script-plan:1"] = _failed_around(draft)
+    tasks.tasks["script-plan:1"] = {"status": "failed"}
 
     waiting = await adapter.inspect(intent=intent, receipt=intent.input_refs[0])
 
@@ -323,21 +326,14 @@ async def test_a_script_plan_this_run_had_quarantined_is_set_aside_and_generated
     assert (tmp_path / "script_plan_segments.invalid.json.rejected-1").exists()
 
 
-def _failed_around(draft, *, after: float = 60.0) -> dict:
-    """A failed task whose run started before the draft was written and finished ``after`` seconds later."""
-    written = draft.stat().st_mtime
-    return {
-        "status": "failed",
-        "started_at": datetime.fromtimestamp(written - 5, UTC).isoformat(),
-        "finished_at": datetime.fromtimestamp(written + after, UTC).isoformat(),
-    }
-
-
-async def test_a_draft_rewritten_after_the_failed_task_finished_stays_for_the_human(tasks, monkeypatch, tmp_path):
+async def test_a_draft_a_human_edited_after_generation_stays_for_the_human(tasks, monkeypatch, tmp_path):
     draft, statuses = _quarantined(tmp_path, monkeypatch)
+    edited = json.loads(draft.read_text(encoding="utf-8"))
+    edited["content"] = {"segments": [{"text": "the Human's rewrite"}]}
+    draft.write_text(json.dumps(edited), encoding="utf-8")
     adapter = _adapter(ScriptPlanAdapter, statuses, monkeypatch)
     intent = _intent(RunStage.SCRIPT_PLAN)
-    tasks.tasks["script-plan:1"] = _failed_around(draft, after=-30.0)
+    tasks.tasks["script-plan:1"] = {"status": "failed"}
 
     with pytest.raises(OwnerBlocked, match="WORKFLOW_SCRIPT_PLAN_QUARANTINED"):
         await adapter.inspect(intent=intent, receipt=intent.input_refs[0])

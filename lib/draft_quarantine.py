@@ -214,6 +214,27 @@ def draft_payload(draft: QuarantinedDraft) -> dict[str, Any]:
     }
 
 
+#: ``meta`` key a generator stamps with the digest of the content it wrote; a Human edit replaces the content and
+#: keeps ``meta``, so the stamp then no longer matches.
+GENERATED_CONTENT_KEY = "generated_content_digest"
+
+
+def generated_meta(content: dict[str, Any]) -> dict[str, Any]:
+    """The ``meta`` entry a generator adds to mark the draft content as its own output."""
+    return {GENERATED_CONTENT_KEY: prefixed_canonical_json_digest(content)}
+
+
+def generated_and_unchanged(path: Path) -> bool:
+    """Whether the draft at ``path`` still holds exactly the content its generator wrote."""
+    data = load_json_or_none(path)
+    if not isinstance(data, dict):
+        return False
+    meta, content = data.get("meta"), data.get("content")
+    if not isinstance(meta, dict) or not isinstance(content, dict):
+        return False
+    return meta.get(GENERATED_CONTENT_KEY) == prefixed_canonical_json_digest(content)
+
+
 def quarantine_path(project_path: Path, episode: int, kind: str) -> Path:
     """该集该阶段的草稿路径（与正式 script_plan 同目录）。"""
     return episode_drafts_dir(project_path, episode) / _QUARANTINE_FILENAMES[kind]
@@ -363,6 +384,7 @@ __all__ = [
     "DOC_TYPE_REFERENCE_PROMPT_AUTHORING",
     "DOC_TYPE_REFERENCE_SCRIPT_PLAN",
     "DOC_TYPE_TO_QUARANTINE_KIND",
+    "GENERATED_CONTENT_KEY",
     "OPEN_DRAFT_TOOL_NAME",
     "PROMOTE_TOOL_NAME",
     "QUARANTINE_FILENAMES",
@@ -375,6 +397,8 @@ __all__ = [
     "clear_quarantine",
     "draft_payload",
     "draft_revision",
+    "generated_and_unchanged",
+    "generated_meta",
     "quarantine_and_report",
     "quarantine_envelope",
     "quarantine_exists",

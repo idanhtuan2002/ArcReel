@@ -40,6 +40,7 @@ from lib.draft_quarantine import (
     QUARANTINE_KIND_PROMPT_AUTHORING,
     QUARANTINE_KIND_SCRIPT_PLAN,
     clear_quarantine,
+    generated_meta,
     quarantine_and_report,
     quarantine_exists,
     quarantine_path,
@@ -312,7 +313,7 @@ def _quarantine_formal_generation_conflict(
                 code="formal_revision_conflict",
             )
         ],
-        meta={"source": source, "base_fingerprint": expected},
+        meta={"source": source, "base_fingerprint": expected, **generated_meta(content)},
     )
 
 
@@ -438,7 +439,7 @@ def _quarantine_invalid_script_plan_generation(
             kind,
             content=content,
             violations=violations,
-            meta={"source": source or None, "base_fingerprint": base_fingerprint},
+            meta={"source": source or None, "base_fingerprint": base_fingerprint, **generated_meta(content)},
         )
 
 

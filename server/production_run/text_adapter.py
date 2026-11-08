@@ -21,11 +21,11 @@ import asyncio
 import re
 from collections.abc import Awaitable, Callable, Sequence
 from dataclasses import dataclass
-from datetime import datetime
 from pathlib import Path
 from typing import Any
 
 from lib.config.resolver import ConfigResolver
+from lib.draft_quarantine import generated_and_unchanged
 from lib.project_manager import ProjectManager
 from lib.script_batch_edit import script_revision as batch_script_revision
 from lib.script_review import content_fingerprint, script_plan_path, script_plan_quarantine_path
@@ -422,16 +422,17 @@ class ScriptPlanAdapter(WorkflowStageAdapter):
 
     async def _set_aside_rejected(self, intent: DispatchIntent, status: WorkflowStatus, episode: int | None) -> bool:
         """A script plan this run generated and the owner quarantined is renamed beside it (kept as evidence) and
-        generated again under the next attempt; a draft no failed task of this run left is the Human's."""
+        generated again under the next attempt; a draft no failed task of this run left, or whose content no longer
+        matches the generator's stamp (a Human edited or replaced it), is the Human's."""
         if episode is None or status.blockers[0].code != "script_plan_quarantined":
             return False
         failed = await self._failed_attempt(intent, f"script-plan:{episode}")
         if failed is None or failed[0] >= self.max_task_attempts:
             return False
-        attempt, task = failed
+        attempt = failed[0]
         project_path = self._projects.get_project_path(intent.scope.project_name)
         path = script_plan_quarantine_path(project_path, self._project(intent.scope.project_name), episode)
-        if path is None or not path.exists() or not _written_by(path, task):
+        if path is None or not path.exists() or not generated_and_unchanged(path):
             return False
         path.rename(path.with_name(f"{path.name}.rejected-{attempt}"))
         return True
@@ -572,21 +573,6 @@ class ScriptAdapter(WorkflowStageAdapter):
         if revision is None:
             raise OwnerBlocked("OWNER_OUTPUT_MISSING")
         return revision_receipt(self.owner, f"episode:{episode}:script", revision)
-
-
-#: Allowance for filesystem timestamp granularity when matching a draft's write time to its task's run.
-_WRITE_TIME_SLACK_SECONDS = 2.0
-
-
-def _written_by(path: Path, task: dict[str, Any]) -> bool:
-    """Whether the draft was last written while ``task`` ran; a draft written before or after it is not the task's."""
-    try:
-        started = datetime.fromisoformat(str(task["started_at"])).timestamp()
-        finished = datetime.fromisoformat(str(task["finished_at"])).timestamp()
-    except (KeyError, TypeError, ValueError):
-        return False
-    written = path.stat().st_mtime
-    return started - _WRITE_TIME_SLACK_SECONDS <= written <= finished + _WRITE_TIME_SLACK_SECONDS
 
 
 __all__ = [
