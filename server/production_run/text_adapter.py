@@ -21,6 +21,7 @@ import asyncio
 import re
 from collections.abc import Awaitable, Callable, Sequence
 from dataclasses import dataclass
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -225,8 +226,8 @@ class WorkflowStageAdapter:
         """Clear a blocker left by this run's own rejected output so the next attempt can run; none by default."""
         return False
 
-    async def _failed_attempt(self, intent: DispatchIntent, sub_key: str) -> int | None:
-        """The attempt number of the sub-command's latest task when that task failed, else ``None``."""
+    async def _failed_attempt(self, intent: DispatchIntent, sub_key: str) -> tuple[int, dict[str, Any]] | None:
+        """The attempt number and task of the sub-command's latest task when that task failed, else ``None``."""
         latest: tuple[int, dict[str, Any]] | None = None
         for attempt in range(1, self.max_task_attempts + 1):
             task = await find_task(self._sessions, intent, sub_key if attempt == 1 else f"{sub_key}#attempt-{attempt}")
@@ -235,7 +236,7 @@ class WorkflowStageAdapter:
             latest = (attempt, task)
         if latest is None or latest[1]["status"] != "failed":
             return None
-        return latest[0]
+        return latest
 
     async def _submit_once(
         self,
@@ -424,12 +425,13 @@ class ScriptPlanAdapter(WorkflowStageAdapter):
         generated again under the next attempt; a draft no failed task of this run left is the Human's."""
         if episode is None or status.blockers[0].code != "script_plan_quarantined":
             return False
-        attempt = await self._failed_attempt(intent, f"script-plan:{episode}")
-        if attempt is None or attempt >= self.max_task_attempts:
+        failed = await self._failed_attempt(intent, f"script-plan:{episode}")
+        if failed is None or failed[0] >= self.max_task_attempts:
             return False
+        attempt, task = failed
         project_path = self._projects.get_project_path(intent.scope.project_name)
         path = script_plan_quarantine_path(project_path, self._project(intent.scope.project_name), episode)
-        if path is None or not path.exists():
+        if path is None or not path.exists() or not _written_by(path, task):
             return False
         path.rename(path.with_name(f"{path.name}.rejected-{attempt}"))
         return True
@@ -570,6 +572,21 @@ class ScriptAdapter(WorkflowStageAdapter):
         if revision is None:
             raise OwnerBlocked("OWNER_OUTPUT_MISSING")
         return revision_receipt(self.owner, f"episode:{episode}:script", revision)
+
+
+#: Allowance for filesystem timestamp granularity when matching a draft's write time to its task's run.
+_WRITE_TIME_SLACK_SECONDS = 2.0
+
+
+def _written_by(path: Path, task: dict[str, Any]) -> bool:
+    """Whether the draft was last written while ``task`` ran; a draft written before or after it is not the task's."""
+    try:
+        started = datetime.fromisoformat(str(task["started_at"])).timestamp()
+        finished = datetime.fromisoformat(str(task["finished_at"])).timestamp()
+    except (KeyError, TypeError, ValueError):
+        return False
+    written = path.stat().st_mtime
+    return started - _WRITE_TIME_SLACK_SECONDS <= written <= finished + _WRITE_TIME_SLACK_SECONDS
 
 
 __all__ = [
