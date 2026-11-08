@@ -336,26 +336,32 @@ class MediaAdapter:
         episode: int,
         decisions: Mapping[str, dict[str, Any]],
     ) -> None:
-        """Record each segment's choice write-ahead, restore a chosen version that is not current, and keep the
-        choices as evidence beside the episode's render."""
+        """Per segment, under the run's locked authority: record the choice write-ahead and add it to
+        ``image_selection.json`` beside the episode's render; then restore a chosen version that is not current."""
         root = self._projects.get_project_path(run.project_name)
         versions = VersionManager(root)
+        evidence = root / "production" / "automation" / run.run_id / f"g{run.generation}" / f"episode_{episode}"
+        evidence /= "image_selection.json"
         subject = await current_subject(self._sessions, intent, subject_digest=subject_digest)
         for unit, decision in sorted(decisions.items()):
+            chosen = decision.get("chosen_version")
+            restore = (
+                isinstance(chosen, int) and chosen != versions.get_versions("storyboards", unit)["current_version"]
+            )
             async with self._sessions() as session, session.begin():
                 await self._authority.require_locked(session, subject=subject)
                 await ProductionRunRepository(session).record_owner_attempt(
                     intent=intent, sub_key=f"select:{unit}:chosen"
                 )
-            chosen = decision.get("chosen_version")
-            current = versions.get_versions("storyboards", unit)["current_version"]
-            decision["restored"] = False
-            if isinstance(chosen, int) and chosen != current:
+                await asyncio.to_thread(
+                    self._record_choice, evidence, run, unit, {**decision, "restore_requested": restore}
+                )
+            if restore and isinstance(chosen, int):
                 await self._restore(run.project_name, "storyboards", unit, chosen)
-                decision["restored"] = True
-        folder = root / "production" / "automation" / run.run_id / f"g{run.generation}" / f"episode_{episode}"
-        folder.mkdir(parents=True, exist_ok=True)
-        evidence = folder / "image_selection.json"
+
+    @staticmethod
+    def _record_choice(evidence: Path, run: RunSnapshot, unit: str, decision: dict[str, Any]) -> None:
+        evidence.parent.mkdir(parents=True, exist_ok=True)
         recorded = json.loads(evidence.read_text(encoding="utf-8")) if evidence.is_file() else {}
         recorded.update(
             {
@@ -363,7 +369,7 @@ class MediaAdapter:
                 "judge_identity": run.policy.image_judge_identity,
                 "judge_prompt_digest": run.policy.image_judge_prompt_digest,
                 "candidates": run.policy.image_candidates,
-                "segments": {**recorded.get("segments", {}), **decisions},
+                "segments": {**recorded.get("segments", {}), unit: decision},
             }
         )
         evidence.write_text(json.dumps(recorded, ensure_ascii=False, indent=2, sort_keys=True), encoding="utf-8")
