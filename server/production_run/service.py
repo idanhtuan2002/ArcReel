@@ -263,6 +263,14 @@ class ProductionRunService:
         self._on_change()
         return run
 
+    async def require_showrunner(self, *, interactive_token: str | None, user_id: str, project_name: str) -> None:
+        """Refuse an actor without the project's current Showrunner grant (setup and qualification changes)."""
+        await self._custodian.activate()
+        async with self._sessions() as session, session.begin():
+            await self._custodian.require_issuer_locked(
+                session, interactive_token=interactive_token, user_id=user_id, project_name=project_name
+            )
+
     async def control(self, *, interactive_token: str | None, command: RunCommand) -> RunSnapshot:
         command = RunCommand.model_validate(command)
         if command.action == "START" or command.run_id is None:

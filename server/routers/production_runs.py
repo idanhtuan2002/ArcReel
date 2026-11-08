@@ -146,9 +146,12 @@ async def get_qualification(project_name: str, user: CurrentUser, service: Servi
 
 
 @router.post("/projects/{project_name}/automation/qualification/reviewers")
-async def start_reviewer_qualification(project_name: str, user: InteractiveUser, service: Service) -> dict[str, Any]:
+async def start_reviewer_qualification(
+    project_name: str, user: InteractiveUser, token: Token, service: Service
+) -> dict[str, Any]:
     """Qualify both reviewer routes on this host's labeled corpus; a qualifying result is recorded."""
     try:
+        await _require(service).require_showrunner(interactive_token=token, user_id=user.id, project_name=project_name)
         return await _qualifications(service).start_reviewers(user_id=user.id, project_name=project_name)
     except QualificationRefused as refused:
         raise HTTPException(status_code=409, detail={"code": str(refused), "reasons": []}) from None
@@ -157,9 +160,12 @@ async def start_reviewer_qualification(project_name: str, user: InteractiveUser,
 
 
 @router.post("/projects/{project_name}/automation/qualification/launch")
-async def record_launch_qualification(project_name: str, user: InteractiveUser, service: Service) -> dict[str, Any]:
+async def record_launch_qualification(
+    project_name: str, user: InteractiveUser, token: Token, service: Service
+) -> dict[str, Any]:
     """Record the launch qualification when the real preflight's only blocking reason is its absence."""
     try:
+        await _require(service).require_showrunner(interactive_token=token, user_id=user.id, project_name=project_name)
         return await _qualifications(service).record_launch(user_id=user.id, project_name=project_name)
     except QualificationRefused as refused:
         raise HTTPException(status_code=409, detail={"code": str(refused), "reasons": []}) from None
@@ -176,10 +182,15 @@ async def get_settings(project_name: str, user: CurrentUser, service: Service) -
 
 @router.put("/projects/{project_name}/automation/settings")
 async def put_settings(
-    project_name: str, body: SettingsUpdate, user: InteractiveUser, service: Service
+    project_name: str, body: SettingsUpdate, user: InteractiveUser, token: Token, service: Service
 ) -> dict[str, Any]:
     """Replace the project's model per role and run limits; a later Start freezes them into its policy."""
-    sessions = async_session_factory if service is None else service.sessions
+    active = _require(service)
+    try:
+        await active.require_showrunner(interactive_token=token, user_id=user.id, project_name=project_name)
+    except _REFUSALS as error:
+        raise _http(error) from error
+    sessions = active.sessions
     try:
         return await save_settings(sessions, get_project_manager(), project_name, body, user_id=user.id)
     except SettingsRefused as refused:

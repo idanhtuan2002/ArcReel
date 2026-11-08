@@ -509,3 +509,31 @@ async def test_a_succeeded_runs_archive_downloads_only_verified_and_only_in_its_
     assert other.status_code == 404
     assert anonymous.status_code == 401
     assert changed.status_code == 409
+
+
+@pytest.mark.parametrize(
+    ("method", "path", "body"),
+    [
+        (
+            "PUT",
+            "automation/settings",
+            {
+                "launch_profile_id": "fiction_narration_vi_v1",
+                "routes": [
+                    {"role": role, "provider_id": "custom-1", "model_id": "m"}
+                    for role in ("writer", "script", "reviewer_a", "reviewer_b", "image", "video", "audio")
+                ],
+            },
+        ),
+        ("POST", "automation/qualification/reviewers", None),
+        ("POST", "automation/qualification/launch", None),
+    ],
+    ids=["settings", "reviewer-qualification", "launch-qualification"],
+)
+async def test_setup_and_qualification_need_the_projects_showrunner(host, method, path, body):
+    stranger = {"Authorization": f"Bearer {auth.create_token('intruder')}"}
+
+    response = await host.http.request(method, f"/api/v1/projects/project/{path}", json=body, headers=stranger)
+
+    assert response.status_code == 403, response.text
+    assert response.json()["detail"]["code"] == "NOT_AUTHORIZED"
