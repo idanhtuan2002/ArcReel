@@ -236,8 +236,11 @@ def _words(text: str) -> str:
 def _named_in(name: str, source: str) -> bool:
     """Whether ``source`` writes ``name`` as whole words (``Ann`` is not named by ``annual``); scripts without spaces
     between words (CJK) are matched as text."""
+    skeleton = _skeleton(name)[0]
+    if not skeleton:
+        return False  # a name of punctuation only names nobody
     if _cjk(source):
-        return _skeleton(name)[0] in _skeleton(source)[0]
+        return skeleton in _skeleton(source)[0]
     words = _words(name)
     return words.strip() != "" and words in _words(source)
 

@@ -263,3 +263,11 @@ async def test_a_symlinked_adaptations_folder_is_never_written_through(tmp_path:
         await adapt_episode(project_path, _project(), 1, generate=_Model(_narration()))
     assert list(outside.iterdir()) == []
     assert adaptation_state(project_path, _project(), 1) == "stale"
+
+
+def test_a_punctuation_only_cast_name_is_never_attested(tmp_path: Path):
+    for source in (SOURCE, "林兰推开药铺的门。陌生人站在檐下。" * 3):
+        inputs = read_inputs(_write(tmp_path, source), _project(), 1)
+        draft = _narration(cast=["Lan", "!!!"])
+        problems = check_adaptation(EpisodeAdaptationDraft.model_validate(draft), inputs)
+        assert any("'!!!'" in p for p in problems)
