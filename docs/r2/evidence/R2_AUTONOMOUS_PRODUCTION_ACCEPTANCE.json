@@ -128,5 +128,57 @@
       "owner": "Human",
       "detail": "Merge, tag, deploy, then set ARCREEL_AUTOMATIC_PRODUCTION=1 and ARCREEL_GPU_ADMISSION_PROBES on a governance-activated host."
     }
-  ]
+  ],
+  "production_run": {
+    "date": "2026-11-08",
+    "release": "r2-v2.2.2 (58258380b) with Ollama probe URL localhost",
+    "run_id": "6de90785-7959-5bf2-80d1-4d479726572c",
+    "project": "san-xuat-tu-ong-7fb4ef4b",
+    "mode": "auto",
+    "human_steps": 0,
+    "status": "SUCCEEDED",
+    "stage": "EXPORT",
+    "started": "2026-11-08T03:54:55Z",
+    "finished": "2026-11-08T08:27Z",
+    "final": {
+      "resolution": "576x1024",
+      "duration_s": 26.146,
+      "audio": true,
+      "master_digest": "sha256:2ee568fe9fcd320fa9af6fa2a2a1909fcf6c51dd40a4951f3dbea5f4d7321c9b",
+      "final_digest": "sha256:0aa7f49503bd66c387060be04c17d5f884f223ce3e754e586a61c3e1fc3db54e"
+    },
+    "archive": {
+      "digest": "sha256:3428eafd1a0b35c3287f6288d5840d3271d59f3a1f236bd9866e79627608eae4",
+      "size": 1102171,
+      "verified": true
+    },
+    "quality": {
+      "gate": "record",
+      "decision": "REWORK",
+      "reviewer_a": {
+        "model": "qwen2.5vl:7b",
+        "scores": {
+          "story": 4,
+          "visual": 5,
+          "audio": 5,
+          "continuity": 5,
+          "pacing": 5
+        },
+        "findings": [
+          "MINOR subtitle/narration mismatch"
+        ]
+      },
+      "reviewer_b": {
+        "model": "gemma3:4b",
+        "scores": {
+          "story": 3,
+          "visual": 4,
+          "audio": 5,
+          "continuity": 4,
+          "pacing": 4
+        }
+      }
+    },
+    "limits": "Quality gate records rather than enforces; the reviewers judged the final below the PASS bar (story 3-4/5). Fixes reviewed by Codex (ACCEPT_WITH_CONDITIONS at eb0617fe4) were not yet deployed during this run."
+  }
 }
