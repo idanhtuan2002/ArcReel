@@ -73,3 +73,31 @@ Human-signed prepare/submit flow on the Quality page.
 - Whether ComfyUI's current frontend shows per-node progress or live previews (pages read do not say).
 - How long a reviewer qualification takes when no stored receipt matches (measured earlier: ~45 min per local
   reviewer on the 40-case corpus; a Gemini reviewer depends on API limits).
+
+## 6. Follow-up 2026-11-08 (after the first production run)
+
+Implementation check at `9f4bf373b` (`frontend/src/features/production-run/`): all four plan items of §4 are wired —
+history filters All / Active / Done / Failed (`ProductionRunPanel.tsx`), example ideas, stage task counts from
+`GET …/progress`, error/reason box, in-panel final preview (`RunReportDetails.tsx`, `GET …/outputs/{n}/final`),
+reviewer and launch qualification (`AutomationQualification.tsx`), settings editor, readiness.
+
+ComfyUI re-read 2026-11-08 (docs.comfy.org; the frontend GitHub README returned 504 and was not read):
+- [job-history](https://docs.comfy.org/interface/job-history): "Jobs are listed with status, progress when running,
+  and preview thumbnails when outputs exist"; sort by "Most recent" or "Total generation time".
+- [settings/comfy](https://docs.comfy.org/interface/settings/comfy): "Live preview method" (none, auto, latent2rgb,
+  taesd) — an image in progress is previewed while a prompt runs.
+- Per-node progress display, tab-title progress, completion sound/notification: not found in the pages read.
+
+Gaps the production run `6de90785` exposed (facts from its progress log):
+- STORY ran ~4 h 10 min as one task; `/progress` returned `{"tasks": {}}` the whole time, so the panel showed only
+  the stage name. ComfyUI shows progress for a running job. Inference: progress inside STORY (scenes drafted of the
+  planned total, repair round) is the highest-value addition; the story run state already tracks its nodes.
+- No elapsed time per stage or per run, and no start/finish time on the run; ComfyUI at least sorts by total
+  generation time. Inference: show started-at, elapsed per stage and total (the run record's step history has the
+  timestamps).
+- Preview exists only for the verified final; ComfyUI shows thumbnails of outputs as they appear. Inference: show
+  the current stage's produced media (storyboards, clips) as thumbnails during MEDIA.
+- The quality gate `record` exported a final the reviewers judged REWORK; the panel shows the decision next to the
+  download, which matches ComfyUI's "status + outputs" pattern; no change needed.
+
+Not adopted, unchanged from §3: node canvas, queue modes, batch count.
