@@ -15,7 +15,7 @@ final), the storyboard and then the clip of every segment a MEDIA-repairable fin
 the new generation before ordinary planning; a Human rework regenerates nothing on its own.
 
 When the run's policy asks for several storyboard candidates, MEDIA makes the extra versions of every storyboard one
-round at a time, has the pinned ranking judge (the ``reviewer_a`` route) choose per segment off the lease, restores
+round at a time, has the pinned ranking judge (the reviewer route with the pinned identity) choose per segment off the lease, restores
 each winner as the current version and records the choices in ``image_selection.json`` beside the episode's render.
 
 Every target's final script is pinned when the stage is planned; a different current script is an external change.
@@ -304,7 +304,14 @@ class MediaAdapter:
     async def _judge(self, run: RunSnapshot, units: list[str], lines: Mapping[str, str]) -> dict[str, dict[str, Any]]:
         """Per segment: the judged candidates (the newest ``image_candidates`` versions that pass their check) and
         the version the judge chose; with fewer than two usable candidates the current version stays."""
-        route = next((r for r in run.policy.routes if r.role == "reviewer_a"), None)
+        route = next(
+            (
+                r
+                for r in run.policy.routes
+                if r.role in {"reviewer_a", "reviewer_b"} and r.model_identity == run.policy.image_judge_identity
+            ),
+            None,
+        )
         root = self._projects.get_project_path(run.project_name)
         versions = VersionManager(root)
         portrait = run.policy.height >= run.policy.width
@@ -317,7 +324,7 @@ class MediaAdapter:
             if route is not None and self._judge_client is not None and len(usable) >= 2:
                 pictures = [await asyncio.to_thread((root / v["file"]).read_bytes) for v in usable]
                 choice = await self._judge_client.choose(route, lines.get(unit, ""), pictures)
-                decision.update(chosen_version=usable[choice.index]["version"], rounds=choice.rounds)
+                decision.update(chosen_version=usable[choice.index]["version"], scores=choice.scores)
             decisions[unit] = decision
         return decisions
 

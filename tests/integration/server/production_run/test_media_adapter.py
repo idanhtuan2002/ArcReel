@@ -467,7 +467,7 @@ class Judge:
     async def choose(self, route, line, pictures):
         self.calls.append((route.role, line, len(pictures)))
         index = self.prefer[line]
-        return Choice(index=index, rounds=[{"between": [0, 1], "answers": ["A", "B"], "later_wins": bool(index)}])
+        return Choice(index=index, scores=[0.9, 0.1] if index == 0 else [0.2, 0.7])
 
 
 def _two_versions(script: Path) -> None:
@@ -495,7 +495,7 @@ async def test_extra_storyboard_versions_are_made_judged_and_the_winner_restored
     adapter._judge_client, adapter._restore = judge, restore
     judge_route = ModelRoute.model_validate(
         {
-            "role": "reviewer_a",
+            "role": "reviewer_b",
             "provider_id": "custom-1",
             "model_id": "judge",
             "model_identity": "ollama/judge@sha256:" + "2" * 64,
@@ -539,7 +539,7 @@ async def test_extra_storyboard_versions_are_made_judged_and_the_winner_restored
         (A.GENERATE_STORYBOARDS, {"script": "episode_1.json", "segment_ids": ["E1S01", "E1S02"]}),
         (A.GENERATE_TTS, {"script": "episode_1.json"}),
     ]
-    assert judge.calls == [("reviewer_a", "E1S01", 2), ("reviewer_a", "E1S02", 2)]
+    assert judge.calls == [("reviewer_b", "E1S01", 2), ("reviewer_b", "E1S02", 2)]
     assert restored == [("storyboards", "E1S01", 1)]
     evidence = json.loads(
         (
@@ -552,10 +552,10 @@ async def test_extra_storyboard_versions_are_made_judged_and_the_winner_restored
             / "image_selection.json"
         ).read_text(encoding="utf-8")
     )
-    assert evidence["segments"]["E1S01"] | {"rounds": None} == {
+    assert evidence["segments"]["E1S01"] == {
         "candidates": [1, 2],
         "chosen_version": 1,
         "restored": True,
-        "rounds": None,
+        "scores": [0.9, 0.1],
     }
     assert evidence["segments"]["E1S02"]["restored"] is False

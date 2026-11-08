@@ -1,6 +1,6 @@
 """Qualify the ranking image judge on a storyboard-pair corpus (``build_image_judge_corpus.py``).
 
-Every pair is asked in both candidate orders through the production judge prompt and image view. The evidence JSON
+Each storyboard of every pair is scored alone through the production judge question and image view. The evidence JSON
 names the model identity, the judge prompt digest, the corpus digest and every answer, and is ``qualified`` only
 under ``qualify_judge``'s rule. A launch profile pins that file by path and sha256 (``image_selection``). Exit 0 only
 when the judge qualifies.
@@ -47,8 +47,8 @@ async def _main(args: argparse.Namespace) -> int:
     async def base_url(_provider: str) -> str:
         return args.base_url
 
-    async with OllamaImageJudge(base_url_for=base_url).comparer(route) as compare:
-        report = await qualify_judge(compare, pairs)
+    async with OllamaImageJudge(base_url_for=base_url).scorer(route) as score:
+        report = await qualify_judge(score, pairs)
     evidence = {
         "schema": "r2.image-judge-qualification.v1",
         "recorded_at": datetime.now(UTC).isoformat(),
@@ -67,7 +67,7 @@ def main() -> int:
     parser.add_argument("--corpus", required=True, type=Path, help="directory holding pairs.json and its images")
     parser.add_argument("--base-url", default="http://localhost:11434")
     parser.add_argument("--model", default="qwen2.5vl:7b")
-    parser.add_argument("--model-identity", required=True, help="the reviewer_a route's exact model identity")
+    parser.add_argument("--model-identity", required=True, help="the judging reviewer route's exact model identity")
     parser.add_argument("--out", required=True, type=Path, help="evidence JSON to write")
     return asyncio.run(_main(parser.parse_args()))
 

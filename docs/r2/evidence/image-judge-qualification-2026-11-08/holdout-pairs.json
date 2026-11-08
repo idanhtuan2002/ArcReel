@@ -1,0 +1,326 @@
+{
+  "schema": "r2.image-judge-corpus.v1",
+  "corpus_digest": "sha256:48213291778e85393f89b89c59065e60429bf58f811af3ad70480f6b462cfec8",
+  "pairs": [
+    {
+      "pair_id": "00_s2",
+      "line": "Ông cẩn thận gỡ lưới ra và đặt chiếc hộp ẩm ướt lên lòng bàn tay nhăn nheo.",
+      "own": "00_s2.png",
+      "own_sha256": "sha256:a8b8c1d3878fd835a4d71ee983d088133ac0ffc0067f5c801d1e1a9bac4e4da9",
+      "other": "00_s3.png",
+      "other_sha256": "sha256:dd9969c70a29656d72714d77f12fc12deda1d3a81d311af756351610d2f7a073"
+    },
+    {
+      "pair_id": "00_s3",
+      "line": "Khi mở hộp ra, không có vàng bạc mà chỉ thấy bức tranh vẽ cảnh sông nước xưa.",
+      "own": "00_s3.png",
+      "own_sha256": "sha256:dd9969c70a29656d72714d77f12fc12deda1d3a81d311af756351610d2f7a073",
+      "other": "00_s2.png",
+      "other_sha256": "sha256:a8b8c1d3878fd835a4d71ee983d088133ac0ffc0067f5c801d1e1a9bac4e4da9"
+    },
+    {
+      "pair_id": "01_s2",
+      "line": "Một ngày đẹp trời, cô bé nhận thấy người bạn thân đã quay trở về.",
+      "own": "01_s2.png",
+      "own_sha256": "sha256:236fb7e448d573c3fba3723e178018901d33a3228022e6e4a7517ab18cb5d6fe",
+      "other": "01_s3.png",
+      "other_sha256": "sha256:7dc0dff863650bf5edd6429efab924dcd23654b55a4e8e0386f0e05127615f79"
+    },
+    {
+      "pair_id": "01_s3",
+      "line": "Cười vỡ òa, nước mắt chảy dài xóa nhòa khoảng cách mười năm xa cách.",
+      "own": "01_s3.png",
+      "own_sha256": "sha256:7dc0dff863650bf5edd6429efab924dcd23654b55a4e8e0386f0e05127615f79",
+      "other": "01_s2.png",
+      "other_sha256": "sha256:236fb7e448d573c3fba3723e178018901d33a3228022e6e4a7517ab18cb5d6fe"
+    },
+    {
+      "pair_id": "02_s2",
+      "line": "Nó bơi qua từng dòng nước xiết để vượt qua những con đê bị vỡ giữa đêm tối.",
+      "own": "02_s2.png",
+      "own_sha256": "sha256:5812d4daa01fc9ef3defd309e4b45258f575d071b1ff12e5437ffa0125302314",
+      "other": "02_s3.png",
+      "other_sha256": "sha256:2b1f4f33df8e7e1a62bfe2d00ba279d1a7834ee33ad5942d9fbd142d2e506601"
+    },
+    {
+      "pair_id": "02_s3",
+      "line": "Khi bình minh ló dạng, sương mù tan đi và hình dáng quen thuộc hiện ra giữa tầm nhìn.",
+      "own": "02_s3.png",
+      "own_sha256": "sha256:2b1f4f33df8e7e1a62bfe2d00ba279d1a7834ee33ad5942d9fbd142d2e506601",
+      "other": "02_s2.png",
+      "other_sha256": "sha256:5812d4daa01fc9ef3defd309e4b45258f575d071b1ff12e5437ffa0125302314"
+    },
+    {
+      "pair_id": "03_s2",
+      "line": "\"Con hư lắm,\" lão thở dài nhưng vẫn dịu dàng bắt cháu ngồi xuống cạnh người mình.",
+      "own": "03_s2.png",
+      "own_sha256": "sha256:2d7e0ed39cc04c8dd288245dbdcde0950d3c7c778878b9825bc6e0cd20409172",
+      "other": "03_s3.png",
+      "other_sha256": "sha256:4c0bc122dd5c30aa1b7203135e05e62809bbed393d0345f9be7116743da2853d"
+    },
+    {
+      "pair_id": "03_s3",
+      "line": "Lão tỉ mỉ gấp từng lớp giấy mỏng, ngón tay run rẩy vì tuổi già truyền kỹ năng cuối cùng cho cháu.",
+      "own": "03_s3.png",
+      "own_sha256": "sha256:4c0bc122dd5c30aa1b7203135e05e62809bbed393d0345f9be7116743da2853d",
+      "other": "03_s2.png",
+      "other_sha256": "sha256:2d7e0ed39cc04c8dd288245dbdcde0950d3c7c778878b9825bc6e0cd20409172"
+    },
+    {
+      "pair_id": "04_s2",
+      "line": "Khi trời mưa tầm tã, em dùng chiếc áo cũ xộc xệch che chắn cho sách vở quý giá.",
+      "own": "04_s2.png",
+      "own_sha256": "sha256:5f247d2ec41bbce56d378d56034634cb5dcb98067041f71eed64355667609abe",
+      "other": "04_s3.png",
+      "other_sha256": "sha256:20161bcd973907b4756f4a8400bc0af88490c68a5438fb0cc34c9093b05b3642"
+    },
+    {
+      "pair_id": "04_s3",
+      "line": "Mỗi bước chân là một thử thách, nhưng em biết mình đang chạy theo giấc mơ.",
+      "own": "04_s3.png",
+      "own_sha256": "sha256:20161bcd973907b4756f4a8400bc0af88490c68a5438fb0cc34c9093b05b3642",
+      "other": "04_s2.png",
+      "other_sha256": "sha256:5f247d2ec41bbce56d378d56034634cb5dcb98067041f71eed64355667609abe"
+    },
+    {
+      "pair_id": "05_s2",
+      "line": "Anh trai dừng lại, giọng run rẩy: 'Mẹ nói ai thương mẹ hơn thì để cho người đó lo.'",
+      "own": "05_s2.png",
+      "own_sha256": "sha256:9dfe16793d64468b9f25f7b87a982b48d909b181520343825604d6661e310ee3",
+      "other": "05_s3.png",
+      "other_sha256": "sha256:4cb81f9e69187cc000a5001fe0286cc984be8cc8932a647f78354225e2f2d4a3"
+    },
+    {
+      "pair_id": "05_s3",
+      "line": "Em trai bước tới, nắm chặt tay anh và cùng nhau tưới nước cho gốc cây cỗi.",
+      "own": "05_s3.png",
+      "own_sha256": "sha256:4cb81f9e69187cc000a5001fe0286cc984be8cc8932a647f78354225e2f2d4a3",
+      "other": "05_s2.png",
+      "other_sha256": "sha256:9dfe16793d64468b9f25f7b87a982b48d909b181520343825604d6661e310ee3"
+    },
+    {
+      "pair_id": "06_s2",
+      "line": "Bác sĩ khẩn trương chuẩn bị dụng cụ, tay run nhưng ánh mắt kiên định nhìn vào đứa bé.",
+      "own": "06_s2.png",
+      "own_sha256": "sha256:07c9a3bf1994ec82ed3aa5a0d1aaa26b6348e6300e9d28b4d9e8d7688a71ca36",
+      "other": "06_s3.png",
+      "other_sha256": "sha256:3147a7f354bf6f251fd4011a123a88f9dce517260e3cfe2d01b3aec008780c3a"
+    },
+    {
+      "pair_id": "06_s3",
+      "line": "Đứa bé cất tiếng khóc đầu tiên, xua tan sợ hãi khi bác sĩ nhẹ nhàng đặt nó vào lòng mẹ.",
+      "own": "06_s3.png",
+      "own_sha256": "sha256:3147a7f354bf6f251fd4011a123a88f9dce517260e3cfe2d01b3aec008780c3a",
+      "other": "06_s2.png",
+      "other_sha256": "sha256:07c9a3bf1994ec82ed3aa5a0d1aaa26b6348e6300e9d28b4d9e8d7688a71ca36"
+    },
+    {
+      "pair_id": "07_s2",
+      "line": "Số tiền ấy đủ chi trả bữa ăn cả tháng của gia đình anh nghèo khó giữa lòng thành phố.",
+      "own": "07_s2.png",
+      "own_sha256": "sha256:b24ec564c016729defbe5a19d431628a478f900a57fa307171b650e52c4edeb3",
+      "other": "07_s3.png",
+      "other_sha256": "sha256:1409cb8ec649c06cec73a17e100c706f5f8f8a4cc234f41b3fa4b6ff76dda588"
+    },
+    {
+      "pair_id": "07_s3",
+      "line": "Cảm giác áy náy khiến anh quyết định quay lại ngay lập tức để trả lại tài sản cho chủ nhân.",
+      "own": "07_s3.png",
+      "own_sha256": "sha256:1409cb8ec649c06cec73a17e100c706f5f8f8a4cc234f41b3fa4b6ff76dda588",
+      "other": "07_s2.png",
+      "other_sha256": "sha256:b24ec564c016729defbe5a19d431628a478f900a57fa307171b650e52c4edeb3"
+    },
+    {
+      "pair_id": "08_s2",
+      "line": "Hàng năm, bà luôn để một phần xôi ngon nhất bên chiếc bát vỡ của bé.",
+      "own": "08_s2.png",
+      "own_sha256": "sha256:77e0a689933aa19da0f6be4e6d5d0ccfccf6f3f6f5612ac2c7b23bce4285d1be",
+      "other": "08_s3.png",
+      "other_sha256": "sha256:f3301482bf7288d4909c935cd2fdd745e6106a6545f96bb1c5ba877bf8020885"
+    },
+    {
+      "pair_id": "08_s3",
+      "line": "Năm ấy mưa lớn, người dân phát hiện bé đã qua đời nhưng bà vẫn nấu xôi như thường.",
+      "own": "08_s3.png",
+      "own_sha256": "sha256:f3301482bf7288d4909c935cd2fdd745e6106a6545f96bb1c5ba877bf8020885",
+      "other": "08_s2.png",
+      "other_sha256": "sha256:77e0a689933aa19da0f6be4e6d5d0ccfccf6f3f6f5612ac2c7b23bce4285d1be"
+    },
+    {
+      "pair_id": "09_s2",
+      "line": "Tôi tìm thấy nấm mồ nhỏ xíu giữa bãi rẫy hoang tàn, nơi anh vẫn nằm ngủ yên.",
+      "own": "09_s2.png",
+      "own_sha256": "sha256:c76314b2f27d98966e98c2ac983f33e3cbc71f349c458c39930b9e24d8c9efc2",
+      "other": "09_s3.png",
+      "other_sha256": "sha256:3f06f1cb07fda22f7d00264485a2b0f4a9aca4176fb218595ce3863dc4aa3c53"
+    },
+    {
+      "pair_id": "09_s3",
+      "line": "Tôi đặt bàn tay run rẩy lên phần mộ lạnh giá như chia sẻ hơi ấm cuối cùng.",
+      "own": "09_s3.png",
+      "own_sha256": "sha256:3f06f1cb07fda22f7d00264485a2b0f4a9aca4176fb218595ce3863dc4aa3c53",
+      "other": "09_s2.png",
+      "other_sha256": "sha256:c76314b2f27d98966e98c2ac983f33e3cbc71f349c458c39930b9e24d8c9efc2"
+    },
+    {
+      "pair_id": "10_s2",
+      "line": "Cơn gió lớn làm đứt sợi dây, diều bay mất và rơi xuống cánh đồng xa.",
+      "own": "10_s2.png",
+      "own_sha256": "sha256:8f528d855825b66b894dfb3e8b4f3b1f5b0d56dc6776bcf6f832ab5e3300edee",
+      "other": "10_s3.png",
+      "other_sha256": "sha256:8b80a493289bc165cfe978ed88daedb2e5d3be6fff8f6f0ac8cdcd36eb856842"
+    },
+    {
+      "pair_id": "10_s3",
+      "line": "Tú chạy theo từng bước chân, dù biết diều không thể trở lại được nữa.",
+      "own": "10_s3.png",
+      "own_sha256": "sha256:8b80a493289bc165cfe978ed88daedb2e5d3be6fff8f6f0ac8cdcd36eb856842",
+      "other": "10_s2.png",
+      "other_sha256": "sha256:8f528d855825b66b894dfb3e8b4f3b1f5b0d56dc6776bcf6f832ab5e3300edee"
+    },
+    {
+      "pair_id": "11_s2",
+      "line": "Hơi nước bốc lên, những câu chuyện về mẹ Tổ quốc được kể vang trong không gian nhỏ hẹp này.",
+      "own": "11_s2.png",
+      "own_sha256": "sha256:2da521674eea7e6997cb13fb9ac1bab28786ae9e42371d4a95e651ce2db17603",
+      "other": "11_s3.png",
+      "other_sha256": "sha256:a23d50295de015564313cebeadfae1838b81d779cdc41ec8c36709b8f04286df"
+    },
+    {
+      "pair_id": "11_s3",
+      "line": "Cô giáo Ánh đã đứng bên bếp này hàng nghìn đêm, trao gửi tương lai cho con cháu bản.",
+      "own": "11_s3.png",
+      "own_sha256": "sha256:a23d50295de015564313cebeadfae1838b81d779cdc41ec8c36709b8f04286df",
+      "other": "11_s2.png",
+      "other_sha256": "sha256:2da521674eea7e6997cb13fb9ac1bab28786ae9e42371d4a95e651ce2db17603"
+    },
+    {
+      "pair_id": "12_s2",
+      "line": "Những buổi tối dài, anh ngồi nhìn nồi nước dùng sôi sùng mà không cảm nhận được chút mặn nhạt nào.",
+      "own": "12_s2.png",
+      "own_sha256": "sha256:e1863cd920d2c730dc23cd5df446c8b8eb297aabd508f33c225d28859b5aac3b",
+      "other": "12_s3.png",
+      "other_sha256": "sha256:46fd85e8a6b89c4bb8e9403866ca397fb7a3c028ed43872911f133432ba1ee76"
+    },
+    {
+      "pair_id": "12_s3",
+      "line": "'Cảm ơn anh, món này làm con nhớ hương vị bà nội thật sự,' cô cháu gái nhỏ run rẩy nói.",
+      "own": "12_s3.png",
+      "own_sha256": "sha256:46fd85e8a6b89c4bb8e9403866ca397fb7a3c028ed43872911f133432ba1ee76",
+      "other": "12_s2.png",
+      "other_sha256": "sha256:e1863cd920d2c730dc23cd5df446c8b8eb297aabd508f33c225d28859b5aac3b"
+    },
+    {
+      "pair_id": "13_s2",
+      "line": "Sông sư cởi áo đắp lên mình hươu rồi dùng tay ấm che chắn gió lạnh.",
+      "own": "13_s2.png",
+      "own_sha256": "sha256:4f3c87e6cbfb768c84d7d7111276141035c67651bc6dcd25c35eee1b581ec637",
+      "other": "13_s3.png",
+      "other_sha256": "sha256:d45972c23ee7398f7275feb23eda372aa65d810652bcb90fe2d9aa22c1a52662"
+    },
+    {
+      "pair_id": "13_s3",
+      "line": "Con hươu dần bình phục, đôi mắt long lanh nhìn sư với sự biết ơn sâu sắc.",
+      "own": "13_s3.png",
+      "own_sha256": "sha256:d45972c23ee7398f7275feb23eda372aa65d810652bcb90fe2d9aa22c1a52662",
+      "other": "13_s2.png",
+      "other_sha256": "sha256:4f3c87e6cbfb768c84d7d7111276141035c67651bc6dcd25c35eee1b581ec637"
+    },
+    {
+      "pair_id": "14_s2",
+      "line": "'Chúng ta sẽ trồng lại,' bà mỉm cười nhẹ nhàng giữa dòng nước chảy từ mái nhà xuống sàn gỗ cũ kỹ.",
+      "own": "14_s2.png",
+      "own_sha256": "sha256:38086fe9609bf1b7059c72463337db0aa5251b8eddf0f77aff24116684bbda44",
+      "other": "14_s3.png",
+      "other_sha256": "sha256:ff75ca2fb19d1f2beb0a63811f60235c31268aafaea97e0c1c4cdc9665219d12"
+    },
+    {
+      "pair_id": "14_s3",
+      "line": "'Một cây thôi cũng đủ làm ấm lòng,' ông cười rạng rỡ khi hai người cùng luống xuống đất lạnh giá.",
+      "own": "14_s3.png",
+      "own_sha256": "sha256:ff75ca2fb19d1f2beb0a63811f60235c31268aafaea97e0c1c4cdc9665219d12",
+      "other": "14_s2.png",
+      "other_sha256": "sha256:38086fe9609bf1b7059c72463337db0aa5251b8eddf0f77aff24116684bbda44"
+    },
+    {
+      "pair_id": "15_s2",
+      "line": "'Nước chảy, người đi,' nhưng tiếng trống trận vẫn vang vọng trong tim mỗi khán giả nhỏ bé.",
+      "own": "15_s2.png",
+      "own_sha256": "sha256:0dcf4875ab5223af6f1287ae260f78d3a6637af7566bd7bacb7d0cc759ca1aa5",
+      "other": "15_s3.png",
+      "other_sha256": "sha256:b7a6eb0568ded04c187757cd793befc6460941472bbc37453786bed4a899cb1d"
+    },
+    {
+      "pair_id": "15_s3",
+      "line": "'Con rối sẽ nghỉ ngơi, nhưng nghệ thuật này vẫn sống mãi qua những giọt mồ hôi hôm nay.'",
+      "own": "15_s3.png",
+      "own_sha256": "sha256:b7a6eb0568ded04c187757cd793befc6460941472bbc37453786bed4a899cb1d",
+      "other": "15_s2.png",
+      "other_sha256": "sha256:0dcf4875ab5223af6f1287ae260f78d3a6637af7566bd7bacb7d0cc759ca1aa5"
+    },
+    {
+      "pair_id": "16_s2",
+      "line": "Cô chạy đua với thời gian để bảo vệ những hạt muối quý giá khỏi dòng nước.",
+      "own": "16_s2.png",
+      "own_sha256": "sha256:1855d583e2c963f49c089385896672c912f19f6abd113186bd5fa6020d3798ea",
+      "other": "16_s3.png",
+      "other_sha256": "sha256:b866b61b194a5254c1473eab9dcacd8bcfd49ec8f5bc8449b7fbd9a405cbbe12"
+    },
+    {
+      "pair_id": "16_s3",
+      "line": "Lũ nước dâng cao nhanh quá sức người, cô ôm chặt bao muối trong tay.",
+      "own": "16_s3.png",
+      "own_sha256": "sha256:b866b61b194a5254c1473eab9dcacd8bcfd49ec8f5bc8449b7fbd9a405cbbe12",
+      "other": "16_s2.png",
+      "other_sha256": "sha256:1855d583e2c963f49c089385896672c912f19f6abd113186bd5fa6020d3798ea"
+    },
+    {
+      "pair_id": "17_s2",
+      "line": "Cậu tưởng tượng cha mình đang lái con tàu màu đỏ trên sóng.",
+      "own": "17_s2.png",
+      "own_sha256": "sha256:0b06422ade0c094aa077d1b94b083e588f2c3142ab1c9a8767dab2615dc7d7ce",
+      "other": "17_s3.png",
+      "other_sha256": "sha256:958cdff759ea9ca93161854a0aad2e3b5abd399bf7a89bd93275e07eb7d4c0cc"
+    },
+    {
+      "pair_id": "17_s3",
+      "line": "Điện thoại reo vang, tin nhắn báo cha đã về an toàn bến bờ.",
+      "own": "17_s3.png",
+      "own_sha256": "sha256:958cdff759ea9ca93161854a0aad2e3b5abd399bf7a89bd93275e07eb7d4c0cc",
+      "other": "17_s2.png",
+      "other_sha256": "sha256:0b06422ade0c094aa077d1b94b083e588f2c3142ab1c9a8767dab2615dc7d7ce"
+    },
+    {
+      "pair_id": "18_s2",
+      "line": "Tiếng chuông đồng hồ điểm canh vang lên trong không gian yên tĩnh và cô đơn.",
+      "own": "18_s2.png",
+      "own_sha256": "sha256:f245fed9f454c89a6eecfb1411b104d24a93adac875e075bebecec93dc53a8cf",
+      "other": "18_s3.png",
+      "other_sha256": "sha256:9ccceb9ce7e0c3cf592ce9eb03ae3d675708a46f81afde3d42824a79fd1c2580"
+    },
+    {
+      "pair_id": "18_s3",
+      "line": "Bỗng con mèo rúe lên, chỉ về phía cửa sổ nơi những đốm sáng pháo hoa hiện ra.",
+      "own": "18_s3.png",
+      "own_sha256": "sha256:9ccceb9ce7e0c3cf592ce9eb03ae3d675708a46f81afde3d42824a79fd1c2580",
+      "other": "18_s2.png",
+      "other_sha256": "sha256:f245fed9f454c89a6eecfb1411b104d24a93adac875e075bebecec93dc53a8cf"
+    },
+    {
+      "pair_id": "19_s2",
+      "line": "Đột nhiên, một phong bì màu vàng nhạt rơi xuống giữa nền giấy cũ.",
+      "own": "19_s2.png",
+      "own_sha256": "sha256:da017a9f8298a621f550b8a9ad86bfeeb75d649b8b4e0df88704f566a0052327",
+      "other": "19_s3.png",
+      "other_sha256": "sha256:e1da09413c0044c0a0d224c5808be9088e09feb8a23aff4325d00b7fe37f82e6"
+    },
+    {
+      "pair_id": "19_s3",
+      "line": "Ông chủ mở thư ra, dòng chữ 'Cảm ơn vì đã lưu giữ ký ức' làm tim ông thắt lại.",
+      "own": "19_s3.png",
+      "own_sha256": "sha256:e1da09413c0044c0a0d224c5808be9088e09feb8a23aff4325d00b7fe37f82e6",
+      "other": "19_s2.png",
+      "other_sha256": "sha256:da017a9f8298a621f550b8a9ad86bfeeb75d649b8b4e0df88704f566a0052327"
+    }
+  ]
+}

@@ -1,0 +1,376 @@
+{
+  "schema": "r2.image-judge-qualification.v1",
+  "recorded_at": "2026-11-08T13:01:34.366515+00:00",
+  "model_identity": "ollama/qwen2.5vl:7b@sha256:5ced39dfa4bac325dc183dd1e4febaa1c46b3ea28bce48896c8e69c1e79611cc",
+  "prompt_digest": "sha256:7d4e810d4725386d0c5e2ee936fa8ebe5303a091563f918f90ba1d313ba1fc78",
+  "corpus_digest": "sha256:5745a8b67b3c500f8597ec9f034332b7274a29c961e1524a69767930daf1d0cc",
+  "pairs": 40,
+  "wrong": {
+    "own_first": 19,
+    "own_second": 17
+  },
+  "max_wrong_rate": 0.1,
+  "qualified": false,
+  "results": [
+    {
+      "pair_id": "00_s0",
+      "answers": {
+        "own_first": "A",
+        "own_second": "A"
+      },
+      "own_first_right": true,
+      "own_second_right": false
+    },
+    {
+      "pair_id": "00_s1",
+      "answers": {
+        "own_first": "A",
+        "own_second": "B"
+      },
+      "own_first_right": true,
+      "own_second_right": true
+    },
+    {
+      "pair_id": "01_s0",
+      "answers": {
+        "own_first": "B",
+        "own_second": "B"
+      },
+      "own_first_right": false,
+      "own_second_right": true
+    },
+    {
+      "pair_id": "01_s1",
+      "answers": {
+        "own_first": "B",
+        "own_second": "B"
+      },
+      "own_first_right": false,
+      "own_second_right": true
+    },
+    {
+      "pair_id": "02_s0",
+      "answers": {
+        "own_first": "B",
+        "own_second": "B"
+      },
+      "own_first_right": false,
+      "own_second_right": true
+    },
+    {
+      "pair_id": "02_s1",
+      "answers": {
+        "own_first": "B",
+        "own_second": "B"
+      },
+      "own_first_right": false,
+      "own_second_right": true
+    },
+    {
+      "pair_id": "03_s0",
+      "answers": {
+        "own_first": "A",
+        "own_second": "A"
+      },
+      "own_first_right": true,
+      "own_second_right": false
+    },
+    {
+      "pair_id": "03_s1",
+      "answers": {
+        "own_first": "A",
+        "own_second": "A"
+      },
+      "own_first_right": true,
+      "own_second_right": false
+    },
+    {
+      "pair_id": "04_s0",
+      "answers": {
+        "own_first": "A",
+        "own_second": "B"
+      },
+      "own_first_right": true,
+      "own_second_right": true
+    },
+    {
+      "pair_id": "04_s1",
+      "answers": {
+        "own_first": "A",
+        "own_second": "A"
+      },
+      "own_first_right": true,
+      "own_second_right": false
+    },
+    {
+      "pair_id": "05_s0",
+      "answers": {
+        "own_first": "A",
+        "own_second": "B"
+      },
+      "own_first_right": true,
+      "own_second_right": true
+    },
+    {
+      "pair_id": "05_s1",
+      "answers": {
+        "own_first": "B",
+        "own_second": "B"
+      },
+      "own_first_right": false,
+      "own_second_right": true
+    },
+    {
+      "pair_id": "06_s0",
+      "answers": {
+        "own_first": "A",
+        "own_second": "A"
+      },
+      "own_first_right": true,
+      "own_second_right": false
+    },
+    {
+      "pair_id": "06_s1",
+      "answers": {
+        "own_first": "A",
+        "own_second": "B"
+      },
+      "own_first_right": true,
+      "own_second_right": true
+    },
+    {
+      "pair_id": "07_s0",
+      "answers": {
+        "own_first": "A",
+        "own_second": "A"
+      },
+      "own_first_right": true,
+      "own_second_right": false
+    },
+    {
+      "pair_id": "07_s1",
+      "answers": {
+        "own_first": "A",
+        "own_second": "A"
+      },
+      "own_first_right": true,
+      "own_second_right": false
+    },
+    {
+      "pair_id": "08_s0",
+      "answers": {
+        "own_first": "A",
+        "own_second": "A"
+      },
+      "own_first_right": true,
+      "own_second_right": false
+    },
+    {
+      "pair_id": "08_s1",
+      "answers": {
+        "own_first": "A",
+        "own_second": "A"
+      },
+      "own_first_right": true,
+      "own_second_right": false
+    },
+    {
+      "pair_id": "09_s0",
+      "answers": {
+        "own_first": "B",
+        "own_second": "B"
+      },
+      "own_first_right": false,
+      "own_second_right": true
+    },
+    {
+      "pair_id": "09_s1",
+      "answers": {
+        "own_first": "B",
+        "own_second": "B"
+      },
+      "own_first_right": false,
+      "own_second_right": true
+    },
+    {
+      "pair_id": "10_s0",
+      "answers": {
+        "own_first": "A",
+        "own_second": "B"
+      },
+      "own_first_right": true,
+      "own_second_right": true
+    },
+    {
+      "pair_id": "10_s1",
+      "answers": {
+        "own_first": "B",
+        "own_second": "B"
+      },
+      "own_first_right": false,
+      "own_second_right": true
+    },
+    {
+      "pair_id": "11_s0",
+      "answers": {
+        "own_first": "B",
+        "own_second": "B"
+      },
+      "own_first_right": false,
+      "own_second_right": true
+    },
+    {
+      "pair_id": "11_s1",
+      "answers": {
+        "own_first": "B",
+        "own_second": "B"
+      },
+      "own_first_right": false,
+      "own_second_right": true
+    },
+    {
+      "pair_id": "12_s0",
+      "answers": {
+        "own_first": "B",
+        "own_second": "B"
+      },
+      "own_first_right": false,
+      "own_second_right": true
+    },
+    {
+      "pair_id": "12_s1",
+      "answers": {
+        "own_first": "A",
+        "own_second": "A"
+      },
+      "own_first_right": true,
+      "own_second_right": false
+    },
+    {
+      "pair_id": "13_s0",
+      "answers": {
+        "own_first": "B",
+        "own_second": "B"
+      },
+      "own_first_right": false,
+      "own_second_right": true
+    },
+    {
+      "pair_id": "13_s1",
+      "answers": {
+        "own_first": "B",
+        "own_second": "B"
+      },
+      "own_first_right": false,
+      "own_second_right": true
+    },
+    {
+      "pair_id": "14_s0",
+      "answers": {
+        "own_first": "B",
+        "own_second": "B"
+      },
+      "own_first_right": false,
+      "own_second_right": true
+    },
+    {
+      "pair_id": "14_s1",
+      "answers": {
+        "own_first": "B",
+        "own_second": "B"
+      },
+      "own_first_right": false,
+      "own_second_right": true
+    },
+    {
+      "pair_id": "15_s0",
+      "answers": {
+        "own_first": "A",
+        "own_second": "A"
+      },
+      "own_first_right": true,
+      "own_second_right": false
+    },
+    {
+      "pair_id": "15_s1",
+      "answers": {
+        "own_first": "A",
+        "own_second": "A"
+      },
+      "own_first_right": true,
+      "own_second_right": false
+    },
+    {
+      "pair_id": "16_s0",
+      "answers": {
+        "own_first": "A",
+        "own_second": "A"
+      },
+      "own_first_right": true,
+      "own_second_right": false
+    },
+    {
+      "pair_id": "16_s1",
+      "answers": {
+        "own_first": "A",
+        "own_second": "A"
+      },
+      "own_first_right": true,
+      "own_second_right": false
+    },
+    {
+      "pair_id": "17_s0",
+      "answers": {
+        "own_first": "A",
+        "own_second": "A"
+      },
+      "own_first_right": true,
+      "own_second_right": false
+    },
+    {
+      "pair_id": "17_s1",
+      "answers": {
+        "own_first": "B",
+        "own_second": "A"
+      },
+      "own_first_right": false,
+      "own_second_right": false
+    },
+    {
+      "pair_id": "18_s0",
+      "answers": {
+        "own_first": "B",
+        "own_second": "B"
+      },
+      "own_first_right": false,
+      "own_second_right": true
+    },
+    {
+      "pair_id": "18_s1",
+      "answers": {
+        "own_first": "B",
+        "own_second": "B"
+      },
+      "own_first_right": false,
+      "own_second_right": true
+    },
+    {
+      "pair_id": "19_s0",
+      "answers": {
+        "own_first": "B",
+        "own_second": "A"
+      },
+      "own_first_right": false,
+      "own_second_right": false
+    },
+    {
+      "pair_id": "19_s1",
+      "answers": {
+        "own_first": "A",
+        "own_second": "B"
+      },
+      "own_first_right": true,
+      "own_second_right": true
+    }
+  ]
+}

@@ -1,9 +1,9 @@
 """A ranking-only judge that picks which storyboard version best shows its narration line (ADR-0112).
 
-The judge never accepts or rejects output: it compares two candidates, A and B, and is asked twice with the order
-swapped to cancel position bias. Only an answer that names the same picture in both orders counts; anything else —
-disagreement, an unreadable answer, an error — keeps the earlier candidate, so a failing judge degrades to one
-storyboard per segment. Three candidates are compared as a short ladder: the winner of the first two meets the third.
+The judge never accepts or rejects output. Each candidate is scored alone, as the probability that the judge answers
+"yes" to whether the picture shows its line (the first token's probability mass of "yes" against "no"); one picture
+per question has no candidate order to be biased by. A later candidate replaces the first only with a strictly
+higher score; a missing score or any error keeps the first, so a failing judge degrades to one storyboard per segment.
 """
 
 from __future__ import annotations
@@ -23,26 +23,24 @@ from lib.text_backends.ollama import normalize_ollama_base_url
 from r2.automation.identity import digest_value
 from r2.contracts.automation import ModelRoute
 from r2.contracts.common import ensure_json_value
+from server.production_run.evaluators import first_token_probability
 
-JUDGE_PROMPT = (
-    "Two pictures, A (first) and B (second), are candidate illustrations for this narration line of a Vietnamese "
-    "short video:\n«{line}»\n"
-    "Pick the picture that shows what the line says more faithfully: the right people and how many, their action, "
-    "the place and the time of day. Prefer a clean picture without text, borders, extra limbs or broken shapes. "
-    "Do not judge beauty. Answer with one letter only: A or B."
+JUDGE_QUESTION = (
+    "Does this picture show what this narration line of a Vietnamese short video says — the right people, their "
+    "action and the place?\n«{line}»\nAnswer yes or no."
 )
 JUDGE_CONTEXT_TOKENS = 8192
 JUDGE_IMAGE_WIDTH = 384
 
-type Compare = Callable[[str, bytes, bytes], Awaitable[str | None]]
+type Score = Callable[[str, bytes], Awaitable[float | None]]
 
 
 def judge_prompt_digest() -> str:
     """The digest of what the judge is asked and how its answers are combined."""
     return digest_value(
-        "r2.production-image-judge.v1",
+        "r2.production-image-judge.v2",
         ensure_json_value(
-            {"prompt": JUDGE_PROMPT, "orders": "both", "disagreement": "keep-earlier", "width": JUDGE_IMAGE_WIDTH}
+            {"question": JUDGE_QUESTION, "method": "yes-probability", "tie": "keep-first", "width": JUDGE_IMAGE_WIDTH}
         ),
     )
 
@@ -57,42 +55,36 @@ def judge_view(picture: bytes) -> bytes:
     return out.getvalue()
 
 
-def letter(text: str) -> str | None:
-    cleaned = text.strip().strip("*\"'.() ").upper()
-    return cleaned[:1] if cleaned[:1] in {"A", "B"} and (len(cleaned) == 1 or not cleaned[1].isalpha()) else None
-
-
 @dataclass
 class Choice:
-    """The chosen candidate's index and each comparison's answers, for the selection evidence."""
+    """The chosen candidate's index and every candidate's score, for the selection evidence."""
 
     index: int
-    rounds: list[dict[str, object]] = field(default_factory=list)
+    scores: list[float | None] = field(default_factory=list)
 
 
-async def prefer(compare: Compare, line: str, earlier: bytes, later: bytes) -> tuple[bool, list[str | None]]:
-    """Whether the later candidate wins in both orders, with the two answers."""
+async def _safe(score: Score, line: str, picture: bytes) -> float | None:
     try:
-        forward = await compare(line, earlier, later)
-        backward = await compare(line, later, earlier)
+        return await score(line, picture)
     except (httpx.HTTPError, KeyError, ValueError):
-        return False, [None, None]
-    return forward == "B" and backward == "A", [forward, backward]
+        return None
 
 
-async def choose(compare: Compare, line: str, candidates: list[bytes]) -> Choice:
-    """The index of the candidate the judge prefers; the first one unless a later one wins in both orders."""
-    choice = Choice(index=0)
-    for index in range(1, len(candidates)):
-        wins, answers = await prefer(compare, line, candidates[choice.index], candidates[index])
-        choice.rounds.append({"between": [choice.index, index], "answers": answers, "later_wins": wins})
-        if wins:
-            choice.index = index
+async def choose(score: Score, line: str, candidates: list[bytes]) -> Choice:
+    """The candidate with the strictly highest score; the first one when any score is missing or none is higher."""
+    scores = [await _safe(score, line, candidate) for candidate in candidates]
+    choice = Choice(index=0, scores=scores)
+    known = [value for value in scores if value is not None]
+    if len(known) != len(scores) or not known:
+        return choice
+    best = max(range(len(known)), key=lambda index: (known[index], -index))
+    if known[best] > known[0]:
+        choice.index = best
     return choice
 
 
 class OllamaImageJudge:
-    """The ranking judge served by an Ollama chat endpoint that accepts several images per message."""
+    """The ranking judge served by an Ollama chat endpoint that returns token log probabilities."""
 
     def __init__(
         self,
@@ -104,19 +96,19 @@ class OllamaImageJudge:
         self._base_url_for, self._timeout, self._transport = base_url_for, timeout_seconds, transport
 
     async def choose(self, route: ModelRoute, line: str, candidates: list[bytes]) -> Choice:
-        async with self.comparer(route) as compare:
-            return await choose(compare, line, [judge_view(candidate) for candidate in candidates])
+        async with self.scorer(route) as score:
+            return await choose(score, line, [judge_view(candidate) for candidate in candidates])
 
     @asynccontextmanager
-    async def comparer(self, route: ModelRoute) -> AsyncGenerator[Compare]:
-        """One admitted device job in which ``compare(line, a, b)`` asks the judge about two judge views."""
+    async def scorer(self, route: ModelRoute) -> AsyncGenerator[Score]:
+        """One admitted device job in which ``score(line, view)`` asks the judge about one judge view."""
         url = normalize_ollama_base_url(await self._base_url_for(route.provider_id))
         async with (
             device_job(local_job(url, route.model_id)),
             httpx.AsyncClient(timeout=self._timeout, transport=self._transport) as client,
         ):
 
-            async def compare(text: str, first: bytes, second: bytes) -> str | None:
+            async def score(text: str, picture: bytes) -> float | None:
                 reply = await client.post(
                     url + "/api/chat",
                     json={
@@ -124,54 +116,43 @@ class OllamaImageJudge:
                         "stream": False,
                         "think": False,
                         "truncate": False,
+                        "logprobs": True,
+                        "top_logprobs": 10,
                         "messages": [
                             {
                                 "role": "user",
-                                "content": JUDGE_PROMPT.format(line=text[:1500]),
-                                "images": [base64.b64encode(first).decode(), base64.b64encode(second).decode()],
+                                "content": JUDGE_QUESTION.format(line=text[:1500]),
+                                "images": [base64.b64encode(picture).decode()],
                             }
                         ],
-                        "options": {"temperature": 0, "num_predict": 4, "num_ctx": JUDGE_CONTEXT_TOKENS},
+                        "options": {"temperature": 0, "num_predict": 1, "num_ctx": JUDGE_CONTEXT_TOKENS},
                     },
                 )
                 reply.raise_for_status()
-                return letter(str(reply.json()["message"].get("content") or ""))
+                return first_token_probability(reply.json().get("logprobs"), yes="yes", no="no")
 
-            yield compare
+            yield score
 
 
 MIN_QUALIFICATION_PAIRS = 30
 MAX_WRONG_RATE = 0.10
 
 
-async def qualify_judge(compare: Compare, pairs: list[dict[str, Any]]) -> dict[str, Any]:
-    """Score the judge on pairs of a segment's own storyboard against another segment's, in both orders.
+async def qualify_judge(score: Score, pairs: list[dict[str, Any]]) -> dict[str, Any]:
+    """Score the judge on pairs of a segment's own storyboard against another segment's.
 
-    Each pair is ``{"pair_id", "line", "own": bytes, "other": bytes}`` (judge views). An answer naming the other
-    storyboard, no answer or an error counts as wrong; the judge qualifies with at least
-    ``MIN_QUALIFICATION_PAIRS`` pairs and at most ``MAX_WRONG_RATE`` wrong in each order."""
+    Each pair is ``{"pair_id", "line", "own": bytes, "other": bytes}`` (judge views). A pair is right only when the
+    own storyboard scores strictly higher; a missing score or an error is wrong. The judge qualifies with at least
+    ``MIN_QUALIFICATION_PAIRS`` pairs and at most ``MAX_WRONG_RATE`` of them wrong."""
     results = []
     for pair in pairs:
-        answers: dict[str, str | None] = {}
-        for order, (first, second) in (
-            ("own_first", (pair["own"], pair["other"])),
-            ("own_second", (pair["other"], pair["own"])),
-        ):
-            try:
-                answers[order] = await compare(pair["line"], first, second)
-            except (httpx.HTTPError, KeyError, ValueError):
-                answers[order] = None
-        results.append(
-            {
-                "pair_id": pair["pair_id"],
-                "answers": answers,
-                "own_first_right": answers["own_first"] == "A",
-                "own_second_right": answers["own_second"] == "B",
-            }
-        )
+        own = await _safe(score, pair["line"], pair["own"])
+        other = await _safe(score, pair["line"], pair["other"])
+        right = own is not None and other is not None and own > other
+        results.append({"pair_id": pair["pair_id"], "own": own, "other": other, "right": right})
     total = len(results)
-    wrong = {order: sum(1 for r in results if not r[f"{order}_right"]) for order in ("own_first", "own_second")}
-    qualified = total >= MIN_QUALIFICATION_PAIRS and all(count <= MAX_WRONG_RATE * total for count in wrong.values())
+    wrong = sum(1 for result in results if not result["right"])
+    qualified = total >= MIN_QUALIFICATION_PAIRS and wrong <= MAX_WRONG_RATE * total
     return {
         "pairs": total,
         "wrong": wrong,
@@ -181,13 +162,4 @@ async def qualify_judge(compare: Compare, pairs: list[dict[str, Any]]) -> dict[s
     }
 
 
-__all__ = [
-    "Choice",
-    "OllamaImageJudge",
-    "choose",
-    "judge_prompt_digest",
-    "judge_view",
-    "letter",
-    "prefer",
-    "qualify_judge",
-]
+__all__ = ["Choice", "OllamaImageJudge", "choose", "judge_prompt_digest", "judge_view", "qualify_judge"]

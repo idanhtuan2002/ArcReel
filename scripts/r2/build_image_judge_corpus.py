@@ -79,28 +79,31 @@ def main() -> int:
     parser.add_argument("--out", required=True, type=Path)
     parser.add_argument("--comfyui", default="http://127.0.0.1:8188")
     parser.add_argument("--per-story", type=int, default=2)
+    parser.add_argument("--first-scene", type=int, default=0, help="skip this many scenes per story (a disjoint split)")
     args = parser.parse_args()
     args.out.mkdir(parents=True, exist_ok=True)
     pairs = []
     for story_file in sorted(args.stories.glob("*.json")):
-        scenes = json.loads(story_file.read_text(encoding="utf-8"))["scenes"][: args.per_story]
+        story = json.loads(story_file.read_text(encoding="utf-8"))["scenes"]
+        scenes = story[args.first_scene : args.first_scene + args.per_story]
         images = []
-        for index, scene in enumerate(scenes):
+        for index, scene in enumerate(scenes, start=args.first_scene):
             image = args.out / f"{story_file.stem}_s{index}.png"
             if not image.is_file():
                 seed = int(hashlib.sha256(f"{story_file.stem}:{index}".encode()).hexdigest()[:8], 16)
                 _generate(args.comfyui, scene["image_prompt"], seed, image)
             images.append(image)
-        for index, scene in enumerate(scenes):
-            other = images[(index + 1) % len(images)]
-            if other == images[index]:
+        for position, scene in enumerate(scenes):
+            index = args.first_scene + position
+            other = images[(position + 1) % len(images)]
+            if other == images[position]:
                 continue
             pairs.append(
                 {
                     "pair_id": f"{story_file.stem}_s{index}",
                     "line": scene["narration"],
-                    "own": images[index].name,
-                    "own_sha256": _sha256(images[index]),
+                    "own": images[position].name,
+                    "own_sha256": _sha256(images[position]),
                     "other": other.name,
                     "other_sha256": _sha256(other),
                 }

@@ -1,0 +1,326 @@
+{
+  "schema": "r2.image-judge-corpus.v1",
+  "corpus_digest": "sha256:5745a8b67b3c500f8597ec9f034332b7274a29c961e1524a69767930daf1d0cc",
+  "pairs": [
+    {
+      "pair_id": "00_s0",
+      "line": "Sông Hồng mênh mông, ông lão lặng lẽ thả lưới giữa dòng nước đỏ au.",
+      "own": "00_s0.png",
+      "own_sha256": "sha256:ebd11a1a375aabcdc51474f51d3dd3f7b47f6add4ab1bc29ad6852fa655a7d10",
+      "other": "00_s1.png",
+      "other_sha256": "sha256:c96e44471ffca8a2d63fbf516fcec74d443ffaf927ed78c2c6ab7378f2d7cad1"
+    },
+    {
+      "pair_id": "00_s1",
+      "line": "Bỗng nhiên, một khối gỗ nặng bất ngờ bám chặt vào lưới cá của ông.",
+      "own": "00_s1.png",
+      "own_sha256": "sha256:c96e44471ffca8a2d63fbf516fcec74d443ffaf927ed78c2c6ab7378f2d7cad1",
+      "other": "00_s0.png",
+      "other_sha256": "sha256:ebd11a1a375aabcdc51474f51d3dd3f7b47f6add4ab1bc29ad6852fa655a7d10"
+    },
+    {
+      "pair_id": "01_s0",
+      "line": "Chợ hoa Hội An, sương sớm mờ ảo quyện hương cam quýt ngọt ngào.",
+      "own": "01_s0.png",
+      "own_sha256": "sha256:36170308d49b314712eac1c7efbe046e40615e4323cf0db16a6480c40b791e78",
+      "other": "01_s1.png",
+      "other_sha256": "sha256:4967d6d2cf0c41c31ca5dd11cffac265d174192417d0a12d2be267826e16b58f"
+    },
+    {
+      "pair_id": "01_s1",
+      "line": "Bao năm trôi qua, chỉ còn những bức thư cũ trong ngăn tủ gỗ.",
+      "own": "01_s1.png",
+      "own_sha256": "sha256:4967d6d2cf0c41c31ca5dd11cffac265d174192417d0a12d2be267826e16b58f",
+      "other": "01_s0.png",
+      "other_sha256": "sha256:36170308d49b314712eac1c7efbe046e40615e4323cf0db16a6480c40b791e78"
+    },
+    {
+      "pair_id": "02_s0",
+      "line": "Ba ngày trôi qua, dòng lũ miền Trung cuốn đi tất cả, chỉ còn chú chó nhỏ lạc đường.",
+      "own": "02_s0.png",
+      "own_sha256": "sha256:9cfd101d547b4e591e10002cb69baf1442fecb00858909cc481aa8836f1e3215",
+      "other": "02_s1.png",
+      "other_sha256": "sha256:3488fa10d0180d6918f05409488a6f2bc44f69adbc58c722809db3b6a95eecde"
+    },
+    {
+      "pair_id": "02_s1",
+      "line": "Chân nó thương tích nhưng đôi mắt vẫn kiên định hướng về ngôi nhà cũ cuối làng.",
+      "own": "02_s1.png",
+      "own_sha256": "sha256:3488fa10d0180d6918f05409488a6f2bc44f69adbc58c722809db3b6a95eecde",
+      "other": "02_s0.png",
+      "other_sha256": "sha256:9cfd101d547b4e591e10002cb69baf1442fecb00858909cc481aa8836f1e3215"
+    },
+    {
+      "pair_id": "03_s0",
+      "line": "Gió lùa qua mái ngói cũ, người lão thợ đèn lồng ngồi lặng lẽ bên đống giấy màu.",
+      "own": "03_s0.png",
+      "own_sha256": "sha256:7cf1b0a1de4b7ce3e96a8d793a35b74eed1b7e4a5f9e96efbe92f58c5e7a650e",
+      "other": "03_s1.png",
+      "other_sha256": "sha256:260aecb345a51507868f33b6c7925de18f8457e4c196ae90790baf532284ba2a"
+    },
+    {
+      "pair_id": "03_s1",
+      "line": "Cháu nội nghịch ngợm chạy vào, tay cầm cành cây khô định quậy tung đống nguyên liệu quý giá.",
+      "own": "03_s1.png",
+      "own_sha256": "sha256:260aecb345a51507868f33b6c7925de18f8457e4c196ae90790baf532284ba2a",
+      "other": "03_s0.png",
+      "other_sha256": "sha256:7cf1b0a1de4b7ce3e96a8d793a35b74eed1b7e4a5f9e96efbe92f58c5e7a650e"
+    },
+    {
+      "pair_id": "04_s0",
+      "line": "Hằng ngày, em gái tôi phải đi bộ mười cây số sương mù để đến trường.",
+      "own": "04_s0.png",
+      "own_sha256": "sha256:2ea63edbeef22d15d080b2945cdd0d71ff3c74a719dd7615d3e428be23f4981d",
+      "other": "04_s1.png",
+      "other_sha256": "sha256:d7d4363a45cf8f5c5c0e0f199e53eedb83e39ce2a511c079066b7aa17adaf8a3"
+    },
+    {
+      "pair_id": "04_s1",
+      "line": "Bàn chân trần nứt nẻ của em chạm đất lạnh, nhưng đôi mắt vẫn sáng rực niềm hy vọng.",
+      "own": "04_s1.png",
+      "own_sha256": "sha256:d7d4363a45cf8f5c5c0e0f199e53eedb83e39ce2a511c079066b7aa17adaf8a3",
+      "other": "04_s0.png",
+      "other_sha256": "sha256:2ea63edbeef22d15d080b2945cdd0d71ff3c74a719dd7615d3e428be23f4981d"
+    },
+    {
+      "pair_id": "05_s0",
+      "line": "Hai anh em cãi vã dữ dội, mỗi người nắm chặt một bên gốc cây cam của mẹ.",
+      "own": "05_s0.png",
+      "own_sha256": "sha256:d1ebf0b246e8f61a13ac5c848f95a5c15ae212c524018ee173f3d21a1731a562",
+      "other": "05_s1.png",
+      "other_sha256": "sha256:b1279fd9d48292bcfae78d833e67c4edcb397a5fece8d000fc8b0e259771e5fd"
+    },
+    {
+      "pair_id": "05_s1",
+      "line": "Gió thổi lay cành khô, cuốn theo lá cuối cùng của mẹ rơi xuống đất lạnh.",
+      "own": "05_s1.png",
+      "own_sha256": "sha256:b1279fd9d48292bcfae78d833e67c4edcb397a5fece8d000fc8b0e259771e5fd",
+      "other": "05_s0.png",
+      "other_sha256": "sha256:d1ebf0b246e8f61a13ac5c848f95a5c15ae212c524018ee173f3d21a1731a562"
+    },
+    {
+      "pair_id": "06_s0",
+      "line": "Bão táp đêm nay, bác sĩ trẻ chạy vội vào trạm y tế vùng cao đầy lo lắng.",
+      "own": "06_s0.png",
+      "own_sha256": "sha256:cf391629429b9d151c0e558ea90979a61130ac0523c266d246e93cebd74083b6",
+      "other": "06_s1.png",
+      "other_sha256": "sha256:1e95bd460c1ac87db03957dc2fbf3c8723f804d9d8ed88ff10588f8aea949d58"
+    },
+    {
+      "pair_id": "06_s1",
+      "line": "Trong phòng sinh简陋, sản phụ đau đớn kêu gào giữa tiếng sấm rền vang ngoài trời.",
+      "own": "06_s1.png",
+      "own_sha256": "sha256:1e95bd460c1ac87db03957dc2fbf3c8723f804d9d8ed88ff10588f8aea949d58",
+      "other": "06_s0.png",
+      "other_sha256": "sha256:cf391629429b9d151c0e558ea90979a61130ac0523c266d246e93cebd74083b6"
+    },
+    {
+      "pair_id": "07_s0",
+      "line": "Xe máy lướt qua Sài Gòn oi bức, chàng trai mồ hôi nhễnhại đang chạy gấp đơn hàng cuối ngày.",
+      "own": "07_s0.png",
+      "own_sha256": "sha256:bbc4262353501040d0a39e900de672a7c54f131ee7eb83e8aa3b4a76f9b68142",
+      "other": "07_s1.png",
+      "other_sha256": "sha256:e70c43fbb464e9fb0ff6ce474c9206c6de33f86d1982881cac2801223f343607"
+    },
+    {
+      "pair_id": "07_s1",
+      "line": "Khi đến nhà khách hàng, anh giật mình thấy chiếc ví dày đặc tiền nằm ngay trên tay vịn xe máy.",
+      "own": "07_s1.png",
+      "own_sha256": "sha256:e70c43fbb464e9fb0ff6ce474c9206c6de33f86d1982881cac2801223f343607",
+      "other": "07_s0.png",
+      "other_sha256": "sha256:bbc4262353501040d0a39e900de672a7c54f131ee7eb83e8aa3b4a76f9b68142"
+    },
+    {
+      "pair_id": "08_s0",
+      "line": "Dưới nắng sớm, bà cụ lặng lẽ nhào nặn từng chiếc xôi thơm phức cho khu phố.",
+      "own": "08_s0.png",
+      "own_sha256": "sha256:15bbf330be2ad76934d4454c62b814b247fdf8342d9ce74cc1e01a44fb32c29a",
+      "other": "08_s1.png",
+      "other_sha256": "sha256:d413f9daa4ec54cd79f442cd997beb3e69b1183bcea1fb903c538d5d823a9284"
+    },
+    {
+      "pair_id": "08_s1",
+      "line": "Một bé trai nhỏ lén nép vào góc bếp để ăn chung với bà mỗi sáng.",
+      "own": "08_s1.png",
+      "own_sha256": "sha256:d413f9daa4ec54cd79f442cd997beb3e69b1183bcea1fb903c538d5d823a9284",
+      "other": "08_s0.png",
+      "other_sha256": "sha256:15bbf330be2ad76934d4454c62b814b247fdf8342d9ce74cc1e01a44fb32c29a"
+    },
+    {
+      "pair_id": "09_s0",
+      "line": "Bụi hồng hoang phủ lớp sương mờ, tôi bước lại mảnh đất này với tim nặng trĩu.",
+      "own": "09_s0.png",
+      "own_sha256": "sha256:0ff33b3e2b9e8a2a3064cf41850ffe1b942d243c4fa8ddf74c555f933bad70d9",
+      "other": "09_s1.png",
+      "other_sha256": "sha256:c6fb1b93d8f6122b1eb7e9e6bbaa51f0be1acbd31e93f3f44e36261de648e176"
+    },
+    {
+      "pair_id": "09_s1",
+      "line": "Cây đa già vẫn đứng đó như người đợi chờ, mắt nhìn về phía quân đoàn xưa.",
+      "own": "09_s1.png",
+      "own_sha256": "sha256:c6fb1b93d8f6122b1eb7e9e6bbaa51f0be1acbd31e93f3f44e36261de648e176",
+      "other": "09_s0.png",
+      "other_sha256": "sha256:0ff33b3e2b9e8a2a3064cf41850ffe1b942d243c4fa8ddf74c555f933bad70d9"
+    },
+    {
+      "pair_id": "10_s0",
+      "line": "Trên đê sông Hồng nắng hạ, cậu bé Tú thả diều giữa trời xanh thẳm.",
+      "own": "10_s0.png",
+      "own_sha256": "sha256:0e2d127ed184e1e9f6aa82aa5f38ce9bb0cfaf481699bea3d664fa926da3f3c9",
+      "other": "10_s1.png",
+      "other_sha256": "sha256:8be583a37d162687c78a85cf97ad2a46297da392b925c80d95ac3bf103bf8f0e"
+    },
+    {
+      "pair_id": "10_s1",
+      "line": "Chờ gió thổi mạnh để diều bay cao, trong mắt Tú hình ảnh phi công đang mơ.",
+      "own": "10_s1.png",
+      "own_sha256": "sha256:8be583a37d162687c78a85cf97ad2a46297da392b925c80d95ac3bf103bf8f0e",
+      "other": "10_s0.png",
+      "other_sha256": "sha256:0e2d127ed184e1e9f6aa82aa5f38ce9bb0cfaf481699bea3d664fa926da3f3c9"
+    },
+    {
+      "pair_id": "11_s0",
+      "line": "Cô giáo Ánh bước vào căn nhà nứa nhỏ, đặt ấm nước sôi bên bếp than hồng giữa đêm.",
+      "own": "11_s0.png",
+      "own_sha256": "sha256:2858efab657e1af16853e9cc79cab058db533850dba9455e494e9f8775c11a6f",
+      "other": "11_s1.png",
+      "other_sha256": "sha256:6ab48027ac806a7f5efbbb76ed0c006864b330b48c7d9c462dc4c834502d83fb"
+    },
+    {
+      "pair_id": "11_s1",
+      "line": "Bên bếp lửa, cô cầm tay các em nhỏ dân tộc và dạy những nét chữ đầu tiên đầy ấm áp.",
+      "own": "11_s1.png",
+      "own_sha256": "sha256:6ab48027ac806a7f5efbbb76ed0c006864b330b48c7d9c462dc4c834502d83fb",
+      "other": "11_s0.png",
+      "other_sha256": "sha256:2858efab657e1af16853e9cc79cab058db533850dba9455e494e9f8775c11a6f"
+    },
+    {
+      "pair_id": "12_s0",
+      "line": "Anh Minh, vị đầu bếp phở huyền thoại, bất ngờ mất hết cảm nhận hương vị trong một buổi sáng bình yên.",
+      "own": "12_s0.png",
+      "own_sha256": "sha256:8bffa65239b6f2238405e030663ba566326aaa2da6d11798a2b80e55daae88ee",
+      "other": "12_s1.png",
+      "other_sha256": "sha256:12b1ef2850cf02ff2c47016e04d9dd3b845ce38c88a94545bb6214cb72329abe"
+    },
+    {
+      "pair_id": "12_s1",
+      "line": "Mỗi nguyên liệu anh nêm nếm đều dựa trên trí nhớ sâu thẳm thay vì vị giác còn lại.",
+      "own": "12_s1.png",
+      "own_sha256": "sha256:12b1ef2850cf02ff2c47016e04d9dd3b845ce38c88a94545bb6214cb72329abe",
+      "other": "12_s0.png",
+      "other_sha256": "sha256:8bffa65239b6f2238405e030663ba566326aaa2da6d11798a2b80e55daae88ee"
+    },
+    {
+      "pair_id": "13_s0",
+      "line": "Giữa rừng già Yên tử, tuyết rơi trắng xóa bao phủ cả đỉnh núi.",
+      "own": "13_s0.png",
+      "own_sha256": "sha256:8306b409e74e47cb0a5394c024b2ba715c1b995616bb35826f34cf9e2a980af3",
+      "other": "13_s1.png",
+      "other_sha256": "sha256:33783a3b23087d22a8b1926b5e0fdd061430b75ca47972e3ea0bb81f40119d30"
+    },
+    {
+      "pair_id": "13_s1",
+      "line": "Đột nhiên, sư trụ trì dừng lại khi nghe tiếng kêu yếu ớt từ bụi cây.",
+      "own": "13_s1.png",
+      "own_sha256": "sha256:33783a3b23087d22a8b1926b5e0fdd061430b75ca47972e3ea0bb81f40119d30",
+      "other": "13_s0.png",
+      "other_sha256": "sha256:8306b409e74e47cb0a5394c024b2ba715c1b995616bb35826f34cf9e2a980af3"
+    },
+    {
+      "pair_id": "14_s0",
+      "line": "Sương muối giá lạnh bao phủ thành phố ngàn hoa, làm lay động căn nhà nhỏ của bà cụ và ông nội.",
+      "own": "14_s0.png",
+      "own_sha256": "sha256:67ca92aa3ae18235f0b8198c251684d26d9ddb7e0333401fefe8f73bc93276e0",
+      "other": "14_s1.png",
+      "other_sha256": "sha256:360f9612d1761e4728fcacc3c59a645698e42e8c97a3b5ea71fe3211ce3bdfb6"
+    },
+    {
+      "pair_id": "14_s1",
+      "line": "'Mưa xuân sắp tới rồi con,' ông nắm tay bà run rẩy nhưng ánh mắt vẫn kiên định nhìn về phía sườn núi.",
+      "own": "14_s1.png",
+      "own_sha256": "sha256:360f9612d1761e4728fcacc3c59a645698e42e8c97a3b5ea71fe3211ce3bdfb6",
+      "other": "14_s0.png",
+      "other_sha256": "sha256:67ca92aa3ae18235f0b8198c251684d26d9ddb7e0333401fefe8f73bc93276e0"
+    },
+    {
+      "pair_id": "15_s0",
+      "line": "Gần sáu mươi năm, anh già vẫn đứng giữa vùng nước phản chiếu nắng chiều vàng óng.",
+      "own": "15_s0.png",
+      "own_sha256": "sha256:f52bb15f021032fb4a5fb3afa2437858b8a9603b3662c8c09599f6a49e801406",
+      "other": "15_s1.png",
+      "other_sha256": "sha256:789e85573301a68abcd08f244c0cf564b22b458719fda939883e881286673f6b"
+    },
+    {
+      "pair_id": "15_s1",
+      "line": "'Đây là vở diễn cuối cùng,' anh khẽ nói khi đôi tay run rẩy nâng con rối cá chép.",
+      "own": "15_s1.png",
+      "own_sha256": "sha256:789e85573301a68abcd08f244c0cf564b22b458719fda939883e881286673f6b",
+      "other": "15_s0.png",
+      "other_sha256": "sha256:f52bb15f021032fb4a5fb3afa2437858b8a9603b3662c8c09599f6a49e801406"
+    },
+    {
+      "pair_id": "16_s0",
+      "line": "Bạc Liêu oi bức, cô gái vẫn miệt mài thu hoạch muối giữa nắng cháy da.",
+      "own": "16_s0.png",
+      "own_sha256": "sha256:1da9240ca9f9e3876f8e3eabbe508e1068356193542216325e26c429c8eaf347",
+      "other": "16_s1.png",
+      "other_sha256": "sha256:d9f71a2abcb10b8c1492ace92e867553c4359ee9303597bb73ca6522a0ff2e5a"
+    },
+    {
+      "pair_id": "16_s1",
+      "line": "Bỗng mây đen kéo đến nhanh chóng, cơn mưa trái mùa ập xuống không báo hiệu.",
+      "own": "16_s1.png",
+      "own_sha256": "sha256:d9f71a2abcb10b8c1492ace92e867553c4359ee9303597bb73ca6522a0ff2e5a",
+      "other": "16_s0.png",
+      "other_sha256": "sha256:1da9240ca9f9e3876f8e3eabbe508e1068356193542216325e26c429c8eaf347"
+    },
+    {
+      "pair_id": "17_s0",
+      "line": "Cậu bé ngồi vẽ, chờ tin cha từ biển xa chưa trở lại.",
+      "own": "17_s0.png",
+      "own_sha256": "sha256:7a5aadb757964185ed12f65f10fc522754e749388cf5c37e84375500c7b2f022",
+      "other": "17_s1.png",
+      "other_sha256": "sha256:e64415c06124be9be26ff8b1b90c859e551a68d22f8a57cae6cf952c146ec7f2"
+    },
+    {
+      "pair_id": "17_s1",
+      "line": "Bút màu đỏ là máu của cha cậu, bay lượn trên giấy trắng.",
+      "own": "17_s1.png",
+      "own_sha256": "sha256:e64415c06124be9be26ff8b1b90c859e551a68d22f8a57cae6cf952c146ec7f2",
+      "other": "17_s0.png",
+      "other_sha256": "sha256:7a5aadb757964185ed12f65f10fc522754e749388cf5c37e84375500c7b2f022"
+    },
+    {
+      "pair_id": "18_s0",
+      "line": "Xa tấp mênh mang giữa biển khơi, người gác hải đăng đứng bên cửa sổ đón đợi Tết.",
+      "own": "18_s0.png",
+      "own_sha256": "sha256:e8105d8376c1ddf425010a9541d8e8eedbfefbe15f62ffc8cc528e19b5822e19",
+      "other": "18_s1.png",
+      "other_sha256": "sha256:c950f122ff65a7b8db9e74fc47b728803a527cee9de3089f233a52e218af6807"
+    },
+    {
+      "pair_id": "18_s1",
+      "line": "Chỉ có bóng con mèo đen cuộn tròn trên sàn gỗ lạnh lẽo để sưởi ấm.",
+      "own": "18_s1.png",
+      "own_sha256": "sha256:c950f122ff65a7b8db9e74fc47b728803a527cee9de3089f233a52e218af6807",
+      "other": "18_s0.png",
+      "other_sha256": "sha256:e8105d8376c1ddf425010a9541d8e8eedbfefbe15f62ffc8cc528e19b5822e19"
+    },
+    {
+      "pair_id": "19_s0",
+      "line": "Tiệm sách nhỏ góc phố Hà Nội sắp đóng cửa, mùi giấy cũ lan tỏa buồn bã.",
+      "own": "19_s0.png",
+      "own_sha256": "sha256:4f252dd5d76361eb7593dcc8850cbecdb19bfbf92b568293529a85797e6b7015",
+      "other": "19_s1.png",
+      "other_sha256": "sha256:139d1beb6b2d78f3a74e5145960adead025586a9826a30902971730a99951d94"
+    },
+    {
+      "pair_id": "19_s1",
+      "line": "Bên quầy, ông chủ nhìn quanh căn phòng trống rỗng với ánh mắt lo lắng.",
+      "own": "19_s1.png",
+      "own_sha256": "sha256:139d1beb6b2d78f3a74e5145960adead025586a9826a30902971730a99951d94",
+      "other": "19_s0.png",
+      "other_sha256": "sha256:4f252dd5d76361eb7593dcc8850cbecdb19bfbf92b568293529a85797e6b7015"
+    }
+  ]
+}

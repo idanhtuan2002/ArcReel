@@ -121,9 +121,18 @@ class ProductionPreflight:
             if len(matches) != 1 or not reviewer_is_qualified(matches[0]):
                 reasons.append("MISSING_QUALIFIED_REVIEWER")
         if policy.image_candidates > 1:
-            # The judge is the run's reviewer_a route; it must be the launch profile's pinned, qualified judge.
+            # The judge is the run's reviewer route with the launch profile's pinned identity, and it is qualified.
             selection = launch.image_selection if launch is not None else None
-            judge = roles.get("reviewer_a")
+            judge = next(
+                (
+                    roles[role]
+                    for role in ("reviewer_a", "reviewer_b")
+                    if role in roles
+                    and selection is not None
+                    and roles[role].model_identity == selection.judge_model_identity
+                ),
+                None,
+            )
             if (
                 selection is None
                 or judge is None

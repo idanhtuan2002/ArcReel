@@ -1,0 +1,16 @@
+{
+  "schema": "r2.image-judge-calibration-probe.v1",
+  "recorded_at": "2026-11-08",
+  "split": "CALIBRATION",
+  "corpus_digest": "sha256:5745a8b67b3c500f8597ec9f034332b7274a29c961e1524a69767930daf1d0cc",
+  "method": "yes-probability per picture (same question and 384 px JPEG view as image_judge.JUDGE_QUESTION / judge_view)",
+  "pairs": 40,
+  "own_scored_higher": {
+    "qwen2.5vl:7b": 29,
+    "gemma3:4b": 35,
+    "gemma3:12b": 35,
+    "qwen3-vl:8b": "no token probabilities for 39 pairs"
+  },
+  "decision": "method yes-probability and model gemma3:4b chosen on this split; qualification runs on the disjoint holdout split",
+  "note": "The pairwise method (calibration-pairwise-qwen2.5vl-7b.json, prompt r2.production-image-judge.v1) answered by position: 32 of 40 pairs got the same letter in both orders."
+}
