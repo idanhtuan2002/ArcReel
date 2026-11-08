@@ -3,9 +3,12 @@
 from __future__ import annotations
 
 import json
+import os
+import random
 from pathlib import Path
 
 import pytest
+from PIL import Image
 
 from lib.db.repositories.production_runs import ProductionRunRepository
 from lib.project_manager import ProjectManager
@@ -282,3 +285,86 @@ async def test_planning_more_episodes_before_the_target_is_complete_is_an_input_
     blocked = await _tick(sessions, controller, run)
 
     assert (blocked.status, blocked.reason) == (RunStatus.BLOCKED_INPUT_CHANGED, "EXTERNAL_INPUT_CHANGED")
+
+
+def _storyboard(path: Path, *, blank: bool) -> str:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    if blank:
+        Image.new("RGB", (576, 1024), (0, 0, 0)).save(path)
+    else:
+        rng = random.Random(3)
+        image = Image.new("RGB", (576, 1024))
+        image.putdata([(rng.randrange(256),) * 3 for _ in range(576 * 1024)])
+        image.save(path)
+    return path.name
+
+
+def _script_with_storyboards(script: Path, *, blank: set[str], clips: set[str] = frozenset()) -> None:
+    root = script.parent.parent
+    segments = []
+    for unit in ("E1S01", "E1S02"):
+        _storyboard(root / "storyboards" / f"scene_{unit}.png", blank=unit in blank)
+        assets = {"storyboard_image": f"storyboards/scene_{unit}.png"}
+        if unit in clips:
+            clip = root / "videos" / f"scene_{unit}.mp4"
+            clip.parent.mkdir(parents=True, exist_ok=True)
+            clip.write_bytes(b"clip")
+            assets["video_clip"] = f"videos/scene_{unit}.mp4"
+        segments.append({"segment_id": unit, "novel_text": unit, "generated_assets": assets})
+    script.write_text(json.dumps({"episode": 1, "content_mode": "narration", "segments": segments}), encoding="utf-8")
+
+
+def _storyboards_made() -> dict:
+    return {"storyboards": {"current_ids": ["E1S01", "E1S02"], "missing_ids": [], "stale_ids": []}}
+
+
+async def test_a_blank_storyboard_is_made_again_before_the_next_action(media_host):
+    sessions, controller, run, planner, tools, script = media_host
+    _script_with_storyboards(script, blank={"E1S02"})
+    planner.plans = [_plan(A.GENERATE_TTS, artifacts=_storyboards_made())]
+
+    waiting = await _tick(sessions, controller, run)
+
+    assert waiting.status is RunStatus.WAITING_TASK
+    assert tools.calls == [(A.GENERATE_STORYBOARDS, {"script": "episode_1.json", "segment_ids": ["E1S02"]})]
+
+
+async def test_a_storyboard_that_keeps_failing_its_check_blocks_after_two_regenerations(media_host):
+    sessions, controller, run, planner, tools, script = media_host
+    _script_with_storyboards(script, blank={"E1S02"})
+    planner.plans = [_plan(A.GENERATE_TTS, artifacts=_storyboards_made())]
+
+    await _tick(sessions, controller, run)
+    await _tick(sessions, controller, run)
+    blocked = await _tick(sessions, controller, run)
+
+    assert (blocked.status, blocked.reason) == (RunStatus.BLOCKED_CONFIGURATION, "MEDIA_IMAGE_CHECK_FAILED")
+    assert [action for action, _ in tools.calls] == [A.GENERATE_STORYBOARDS] * 2
+
+
+async def test_a_storyboard_made_again_also_remakes_its_older_clip_then_planning_continues(media_host):
+    sessions, controller, run, planner, tools, script = media_host
+    _script_with_storyboards(script, blank={"E1S02"}, clips={"E1S01", "E1S02"})
+    planner.plans = [_plan(A.GENERATE_TTS, artifacts=_storyboards_made())]
+    await _tick(sessions, controller, run)
+    # The regenerated storyboard is newer than the clip made from the blank one.
+    clip = script.parent.parent / "videos" / "scene_E1S02.mp4"
+    _storyboard(script.parent.parent / "storyboards" / "scene_E1S02.png", blank=False)
+    os.utime(clip, ns=(1, 1))
+
+    await _tick(sessions, controller, run)
+    os.utime(clip, None)
+    await _tick(sessions, controller, run)
+
+    assert tools.calls[1:] == [
+        (
+            A.GENERATE_VIDEOS,
+            {
+                "script": "episode_1.json",
+                "target": {"scope": "selected", "ids": ["E1S02"]},
+                "narration_delivery": "use_tts",
+                "force": True,
+            },
+        ),
+        (A.GENERATE_TTS, {"script": "episode_1.json"}),
+    ]
