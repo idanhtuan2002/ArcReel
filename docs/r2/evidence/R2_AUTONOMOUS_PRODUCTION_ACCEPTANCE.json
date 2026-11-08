@@ -115,7 +115,7 @@
     {
       "id": "INDEPENDENT_REVIEW",
       "owner": "Codex",
-      "detail": "Independent review by codex:codex-rescue at ad16f3e77 (range a641673b6..HEAD, docs excluded). Attempted 2026-11-04 01:5x: Codex job failed after 6 s with a usage limit (\"try again at 11:38 PM\"); rerun the same prompt after the reset.",
+      "detail": "Independent review by Codex (2026-11-08). Round 1 at 8bdf5e8c4: REJECT, 4 BLOCKING (set-aside of a Human draft, queued-task grant race, zero reservation on paid routes, setup routes not Showrunner-gated). Fixes ac6df93ce/d5ac7f42e, 7b1fc3ee8, 047524930, 91c0af490/55cc7f747 (+ GPU loopback 2fd116c43). Round 2 at 91c0af490: #3/#4 RESOLVED, #1/#2 PARTIAL. Round 3 at eb0617fe4: ACCEPT_WITH_CONDITIONS, all four RESOLVED, no new blocker; conditions: source inspection only in rounds 2-3 (author ran the tests: production_run/routers/grants on PG16 serially, text/draft on SQLite), and an in-flight provider call that passed the guard may complete after a revocation (accepted residual). Fixes not yet released; production runs r2-v2.2.2.",
       "status": "OPEN"
     },
     {
