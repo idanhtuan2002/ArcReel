@@ -284,6 +284,56 @@ describe("ProductionRunPanel", () => {
     ).toBeInTheDocument();
   });
 
+  it("shows how far the story is written while the run is in STORY", async () => {
+    vi.spyOn(client, "listProductionRuns").mockResolvedValue({ start: OFFER, runs: [snapshot()] });
+    vi.spyOn(client, "getProductionRunProgress").mockResolvedValue({
+      run_id: "run-1",
+      stage: "STORY",
+      tasks: {},
+      story: {
+        phase: "RUNNING",
+        planning_done: 7,
+        planning_total: 7,
+        scenes_drafted: 6,
+        scenes_planned: 10,
+        reviews_done: 1,
+        reviews_total: 5,
+        generate_calls: 120,
+        generate_calls_max: 300,
+      },
+    });
+    render(<ProductionRunPanel projectName="alpha" />);
+
+    expect(
+      await screen.findByText("Writing the story: planning 7/7 · scenes 6/10 · reviews 1/5 · model calls 120/300"),
+    ).toBeInTheDocument();
+  });
+
+  it("names each passed stage's duration and the run's total time once it has finished", async () => {
+    vi.spyOn(client, "listProductionRuns").mockResolvedValue({
+      start: OFFER,
+      runs: [snapshot({ status: "SUCCEEDED", stage: "EXPORT" })],
+    });
+    vi.spyOn(client, "getProductionRunProgress").mockResolvedValue({
+      run_id: "run-1",
+      stage: "EXPORT",
+      started_at: "2026-11-01T00:00:00Z",
+      stages: [
+        { stage: "BRIEF", finished_at: "2026-11-01T00:00:45Z" },
+        { stage: "STORY", finished_at: "2026-11-01T04:10:45Z" },
+        { stage: "EXPORT", finished_at: "2026-11-01T04:33:00Z" },
+      ],
+      tasks: {},
+    });
+    render(<ProductionRunPanel projectName="alpha" />);
+
+    const steps = await screen.findByRole("list", { name: "Steps" });
+    await waitFor(() => expect(steps).toHaveTextContent(/· 4h 10m/));
+    expect(steps).toHaveTextContent(/· 45s/);
+    expect(steps).toHaveTextContent(/· 22m/);
+    expect(screen.getByText(/elapsed 4h 33m/)).toBeInTheDocument();
+  });
+
   it("filters earlier runs by status and names a stop in an alert with a copy action", async () => {
     vi.spyOn(client, "listProductionRuns").mockResolvedValue({
       start: OFFER,

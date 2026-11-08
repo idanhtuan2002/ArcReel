@@ -27,6 +27,7 @@ import { AutomationQualification } from "./AutomationQualification";
 import { AutomationReadiness } from "./AutomationReadiness";
 import { AutomationSettingsEditor } from "./AutomationSettingsEditor";
 import { RunReportDetails } from "./RunReportDetails";
+import { formatDuration, stageTimes, totalTime } from "./runTimeline";
 
 const POLL_MS = 5000;
 const EXAMPLE_IDEAS = ["auto_example_1", "auto_example_2", "auto_example_3"] as const;
@@ -103,6 +104,8 @@ export function ProductionRunPanel({ projectName }: Props) {
   const [episodes, setEpisodes] = useState(1);
   const [historyFilter, setHistoryFilter] = useState<HistoryFilter>("all");
   const [progress, setProgress] = useState<RunProgress | null>(null);
+  // The time the progress was read; the current stage's elapsed time counts to it.
+  const [readAt, setReadAt] = useState(() => Date.now());
   // Bumped after a settings save so readiness is checked again against the new settings.
   const [setupVersion, setSetupVersion] = useState(0);
   const [busy, setBusy] = useState(false);
@@ -139,26 +142,31 @@ export function ProductionRunPanel({ projectName }: Props) {
     };
   }, [refresh]);
 
-  // The current stage's owner tasks, like a queue's running and queued counts; read only while the run is active.
-  const progressRunId = run && !TERMINAL.has(run.status) ? run.run_id : null;
+  // The run's timeline and the current stage's progress (owner tasks like a queue's running and queued counts, the
+  // story's writing inside STORY): read once for a finished run, polled while the run is active.
+  const progressRunId = run?.run_id ?? null;
+  const progressActive = run !== null && !TERMINAL.has(run.status);
   useEffect(() => {
     if (!progressRunId) return;
     const controller = new AbortController();
     const read = () =>
       getProductionRunProgress(projectName, progressRunId, { signal: controller.signal })
         .then((loaded) => {
-          if (!controller.signal.aborted) setProgress(loaded);
+          if (controller.signal.aborted) return;
+          setProgress(loaded);
+          setReadAt(Date.now());
         })
         .catch(() => {
           // Progress is supplementary; the stage and status stay authoritative.
         });
     void read();
+    if (!progressActive) return () => controller.abort();
     const timer = window.setInterval(() => void read(), POLL_MS);
     return () => {
       controller.abort();
       window.clearInterval(timer);
     };
-  }, [projectName, progressRunId]);
+  }, [projectName, progressRunId, progressActive]);
 
   const act = useCallback(
     async (call: () => Promise<RunSnapshot>) => {
@@ -253,6 +261,10 @@ export function ProductionRunPanel({ projectName }: Props) {
   const active = run !== null && !TERMINAL.has(run.status);
   const startable = latest === null || TERMINAL.has(latest.status);
   const reached = run ? STAGES.indexOf(run.stage) : -1;
+  const runProgress = run && progress?.run_id === run.run_id ? progress : null;
+  const times = run ? stageTimes(runProgress, run.stage, active, readAt) : {};
+  const total = totalTime(runProgress, active, readAt);
+  const story = active && run?.stage === "STORY" ? runProgress?.story : null;
   return (
     <section
       aria-label={t("auto_title")}
@@ -408,6 +420,7 @@ export function ProductionRunPanel({ projectName }: Props) {
           <p className="text-[11.5px]" style={{ color: "var(--color-text-3)" }}>
             {[
               t("auto_detail_started", { time: new Date(run.created_at).toLocaleString() }),
+              ...(total === null ? [] : [t("auto_detail_elapsed", { duration: formatDuration(total) })]),
               t("auto_detail_generation", { generation: run.generation }),
               t("auto_detail_evaluations", {
                 count: run.final_evaluations ?? 0,
@@ -436,17 +449,36 @@ export function ProductionRunPanel({ projectName }: Props) {
                   }}
                 >
                   {t(`auto_stage_${stage}`)}
+                  {times[stage] && (
+                    <span style={{ color: "var(--color-text-3)" }}>
+                      {" · "}
+                      {formatDuration(times[stage].ms)}
+                    </span>
+                  )}
                 </li>
               );
             })}
           </ol>
-          {active && progress?.run_id === run.run_id && Object.keys(progress.tasks).length > 0 && (
+          {story && (
+            <p className="text-[11.5px]" style={{ color: "var(--color-text-3)" }}>
+              {t("auto_progress_story", {
+                planning: `${story.planning_done}/${story.planning_total}`,
+                scenes:
+                  story.scenes_planned === null
+                    ? String(story.scenes_drafted)
+                    : `${story.scenes_drafted}/${story.scenes_planned}`,
+                reviews: `${story.reviews_done}/${story.reviews_total}`,
+                calls: `${story.generate_calls}/${story.generate_calls_max}`,
+              })}
+            </p>
+          )}
+          {active && runProgress && Object.keys(runProgress.tasks).length > 0 && (
             <p className="text-[11.5px]" style={{ color: "var(--color-text-3)" }}>
               {t("auto_progress_tasks", {
-                running: progress.tasks.running ?? 0,
-                queued: progress.tasks.queued ?? 0,
-                done: progress.tasks.succeeded ?? 0,
-                failed: progress.tasks.failed ?? 0,
+                running: runProgress.tasks.running ?? 0,
+                queued: runProgress.tasks.queued ?? 0,
+                done: runProgress.tasks.succeeded ?? 0,
+                failed: runProgress.tasks.failed ?? 0,
               })}
             </p>
           )}

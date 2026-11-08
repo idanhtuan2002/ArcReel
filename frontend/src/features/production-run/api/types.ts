@@ -151,10 +151,27 @@ export interface RunReport {
 }
 
 /** The owner tasks of the run's current stage by status (queued, running, succeeded, failed, cancelled). */
+/** How far the story run of the STORY stage has written; the planned scene total is null until every chapter is planned. */
+export interface StoryProgress {
+  phase: string;
+  planning_done: number;
+  planning_total: number;
+  scenes_drafted: number;
+  scenes_planned: number | null;
+  reviews_done: number;
+  reviews_total: number;
+  generate_calls: number;
+  generate_calls_max: number;
+}
+
 export interface RunProgress {
   run_id: string;
   stage: RunStage;
+  /** When the run started and when each passed stage last passed (ISO timestamps). */
+  started_at?: string;
+  stages?: { stage: RunStage; finished_at: string }[];
   tasks: Record<string, number>;
+  story?: StoryProgress | null;
 }
 
 export interface ReadinessRoute {

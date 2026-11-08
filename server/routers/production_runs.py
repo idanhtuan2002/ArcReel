@@ -341,13 +341,13 @@ async def get_report(project_name: str, run_id: str, user: CurrentUser, service:
 
 @router.get("/projects/{project_name}/production-runs/{run_id}/progress")
 async def get_progress(project_name: str, run_id: str, user: CurrentUser, service: Service) -> dict[str, Any]:
-    """The owner tasks of the run's current stage by status."""
+    """The run's timeline and its current stage's progress (owner tasks by status; story writing inside STORY)."""
     sessions = async_session_factory if service is None else service.sessions
     async with sessions() as session:
         run = await ProductionRunRepository(session).get(user_id=user.id, project_name=project_name, run_id=run_id)
     if run is None:
         raise HTTPException(status_code=404, detail={"code": "RUN_NOT_FOUND", "reasons": []})
-    return await run_progress(sessions, run)
+    return await run_progress(sessions, run, get_project_manager())
 
 
 @router.get("/projects/{project_name}/production-runs/{run_id}/outputs/{episode}/final")

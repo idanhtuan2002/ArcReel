@@ -2,13 +2,16 @@
 
 from __future__ import annotations
 
+import json
 import os
 from datetime import UTC, datetime
 
 from r2.automation.assessment import AssessmentFinding, ModelAssessment
 from r2.contracts.automation import RunSnapshot, RunStage
 from server.production_run.render_adapter import render_dir
-from server.production_run.report import _reviews
+from server.production_run.report import _reviews, _story_counts
+from server.story_authoring.artifacts import StoryBlobStore
+from server.story_authoring.runtime import NodeHead, RevisionOutcome, RevisionRecord, StoryLimits, new_run_state
 from tests.unit.server.production_run.test_controller import _policy
 
 DIGEST = "sha256:" + "1" * 64
@@ -83,3 +86,59 @@ def test_reviews_of_an_earlier_generation_are_not_current(tmp_path):
     _store(tmp_path, _run(1), 1, "aaaa.reviewer_a.json", _review("model-a", visual=4), 100)
 
     assert _reviews(Projects(tmp_path), _run(2)) == []
+
+
+def _story_state(blobs, *, plans: dict[int, int], drafted: int, reviews: tuple[str, ...] = ()):
+    nodes, revisions = {}, {}
+    now = datetime(2026, 11, 8, tzinfo=UTC)
+
+    def head(node: str, data: bytes) -> None:
+        digest = blobs.put(data)
+        revision = f"rev-{node}"
+        revisions[revision] = RevisionRecord(
+            revision_id=revision,
+            node_id=node,
+            digest=digest,
+            fingerprint="f",
+            attempt_id=None,
+            outcome=RevisionOutcome.HEAD,
+            created_at=now,
+        )
+        nodes[node] = NodeHead(node_id=node, head_revision_id=revision)
+
+    for node in ("seed", "story_bible", "style_bible", "outline"):
+        head(node, node.encode())
+    for chapter, scenes in plans.items():
+        head(f"chapter_plan[{chapter}]", json.dumps({"scenes": [{}] * scenes}).encode())
+    for index in range(drafted):
+        head(f"scene_draft[1,{index + 1}]", f"scene {index}".encode())
+    for node in reviews:
+        head(node, node.encode())
+    state = new_run_state(
+        run_id="story-1",
+        limits=StoryLimits(input_tokens_max=10**6, output_tokens_max=10**6, wall_clock_max_seconds=10**5),
+        now=now,
+    )
+    return state.model_copy(update={"nodes": nodes, "revisions": revisions})
+
+
+def test_story_progress_counts_scenes_drafted_of_the_planned_total(tmp_path):
+    blobs = StoryBlobStore(tmp_path)
+    state = _story_state(blobs, plans={1: 3, 2: 4, 3: 3}, drafted=2, reviews=("chapter_review[1]",))
+
+    counts = _story_counts(state, blobs)
+
+    assert counts["planning_done"] == counts["planning_total"] == 7
+    assert (counts["scenes_drafted"], counts["scenes_planned"]) == (2, 10)
+    assert (counts["reviews_done"], counts["reviews_total"]) == (1, 5)
+    assert counts["phase"] == "RUNNING"
+    assert counts["generate_calls"] == 0
+    assert counts["generate_calls_max"] == state.limits.generate_calls_max
+
+
+def test_story_progress_leaves_the_scene_total_unknown_until_every_chapter_is_planned(tmp_path):
+    blobs = StoryBlobStore(tmp_path)
+
+    counts = _story_counts(_story_state(blobs, plans={1: 3}, drafted=0), blobs)
+
+    assert (counts["planning_done"], counts["scenes_planned"], counts["scenes_drafted"]) == (5, None, 0)

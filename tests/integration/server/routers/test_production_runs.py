@@ -193,9 +193,26 @@ async def test_a_runs_report_is_empty_before_quality_and_story_and_unknown_runs_
     assert report.json() == {"run_id": started["run_id"], "quality": [], "story_exceptions": [], "previews": []}
     assert missing.status_code == 404
     progress = await host.http.get(f"{BASE}/{started['run_id']}/progress", headers=host.headers)
-    assert progress.json() == {"run_id": started["run_id"], "stage": "BRIEF", "tasks": {}}
+    body = progress.json()
+    assert datetime.fromisoformat(body.pop("started_at")) == datetime.fromisoformat(started["created_at"])
+    assert body == {"run_id": started["run_id"], "stage": "BRIEF", "stages": [], "tasks": {}}
     preview = await host.http.get(f"{BASE}/{started['run_id']}/outputs/1/final", headers=host.headers)
     assert preview.status_code == 404
+
+
+async def test_progress_names_when_each_passed_stage_finished(host):
+    run = (await host.start()).json()
+    await host.scheduler.scan_once()
+    await host.scheduler.scan_once()
+
+    progress = (await host.http.get(f"{BASE}/{run['run_id']}/progress", headers=host.headers)).json()
+
+    started = datetime.fromisoformat(progress["started_at"])
+    finished = [(item["stage"], datetime.fromisoformat(item["finished_at"])) for item in progress["stages"]]
+    assert [stage for stage, _ in finished][:1] == ["BRIEF"], progress
+    assert progress["stage"] != "BRIEF"
+    assert all(started <= at for _, at in finished)
+    assert [at for _, at in finished] == sorted(at for _, at in finished)
 
 
 async def test_readiness_names_preflight_reasons_and_the_policy_a_start_would_freeze(host):

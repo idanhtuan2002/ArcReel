@@ -431,6 +431,24 @@ class ProductionRunRepository:
             raise ProductionRunConflict("RUN_STATE_INTEGRITY_FAILED")
         return outcome
 
+    async def stage_finish_times(self, *, run: RunSnapshot) -> dict[str, datetime]:
+        """When each stage last passed at or below the run's generation for its current input, by stage name."""
+        run = RunSnapshot.model_validate(run)
+        rows = (
+            await self.session.execute(
+                select(ProductionStepOutcomeModel.stage, func.max(ProductionStepOutcomeModel.created_at))
+                .where(
+                    ProductionStepOutcomeModel.user_id == run.user_id,
+                    ProductionStepOutcomeModel.project_name == run.project_name,
+                    ProductionStepOutcomeModel.run_id == run.run_id,
+                    ProductionStepOutcomeModel.generation <= run.generation,
+                    ProductionStepOutcomeModel.input_digest == run.input_digest,
+                )
+                .group_by(ProductionStepOutcomeModel.stage)
+            )
+        ).tuples()
+        return dict(rows.all())
+
     async def stage_receipt(self, *, run: RunSnapshot, stage: RunStage) -> OwnerReceipt | None:
         """The receipt of ``stage``'s newest step at or below the run's generation for its current input."""
         run = RunSnapshot.model_validate(run)
