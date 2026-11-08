@@ -88,6 +88,8 @@ class CloudReply:
 
 class StoryCloudClient(Protocol):
     adapter_version: str
+    #: ``True`` when ``count`` asks the provider; ``False`` when it is a local upper bound (see OPENAI_* below).
+    exact_count: bool
 
     def wire_config(self, request: StoryStepRequest) -> dict[str, Any]: ...
 
@@ -100,6 +102,7 @@ class StoryCloudClient(Protocol):
 
 class GeminiStoryClient:
     adapter_version = CLOUD_ADAPTERS[CLOUD_ENDPOINT]
+    exact_count = True
 
     def __init__(self, *, api_key: str, base_url: str):
         self._client = genai.Client(
@@ -184,9 +187,12 @@ class GeminiStoryClient:
 
 #: An OpenAI-compatible server has no count endpoint, so the input is bounded before dispatch by its UTF-8 size: every
 #: token of a byte-level BPE or byte-fallback SentencePiece vocabulary covers at least one byte, so the byte count
-#: never undercounts the text. The chat template adds a bounded number of tokens per message and per request.
-OPENAI_MESSAGE_OVERHEAD = 16
-OPENAI_REQUEST_OVERHEAD = 64
+#: never undercounts the text. The chat template and any system text the server adds are bounded by a per-message and
+#: a per-request margin. The bound is then checked against the provider's reported usage: a reply over it ends the
+#: run (``INPUT_OVER_LIMIT``, never retried), so a server whose hidden overhead exceeds the margin costs at most one
+#: call's excess before a Human sees it.
+OPENAI_MESSAGE_OVERHEAD = 32
+OPENAI_REQUEST_OVERHEAD = 1024
 #: Per-step input cap of a brief with an OpenAI-compatible route, in the byte-bound units above (four times the
 #: default token cap, since UTF-8 Vietnamese text runs several bytes per token).
 OPENAI_MAX_INPUT_BOUND = 4 * 24576
@@ -196,6 +202,7 @@ class OpenAIStoryClient:
     """Any OpenAI-compatible Chat Completions server: JSON-schema output, usage from the response."""
 
     adapter_version = CLOUD_ADAPTERS[OPENAI_ENDPOINT]
+    exact_count = False
 
     def __init__(self, *, api_key: str, base_url: str):
         self._client = create_openai_client(api_key=api_key, base_url=base_url, max_retries=0)
@@ -344,7 +351,10 @@ class CloudStoryGateway(AuthoringTextGateway):
         code = None
         detail = ""
         text = ""
-        if response.input_tokens > bound or response.output_tokens > request.max_output_tokens:
+        if response.input_tokens > bound and not self._cloud_client.exact_count:
+            # The local input bound did not hold for this server: stop rather than pay for it again.
+            code, detail = StoryFailureCode.INPUT_OVER_LIMIT, "reported input exceeds the local byte bound"
+        elif response.input_tokens > bound or response.output_tokens > request.max_output_tokens:
             code, detail = StoryFailureCode.COUNT_MISMATCH, "reported usage exceeds the reserved token bound"
         elif response.finish_reason == "MAX_TOKENS":
             code, detail = StoryFailureCode.OUTPUT_TRUNCATED, "cloud output was truncated"

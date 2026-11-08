@@ -265,7 +265,7 @@ async def test_an_openai_compatible_route_needs_no_model_list_and_counts_locally
 
 
 @pytest.mark.parametrize(
-    ("finish", "tokens", "code"), [("length", 90, "OUTPUT_TRUNCATED"), ("stop", 10**6, "COUNT_MISMATCH")]
+    ("finish", "tokens", "code"), [("length", 90, "OUTPUT_TRUNCATED"), ("stop", 10**6, "INPUT_OVER_LIMIT")]
 )
 async def test_an_openai_compatible_reply_past_its_bounds_fails(respx_mock, finish, tokens, code):
     respx_mock.post(f"{OPENAI_SELECTION.base_url}/chat/completions").mock(
@@ -290,3 +290,12 @@ def test_a_client_must_speak_its_routes_endpoint():
         )
     with pytest.raises(ValueError, match="endpoint"):
         story_cloud_client(OPENAI_SELECTION.model_copy(update={"endpoint": "ollama-chat"}), api_key="k")
+
+
+def test_an_input_over_the_local_bound_stops_the_run_instead_of_retrying():
+    from server.story_authoring.contracts import StoryFailureCode
+    from server.story_authoring.driver import RETRYABLE, TRANSPORT
+
+    assert StoryFailureCode.INPUT_OVER_LIMIT not in RETRYABLE | TRANSPORT
+    assert story_cloud_client(OPENAI_SELECTION, api_key="k").exact_count is False
+    assert story_cloud_client(SELECTION, api_key="k").exact_count is True
