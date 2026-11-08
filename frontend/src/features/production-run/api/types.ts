@@ -164,6 +164,16 @@ export interface StoryProgress {
   generate_calls_max: number;
 }
 
+/** A picture, clip or voice file a finished task of the current stage produced, as a project-relative path. */
+export interface RunMedia {
+  task_id: string;
+  media_type: "image" | "video" | "audio";
+  resource_type: string | null;
+  resource_id: string;
+  file_path: string;
+  version: number | null;
+}
+
 export interface RunProgress {
   run_id: string;
   stage: RunStage;
@@ -172,6 +182,7 @@ export interface RunProgress {
   stages?: { stage: RunStage; finished_at: string }[];
   tasks: Record<string, number>;
   story?: StoryProgress | null;
+  media?: RunMedia[];
 }
 
 export interface ReadinessRoute {

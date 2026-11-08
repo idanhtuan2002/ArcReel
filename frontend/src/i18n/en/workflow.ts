@@ -197,6 +197,8 @@ export default {
   'auto_history_done': "Done ({{count}})",
   'auto_history_failed': "Failed ({{count}})",
   'auto_progress_tasks': "Tasks of this stage: {{running}} running · {{queued}} queued · {{done}} done · {{failed}} failed",
+  'auto_media_made': 'Made so far: {{pictures}} pictures and clips · {{voices}} voice files',
+  'auto_media_list': 'Pictures and clips made in this stage',
   'auto_progress_story': "Writing the story: planning {{planning}} · scenes {{scenes}} · reviews {{reviews}} · model calls {{calls}}",
   'auto_copy_error': "Copy error",
   'auto_report_preview': "Final of episode {{episode}}",

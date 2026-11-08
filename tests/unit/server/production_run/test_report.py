@@ -6,10 +6,11 @@ import json
 import os
 from datetime import UTC, datetime
 
+from lib.db.models.task import Task
 from r2.automation.assessment import AssessmentFinding, ModelAssessment
 from r2.contracts.automation import RunSnapshot, RunStage
 from server.production_run.render_adapter import render_dir
-from server.production_run.report import _reviews, _story_counts
+from server.production_run.report import _media, _reviews, _story_counts
 from server.story_authoring.artifacts import StoryBlobStore
 from server.story_authoring.runtime import NodeHead, RevisionOutcome, RevisionRecord, StoryLimits, new_run_state
 from tests.unit.server.production_run.test_controller import _policy
@@ -142,3 +143,40 @@ def test_story_progress_leaves_the_scene_total_unknown_until_every_chapter_is_pl
     counts = _story_counts(_story_state(blobs, plans={1: 3}, drafted=0), blobs)
 
     assert (counts["planning_done"], counts["scenes_planned"], counts["scenes_drafted"]) == (5, None, 0)
+
+
+def _task(task_id: str, *, status="succeeded", media_type="image", result=None, minute=0) -> Task:
+    at = datetime(2026, 11, 8, 15, minute, tzinfo=UTC)
+    return Task(
+        task_id=task_id,
+        project_name="film",
+        task_type="storyboard",
+        media_type=media_type,
+        resource_id=f"E1S0{task_id[-1]}",
+        resource_type="storyboards",
+        status=status,
+        result_json=json.dumps(result) if result is not None else None,
+        source="mcp",
+        queued_at=at,
+        finished_at=at,
+        updated_at=at,
+    )
+
+
+def test_progress_media_lists_the_files_finished_tasks_produced_newest_first():
+    tasks = [
+        _task("t1", result={"file_path": "storyboards/scene_E1S01.png", "version": 1}, minute=1),
+        _task("t2", media_type="video", result={"file_path": "videos/scene_E1S02.mp4", "version": 2}, minute=3),
+        _task("t3", status="running", result=None, minute=4),
+        _task("t4", media_type="text", result={"file_path": "scripts/episode_1.json"}, minute=5),
+        _task("t5", result={"file_path": "../secrets.txt"}, minute=6),
+        _task("t6", result={"file_path": "/etc/passwd"}, minute=7),
+        _task("t7", result={}, minute=8),
+    ]
+
+    media = _media(tasks)
+
+    assert [(m["task_id"], m["media_type"], m["file_path"], m["version"]) for m in media] == [
+        ("t2", "video", "videos/scene_E1S02.mp4", 2),
+        ("t1", "image", "storyboards/scene_E1S01.png", 1),
+    ]

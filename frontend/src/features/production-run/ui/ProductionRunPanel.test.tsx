@@ -284,6 +284,32 @@ describe("ProductionRunPanel", () => {
     ).toBeInTheDocument();
   });
 
+  it("shows the pictures and clips the current stage has made as thumbnails", async () => {
+    vi.spyOn(client, "listProductionRuns").mockResolvedValue({
+      start: OFFER,
+      runs: [snapshot({ status: "WAITING_TASK", stage: "MEDIA" })],
+    });
+    vi.spyOn(client, "getProductionRunProgress").mockResolvedValue({
+      run_id: "run-1",
+      stage: "MEDIA",
+      tasks: { running: 1, succeeded: 3 },
+      media: [
+        { task_id: "t1", media_type: "image", resource_type: "storyboards", resource_id: "E1S01", file_path: "storyboards/scene_E1S01.png", version: 2 },
+        { task_id: "t2", media_type: "video", resource_type: "videos", resource_id: "E1S02", file_path: "videos/scene_E1S02.mp4", version: null },
+        { task_id: "t3", media_type: "audio", resource_type: "audio", resource_id: "E1S01", file_path: "audio/E1S01.wav", version: 1 },
+      ],
+    });
+    render(<ProductionRunPanel projectName="alpha" />);
+
+    const list = await screen.findByRole("list", { name: "Pictures and clips made in this stage" });
+    expect(list.querySelectorAll("li")).toHaveLength(2);
+    expect(screen.getByRole("img", { name: "E1S01 · storyboards" })).toHaveAttribute(
+      "src",
+      expect.stringContaining("/files/alpha/storyboards/scene_E1S01.png?v=2"),
+    );
+    expect(screen.getByText("Made so far: 2 pictures and clips · 1 voice files")).toBeInTheDocument();
+  });
+
   it("shows how far the story is written while the run is in STORY", async () => {
     vi.spyOn(client, "listProductionRuns").mockResolvedValue({ start: OFFER, runs: [snapshot()] });
     vi.spyOn(client, "getProductionRunProgress").mockResolvedValue({

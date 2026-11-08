@@ -15,6 +15,7 @@ from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from lib.db.models.task import Task
 from lib.db.repositories.production_runs import ProductionRunRepository
 from lib.db.repositories.task_repo import StoryRunStateConflict
 from lib.project_manager import ProjectManager
@@ -125,11 +126,44 @@ async def _story_progress(
     return _story_counts(state, StoryBlobStore(projects.get_project_path(run.project_name)))
 
 
+MEDIA_PREVIEW_LIMIT = 60
+
+
+def _media(tasks: list[Task]) -> list[dict[str, Any]]:
+    """The pictures, clips and voice the current stage's finished tasks produced, newest first, as project-relative
+    files the owner's authenticated file route serves; a task without a recorded file contributes nothing."""
+    produced = []
+    for task in tasks:
+        if task.status != "succeeded" or task.media_type not in {"image", "video", "audio"}:
+            continue
+        try:
+            result = json.loads(task.result_json or "{}")
+        except ValueError:
+            continue
+        path = result.get("file_path") if isinstance(result, dict) else None
+        if not isinstance(path, str) or not path or path.startswith("/") or ".." in path.split("/"):
+            continue
+        produced.append((task.finished_at or task.updated_at, task, path, result.get("version")))
+    produced.sort(key=lambda item: item[0], reverse=True)
+    return [
+        {
+            "task_id": task.task_id,
+            "media_type": task.media_type,
+            "resource_type": task.resource_type,
+            "resource_id": task.resource_id,
+            "file_path": path,
+            "version": version if isinstance(version, int) else None,
+        }
+        for _, task, path, version in produced[:MEDIA_PREVIEW_LIMIT]
+    ]
+
+
 async def run_progress(
     sessions: async_sessionmaker[AsyncSession], run: RunSnapshot, projects: ProjectManager | None = None
 ) -> dict[str, Any]:
     """The run's timeline (start and each stage's pass time) and its current stage's progress: the owner tasks by
-    status, like a queue's running/queued counts, and inside STORY how far the story has been written."""
+    status, like a queue's running/queued counts, the media its finished tasks produced, and inside STORY how far
+    the story has been written."""
     async with sessions() as session:
         repository = ProductionRunRepository(session)
         finished = await repository.stage_finish_times(run=run)
@@ -149,6 +183,7 @@ async def run_progress(
         intent, _ = current
         tasks = await step_tasks(sessions, intent) or await attempt_window_tasks(sessions, intent)
         progress["tasks"] = dict(Counter(task.status for task in tasks))
+        progress["media"] = _media(tasks)
     if run.stage is RunStage.STORY and projects is not None:
         progress["story"] = await _story_progress(sessions, projects, run)
     return progress

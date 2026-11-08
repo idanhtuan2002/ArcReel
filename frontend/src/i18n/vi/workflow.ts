@@ -199,6 +199,8 @@ export default {
   'auto_history_done': "Hoàn thành ({{count}})",
   'auto_history_failed': "Lỗi ({{count}})",
   'auto_progress_tasks': "Task của bước này: {{running}} đang chạy · {{queued}} chờ · {{done}} xong · {{failed}} lỗi",
+  'auto_media_made': 'Đã tạo: {{pictures}} ảnh và clip · {{voices}} file giọng đọc',
+  'auto_media_list': 'Ảnh và clip đã tạo ở bước này',
   'auto_progress_story': "Đang viết truyện: lập kế hoạch {{planning}} · cảnh {{scenes}} · duyệt {{reviews}} · lượt gọi model {{calls}}",
   'auto_copy_error': "Sao chép lỗi",
   'auto_report_preview': "Bản dựng cuối tập {{episode}}",

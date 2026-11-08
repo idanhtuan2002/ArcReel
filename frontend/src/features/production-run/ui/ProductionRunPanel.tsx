@@ -26,6 +26,7 @@ import {
 import { AutomationQualification } from "./AutomationQualification";
 import { AutomationReadiness } from "./AutomationReadiness";
 import { AutomationSettingsEditor } from "./AutomationSettingsEditor";
+import { RunMediaStrip } from "./RunMediaStrip";
 import { RunReportDetails } from "./RunReportDetails";
 import { formatDuration, stageTimes, totalTime } from "./runTimeline";
 
@@ -482,6 +483,7 @@ export function ProductionRunPanel({ projectName }: Props) {
               })}
             </p>
           )}
+          {active && runProgress?.media && <RunMediaStrip projectName={projectName} media={runProgress.media} />}
           {run.reason && (
             <div
               role={STOPPED.has(run.status) || FAILED.has(run.status) ? "alert" : undefined}
