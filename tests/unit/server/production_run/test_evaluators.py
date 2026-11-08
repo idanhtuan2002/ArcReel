@@ -24,9 +24,11 @@ from server.production_run.evaluators import (
     illustration_findings,
     prompt_digest,
     review_method,
+    segment_keys,
     upright_letter,
     yes_no,
 )
+from server.production_run.quality_adapter import final_segments
 
 pytestmark = pytest.mark.skipif(shutil.which("ffmpeg") is None, reason="needs ffmpeg")
 
@@ -266,3 +268,61 @@ def test_the_questions_method_needs_most_frames_upside_down():
     assert codes(reflections, QUESTIONS) == []
     assert codes(flipped_final, QUESTIONS) == ["FRAME_UPSIDE_DOWN"]
     assert codes(reflections, PROBABILITIES) == ["FRAME_UPSIDE_DOWN"]
+
+
+def test_frame_rules_keep_their_episode_threshold_and_name_each_offending_segment():
+    keys = ["episode:1:segment:E1S01"] * 3 + ["episode:1:segment:E1S02"] * 3 + ["episode:1:segment:E1S03"] * 2
+    illustrates = [True, True, True, False, True, True, False, True]
+
+    findings = frame_answer_findings([False] * 8, illustrates, [False] * 8, unit_key="episode:1", frame_keys=keys)
+
+    assert [(f.code, f.unit_key) for f in findings] == [
+        ("FRAME_NOT_ILLUSTRATING_NARRATION", "episode:1:segment:E1S02"),
+        ("FRAME_NOT_ILLUSTRATING_NARRATION", "episode:1:segment:E1S03"),
+    ]
+    assert {f.detail for f in findings} == {"2 frames do not illustrate their narration line"}
+    one_bad = [True] * 7 + [False]
+    assert frame_answer_findings([False] * 8, one_bad, [False] * 8, unit_key="episode:1", frame_keys=keys) == []
+
+
+def test_frame_rules_name_the_episode_when_frames_cannot_be_placed():
+    findings = frame_answer_findings([False] * 8, [False] * 8, [False] * 8, unit_key="episode:1")
+
+    assert [f.unit_key for f in findings] == ["episode:1"]
+
+
+def test_each_sampled_frame_falls_in_the_segment_playing_at_its_time(tmp_path):
+    evidence = FinalEvidence(
+        unit_key="episode:1",
+        final_path=tmp_path / "f.mp4",
+        subtitle_path=tmp_path / "f.srt",
+        narration_text="",
+        subject_digest="sha256:" + "0" * 64,
+        segments=(("E1S01", 9.0), ("E1S02", 17.0)),
+    )
+
+    assert segment_keys(evidence, [0.5, 8.9, 9.0, 16.0, 30.0]) == [
+        "episode:1:segment:E1S01",
+        "episode:1:segment:E1S01",
+        "episode:1:segment:E1S02",
+        "episode:1:segment:E1S02",
+        "episode:1",
+    ]
+
+
+def test_a_finals_segments_come_from_its_render_manifest_in_play_order(tmp_path):
+    final = tmp_path / "episode_1.mp4"
+    (tmp_path / "episode_1.manifest.json").write_text(
+        json.dumps(
+            {
+                "units": [
+                    {"unit_id": "E1S01", "video": {"duration_us": 9_041_667}},
+                    {"unit_id": "E1S02", "video": {"duration_us": 8_041_667}},
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    assert final_segments(final, 1) == (("E1S01", 9.041667), ("E1S02", 17.083334))
+    assert final_segments(tmp_path / "missing" / "episode_1.mp4", 1) == ()

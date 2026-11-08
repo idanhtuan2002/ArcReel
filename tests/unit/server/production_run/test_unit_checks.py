@@ -52,7 +52,17 @@ needs_ffmpeg = pytest.mark.skipif(FFMPEG is None, reason="ffmpeg is required")
 
 def _audio(path, source: str):
     subprocess.run(
-        [FFMPEG or "ffmpeg", "-nostdin", "-hide_banner", "-loglevel", "error", "-y", "-filter_complex", source, str(path)],
+        [
+            FFMPEG or "ffmpeg",
+            "-nostdin",
+            "-hide_banner",
+            "-loglevel",
+            "error",
+            "-y",
+            "-filter_complex",
+            source,
+            str(path),
+        ],
         check=True,
     )
     return path

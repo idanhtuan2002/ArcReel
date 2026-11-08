@@ -52,6 +52,21 @@ QUALITY_OWNER = "quality"
 REVIEWER_ROLES = ("reviewer_a", "reviewer_b")
 
 
+def final_segments(final: Path, episode: int) -> tuple[tuple[str, float], ...]:
+    """The final's segments in play order as (unit id, end second) from its render manifest; the renderer
+    concatenates units in manifest order, each lasting its ``video.duration_us``. Empty when unreadable: findings
+    then name the episode."""
+    try:
+        manifest = json.loads(final.with_name(f"episode_{episode}.manifest.json").read_text(encoding="utf-8"))
+        segments, end = [], 0.0
+        for unit in manifest["units"]:
+            end += int(unit["video"]["duration_us"]) / 1_000_000
+            segments.append((str(unit["unit_id"]), end))
+    except (OSError, ValueError, KeyError, TypeError):
+        return ()
+    return tuple(segments)
+
+
 def _episode(receipt: OwnerReceipt) -> int:
     return int(receipt.receipt_ref.split(":")[1])
 
@@ -228,6 +243,7 @@ class QualityAdapter:
                 subtitle_path=final.with_suffix(".srt"),
                 narration_text=self._narration(run.project_name, episode),
                 subject_digest=master.digest,
+                segments=final_segments(final, episode),
             )
         return targets
 

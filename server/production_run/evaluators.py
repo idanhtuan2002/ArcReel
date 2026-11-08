@@ -24,7 +24,7 @@ import tempfile
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Protocol
+from typing import Any, Protocol
 
 import httpx
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
@@ -148,19 +148,44 @@ def review_method(route: ModelRoute) -> str:
     return REVIEW_METHODS.get(route.model_id, QUESTIONS)
 
 
-def illustration_findings(probabilities: list[float | None], *, unit_key: str) -> list[AssessmentFinding]:
-    """The ``probabilities`` method's rule: frames that on average do not illustrate their line are CRITICAL."""
+def _offending_keys(
+    answers: list, offending: Callable[[Any], bool], frame_keys: list[str] | None, unit_key: str
+) -> list[str]:
+    """The distinct unit keys of the frames whose answer is offending, in frame order; the episode key when frames
+    cannot be placed in a segment or none is offending."""
+    if not frame_keys:
+        return [unit_key]
+    keys = [key for answer, key in zip(answers, frame_keys, strict=False) if offending(answer)]
+    return list(dict.fromkeys(keys)) or [unit_key]
+
+
+def segment_keys(evidence: FinalEvidence, times: list[float]) -> list[str]:
+    """Each sampled frame's unit key: its segment when the render manifest places it, otherwise the episode."""
+    keys = []
+    for seconds in times:
+        segment = next((unit for unit, end in evidence.segments if seconds < end), None)
+        keys.append(f"{evidence.unit_key}:segment:{segment}" if segment else evidence.unit_key)
+    return keys
+
+
+def illustration_findings(
+    probabilities: list[float | None], *, unit_key: str, frame_keys: list[str] | None = None
+) -> list[AssessmentFinding]:
+    """The ``probabilities`` method's rule: frames that on average do not illustrate their line are CRITICAL, one
+    finding per segment holding a frame below the cut."""
     known = [p for p in probabilities if p is not None]
     if not known or sum(known) / len(known) >= MAX_MEAN_ILLUSTRATES:
         return []
+    keys = _offending_keys(probabilities, lambda p: p is not None and p <= PROBABILITY_CUT, frame_keys, unit_key)
     return [
         AssessmentFinding(
             code="FRAMES_NOT_ILLUSTRATING_NARRATION",
             severity="CRITICAL",
-            unit_key=unit_key,
+            unit_key=key,
             repair_stage=RunStage.MEDIA,
             detail=f"mean probability {sum(known) / len(known):.2f} that a frame illustrates its line",
         )
+        for key in keys
     ]
 
 
@@ -186,41 +211,38 @@ def frame_answer_findings(
     *,
     unit_key: str,
     min_flipped: int = MIN_FLIPPED_FRAMES,
+    frame_keys: list[str] | None = None,
 ) -> list[AssessmentFinding]:
-    """Findings from the reviewer's one-picture answers: broken, upside-down and non-illustrating frames."""
+    """Findings from the reviewer's one-picture answers: broken, upside-down and non-illustrating frames.
+
+    Each rule counts over the whole episode, as qualified; once it fires, it names every segment holding an
+    offending frame (``frame_keys``, one unit key per frame) so a repair can regenerate exactly those segments."""
+    broken = broken or []
+    rules = [
+        ("FRAME_BROKEN", broken, lambda a: a is True, MIN_BROKEN_FRAMES, "{n} frames black, noisy or a test pattern"),
+        ("FRAME_UPSIDE_DOWN", flipped, lambda a: a is True, min_flipped, "{n} frames upside down"),
+        (
+            "FRAME_NOT_ILLUSTRATING_NARRATION",
+            illustrates,
+            lambda a: a is False,
+            MIN_MISMATCHED_FRAMES,
+            "{n} frames do not illustrate their narration line",
+        ),
+    ]
     found: list[AssessmentFinding] = []
-    damaged = sum(1 for answer in broken or [] if answer is True)
-    upside_down = sum(1 for answer in flipped if answer is True)
-    mismatched = sum(1 for answer in illustrates if answer is False)
-    if damaged >= MIN_BROKEN_FRAMES:
-        found.append(
+    for code, answers, offending, threshold, detail in rules:
+        count = sum(1 for answer in answers if offending(answer))
+        if count < threshold:
+            continue
+        found.extend(
             AssessmentFinding(
-                code="FRAME_BROKEN",
+                code=code,
                 severity="CRITICAL",
-                unit_key=unit_key,
+                unit_key=key,
                 repair_stage=RunStage.MEDIA,
-                detail=f"{damaged} frames black, noisy or a test pattern",
+                detail=detail.format(n=count),
             )
-        )
-    if upside_down >= min_flipped:
-        found.append(
-            AssessmentFinding(
-                code="FRAME_UPSIDE_DOWN",
-                severity="CRITICAL",
-                unit_key=unit_key,
-                repair_stage=RunStage.MEDIA,
-                detail=f"{upside_down} frames upside down",
-            )
-        )
-    if mismatched >= MIN_MISMATCHED_FRAMES:
-        found.append(
-            AssessmentFinding(
-                code="FRAME_NOT_ILLUSTRATING_NARRATION",
-                severity="CRITICAL",
-                unit_key=unit_key,
-                repair_stage=RunStage.MEDIA,
-                detail=f"{mismatched} frames do not illustrate their narration line",
-            )
+            for key in _offending_keys(answers, offending, frame_keys, unit_key)
         )
     return found
 
@@ -296,6 +318,8 @@ class FinalEvidence:
     subtitle_path: Path
     narration_text: str
     subject_digest: str
+    #: The final's segments in play order as (unit id, end second), from the render manifest; empty when unknown.
+    segments: tuple[tuple[str, float], ...] = ()
 
 
 class QualifiedEvaluator(Protocol):
@@ -512,11 +536,17 @@ class OllamaReviewer:
                 response = await client.post(url + "/api/chat", json=body)
             response.raise_for_status()
             answer = json.loads(response.json()["message"]["content"])
+            frame_keys = segment_keys(evidence, times)
             checks += frame_answer_findings(
-                flipped, illustrates, broken, unit_key=evidence.unit_key, min_flipped=_min_flipped(method)
+                flipped,
+                illustrates,
+                broken,
+                unit_key=evidence.unit_key,
+                min_flipped=_min_flipped(method),
+                frame_keys=frame_keys,
             )
             if method == PROBABILITIES:
-                checks += illustration_findings(illustrating, unit_key=evidence.unit_key)
+                checks += illustration_findings(illustrating, unit_key=evidence.unit_key, frame_keys=frame_keys)
             return ModelAssessment.model_validate(
                 {
                     **base,

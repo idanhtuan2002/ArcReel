@@ -14,6 +14,7 @@ from lib.db.repositories.production_runs import ProductionRunRepository
 from lib.project_manager import ProjectManager
 from lib.workflow_plan import WorkflowNarrationDelivery, WorkflowPlan
 from lib.workflow_state import WorkflowActionType, WorkflowNextAction, WorkflowProject, WorkflowStatus, WorkflowTarget
+from r2.automation.assessment import AssessmentFinding, ModelAssessment
 from r2.contracts.automation import RunStage, RunStatus
 from server.production_run.controller import ProductionController
 from server.production_run.media_adapter import MediaAdapter
@@ -368,3 +369,88 @@ async def test_a_storyboard_made_again_also_remakes_its_older_clip_then_planning
         ),
         (A.GENERATE_TTS, {"script": "episode_1.json"}),
     ]
+
+
+def _review(identity: str, *, accepted: bool, segments: list[str]) -> ModelAssessment:
+    score = 5 if accepted else 2
+    return ModelAssessment.model_validate(
+        {
+            "reviewer_route_digest": "sha256:" + "1" * 64,
+            "model_identity": identity,
+            "prompt_digest": "sha256:" + "1" * 64,
+            "subject_digest": "sha256:" + "1" * 64,
+            "evidence_digest": "sha256:" + "1" * 64,
+            "outcome": "COMPLETED",
+            "language": "vi",
+            "scores": {"story": 5, "visual": score, "audio": 5, "continuity": 5, "pacing": 5},
+            "findings": [
+                AssessmentFinding(
+                    code="FRAME_NOT_ILLUSTRATING_NARRATION",
+                    severity="CRITICAL",
+                    unit_key=f"episode:1:segment:{unit}",
+                    repair_stage=RunStage.MEDIA,
+                    detail="2 frames",
+                )
+                for unit in segments
+            ]
+            + [AssessmentFinding(code="PACING", severity="MAJOR", unit_key="episode:1", repair_stage=RunStage.MEDIA)],
+        }
+    )
+
+
+async def _second_generation(sessions, run, script, *, accepted: tuple[bool, bool]):
+    """The run back at MEDIA as generation 2, with the reviews generation 1's final drew."""
+    async with sessions() as session, session.begin():
+        repository = ProductionRunRepository(session)
+        current = await repository.claim_due(owner_id="controller", lease_seconds=120)
+        assert current is not None
+        await repository.transition(
+            expected=current,
+            updated=current.model_copy(update={"generation": 2, "version": current.version + 1}),
+            fencing_epoch=current.fencing_epoch,
+        )
+    folder = script.parent.parent / "production" / "automation" / run.run_id / "g1" / "episode_1" / "quality"
+    folder.mkdir(parents=True)
+    reviews = (("reviewer_a", ["E1S02"]), ("reviewer_b", ["E1S02", "E1S01"]))
+    for (role, segments), ok in zip(reviews, accepted, strict=True):
+        review = _review(f"model-{role}", accepted=ok, segments=[] if ok else segments)
+        (folder / f"subject.{role}.json").write_text(review.model_dump_json(), encoding="utf-8")
+
+
+async def test_an_automatic_rework_makes_the_named_segments_again_then_their_clips(media_host):
+    sessions, controller, run, planner, tools, script = media_host
+    _script_with_storyboards(script, blank=set(), clips={"E1S01", "E1S02"})
+    await _second_generation(sessions, run, script, accepted=(False, False))
+    planner.plans = [_plan(A.EXPORT, artifacts=_storyboards_made())]
+
+    first = await _tick(sessions, controller, run)
+    # The storyboards were made again: newer than the clips made from the rejected ones.
+    for unit in ("E1S01", "E1S02"):
+        os.utime(script.parent.parent / "videos" / f"scene_{unit}.mp4", ns=(1, 1))
+    second = await _tick(sessions, controller, run)
+
+    assert (first.status, second.status) == (RunStatus.WAITING_TASK, RunStatus.WAITING_TASK)
+    assert tools.calls == [
+        (A.GENERATE_STORYBOARDS, {"script": "episode_1.json", "segment_ids": ["E1S01", "E1S02"]}),
+        (
+            A.GENERATE_VIDEOS,
+            {
+                "script": "episode_1.json",
+                "target": {"scope": "selected", "ids": ["E1S01", "E1S02"]},
+                "narration_delivery": "use_tts",
+                "force": True,
+            },
+        ),
+    ]
+
+
+async def test_a_human_rework_after_accepting_reviews_regenerates_nothing_on_its_own(media_host):
+    sessions, controller, run, planner, tools, script = media_host
+    _script_with_storyboards(script, blank=set(), clips={"E1S01", "E1S02"})
+    await _second_generation(sessions, run, script, accepted=(True, True))
+    planner.plans = [_plan(A.EXPORT, artifacts=_storyboards_made())]
+
+    passed = await _tick(sessions, controller, run)
+
+    assert (passed.stage, passed.status) == (RunStage.RENDER, RunStatus.RUNNING)
+    assert tools.calls == []
