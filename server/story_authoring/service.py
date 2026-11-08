@@ -35,6 +35,7 @@ from r2.host_hardening.paid_routes import PaidRouteUnqualifiedError
 from r2.narrative_lifecycle.errors import NarrativeDecisionAuthorizationError
 from server.story_authoring.artifacts import StoryBlobStore
 from server.story_authoring.authority import GrantNarrativeShowrunnerAuthority
+from server.story_authoring.cloud import CLOUD_ADAPTERS
 from server.story_authoring.commit import ManuscriptCommitter, load_offered_manifest
 from server.story_authoring.contracts import OLLAMA_CHAT_ENDPOINT, StoryLimits, StoryModelSelection
 from server.story_authoring.driver import CHAPTERS, StoryBrief, run_call_bound, story_bible_input
@@ -174,8 +175,15 @@ class StoryAuthoringService:
     async def list_routes(self) -> list[dict[str, Any]]:
         return await story_routes(self._factory)
 
+    async def _custom_endpoint(self, provider_id: str, model_id: str) -> str | None:
+        async with self._factory() as session:
+            repo = CustomProviderRepository(session)
+            provider = await repo.get_provider(parse_provider_id(provider_id))
+            model = await repo.get_model_by_ids(provider.id, model_id) if provider is not None else None
+        return model.endpoint if model is not None else None
+
     async def _selection(self, provider_id: str, model_id: str) -> StoryModelSelection:
-        if not is_custom_provider(provider_id):
+        if not is_custom_provider(provider_id) or await self._custom_endpoint(provider_id, model_id) in CLOUD_ADAPTERS:
             try:
                 return (await resolve_cloud_route(self._factory, provider_id, model_id)).selection
             except (ValueError, PaidRouteUnqualifiedError):

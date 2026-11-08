@@ -116,11 +116,14 @@ class StoryLimits(_Frozen):
         return self.count_calls_max + self.generate_calls_max
 
 
+type StoryAdapterVersion = Literal["gemini-story-v1", "openai-story-v1"]
+
+
 class CloudRouteProfile(_Frozen):
     version: Literal[2] = 2
     selection_digest: str
     binding: str
-    adapter_version: Literal["gemini-story-v1"] = "gemini-story-v1"
+    adapter_version: StoryAdapterVersion = "gemini-story-v1"
     prices: CloudPriceBounds
 
 

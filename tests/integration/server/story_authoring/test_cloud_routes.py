@@ -239,3 +239,66 @@ def test_local_brief_retains_the_shipped_v2_approval_digest():
     assert BRIEF.digest() == "sha256:2af86f738aca946a61e3e24ef8ba357cdb8942354bf5bc1ad935dca930e86174"
     assert "cloud_profiles" not in BRIEF.model_dump(mode="json")
     assert "cloud_prices" not in BRIEF.model_dump(mode="json")["limits"]
+
+
+async def _custom_text(factory, *, endpoint="openai-chat", priced=True, key="fixture-custom-key"):
+    from lib.db.repositories.custom_provider_repo import CustomProviderRepository
+
+    model = {"model_id": "brand-new-model", "display_name": "Brand new", "endpoint": endpoint, "is_enabled": True}
+    if priced:
+        model |= {"price_unit": "token", "price_input": 0.5, "price_output": 1.5, "currency": "USD"}
+    async with factory() as session:
+        provider = await CustomProviderRepository(session).create_provider(
+            display_name="Any cloud",
+            discovery_format="openai",
+            base_url="https://llm.example.test/v1",
+            api_key=key,
+            models=[model],
+        )
+        await session.commit()
+        return f"custom-{provider.id}"
+
+
+async def test_a_priced_custom_cloud_model_is_a_story_route_without_code_changes(db_factory, monkeypatch, tmp_path):
+    monkeypatch.setenv("ARCREEL_RELEASE_MODE", "DEV")
+    provider_id = await _custom_text(db_factory)
+    resolved = await resolve_cloud_route(db_factory, provider_id, "brand-new-model")
+    assert resolved.selection.endpoint == "openai-chat"
+    assert resolved.profile.adapter_version == "openai-story-v1"
+    assert resolved.profile.prices == CloudPriceBounds(
+        input_per_million=Decimal("0.5"), output_per_million=Decimal("1.5")
+    )
+    row = next(row for row in await story_routes(db_factory) if row["provider_id"] == provider_id)
+    assert (row["enabled"], row["cloud"]) == (True, True)
+    service = StoryAuthoringService(session_factory=db_factory, authority=object(), project_dir_for=lambda _: tmp_path)
+    brief = await service.draft_brief(
+        idea="A village story",
+        genre="drama",
+        provider_id=provider_id,
+        model_id="brand-new-model",
+        max_cost_minor_units=50,
+    )
+    assert brief.limits.currency == "USD"
+    assert brief.cloud_profiles[0].adapter_version == "openai-story-v1"
+    await validate_cloud_brief(db_factory, brief)
+
+
+async def test_an_unpriced_custom_cloud_model_is_listed_but_not_usable(db_factory, monkeypatch):
+    monkeypatch.setenv("ARCREEL_RELEASE_MODE", "DEV")
+    provider_id = await _custom_text(db_factory, priced=False)
+    with pytest.raises(ValueError, match="price"):
+        await resolve_cloud_route(db_factory, provider_id, "brand-new-model")
+    row = next(row for row in await story_routes(db_factory) if row["provider_id"] == provider_id)
+    assert (row["enabled"], row["reason"]) == (False, "UNAVAILABLE")
+
+
+async def test_a_custom_cloud_story_route_still_needs_its_paid_route_qualification(db_factory, monkeypatch):
+    monkeypatch.setenv("ARCREEL_RELEASE_MODE", "PRODUCTION_CANDIDATE")
+    provider_id = await _custom_text(db_factory)
+    with pytest.raises(PaidRouteUnqualifiedError):
+        await resolve_cloud_route(db_factory, provider_id, "brand-new-model")
+    set_qualification_lookup(lambda route, model, binding: route.ref == f"story:{provider_id}")
+    try:
+        await resolve_cloud_route(db_factory, provider_id, "brand-new-model")
+    finally:
+        set_qualification_lookup(None)

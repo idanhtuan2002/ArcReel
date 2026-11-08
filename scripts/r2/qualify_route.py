@@ -191,7 +191,7 @@ async def run_story_canary(
     from lib.db.models import User
     from lib.db.repositories.task_repo import STORY_RUN_TASK_TYPE, TaskRepository
     from r2.host_hardening.route_qualifications import qualifications_dir
-    from server.story_authoring.cloud import CloudStoryGateway, GeminiStoryClient
+    from server.story_authoring.cloud import CloudStoryGateway, story_cloud_client
     from server.story_authoring.contracts import (
         OutputMode,
         StoryDecoding,
@@ -229,7 +229,7 @@ async def run_story_canary(
         directory.mkdir(parents=True)
         engine = create_async_engine(f"sqlite+aiosqlite:///{directory / 'attempts.db'}")
         factory = async_sessionmaker(engine, expire_on_commit=False)
-        client = GeminiStoryClient(api_key=resolved.credential, base_url=resolved.selection.base_url)
+        client = story_cloud_client(resolved.selection, api_key=resolved.credential)
         try:
             async with engine.begin() as connection:
                 await connection.run_sync(Base.metadata.create_all)

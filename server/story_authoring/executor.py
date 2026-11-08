@@ -24,7 +24,7 @@ from lib.project_manager import get_project_manager
 from lib.text_backends.ollama import OllamaChatClient
 from r2.host_hardening.paid_routes import PaidRouteUnqualifiedError
 from server.story_authoring.artifacts import StoryBlobStore
-from server.story_authoring.cloud import CloudStoryGateway, GeminiStoryClient
+from server.story_authoring.cloud import CloudStoryGateway, StoryCloudClient, story_cloud_client
 from server.story_authoring.contracts import StoryModelSelection
 from server.story_authoring.driver import StoryBrief, StoryRunDriver
 from server.story_authoring.generation import AuthoringTextGateway
@@ -49,7 +49,7 @@ class RouteUnavailable(Exception):
 
 async def resolve_route_credential(factory: Factory, selection: StoryModelSelection) -> str | None:
     """The provider's credential, after checking that the provider still serves exactly the frozen route."""
-    if not is_custom_provider(selection.provider_id):
+    if not is_custom_provider(selection.provider_id) or selection.endpoint != "ollama-chat":
         try:
             resolved = await resolve_cloud_route(factory, selection.provider_id, selection.model_id)
             if resolved.selection != selection:
@@ -113,7 +113,7 @@ async def execute_story_run_task(
         await validate_cloud_brief(session_factory, brief)
 
     gateways = []
-    cloud_clients = []
+    cloud_clients: list[StoryCloudClient] = []
     for route, key in zip(routes, keys, strict=True):
         profile = next(
             (profile for profile in brief.cloud_profiles if profile.selection_digest == route.config_digest), None
@@ -133,7 +133,7 @@ async def execute_story_run_task(
         else:
             if not key or profile is None:
                 raise RouteUnavailable("cloud brief is missing its approved profile")
-            client = GeminiStoryClient(api_key=key, base_url=route.base_url)
+            client = story_cloud_client(route, api_key=key)
             cloud_clients.append(client)
             gateway = CloudStoryGateway(
                 selection=route, limits=brief.limits, client=client, sink=sink, revalidate=revalidate

@@ -1,4 +1,8 @@
-"""Story cloud transport: one counted SDK call per durable attempt, without retries."""
+"""Story cloud transport: one counted call per durable attempt, without retries.
+
+The transport follows the route's endpoint, never its model name: ``gemini-generate`` uses the Gemini API (exact
+``countTokens``), ``openai-chat`` any OpenAI-compatible Chat Completions server (counted by a local bound).
+"""
 
 from __future__ import annotations
 
@@ -7,18 +11,20 @@ import math
 import time
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Protocol
 
 import httpx
 from google import genai
 from google.genai import types
 
-from lib.config.url_utils import ensure_google_base_url
+from lib.config.url_utils import ensure_google_base_url, is_official_openai_base_url
+from lib.openai_shared import create_openai_client
 from lib.text_backends.base import resolve_schema
 from lib.text_backends.gemini import _to_response_schema
 from server.story_authoring.contracts import (
     AttemptKind,
     OutputMode,
+    StoryAdapterVersion,
     StoryFailureCode,
     StoryLimits,
     StoryModelSelection,
@@ -36,10 +42,14 @@ from server.story_authoring.generation import (
 )
 
 CLOUD_ENDPOINT = "gemini-generate"
-GEMINI_STORY_MODELS = frozenset({"gemini-2.5-flash", "gemini-3.5-flash-lite", "gemini-3.6-flash", "gemini-3.8-flash"})
+OPENAI_ENDPOINT = "openai-chat"
+#: Adapter version of each cloud endpoint; it names the request shape in request digests and route bindings.
+CLOUD_ADAPTERS: dict[str, StoryAdapterVersion] = {CLOUD_ENDPOINT: "gemini-story-v1", OPENAI_ENDPOINT: "openai-story-v1"}
 
 
-def _schema(request: StoryStepRequest) -> dict[str, Any]:
+def _schema(request: StoryStepRequest, *, gemini: bool = True) -> dict[str, Any]:
+    """The step's output schema without the keywords cloud schema decoders reject; the reply is still validated
+    against the full schema. Gemini's dialect also turns ``const`` and non-string enums into string enums."""
     if request.output_mode is OutputMode.PROSE:
         schema = prose_schema(
             min_paragraphs=request.min_paragraphs,
@@ -50,7 +60,7 @@ def _schema(request: StoryStepRequest) -> dict[str, Any]:
     else:
         assert request.response_model is not None
         schema = resolve_schema(request.response_model)
-    normalized = _to_response_schema(schema)
+    normalized = _to_response_schema(schema) if gemini else resolve_schema(schema)
 
     def strip(node: Any, *, properties: bool = False) -> Any:
         if isinstance(node, list):
@@ -76,7 +86,21 @@ class CloudReply:
     output_tokens: int
 
 
+class StoryCloudClient(Protocol):
+    adapter_version: str
+
+    def wire_config(self, request: StoryStepRequest) -> dict[str, Any]: ...
+
+    async def count(self, request: StoryStepRequest) -> int: ...
+
+    async def generate(self, request: StoryStepRequest) -> CloudReply: ...
+
+    async def close(self) -> None: ...
+
+
 class GeminiStoryClient:
+    adapter_version = CLOUD_ADAPTERS[CLOUD_ENDPOINT]
+
     def __init__(self, *, api_key: str, base_url: str):
         self._client = genai.Client(
             api_key=api_key,
@@ -100,6 +124,9 @@ class GeminiStoryClient:
             top_k=request.decoding.top_k,
             automatic_function_calling=types.AutomaticFunctionCallingConfig(disable=True),
         )
+
+    def wire_config(self, request: StoryStepRequest) -> dict[str, Any]:
+        return self.config(request).model_dump(mode="json", exclude_none=True)
 
     async def count(self, request: StoryStepRequest) -> int:
         config = self.config(request)
@@ -155,6 +182,72 @@ class GeminiStoryClient:
         self._client.close()
 
 
+#: Bytes per token assumed when no count endpoint exists. Byte-level BPE vocabularies average well above two bytes
+#: per token for Vietnamese, English and CJK text, so half the UTF-8 size bounds the real count in practice; a
+#: provider reporting more fails the step ``COUNT_MISMATCH`` rather than passing unbounded.
+OPENAI_BYTES_PER_TOKEN = 2
+OPENAI_MESSAGE_OVERHEAD = 64
+
+
+class OpenAIStoryClient:
+    """Any OpenAI-compatible Chat Completions server: JSON-schema output, usage from the response."""
+
+    adapter_version = CLOUD_ADAPTERS[OPENAI_ENDPOINT]
+
+    def __init__(self, *, api_key: str, base_url: str):
+        self._client = create_openai_client(api_key=api_key, base_url=base_url, max_retries=0)
+        # Official endpoints reject max_tokens for reasoning models; compatible servers may not know the new name.
+        self._token_param = "max_completion_tokens" if is_official_openai_base_url(base_url) else "max_tokens"
+
+    def wire_config(self, request: StoryStepRequest) -> dict[str, Any]:
+        return {
+            "response_format": {
+                "type": "json_schema",
+                "json_schema": {"name": "story_step", "strict": False, "schema": _schema(request, gemini=False)},
+            },
+            self._token_param: request.max_output_tokens,
+            "temperature": request.decoding.temperature,
+            "top_p": request.decoding.top_p,
+            "seed": request.decoding.seed,
+        }
+
+    @staticmethod
+    def messages(request: StoryStepRequest) -> list[dict[str, str]]:
+        return [{"role": "system", "content": request.system_prompt}, {"role": "user", "content": request.prompt}]
+
+    async def count(self, request: StoryStepRequest) -> int:
+        size = sum(len(message["content"].encode("utf-8")) for message in self.messages(request))
+        return math.ceil(size / OPENAI_BYTES_PER_TOKEN) + OPENAI_MESSAGE_OVERHEAD
+
+    async def generate(self, request: StoryStepRequest) -> CloudReply:
+        body: dict[str, Any] = {
+            "model": request.selection.model_id,
+            "messages": self.messages(request),
+            **self.wire_config(request),
+        }
+        response = await self._client.chat.completions.create(**body)
+        usage = response.usage
+        if usage is None or type(usage.prompt_tokens) is not int or type(usage.completion_tokens) is not int:
+            raise ValueError("missing generation usage")
+        if usage.prompt_tokens < 0 or usage.completion_tokens < 0 or len(response.choices) != 1:
+            raise ValueError("invalid generation reply")
+        choice = response.choices[0]
+        reason = {"stop": "STOP", "length": "MAX_TOKENS"}.get(str(choice.finish_reason), str(choice.finish_reason))
+        return CloudReply(choice.message.content or "", reason, usage.prompt_tokens, usage.completion_tokens)
+
+    async def close(self) -> None:
+        await self._client.close()
+
+
+def story_cloud_client(selection: StoryModelSelection, *, api_key: str) -> StoryCloudClient:
+    """The transport of a cloud story route, chosen by its endpoint."""
+    if selection.endpoint == CLOUD_ENDPOINT:
+        return GeminiStoryClient(api_key=api_key, base_url=selection.base_url)
+    if selection.endpoint == OPENAI_ENDPOINT:
+        return OpenAIStoryClient(api_key=api_key, base_url=selection.base_url)
+    raise ValueError("unsupported cloud story endpoint")
+
+
 class CloudStoryGateway(AuthoringTextGateway):
     """Same story contract and acceptance policy, with the qualified cloud transport."""
 
@@ -163,11 +256,11 @@ class CloudStoryGateway(AuthoringTextGateway):
         *,
         selection: StoryModelSelection,
         limits: StoryLimits,
-        client: GeminiStoryClient,
+        client: StoryCloudClient,
         sink: AttemptSink,
         revalidate: Callable[[], Awaitable[None]],
     ):
-        if selection.endpoint != CLOUD_ENDPOINT or selection.model_id not in GEMINI_STORY_MODELS:
+        if CLOUD_ADAPTERS.get(selection.endpoint) != client.adapter_version:
             raise ValueError("unsupported cloud story route")
         if limits.currency != "USD" or limits.cloud_prices is None:
             raise ValueError("cloud story requests require an approved USD budget")
@@ -208,10 +301,10 @@ class CloudStoryGateway(AuthoringTextGateway):
             )
         digest = sha256_digest(
             {
-                "profile": "gemini-story-v1",
+                "profile": self._cloud_client.adapter_version,
                 "selection": request.selection.model_dump(mode="json"),
                 "prompt": request.prompt,
-                "config": self._cloud_client.config(request).model_dump(mode="json", exclude_none=True),
+                "config": self._cloud_client.wire_config(request),
             }
         )
         count_attempt = await self._sink.reserve(

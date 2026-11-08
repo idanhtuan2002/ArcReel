@@ -7,7 +7,7 @@ from decimal import Decimal
 import httpx
 import pytest
 
-from server.story_authoring.cloud import CloudStoryGateway, GeminiStoryClient
+from server.story_authoring.cloud import CloudStoryGateway, GeminiStoryClient, story_cloud_client
 from server.story_authoring.contracts import AttemptKind, CloudPriceBounds, StoryLimits, StoryModelSelection
 from server.story_authoring.generation import StoryStepError
 from server.story_authoring.runtime import BudgetExhausted, new_run_state, reserve
@@ -202,3 +202,91 @@ async def test_sdk_uses_the_google_canonical_base_url(configured, canonical, res
     assert response.call_count == 1
     assert ensure_google_base_url(configured) == canonical
     await client.close()
+
+
+OPENAI_SELECTION = StoryModelSelection.create(
+    provider_id="custom-7",
+    model_id="any-new-model",
+    endpoint="openai-chat",
+    base_url="https://llm.example.test/v1",
+    has_credential=True,
+)
+
+
+def _openai_reply(*, finish="stop", prompt_tokens=90):
+    return httpx.Response(
+        200,
+        json={
+            "id": "r",
+            "object": "chat.completion",
+            "created": 0,
+            "model": "any-new-model",
+            "choices": [
+                {
+                    "index": 0,
+                    "finish_reason": finish,
+                    "message": {
+                        "role": "assistant",
+                        "content": json.dumps({"paragraphs": ["A sufficiently long paragraph about a quiet village."]}),
+                    },
+                }
+            ],
+            "usage": {"prompt_tokens": prompt_tokens, "completion_tokens": 30, "total_tokens": prompt_tokens + 30},
+        },
+    )
+
+
+def _openai_gateway(sink):
+    return CloudStoryGateway(
+        selection=OPENAI_SELECTION,
+        limits=_limits(),
+        sink=sink,
+        client=story_cloud_client(OPENAI_SELECTION, api_key="fixture-openai-key"),
+        revalidate=_guard,
+    )
+
+
+async def test_an_openai_compatible_route_needs_no_model_list_and_counts_locally(respx_mock):
+    generate = respx_mock.post(f"{OPENAI_SELECTION.base_url}/chat/completions").mock(return_value=_openai_reply())
+    sink = _Sink()
+    request = _step().model_copy(update={"selection": OPENAI_SELECTION})
+    result = await _openai_gateway(sink).generate(scope=SCOPE, request=request)
+    assert generate.call_count == 1
+    assert (result.input_tokens, result.output_tokens) == (90, 30)
+    assert "quiet village" in result.text
+    payload = json.loads(generate.calls[0].request.content)
+    assert payload["model"] == "any-new-model"
+    assert payload["max_tokens"] == request.max_output_tokens
+    assert payload["response_format"]["type"] == "json_schema"
+    assert [m["role"] for m in payload["messages"]] == ["system", "user"]
+    assert generate.calls[0].request.headers["authorization"] == "Bearer fixture-openai-key"
+    assert "fixture-openai-key" not in str(sink.events)
+    assert [e[2] for e in sink.events if e[0] == "reserve"] == [AttemptKind.COUNT, AttemptKind.GENERATE]
+
+
+@pytest.mark.parametrize(
+    ("finish", "tokens", "code"), [("length", 90, "OUTPUT_TRUNCATED"), ("stop", 10**6, "COUNT_MISMATCH")]
+)
+async def test_an_openai_compatible_reply_past_its_bounds_fails(respx_mock, finish, tokens, code):
+    respx_mock.post(f"{OPENAI_SELECTION.base_url}/chat/completions").mock(
+        return_value=_openai_reply(finish=finish, prompt_tokens=tokens)
+    )
+    sink = _Sink()
+    with pytest.raises(StoryStepError) as raised:
+        await _openai_gateway(sink).generate(
+            scope=SCOPE, request=_step().model_copy(update={"selection": OPENAI_SELECTION})
+        )
+    assert raised.value.code.value == code
+
+
+def test_a_client_must_speak_its_routes_endpoint():
+    with pytest.raises(ValueError, match="unsupported"):
+        CloudStoryGateway(
+            selection=OPENAI_SELECTION,
+            limits=_limits(),
+            sink=_Sink(),
+            client=GeminiStoryClient(api_key="k", base_url=SELECTION.base_url),
+            revalidate=_guard,
+        )
+    with pytest.raises(ValueError, match="endpoint"):
+        story_cloud_client(OPENAI_SELECTION.model_copy(update={"endpoint": "ollama-chat"}), api_key="k")
