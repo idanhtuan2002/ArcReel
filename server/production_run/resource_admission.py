@@ -16,11 +16,10 @@ import time
 from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Protocol
-from urllib.parse import urlsplit
 
 import httpx
 
-from lib.generation_resources import DeviceJob, DeviceLease, JobReceipt
+from lib.generation_resources import DeviceJob, DeviceLease, JobReceipt, workload_for
 
 logger = logging.getLogger(__name__)
 
@@ -147,7 +146,7 @@ class OllamaProbe:
 
     def __init__(self, base_url: str, *, client: httpx.AsyncClient | None = None) -> None:
         self._base = base_url.rstrip("/")
-        self._prefix = urlsplit(base_url).netloc + "/"
+        self._prefix = workload_for(base_url, "")
         self._client = client or httpx.AsyncClient(timeout=30)
 
     def owns(self, workload: str) -> bool:
@@ -176,7 +175,7 @@ class ComfyuiProbe:
 
     def __init__(self, base_url: str, *, client: httpx.AsyncClient | None = None) -> None:
         self._base = base_url.rstrip("/")
-        self._prefix = urlsplit(base_url).netloc + "/"
+        self._prefix = workload_for(base_url, "")
         self._client = client or httpx.AsyncClient(timeout=30)
 
     def owns(self, workload: str) -> bool:

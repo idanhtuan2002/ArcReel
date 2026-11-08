@@ -147,3 +147,21 @@ async def test_a_failed_job_still_releases_after_quiescence():
     finally:
         configure_device_admission(None)
     assert port.released == 1
+
+
+@pytest.mark.parametrize("host", ["localhost", "127.0.0.1", "[::1]"])
+def test_every_loopback_spelling_of_one_server_is_one_workload(host):
+    assert workload_for(f"http://{host}:11434", "qwen3:8b") == OLLAMA
+
+
+async def test_ollama_probe_owns_and_keeps_a_model_called_through_localhost():
+    from server.production_run.resource_admission import OllamaProbe
+
+    def loaded(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json={"models": [{"name": "qwen3:8b"}]})
+
+    probe = OllamaProbe("http://127.0.0.1:11434", client=httpx.AsyncClient(transport=httpx.MockTransport(loaded)))
+    resident = workload_for("http://localhost:11434", "qwen3:8b")
+
+    assert probe.owns(resident)
+    assert await probe.busy(resident=resident) is False

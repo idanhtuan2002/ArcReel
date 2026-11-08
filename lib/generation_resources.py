@@ -85,8 +85,13 @@ def local_device_for(base_url: str | None) -> str | None:
 
 
 def workload_for(base_url: str | None, model: str) -> str:
-    """The workload key of ``model`` served at ``base_url``: the same physical server shares one key."""
-    return f"{urlsplit(base_url or '').netloc}/{model}"
+    """The workload key of ``model`` served at ``base_url``: the same physical server shares one key, so every
+    loopback spelling (``localhost``, ``127.0.0.1``, ``::1``) of one port is the same server."""
+    parts = urlsplit(base_url or "")
+    netloc = parts.netloc
+    if local_device_for(base_url) is not None:
+        netloc = "127.0.0.1" + (f":{parts.port}" if parts.port is not None else "")
+    return f"{netloc}/{model}"
 
 
 def local_job(base_url: str | None, model: str) -> DeviceJob | None:
