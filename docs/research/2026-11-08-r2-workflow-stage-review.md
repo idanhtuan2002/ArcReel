@@ -15,9 +15,12 @@ nguồn), **Suy luận**, **Chưa biết**.
   với kiểm soát quyền, ghi bằng chứng và khôi phục sau sự cố mạnh hơn mọi donor (không donor nào có cổng kiểm định model,
   ghi trước từng lần thử hay đóng gói có lineage).
 - **Sự thật:** chất lượng và hiệu quả còn kém ở ba chỗ, xếp theo tác động:
-  1. **Truyện dài không tương xứng với phim:** STORY tốn 4 giờ 10 phút (≈92% thời gian run) để viết truyện 3 chương,
-     mặc định 9 000 âm tiết (`StoryBrief.story_target_syllables`, `driver.py`, tối thiểu 7 000), trong khi phim ra chỉ
-     26,1 giây và chỉ một tập được làm.
+  1. **Thiếu bước chuyển thể/biên kịch giữa truyện và phim.** Truyện là sản phẩm thương mại độc lập (quyết định sponsor
+     2026-11-08: không rút ngắn truyện cho vừa phim; STORY 4 giờ 10 phút là chi phí sản phẩm, không phải lãng phí). Nhưng ở
+     chế độ narration, lời đọc của phim là **nguyên văn** truyện: prompt kịch bản yêu cầu voiceover "不改写、不润色、不删减、
+     不补写" (`lib/prompt_builders_script.py:216`), chỉ lớp hình được chuyển thể. Một tập là một lát cắt nguồn trong sổ tập
+     (`source_range`, `lib/episode_ledger.py`), nên nhịp phim là nhịp văn xuôi: không có hook mở đầu, không nén, không
+     dựng lại cho màn hình. Mỗi run mặc định chỉ làm 1 tập (`max_target_episodes` = 1, tối đa 12, `settings.py:70`).
   2. **Độ dài phim trượt mục tiêu:** launch profile đặt 45 giây (`fiction_narration_vi_v1.json`), phim ra 26,1 giây; không
      công đoạn nào canh độ dài lời đọc theo mục tiêu.
   3. **Hình gần như tĩnh:** clip là ảnh tĩnh chuyển động Ken Burns (`still-clip-local`); không donor sản xuất phim nào dừng
@@ -36,10 +39,11 @@ Thang đánh giá so với donor tốt nhất ở công đoạn đó: **Tốt h�
 | # | Công đoạn | ArcReel hiện tại (sự thật) | Donor đã chọn (thiết kế R2) | Donor làm tốt nhất (sự thật) | Đánh giá |
 |---|---|---|---|---|---|
 | 1 | BRIEF | Brief từ ý tưởng + writer route đã đóng băng, Gate A duyệt tự động theo grant (`story_adapter.py`) | Novel Studio / Huohuo | ViMax: một lời gọi cho truyện ngắn | Ngang (có digest, grant; donor không có) |
-| 2 | STORY | Đồ thị node (seed, bible, outline, chapter plan, scene draft, review, packaging), chỉ làm lại node bẩn; cơ chế Shenbi (review từng chiều, giữ bản tốt nhất, chuẩn hoá độ dài), Huohuo (vá liên tục, khử lặp), prompt Novel Studio (`server/story_authoring/`) | Novel Studio + Huohuo + Shenbi + StoryBox | Huohuo: bộ nhớ theo cuốn (world bible, nhân vật, sổ cốt truyện, chuỗi nhân quả) + change record cuối chương + dải độ dài + dừng khi trì trệ (`novel-writing.ts:546-683,1272-1392`) | Ngang về cơ chế; **Kém hơn về hiệu quả**: viết 9 000 âm tiết cho phim 26 giây. StoryBox (mô phỏng nhân vật) không dùng |
+| 2 | STORY (sản phẩm độc lập) | Đồ thị node (seed, bible, outline, chapter plan, scene draft, review, packaging), chỉ làm lại node bẩn; cơ chế Shenbi (review từng chiều, giữ bản tốt nhất, chuẩn hoá độ dài), Huohuo (vá liên tục, khử lặp), prompt Novel Studio (`server/story_authoring/`) | Novel Studio + Huohuo + Shenbi + StoryBox | Huohuo: bộ nhớ theo cuốn (world bible, nhân vật, sổ cốt truyện, chuỗi nhân quả) + change record cuối chương + dải độ dài + dừng khi trì trệ (`novel-writing.ts:546-683,1272-1392`) | Ngang về cơ chế (chất lượng thương mại còn tùy model writer). StoryBox (mô phỏng nhân vật) không dùng |
 | 3 | STORY_COMMIT / HANDOFF | Duyệt manifest qua `AutomaticNarrativeAuthority`, không duyệt khi còn finding mở; giao bản thảo vào nguồn một lần | R2 Canon Kernel | Không donor có cổng commit | Tốt hơn |
 | 4 | ASSET_ANALYSIS | Một lời gọi theo schema trích nhân vật/cảnh/đạo cụ, bỏ tên đã có, ghi nguyên tử với source revision (`lib/asset_extraction.py`); **không kiểm tên/miêu tả có trong truyện** | Huohuo / DramaClaw | DramaClaw: câu trích phải có nguyên văn trong đoạn, tên phải được truyện viết ra, gộp thận trọng (`structured_extraction.py:285-300,489-512`); ViMax sinh ảnh nghiêng/sau từ ảnh chính diện, lỗi thì dùng ảnh chính diện | Kém hơn ở kiểm chứng nguồn |
 | 5 | EPISODE_PLAN | Cửa sổ planner đến khi mọi tập mục tiêu có trong ledger (`text_adapter.py`) | Huohuo (batch planning) | DramaClaw: schema `EpisodePlan` (khoảng chương, xung đột, cliffhanger, sự kiện, 3–6 nhân vật) + kiểm khoảng hở/chồng lấn tất định — reviewer/fixer chưa nối dây trong checkout (`graph_build.py:188`) | Ngang; thiếu kiểm khoảng hở/chồng lấn |
+| 5b | **Chuyển thể / biên kịch** (chưa có) | Không có công đoạn: narration đọc nguyên văn truyện; chỉ lớp hình được chuyển thể (`prompt_builders_script.py:183-216`) | Huohuo (Adaptation Authority, `R2_02` "Adaptation planning — Huohuo-derived") | huohuo `drama_script_formatter`, nối dây ở `drama-episode-pipeline.ts:400`: đoạn truyện → kịch bản phân cảnh có tiêu đề cảnh, thoại đẩy xung đột, nén dẫn chuyện, cảnh 30–60 giây, tập 1–3 phút, 3–8 cảnh, không đổi kết; dài hơn nguyên văn 20–30% do định dạng, không do thêm tình tiết | **Thiếu** |
 | 6 | SCRIPT_PLAN / SCRIPT | Kế hoạch kịch bản + xác nhận nội dung theo grant, rồi kịch bản cuối; schema có `shot_type`, `camera_motion`, `video_prompt.action`, `image_prompt` | take (shot grammar) + Butterfly (PromptPlan) | huohuo: hợp đồng storyboard `ceil(duration/3)` đoạn prompt 3 giây gắn scene/character id; OpenMontage: kiểm cảnh 5 khía cạnh + biên dịch enum→prompt; DramaClaw: cấm camera tĩnh, tên nhân vật, từ cảm xúc trừu tượng trong prompt keyframe | Ngang về schema; **thiếu ngân sách độ dài lời đọc** (OpenMontage 2,5 từ/giây) |
 | 7 | MEDIA – storyboard | ComfyUI FLUX.2 klein 4B; catalog tham chiếu nhân vật/cảnh qua `@[tên]`; kiểm tất định từng ảnh, làm lại ≤2 lần; best-of-N có sẵn nhưng tắt (judge local chưa qua kiểm định) | ai-short-film (identity) + Butterfly (prompt) | ViMax chọn tối đa 8 ảnh tham chiếu ưu tiên cùng góc máy/gần nhất; DramaClaw lời nhắc khoá danh tính + chặn render beat thiếu nhãn danh tính (`render_identity_guard.py:20-37`); huohuo gói tối đa 6 ảnh tham chiếu | Ngang–kém: có tham chiếu và kiểm từng ảnh (donor không có), thiếu chặn beat thiếu danh tính |
 | 8 | MEDIA – video | Ảnh tĩnh + Ken Burns cục bộ | DramaClaw (media gateway) | huohuo first+last frame tuần tự; ai-short-film nối khung cuối sang shot sau; ViMax chỉ sinh khung cuối khi biến đổi vừa/lớn; DramaClaw `adjust_video_duration` (cắt, giãn ≤1,5×, đóng băng khung cuối) | **Kém hơn rõ nhất** |
@@ -52,10 +56,13 @@ Thang đánh giá so với donor tốt nhất ở công đoạn đó: **Tốt h�
 
 ## 3. Đề xuất theo giá trị trên công sức (suy luận)
 
-1. **Chế độ truyện ngắn theo mục tiêu phim (STORY + SCRIPT).** Tính `story_target_syllables` và số chương từ độ dài mục
-   tiêu và số tập thay vì mặc định 9 000; cho phép dưới 7 000 cho phim ngắn. Dự kiến cắt phần lớn 4 giờ 10 phút. Cơ chế
-   tham khảo: ViMax một lời gọi cho truyện ngắn; huohuo dải độ dài và sàn chống rút ngắn. Công sức: nhỏ–vừa (đổi contract
-   brief nên cần review).
+1. **Công đoạn chuyển thể (biên kịch) giữa truyện và kịch bản.** Truyện giữ nguyên là sản phẩm; mỗi tập phim được chuyển
+   thể từ lát cắt truyện của nó thành kịch bản cho màn hình dọc: hook vài giây đầu, nén dẫn chuyện, thoại/độc thoại đẩy xung
+   đột, kết bằng cliffhanger, không đổi tình tiết và kết thúc. Với narration là "kịch bản lời kể" (nén và dựng lại, không
+   đọc nguyên văn); với drama là kịch bản phân cảnh có thoại (huohuo `drama_script_formatter`). Bản chuyển thể có bằng chứng
+   lineage về đoạn truyện gốc và được reviewer kiểm "trung thành với nguồn". Cùng với đó, kế hoạch tập phủ toàn bộ truyện
+   (DramaClaw `EpisodePlan`: xung đột, cliffhanger, sự kiện chính; kiểm hở/chồng lấn). Công sức: vừa–lớn (công đoạn mới,
+   cần ADR). Giảm thời gian STORY thì bằng model writer mạnh/nhanh hơn, không bằng rút ngắn truyện.
 2. **Ngân sách độ dài lời đọc và khớp thời lượng (SCRIPT + MEDIA).** Kiểm tổng độ dài narration theo mục tiêu (OpenMontage
    2,5 từ/giây; với tiếng Việt cần đo tốc độ VieNeu) trước khi sinh media; khớp clip với độ dài audio như
    `adjust_video_duration` của DramaClaw. Công sức: nhỏ.
