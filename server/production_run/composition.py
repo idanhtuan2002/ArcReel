@@ -41,6 +41,7 @@ from server.production_run.evaluators import OllamaReviewer, QualifiedEvaluator,
 from server.production_run.execution_guard import configure_run_task_authority
 from server.production_run.final_master_adapter import FinalMasterAdapter
 from server.production_run.gemini_reviewer import GeminiReviewer, RoutedReviewer, provider_credentials
+from server.production_run.image_judge import OllamaImageJudge
 from server.production_run.inputs import ProjectInputWitness
 from server.production_run.media_adapter import MediaAdapter
 from server.production_run.packaging_adapter import ExportAdapter, PackagingAdapter
@@ -144,6 +145,15 @@ class ProjectPolicyResolver:
                 "fps": launch.fps,
                 "language": launch.language,
                 "quality_gate": launch.quality_gate,
+                **(
+                    {
+                        "image_candidates": launch.image_selection.candidates,
+                        "image_judge_identity": launch.image_selection.judge_model_identity,
+                        "image_judge_prompt_digest": launch.image_selection.judge_prompt_digest,
+                    }
+                    if launch.image_selection is not None
+                    else {}
+                ),
             }
         )
 
@@ -253,7 +263,9 @@ def build_adapters(
         RunStage.EPISODE_PLAN: EpisodePlanAdapter(sessions, **text),
         RunStage.SCRIPT_PLAN: ScriptPlanAdapter(sessions, **text),
         RunStage.SCRIPT: ScriptAdapter(sessions, **text),
-        RunStage.MEDIA: MediaAdapter(sessions, **text),
+        RunStage.MEDIA: MediaAdapter(
+            sessions, **text, judge=OllamaImageJudge(base_url_for=provider_base_url(sessions))
+        ),
         RunStage.RENDER: RenderAdapter(sessions, **owners),
         RunStage.MASTER: FinalMasterAdapter(sessions, **owners),
         RunStage.QUALITY: QualityAdapter(sessions, **owners, evaluator=evaluator),

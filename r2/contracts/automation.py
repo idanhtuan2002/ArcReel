@@ -132,6 +132,18 @@ class RunPolicy(AutomationContract):
     language: ExactIdentity = "vi"
     #: Frozen from the launch profile: ``record`` exports a rejected final with its REWORK disposition.
     quality_gate: Literal["enforce", "record"] = "enforce"
+    #: Frozen from the launch profile: storyboard versions MEDIA makes for the ranking judge to choose from (ADR-0112).
+    image_candidates: Annotated[StrictInt, Field(ge=1, le=3)] = 1
+    #: The ranking judge's exact model identity and prompt digest when ``image_candidates`` is above 1.
+    image_judge_identity: ExactIdentity | None = None
+    image_judge_prompt_digest: Digest | None = None
+
+    @model_validator(mode="after")
+    def image_selection(self) -> Self:
+        pinned = (self.image_judge_identity is not None, self.image_judge_prompt_digest is not None)
+        if pinned != ((self.image_candidates > 1),) * 2:
+            raise ValueError("storyboard candidates need exactly one pinned ranking judge, and one storyboard none")
+        return self
 
     @model_validator(mode="after")
     def checkpoint_policy(self) -> Self:

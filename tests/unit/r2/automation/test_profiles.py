@@ -1,6 +1,16 @@
 """Launch metadata and reviewer calibration prerequisites are independent of runtime authority."""
 
+import hashlib
+import json
+
 import pytest
+from pydantic import ValidationError
+
+from r2.automation import profiles
+from r2.automation.identity import digest_value, policy_digest
+from r2.automation.profiles import ImageSelection, image_judge_is_qualified
+from r2.contracts.automation import RunPolicy
+from r2.contracts.common import ensure_json_value
 
 
 def test_launch_profiles_pin_output_and_candidate_media_routes():
@@ -73,3 +83,55 @@ def test_qualification_requires_disjoint_calibration_holdout_and_critical_negati
     duplicate = list(cases)
     duplicate[-1] = {**duplicate[-1], "case_digest": cases[0]["case_digest"]}
     assert not reviewer_is_qualified(record.model_copy(update={"cases": tuple(duplicate)}))
+
+
+def _judged(policy_data: dict, **changes) -> dict:
+    return {
+        **policy_data,
+        "image_candidates": 2,
+        "image_judge_identity": "ollama/judge@sha256:" + "2" * 64,
+        "image_judge_prompt_digest": "sha256:" + "3" * 64,
+        **changes,
+    }
+
+
+def test_a_policy_at_the_later_defaults_keeps_its_earlier_digest(policy_data):
+    policy = RunPolicy.model_validate(policy_data)
+    body = policy.model_dump(mode="json")
+    body["checkpoints"] = []
+    for field in ("image_candidates", "image_judge_identity", "image_judge_prompt_digest"):
+        body.pop(field)
+
+    assert policy_digest(policy) == digest_value("r2.production-policy.v1", ensure_json_value(body))
+    assert policy_digest(RunPolicy.model_validate(_judged(policy_data))) != policy_digest(policy)
+
+
+def test_storyboard_candidates_need_exactly_one_pinned_judge(policy_data):
+    assert RunPolicy.model_validate(_judged(policy_data)).image_candidates == 2
+    with pytest.raises(ValidationError):
+        RunPolicy.model_validate(_judged(policy_data, image_judge_identity=None))
+    with pytest.raises(ValidationError):
+        RunPolicy.model_validate({**policy_data, "image_judge_identity": "ollama/judge@sha256:" + "2" * 64})
+
+
+def test_an_image_judge_qualifies_only_through_its_pinned_evidence_file(tmp_path, monkeypatch):
+    monkeypatch.setattr(profiles, "REPOSITORY_ROOT", tmp_path)
+    evidence = {"qualified": True, "model_identity": "ollama/judge", "prompt_digest": "sha256:" + "3" * 64}
+    data = json.dumps(evidence).encode()
+    (tmp_path / "evidence.json").write_bytes(data)
+    selection = ImageSelection(
+        candidates=2,
+        judge_model_identity="ollama/judge",
+        judge_prompt_digest="sha256:" + "3" * 64,
+        qualification_evidence="evidence.json",
+        qualification_digest="sha256:" + hashlib.sha256(data).hexdigest(),
+    )
+
+    assert image_judge_is_qualified(selection) is True
+    assert image_judge_is_qualified(selection.model_copy(update={"judge_model_identity": "other"})) is False
+    assert (
+        image_judge_is_qualified(selection.model_copy(update={"qualification_digest": "sha256:" + "0" * 64})) is False
+    )
+    assert image_judge_is_qualified(selection.model_copy(update={"qualification_evidence": "../outside.json"})) is False
+    (tmp_path / "evidence.json").write_bytes(json.dumps({**evidence, "qualified": False}).encode())
+    assert image_judge_is_qualified(selection) is False

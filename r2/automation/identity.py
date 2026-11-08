@@ -14,10 +14,17 @@ def digest_value(domain: str, body: JSONValue) -> str:
     return "sha256:" + hashlib.sha256(canonical_json_bytes({"domain": domain, "body": body})).hexdigest()
 
 
+_LATER_DEFAULTS = {"image_candidates": 1, "image_judge_identity": None, "image_judge_prompt_digest": None}
+
+
 def policy_digest(policy: RunPolicy) -> str:
     policy = RunPolicy.model_validate(policy)
     body = policy.model_dump(mode="json")
     body["checkpoints"] = sorted(c.value for c in policy.checkpoints or ())
+    # Fields added after runs were frozen leave the digest unchanged at their defaults, so earlier runs keep theirs.
+    for field, default in _LATER_DEFAULTS.items():
+        if body.get(field) == default:
+            body.pop(field, None)
     return digest_value("r2.production-policy.v1", ensure_json_value(body))
 
 

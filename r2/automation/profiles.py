@@ -1,11 +1,33 @@
 """Candidate launch metadata and declared qualification checks, never runtime authority."""
 
+import hashlib
+import json
 from pathlib import Path
 from typing import Literal
 
 from r2.automation.identity import digest_value
-from r2.contracts.automation import AutomationContract, ExactIdentity, ModelRoute, PositiveInt, ReviewerQualification
+from r2.contracts.automation import (
+    AutomationContract,
+    Digest,
+    ExactIdentity,
+    ModelRoute,
+    PositiveInt,
+    ReviewerQualification,
+)
 from r2.contracts.common import ensure_json_value
+
+REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
+
+
+class ImageSelection(AutomationContract):
+    """Best-of-N storyboards with a ranking-only judge (ADR-0112), pinned to the judge's committed qualification."""
+
+    candidates: Literal[2, 3]
+    judge_model_identity: ExactIdentity
+    judge_prompt_digest: Digest
+    #: Repository-relative path of the judge's qualification evidence and that file's sha256 digest.
+    qualification_evidence: ExactIdentity
+    qualification_digest: Digest
 
 
 class LaunchProfile(AutomationContract):
@@ -30,6 +52,8 @@ class LaunchProfile(AutomationContract):
     #: Free disk and schedulable GPU memory one run of this profile needs on the host.
     required_disk_bytes: PositiveInt
     required_gpu_bytes: PositiveInt
+    #: Absent: one storyboard per segment.
+    image_selection: ImageSelection | None = None
 
 
 def resolve_launch_profile(profile_id: str) -> LaunchProfile:
@@ -62,3 +86,23 @@ def reviewer_is_qualified(record: ReviewerQualification) -> bool:
         ):
             return False
     return True
+
+
+def image_judge_is_qualified(selection: ImageSelection) -> bool:
+    """The pinned evidence file exists with its pinned digest and qualifies exactly the pinned judge."""
+    selection = ImageSelection.model_validate(selection)
+    path = (REPOSITORY_ROOT / selection.qualification_evidence).resolve()
+    if not path.is_relative_to(REPOSITORY_ROOT) or not path.is_file():
+        return False
+    data = path.read_bytes()
+    if "sha256:" + hashlib.sha256(data).hexdigest() != selection.qualification_digest:
+        return False
+    try:
+        evidence = json.loads(data)
+    except ValueError:
+        return False
+    return (
+        evidence.get("qualified") is True
+        and evidence.get("model_identity") == selection.judge_model_identity
+        and evidence.get("prompt_digest") == selection.judge_prompt_digest
+    )

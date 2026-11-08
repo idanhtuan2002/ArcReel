@@ -14,11 +14,17 @@ After an automatic QUALITY rework (``quality_gate`` ``enforce``, both reviewers 
 final), the storyboard and then the clip of every segment a MEDIA-repairable finding names are made again once at
 the new generation before ordinary planning; a Human rework regenerates nothing on its own.
 
+When the run's policy asks for several storyboard candidates, MEDIA makes the extra versions of every storyboard one
+round at a time, has the pinned ranking judge (the ``reviewer_a`` route) choose per segment off the lease, restores
+each winner as the current version and records the choices in ``image_selection.json`` beside the episode's render.
+
 Every target's final script is pinned when the stage is planned; a different current script is an external change.
 """
 
 from __future__ import annotations
 
+import asyncio
+import json
 from collections.abc import Awaitable, Callable, Mapping
 from pathlib import Path
 from typing import Any
@@ -29,6 +35,7 @@ from lib.generation_queue import GenerationQueue, get_generation_queue
 from lib.narration_delivery import USE_TTS
 from lib.project_manager import ProjectManager
 from lib.storyboard_sequence import get_storyboard_items
+from lib.version_manager import VersionManager
 from lib.workflow_plan import WorkflowPlan, WorkflowPlanRequest
 from lib.workflow_state import WorkflowActionType
 from r2.automation.assessment import ModelAssessment
@@ -48,6 +55,7 @@ from server.media_tools.context import ToolContext
 from server.media_tools.narration_audio import handle_generate_narration_audio
 from server.media_tools.storyboards import handle_generate_storyboards
 from server.media_tools.videos import handle_generate_videos
+from server.production_run.image_judge import OllamaImageJudge
 from server.production_run.owner_support import (
     OwnerBlocked,
     Sessions,
@@ -60,6 +68,7 @@ from server.production_run.owner_tasks import attempt_window_tasks, tasks_usage
 from server.production_run.ports import StepPlan
 from server.production_run.text_adapter import episode_number, receipt_revision, revision_receipt
 from server.production_run.unit_checks import narration_problem, storyboard_problem
+from server.routers.versions import restore_resource_version
 from server.services.automation_grants import RunAutomationAuthority
 from server.services.workflow_planner import WorkflowPlanner
 from server.tool_runtime import CallerContext, ToolOutcome
@@ -109,6 +118,8 @@ class MediaAdapter:
         queue: GenerationQueue | None = None,
         tools: dict[WorkflowActionType, MediaTool] | None = None,
         max_attempts: int = 2,
+        judge: OllamaImageJudge | None = None,
+        restore: Callable[[str, str, str, int], Awaitable[Any]] | None = None,
     ) -> None:
         self._sessions, self._authority, self._projects, self._resolver = sessions, authority, projects, resolver
         self._planner = planner or WorkflowPlanner(projects)
@@ -117,6 +128,10 @@ class MediaAdapter:
         self._max_attempts = max_attempts
         # Check results by (path, mtime, size): an unchanged file is not decoded again on every poll.
         self._checked: dict[tuple[str, int, int], str | None] = {}
+        self._judge_client = judge
+        self._restore = restore or restore_resource_version
+        # Storyboard selections in flight, off the controller lease, by step command and episode.
+        self._jobs: dict[str, asyncio.Task[dict[str, dict[str, Any]]]] = {}
 
     async def plan(self, *, run: RunSnapshot) -> StepPlan:
         pins = []
@@ -164,6 +179,8 @@ class MediaAdapter:
                     return outcome(intent, "WAIT", owner_state="REWORK_REGENERATING")
                 if await self._redo_failing_units(intent, receipt.digest, plan):
                     return outcome(intent, "WAIT", owner_state="UNIT_REGENERATING")
+                if await self._select_storyboards(intent, receipt.digest, plan, episode):
+                    return outcome(intent, "WAIT", owner_state="STORYBOARDS_SELECTING")
             action = plan.next_action
             if action.type is A.EXPORT or (action.type is A.PLAN_EPISODES and self._episode_media_current(plan)):
                 artifacts = digest_value("r2.production-media-artifacts.v1", ensure_json_value(plan.status.artifacts))
@@ -242,6 +259,108 @@ class MediaAdapter:
             }
         )
 
+    # --- storyboard selection ------------------------------------------------------------------------
+
+    async def _select_storyboards(
+        self, intent: DispatchIntent, subject_digest: str, plan: WorkflowPlan, episode: int
+    ) -> bool:
+        """Make the policy's extra storyboard versions, then let the ranking judge choose; ``True`` while working."""
+        run = await self._run(intent)
+        target = plan.status.target
+        if run is None or target is None or run.policy.image_candidates < 2 or not self._all_made(plan, "storyboards"):
+            return False
+        items, id_field = self._script_items(intent.scope.project_name, target.script_filename)
+        units = [
+            str(item[id_field])
+            for item in items
+            if item.get(id_field) and (item.get("generated_assets") or {}).get("storyboard_image")
+        ]
+        for candidate in range(2, run.policy.image_candidates + 1):
+            pending = [unit for unit in units if not await self._attempts(intent, f"select:{unit}:v{candidate}")]
+            if pending:
+                args: dict[str, Any] = {"script": target.script_filename, "segment_ids": pending}
+                sub_keys = [f"select:{unit}:v{candidate}" for unit in pending]
+                await self._send(intent, subject_digest, sub_keys, A.GENERATE_STORYBOARDS, args, "MEDIA_RETRY_LIMIT")
+                return True
+        undecided = [unit for unit in units if not await self._attempts(intent, f"select:{unit}:chosen")]
+        if not undecided:
+            return False
+        key = f"{intent.identity.command_id}:select:{episode}"
+        job = self._jobs.get(key)
+        if job is None:
+            lines = {str(item[id_field]): str(item.get("novel_text") or "") for item in items if item.get(id_field)}
+            self._jobs[key] = asyncio.create_task(self._judge(run, undecided, lines))
+            return True
+        if not job.done():
+            return True
+        self._jobs.pop(key, None)
+        try:
+            decisions = job.result()
+        except Exception as error:
+            decisions = {unit: {"chosen_version": None, "error": type(error).__name__} for unit in undecided}
+        await self._apply_choices(intent, subject_digest, run, episode, decisions)
+        return True
+
+    async def _judge(self, run: RunSnapshot, units: list[str], lines: Mapping[str, str]) -> dict[str, dict[str, Any]]:
+        """Per segment: the judged candidates (the newest ``image_candidates`` versions that pass their check) and
+        the version the judge chose; with fewer than two usable candidates the current version stays."""
+        route = next((r for r in run.policy.routes if r.role == "reviewer_a"), None)
+        root = self._projects.get_project_path(run.project_name)
+        versions = VersionManager(root)
+        portrait = run.policy.height >= run.policy.width
+        decisions: dict[str, dict[str, Any]] = {}
+        for unit in units:
+            listed = sorted(versions.get_versions("storyboards", unit)["versions"], key=lambda v: v["version"])
+            newest = listed[-run.policy.image_candidates :]
+            usable = [v for v in newest if storyboard_problem(root / v["file"], portrait=portrait) is None]
+            decision: dict[str, Any] = {"candidates": [v["version"] for v in usable], "chosen_version": None}
+            if route is not None and self._judge_client is not None and len(usable) >= 2:
+                pictures = [await asyncio.to_thread((root / v["file"]).read_bytes) for v in usable]
+                choice = await self._judge_client.choose(route, lines.get(unit, ""), pictures)
+                decision.update(chosen_version=usable[choice.index]["version"], rounds=choice.rounds)
+            decisions[unit] = decision
+        return decisions
+
+    async def _apply_choices(
+        self,
+        intent: DispatchIntent,
+        subject_digest: str,
+        run: RunSnapshot,
+        episode: int,
+        decisions: Mapping[str, dict[str, Any]],
+    ) -> None:
+        """Record each segment's choice write-ahead, restore a chosen version that is not current, and keep the
+        choices as evidence beside the episode's render."""
+        root = self._projects.get_project_path(run.project_name)
+        versions = VersionManager(root)
+        subject = await current_subject(self._sessions, intent, subject_digest=subject_digest)
+        for unit, decision in sorted(decisions.items()):
+            async with self._sessions() as session, session.begin():
+                await self._authority.require_locked(session, subject=subject)
+                await ProductionRunRepository(session).record_owner_attempt(
+                    intent=intent, sub_key=f"select:{unit}:chosen"
+                )
+            chosen = decision.get("chosen_version")
+            current = versions.get_versions("storyboards", unit)["current_version"]
+            decision["restored"] = False
+            if isinstance(chosen, int) and chosen != current:
+                await self._restore(run.project_name, "storyboards", unit, chosen)
+                decision["restored"] = True
+        folder = root / "production" / "automation" / run.run_id / f"g{run.generation}" / f"episode_{episode}"
+        folder.mkdir(parents=True, exist_ok=True)
+        evidence = folder / "image_selection.json"
+        recorded = json.loads(evidence.read_text(encoding="utf-8")) if evidence.is_file() else {}
+        recorded.update(
+            {
+                "schema": "r2.production-image-selection.v1",
+                "judge_identity": run.policy.image_judge_identity,
+                "judge_prompt_digest": run.policy.image_judge_prompt_digest,
+                "candidates": run.policy.image_candidates,
+                "segments": {**recorded.get("segments", {}), **decisions},
+            }
+        )
+        evidence.write_text(json.dumps(recorded, ensure_ascii=False, indent=2, sort_keys=True), encoding="utf-8")
+
     # --- unit checks ---------------------------------------------------------------------------------
 
     async def _redo_failing_units(self, intent: DispatchIntent, subject_digest: str, plan: WorkflowPlan) -> bool:
@@ -268,7 +387,11 @@ class MediaAdapter:
                     continue
                 sub_key = f"unit:{collection}:{unit}"
                 if await self._attempts(intent, sub_key) or (
-                    collection == "storyboards" and await self._attempts(intent, f"rework:storyboards:{unit}")
+                    collection == "storyboards"
+                    and (
+                        await self._attempts(intent, f"rework:storyboards:{unit}")
+                        or await self._attempts(intent, f"select:{unit}:chosen")
+                    )
                 ):
                     redone.add(unit)
                 if self._unit_problem(root / path, field, portrait) is not None:

@@ -295,3 +295,42 @@ async def test_model_qualification_alone_does_not_qualify_launch_media_route():
     )
     assert not report.dispatch_allowed
     assert "LAUNCH_PROFILE_NOT_QUALIFIED" in report.blocking_reasons
+
+
+async def test_storyboard_candidates_need_the_launch_profiles_pinned_qualified_judge(monkeypatch):
+    from r2.automation import profiles
+    from server.production_run import preflight
+    from server.production_run.preflight import ProductionPreflight
+
+    frozen, snapshot = complete_snapshot()
+    judge = next(route for route in frozen.routes if route.role == "reviewer_a")
+    selecting = frozen.model_copy(
+        update={
+            "image_candidates": 2,
+            "image_judge_identity": judge.model_identity,
+            "image_judge_prompt_digest": "sha256:" + "3" * 64,
+        }
+    )
+    launch = profiles.resolve_launch_profile(frozen.launch_profile_id)
+
+    async def check(policy, selection, qualified):
+        pinned = launch.model_copy(update={"image_selection": selection})
+        monkeypatch.setattr(preflight, "resolve_launch_profile", lambda _profile_id: pinned)
+        monkeypatch.setattr(preflight, "image_judge_is_qualified", lambda _selection: qualified)
+        report = await ProductionPreflight(SnapshotReader(snapshot)).check(
+            user_id=snapshot.user_id, project_name=snapshot.project_name, policy=policy
+        )
+        return "IMAGE_JUDGE_NOT_QUALIFIED" in report.blocking_reasons
+
+    selection = profiles.ImageSelection(
+        candidates=2,
+        judge_model_identity=judge.model_identity,
+        judge_prompt_digest="sha256:" + "3" * 64,
+        qualification_evidence="docs/evidence.json",
+        qualification_digest="sha256:" + "4" * 64,
+    )
+    assert await check(selecting, selection, True) is False
+    assert await check(selecting, selection, False) is True
+    assert await check(selecting, None, True) is True
+    assert await check(selecting, selection.model_copy(update={"judge_model_identity": "other"}), True) is True
+    assert await check(frozen, None, False) is False

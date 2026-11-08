@@ -3,7 +3,7 @@
 from typing import Protocol
 
 from r2.automation.identity import policy_digest
-from r2.automation.profiles import resolve_launch_profile, reviewer_is_qualified, route_digest
+from r2.automation.profiles import image_judge_is_qualified, resolve_launch_profile, reviewer_is_qualified, route_digest
 from r2.contracts.automation import PreflightReport, PreflightSnapshot, RunPolicy
 from r2.contracts.quality import AssessorClass
 from r2.quality.digests import verify_caches
@@ -120,6 +120,19 @@ class ProductionPreflight:
             ]
             if len(matches) != 1 or not reviewer_is_qualified(matches[0]):
                 reasons.append("MISSING_QUALIFIED_REVIEWER")
+        if policy.image_candidates > 1:
+            # The judge is the run's reviewer_a route; it must be the launch profile's pinned, qualified judge.
+            selection = launch.image_selection if launch is not None else None
+            judge = roles.get("reviewer_a")
+            if (
+                selection is None
+                or judge is None
+                or (policy.image_judge_identity, policy.image_judge_prompt_digest)
+                != (selection.judge_model_identity, selection.judge_prompt_digest)
+                or judge.model_identity != selection.judge_model_identity
+                or not image_judge_is_qualified(selection)
+            ):
+                reasons.append("IMAGE_JUDGE_NOT_QUALIFIED")
         profile = snapshot.profile
         if profile is None:
             reasons.append("MISSING_PUBLISHED_PROFILE")

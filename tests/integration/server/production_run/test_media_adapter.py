@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 import os
 import random
@@ -15,8 +16,9 @@ from lib.project_manager import ProjectManager
 from lib.workflow_plan import WorkflowNarrationDelivery, WorkflowPlan
 from lib.workflow_state import WorkflowActionType, WorkflowNextAction, WorkflowProject, WorkflowStatus, WorkflowTarget
 from r2.automation.assessment import AssessmentFinding, ModelAssessment
-from r2.contracts.automation import RunStage, RunStatus
+from r2.contracts.automation import ModelRoute, RunStage, RunStatus
 from server.production_run.controller import ProductionController
+from server.production_run.image_judge import Choice
 from server.production_run.media_adapter import MediaAdapter
 from server.tool_runtime import ToolOutcome, ToolProblem
 from tests.integration.server.production_run.test_render_master_adapter import RunInput
@@ -454,3 +456,106 @@ async def test_a_human_rework_after_accepting_reviews_regenerates_nothing_on_its
 
     assert (passed.stage, passed.status) == (RunStage.RENDER, RunStatus.RUNNING)
     assert tools.calls == []
+
+
+class Judge:
+    """A ranking judge that prefers each segment's listed candidate index."""
+
+    def __init__(self, prefer: dict[str, int]) -> None:
+        self.prefer, self.calls = prefer, []
+
+    async def choose(self, route, line, pictures):
+        self.calls.append((route.role, line, len(pictures)))
+        index = self.prefer[line]
+        return Choice(index=index, rounds=[{"between": [0, 1], "answers": ["A", "B"], "later_wins": bool(index)}])
+
+
+def _two_versions(script: Path) -> None:
+    root = script.parent.parent
+    versions: dict[str, dict] = {}
+    for unit in ("E1S01", "E1S02"):
+        files = []
+        for version in (1, 2):
+            name = f"versions/storyboards/{unit}_v{version}.png"
+            _storyboard(root / name, blank=False)
+            files.append({"version": version, "file": name, "prompt": "p", "created_at": "2026-11-08T00:00:00Z"})
+        versions[unit] = {"current_version": 2, "versions": files}
+    (root / "versions" / "versions.json").write_text(json.dumps({"storyboards": versions}), encoding="utf-8")
+
+
+async def test_extra_storyboard_versions_are_made_judged_and_the_winner_restored(media_host, monkeypatch):
+    sessions, controller, run, planner, tools, script = media_host
+    _script_with_storyboards(script, blank=set())
+    adapter = controller._adapters[RunStage.MEDIA]
+    judge, restored = Judge({"E1S01": 0, "E1S02": 1}), []
+
+    async def restore(project, resource_type, unit, version):
+        restored.append((resource_type, unit, version))
+
+    adapter._judge_client, adapter._restore = judge, restore
+    judge_route = ModelRoute.model_validate(
+        {
+            "role": "reviewer_a",
+            "provider_id": "custom-1",
+            "model_id": "judge",
+            "model_identity": "ollama/judge@sha256:" + "2" * 64,
+            "config_digest": "sha256:" + "2" * 64,
+            "local": True,
+            "paid": False,
+            "currency": "USD",
+            "max_cost_per_call": None,
+        }
+    )
+    real_run = adapter._run
+
+    async def selecting_run(intent):
+        snapshot = await real_run(intent)
+        policy = snapshot.policy.model_copy(
+            update={
+                "image_candidates": 2,
+                "image_judge_identity": judge_route.model_identity,
+                "image_judge_prompt_digest": "sha256:" + "3" * 64,
+                "routes": (judge_route,),
+            }
+        )
+        return snapshot.model_copy(update={"policy": policy})
+
+    monkeypatch.setattr(adapter, "_run", selecting_run)
+    planned = json.loads(script.read_text(encoding="utf-8"))
+    for item in planned["segments"]:
+        item["novel_text"] = item["segment_id"]
+    script.write_text(json.dumps(planned), encoding="utf-8")
+    planner.plans = [_plan(A.GENERATE_TTS, artifacts=_storyboards_made())]
+
+    extra = await _tick(sessions, controller, run)
+    _two_versions(script)
+    started = await _tick(sessions, controller, run)
+    await asyncio.sleep(0.05)
+    chosen = await _tick(sessions, controller, run)
+    continued = await _tick(sessions, controller, run)
+
+    assert [s.status for s in (extra, started, chosen, continued)] == [RunStatus.WAITING_TASK] * 4
+    assert tools.calls == [
+        (A.GENERATE_STORYBOARDS, {"script": "episode_1.json", "segment_ids": ["E1S01", "E1S02"]}),
+        (A.GENERATE_TTS, {"script": "episode_1.json"}),
+    ]
+    assert judge.calls == [("reviewer_a", "E1S01", 2), ("reviewer_a", "E1S02", 2)]
+    assert restored == [("storyboards", "E1S01", 1)]
+    evidence = json.loads(
+        (
+            script.parent.parent
+            / "production"
+            / "automation"
+            / run.run_id
+            / "g1"
+            / "episode_1"
+            / "image_selection.json"
+        ).read_text(encoding="utf-8")
+    )
+    assert evidence["segments"]["E1S01"] | {"rounds": None} == {
+        "candidates": [1, 2],
+        "chosen_version": 1,
+        "restored": True,
+        "rounds": None,
+    }
+    assert evidence["segments"]["E1S02"]["restored"] is False
