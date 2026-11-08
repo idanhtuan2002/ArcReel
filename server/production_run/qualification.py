@@ -16,6 +16,7 @@ from pathlib import Path
 from lib.config.resolver import ConfigResolver
 from lib.project_manager import ProjectManager
 from r2.automation.assessment import ModelAssessment
+from r2.automation.profiles import resolve_launch_profile
 from r2.contracts.automation import (
     AutomationMode,
     LaunchQualification,
@@ -178,7 +179,7 @@ async def build_record(
     report = await ProductionPreflight(reader).check(user_id=user_id, project_name=project_name, policy=policy)
     if report.blocking_reasons != ONLY_MISSING:
         return None, report.blocking_reasons
-    settings = projects.load_project(project_name)["automation"]
+    launch_profile = resolve_launch_profile(policy.launch_profile_id)
     receipt_ref, digest = evidence_receipt(evidence)
     return (
         LaunchQualification(
@@ -190,8 +191,8 @@ async def build_record(
             launch_profile_id=policy.launch_profile_id,
             profile_digest=policy.profile_digest,
             route_digests=report.route_digests,
-            required_disk_bytes=int(settings["required_disk_bytes"]),
-            required_gpu_bytes=int(settings["required_gpu_bytes"]),
+            required_disk_bytes=launch_profile.required_disk_bytes,
+            required_gpu_bytes=launch_profile.required_gpu_bytes,
         ),
         (),
     )

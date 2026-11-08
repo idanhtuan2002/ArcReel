@@ -14,5 +14,7 @@
   "audio_route": ["custom-2", "vieneu-tts-v3-turbo"],
   "requires_lip_sync": false,
   "support_status": "CANDIDATE",
-  "quality_gate": "record"
+  "quality_gate": "record",
+  "required_disk_bytes": 8589934592,
+  "required_gpu_bytes": 7516192768
 }

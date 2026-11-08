@@ -72,6 +72,10 @@ class _Policies:
         del project_name
         return ()
 
+    async def voice_available(self, project_name: str) -> bool:
+        del project_name
+        return True
+
 
 async def test_preflight_reads_the_launch_record_and_reports_an_unpublished_profile(session_factory, tmp_path) -> None:
     projects = ProjectManager(tmp_path / "projects")

@@ -106,6 +106,17 @@ class ProjectPolicyResolver:
                     ) from None
         return tuple(routes)
 
+    async def voice_available(self, project_name: str) -> bool:
+        """A narration project with an audio route and a resolvable narration voice; drama needs character voices."""
+        project = self._projects.load_project(project_name)
+        settings = project.get("automation")
+        routes = settings.get("routes") if isinstance(settings, dict) else None
+        if project.get("content_mode") != "narration" or not any(
+            isinstance(route, dict) and route.get("role") == "audio" for route in routes or []
+        ):
+            return False
+        return bool((await self._resolver.resolve_narration_voice(project)).strip())
+
     async def resolve(self, *, user_id: str, project_name: str, mode: AutomationMode) -> RunPolicy:
         del user_id
         settings = _automation(self._projects, project_name)
@@ -187,8 +198,6 @@ class HostPreflightReader:
 
     async def read(self, *, user_id: str, project_name: str, policy: RunPolicy) -> PreflightSnapshot:
         project = self._projects.load_project(project_name)
-        raw = project.get("automation")
-        settings: dict = raw if isinstance(raw, dict) else {}
         async with self._sessions() as session:
             qualifications = await ReviewerQualificationRepository(session).qualified(
                 profile_digest=policy.profile_digest,
@@ -200,6 +209,7 @@ class HostPreflightReader:
             )
         profile = await self._profile_reader(user_id, project_name, policy.profile_id)
         mode = str(project.get("content_mode", ""))
+        launch_profile = resolve_launch_profile(policy.launch_profile_id)
         return PreflightSnapshot(
             user_id=user_id,
             project_name=project_name,
@@ -211,11 +221,11 @@ class HostPreflightReader:
             profile=profile,
             qualifications=qualifications,
             launch_qualification=launch,
-            voice_available=bool(settings.get("voice_available", False)),
+            voice_available=await self._policies.voice_available(project_name),
             disk_free_bytes=shutil.disk_usage(self._projects.projects_root).free,
-            required_disk_bytes=int(settings.get("required_disk_bytes", 0)),
+            required_disk_bytes=launch_profile.required_disk_bytes,
             gpu_free_bytes=self._gpu_free(),
-            required_gpu_bytes=int(settings.get("required_gpu_bytes", 0)),
+            required_gpu_bytes=launch_profile.required_gpu_bytes,
             checked_at=datetime.now(UTC),
         )
 

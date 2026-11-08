@@ -27,6 +27,9 @@ class LaunchProfile(AutomationContract):
     #: ``enforce`` exports only a final both reviewers pass; ``record`` (local plumbing profiles, whose models do not
     #: reach release quality) records the quality verdict as the final's disposition and still exports it.
     quality_gate: Literal["enforce", "record"] = "enforce"
+    #: Free disk and schedulable GPU memory one run of this profile needs on the host.
+    required_disk_bytes: PositiveInt
+    required_gpu_bytes: PositiveInt
 
 
 def resolve_launch_profile(profile_id: str) -> LaunchProfile:

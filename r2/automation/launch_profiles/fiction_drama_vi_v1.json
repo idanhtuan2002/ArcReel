@@ -13,5 +13,7 @@
   "video_route": ["custom-3", "wan2.2-ti2v-5b-gguf"],
   "audio_route": ["custom-2", "vieneu-tts-v3-turbo"],
   "requires_lip_sync": true,
-  "support_status": "CANDIDATE"
+  "support_status": "CANDIDATE",
+  "required_disk_bytes": 8589934592,
+  "required_gpu_bytes": 7516192768
 }
