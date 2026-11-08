@@ -14,6 +14,7 @@ from collections import Counter
 from pathlib import Path
 from typing import Any
 
+from pydantic import ValidationError
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from lib.db.models.task import Task
@@ -154,11 +155,14 @@ async def _story_progress(
         receipt = await ProductionRunRepository(session).stage_receipt(run=run, stage=RunStage.STORY)
     if receipt is None or receipt.task_id is None:
         return None
+    # Story progress is supplementary: a story state not written yet or unreadable, or a project folder that is
+    # gone, leaves the block out instead of failing the progress read.
     try:
         state = await RunStateStore(sessions, task_id=str(receipt.task_id)).load()
-    except StoryRunStateConflict:
+        blobs = StoryBlobStore(projects.get_project_path(run.project_name))
+    except (StoryRunStateConflict, ValidationError, FileNotFoundError):
         return None
-    return _story_counts(state, StoryBlobStore(projects.get_project_path(run.project_name)))
+    return _story_counts(state, blobs)
 
 
 MEDIA_PREVIEW_LIMIT = 60

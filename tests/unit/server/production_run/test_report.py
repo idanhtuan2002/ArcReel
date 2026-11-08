@@ -22,7 +22,14 @@ from server.production_run import report as report_module
 from server.production_run.render_adapter import render_dir
 from server.production_run.report import _media, _reviews, _story_counts, pending_final
 from server.story_authoring.artifacts import StoryBlobStore
-from server.story_authoring.runtime import NodeHead, RevisionOutcome, RevisionRecord, StoryLimits, new_run_state
+from server.story_authoring.runtime import (
+    NodeHead,
+    RevisionOutcome,
+    RevisionRecord,
+    RunStateStore,
+    StoryLimits,
+    new_run_state,
+)
 from tests.unit.server.production_run.test_controller import _policy
 
 DIGEST = "sha256:" + "1" * 64
@@ -261,3 +268,26 @@ async def test_a_pending_final_whose_bytes_moved_is_not_previewed(tmp_path, monk
     _repository_with(monkeypatch, outcome)
 
     assert await pending_final(_Sessions(), Projects(tmp_path), _waiting_final(), 1) is None
+
+
+async def test_story_progress_is_left_out_when_the_project_folder_is_gone(tmp_path, monkeypatch):
+    class Repository:
+        def __init__(self, _session) -> None:
+            pass
+
+        async def stage_receipt(self, *, run, stage):
+            return OwnerReceipt(owner="story", receipt_ref="story", digest=DIGEST, task_id="task-1")
+
+    state = _story_state(StoryBlobStore(tmp_path), plans={}, drafted=0)
+
+    async def load(self):
+        return state
+
+    class GoneProjects:
+        def get_project_path(self, name: str):
+            raise FileNotFoundError(name)
+
+    monkeypatch.setattr(report_module, "ProductionRunRepository", Repository)
+    monkeypatch.setattr(RunStateStore, "load", load)
+
+    assert await report_module._story_progress(_Sessions(), GoneProjects(), _run()) is None

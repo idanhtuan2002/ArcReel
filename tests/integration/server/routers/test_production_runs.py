@@ -16,6 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from lib.db.models.production_run import ProductionPolicyModel
 from lib.db.repositories.automation_grants import AutomationGrantRepository
+from lib.db.repositories.production_runs import ProductionRunRepository
 from r2.automation.identity import policy_digest
 from r2.contracts.automation import (
     AutomationMode,
@@ -404,10 +405,19 @@ async def test_a_final_film_review_can_send_the_final_back_to_media_as_a_new_gen
     # Two passes through MEDIA..QUALITY plus the stages before them.
     host.policies.semi_limits = {"max_cost_minor_units": 1000, "max_model_calls": 100, "max_tasks": 100}
     host.owner.states[RunStage.QUALITY] = "PASS"
+    dispatched: list[tuple[str, int]] = []
+    owner_dispatch = host.owner.dispatch
+
+    async def recording_dispatch(intent):
+        dispatched.append((intent.identity.stage.value, intent.identity.generation))
+        return await owner_dispatch(intent)
+
+    host.owner.dispatch = recording_dispatch
     run = (await host.start(mode="semi")).json()
     waiting = await _waiting_review(host, run)
     pending = waiting["pending_review"]
     assert (waiting["stage"], pending["checkpoint"]) == ("QUALITY", "FINAL_FILM"), waiting
+    before_rework = len(dispatched)
     body = {
         "command_id": "review-rework-1",
         "expected_version": waiting["version"],
@@ -426,6 +436,22 @@ async def test_a_final_film_review_can_send_the_final_back_to_media_as_a_new_gen
     again = await _waiting_review(host, run)
     assert again["pending_review"]["checkpoint"] == "FINAL_FILM"
     assert again["pending_review"]["binding_digest"] != pending["binding_digest"]
+    # Every stage from MEDIA to QUALITY ran again as the new generation; nothing before MEDIA ran again.
+    redone = sorted(set(dispatched[before_rework:]), key=lambda item: list(RunStage).index(RunStage(item[0])))
+    generation = waiting["generation"] + 1
+    assert redone == [(stage, generation) for stage in ("MEDIA", "RENDER", "MASTER", "QUALITY")]
+    # Later stages read the new generation's outcomes, not the earlier generation's.
+    async with host.sessions() as session:
+        repository = ProductionRunRepository(session)
+        snapshot = await repository.get(user_id=run["user_id"], project_name=run["project_name"], run_id=run["run_id"])
+        assert snapshot is not None
+        for stage in (RunStage.MEDIA, RunStage.RENDER, RunStage.MASTER):
+            outcome = await repository.stage_outcome(run=snapshot, stage=stage)
+            assert outcome is not None
+            assert outcome.generation == generation
+        script = await repository.stage_outcome(run=snapshot, stage=RunStage.SCRIPT)
+        assert script is not None
+        assert script.generation == waiting["generation"]
 
 
 async def test_rework_is_refused_at_a_checkpoint_before_the_final(host):
