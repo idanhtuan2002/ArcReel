@@ -23,6 +23,7 @@ import type {
   ReferenceBatchGenerateRequest,
   ReferenceGenerationRequestOptions,
 } from "@/types";
+import { isTerminalStatus, type TaskStatus } from "@/types/task";
 import {
   useTasksStore,
   type ImageEditResourceKind,
@@ -412,4 +413,49 @@ export async function enqueueR2Shot(
   );
   notifyEnqueued(false, i18n.t("dashboard:shot_workflow_generate_queued", { id: targetId }));
   return { taskIds: [res.task_id], deduped: false };
+}
+
+/** How often a variant run reads its current task until the task ends. */
+export const VARIANT_POLL_MS = 2000;
+
+/** Reads a task until it ends; resolves with its final status. */
+export async function waitForTask(
+  taskId: string,
+  { pollMs = VARIANT_POLL_MS, signal }: { pollMs?: number; signal?: AbortSignal } = {},
+): Promise<TaskStatus> {
+  for (;;) {
+    if (signal?.aborted) return "cancelled";
+    const task = await API.getTask(taskId);
+    if (isTerminalStatus(task.status)) return task.status;
+    await new Promise((resolve) => setTimeout(resolve, pollMs));
+  }
+}
+
+/**
+ * Makes `count` versions of one asset one after another (the queue keeps a single active task per asset); each
+ * success is a new version in the asset's version history, made with its own random seed, for the owner to pick.
+ * Stops at the first task that does not succeed. Resolves with how many versions were made.
+ */
+export async function makeVariantsInTurn(
+  count: number,
+  enqueueOnce: () => Promise<EnqueueResult>,
+  {
+    wait = waitForTask,
+    onProgress,
+    signal,
+  }: {
+    wait?: (taskId: string, options: { signal?: AbortSignal }) => Promise<TaskStatus>;
+    onProgress?: (made: number, count: number) => void;
+    signal?: AbortSignal;
+  } = {},
+): Promise<number> {
+  let made = 0;
+  for (let index = 0; index < count && !signal?.aborted; index += 1) {
+    const { taskIds } = await enqueueOnce();
+    const [taskId] = taskIds;
+    if (!taskId || (await wait(taskId, { signal })) !== "succeeded") break;
+    made += 1;
+    onProgress?.(made, count);
+  }
+  return made;
 }

@@ -29,6 +29,8 @@ interface ShotSplitViewProps {
   /** 广告/短片分镜顺序调整，resolve 为是否移动成功 */
   onMoveShot?: (shotId: string, direction: "earlier" | "later") => Promise<boolean>;
   onGenerateStoryboard?: (segmentId: string) => void;
+  /** 为同一分镜依次生成多个版本（各用随机 seed），供在版本历史中挑选 */
+  onGenerateStoryboardVariants?: (segmentId: string, count: number) => Promise<void>;
   onGenerateVideo?: (
     segmentId: string,
     requestOptions?: ReferenceGenerationRequestOptions,
@@ -60,6 +62,7 @@ export function ShotSplitView({
   onUpdatePrompt,
   onMoveShot,
   onGenerateStoryboard,
+  onGenerateStoryboardVariants,
   onGenerateVideo,
   onGenerateNarration,
   onRestoreStoryboard,
@@ -164,6 +167,7 @@ export function ShotSplitView({
         onMoveShot={handleMoveShot}
         movePending={movePending}
         onGenerateStoryboard={onGenerateStoryboard}
+        onGenerateStoryboardVariants={onGenerateStoryboardVariants}
         onGenerateVideo={onGenerateVideo}
         onGenerateNarration={onGenerateNarration}
         onRestoreStoryboard={onRestoreStoryboard}

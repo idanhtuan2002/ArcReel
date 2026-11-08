@@ -1,4 +1,5 @@
 import { Sparkles, ImageIcon, Film } from "lucide-react";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { API } from "@/api";
 import { useProjectsStore } from "@/stores/projects-store";
@@ -41,6 +42,8 @@ interface MediaCardProps {
   estimatedCost?: CostBreakdown;
   /** 触发生成 */
   onGenerate?: () => void;
+  /** 依次生成 count 个版本供挑选；提供时在生成按钮下显示「生成多个版本」入口 */
+  onGenerateVariants?: (count: number) => Promise<void>;
   /** 版本恢复回调；未提供时不显示版本入口（只读展示无版本可回滚） */
   onRestore?: () => Promise<void> | void;
   /** 自主上传回调（替换该分镜的分镜图/视频）；未提供时不显示上传入口 */
@@ -52,6 +55,9 @@ interface MediaCardProps {
   /** 分镜编辑所需的剧集文件；提供时（且 kind=storyboard、已有图）显示编辑入口 */
   editScriptFile?: string | null;
 }
+
+/** 一次「生成多个版本」做几个版本：本地出图约一分钟一张，三张够挑又不久等 */
+const VARIANT_COUNT = 3;
 
 const UPLOAD_ACCEPT: Record<MediaKind, string> = {
   storyboard: UPLOAD_IMAGE_ACCEPT,
@@ -71,6 +77,7 @@ export function MediaCard({
   generating,
   estimatedCost,
   onGenerate,
+  onGenerateVariants,
   onRestore,
   onUpload,
   uploading,
@@ -102,7 +109,17 @@ export function MediaCard({
     kind === "storyboard" ? "storyboards" : "videos";
   // uploadDisabled 是本卡片之外的互斥占用（如同一分镜另一张卡在上传中）；
   // 编辑/版本恢复/生成同样写这个资源，须一并禁用，否则会与占用中的写操作并发冲突。
-  const resourceBusy = generating || uploading || uploadDisabled;
+  const [makingVariants, setMakingVariants] = useState(false);
+  const resourceBusy = generating || uploading || uploadDisabled || makingVariants;
+  const makeVariants = async () => {
+    if (!onGenerateVariants) return;
+    setMakingVariants(true);
+    try {
+      await onGenerateVariants(VARIANT_COUNT);
+    } finally {
+      setMakingVariants(false);
+    }
+  };
 
   return (
     <div>
@@ -225,6 +242,17 @@ export function MediaCard({
               ~{formatCost(estimatedCost)}
             </span>
           )}
+        </button>
+      )}
+      {!hideGenerateButton && onGenerateVariants && !demoReadOnly && (
+        <button
+          type="button"
+          onClick={() => void makeVariants()}
+          disabled={generateDisabled || resourceBusy}
+          className="mt-1.5 inline-flex w-full items-center justify-center gap-1.5 rounded-[10px] px-3.5 py-1.5 text-[12px] transition-opacity focus-ring disabled:cursor-not-allowed disabled:opacity-50"
+          style={{ color: "var(--color-text-2)", border: "1px solid var(--color-hairline-strong)" }}
+        >
+          {makingVariants ? t("media_variants_making", { n: VARIANT_COUNT }) : t("media_variants", { n: VARIANT_COUNT })}
         </button>
       )}
     </div>

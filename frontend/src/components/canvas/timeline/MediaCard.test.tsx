@@ -106,3 +106,23 @@ describe("MediaCard in the demo workbench", () => {
     expect(getByRole("button", { name: /重新生成分镜/ })).toBeInTheDocument();
   });
 });
+
+describe("MediaCard variants", () => {
+  it("makes three versions to choose from and stays busy until they are made", async () => {
+    let finish: () => void = () => undefined;
+    const onGenerateVariants = vi.fn(() => new Promise<void>((resolve) => (finish = resolve)));
+    const { getByRole, findByRole } = renderCard({ onGenerate: vi.fn(), onGenerateVariants });
+
+    fireEvent.click(getByRole("button", { name: "生成 3 个版本供挑选" }));
+
+    expect(onGenerateVariants).toHaveBeenCalledWith(3);
+    expect(await findByRole("button", { name: "正在依次生成 3 个版本…" })).toBeDisabled();
+    finish();
+    expect(await findByRole("button", { name: "生成 3 个版本供挑选" })).toBeEnabled();
+  });
+
+  it("offers no variants without a handler", () => {
+    const { queryByRole } = renderCard({ onGenerate: vi.fn() });
+    expect(queryByRole("button", { name: "生成 3 个版本供挑选" })).not.toBeInTheDocument();
+  });
+});

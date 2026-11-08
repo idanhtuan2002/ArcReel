@@ -46,6 +46,7 @@ import {
   enqueueProp,
   enqueueScene,
   enqueueStoryboard,
+  makeVariantsInTurn,
   enqueueVideo,
 } from "@/actions/generation";
 import { buildEntityRevisionKey } from "@/utils/project-changes";
@@ -256,6 +257,30 @@ export function StudioCanvasRouter() {
       useAppStore.getState().pushToast(tRef.current("generate_storyboard_failed", { message: errMsg(err) }), "error");
     }
   }, [currentProjectName, currentScripts]);
+
+  const handleGenerateStoryboardVariants = useCallback(
+    async (segmentId: string, count: number, scriptFile?: string) => {
+      if (!currentProjectName || !currentScripts) return;
+      const resolved = resolveSegmentPrompt(currentScripts, segmentId, "image_prompt", scriptFile);
+      if (!resolved) return;
+      try {
+        const made = await makeVariantsInTurn(count, () =>
+          enqueueStoryboard(
+            currentProjectName,
+            segmentId,
+            resolved.prompt as string | Record<string, unknown>,
+            resolved.resolvedFile,
+          ),
+        );
+        useAppStore
+          .getState()
+          .pushToast(tRef.current("storyboard_variants_done", { made, n: count, id: segmentId }), made ? "success" : "error");
+      } catch (err) {
+        useAppStore.getState().pushToast(tRef.current("generate_storyboard_failed", { message: errMsg(err) }), "error");
+      }
+    },
+    [currentProjectName, currentScripts],
+  );
 
   const handleGenerateVideo = useCallback(async (
     segmentId: string,
@@ -944,6 +969,7 @@ export function StudioCanvasRouter() {
                     onUpdatePrompt={awaitedUpdatePrompt}
                     onMoveShot={isAd ? handleMoveShot : undefined}
                     onGenerateStoryboard={voidPromise(handleGenerateStoryboard)}
+                    onGenerateStoryboardVariants={handleGenerateStoryboardVariants}
                     onGenerateVideo={handleGenerateVideo}
                     onGenerateNarration={voidPromise(handleGenerateNarration)}
                     onGenerateEpisodeNarration={voidPromise(handleGenerateEpisodeNarration)}

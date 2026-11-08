@@ -85,6 +85,8 @@ interface ShotDetailProps {
   /** 分镜重排请求在途，移动按钮禁用 */
   movePending?: boolean;
   onGenerateStoryboard?: (segmentId: string) => void;
+  /** 为同一分镜依次生成多个版本（各用随机 seed），供在版本历史中挑选 */
+  onGenerateStoryboardVariants?: (segmentId: string, count: number) => Promise<void>;
   onGenerateVideo?: (
     segmentId: string,
     requestOptions?: ReferenceGenerationRequestOptions,
@@ -447,6 +449,7 @@ export function ShotDetail({
   onMoveShot,
   movePending,
   onGenerateStoryboard,
+  onGenerateStoryboardVariants,
   onGenerateVideo,
   onGenerateNarration,
   onRestoreStoryboard,
@@ -1088,6 +1091,9 @@ export function ShotDetail({
         generating={generatingStoryboard}
         estimatedCost={sbEstimate ?? undefined}
         onGenerate={onGenerateStoryboard ? () => onGenerateStoryboard(segmentId) : undefined}
+        onGenerateVariants={
+          onGenerateStoryboardVariants ? (count) => onGenerateStoryboardVariants(segmentId, count) : undefined
+        }
         onRestore={onRestoreStoryboard}
         onUpload={
           scriptFile && !refsReadOnly ? (file) => handleUpload("storyboard", file) : undefined

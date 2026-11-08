@@ -28,6 +28,8 @@ import {
   enqueueReferenceVideoUnit,
   enqueueScene,
   enqueueStoryboard,
+  makeVariantsInTurn,
+  waitForTask,
   enqueueVideo,
 } from "@/actions/generation";
 
@@ -604,5 +606,61 @@ describe("enqueueReferenceVideoBatch", () => {
     );
 
     expect(markCounts()).toEqual({ resource: 0, scriptFile: 0 });
+  });
+});
+
+describe("makeVariantsInTurn", () => {
+  it("makes the versions one after another and stops at the first task that does not succeed", async () => {
+    const order: string[] = [];
+    let next = 0;
+    const enqueueOnce = vi.fn(async () => {
+      next += 1;
+      order.push(`enqueue ${next}`);
+      return { taskIds: [`task-${next}`], deduped: false };
+    });
+    const statuses: Record<string, "succeeded" | "failed"> = {
+      "task-1": "succeeded",
+      "task-2": "succeeded",
+      "task-3": "failed",
+    };
+    const wait = vi.fn(async (taskId: string) => {
+      order.push(`wait ${taskId}`);
+      return statuses[taskId];
+    });
+    const onProgress = vi.fn();
+
+    const made = await makeVariantsInTurn(4, enqueueOnce, { wait, onProgress });
+
+    expect(made).toBe(2);
+    expect(order).toEqual(["enqueue 1", "wait task-1", "enqueue 2", "wait task-2", "enqueue 3", "wait task-3"]);
+    expect(onProgress.mock.calls).toEqual([
+      [1, 4],
+      [2, 4],
+    ]);
+  });
+
+  it("stops before the next version once aborted", async () => {
+    const controller = new AbortController();
+    const enqueueOnce = vi.fn(async () => ({ taskIds: ["t"], deduped: false }));
+    const wait = vi.fn(async () => {
+      controller.abort();
+      return "succeeded" as const;
+    });
+
+    expect(await makeVariantsInTurn(3, enqueueOnce, { wait, signal: controller.signal })).toBe(1);
+    expect(enqueueOnce).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("waitForTask", () => {
+  it("reads the task until it ends", async () => {
+    const getTask = vi
+      .spyOn(API, "getTask")
+      .mockResolvedValueOnce({ status: "queued" } as Awaited<ReturnType<typeof API.getTask>>)
+      .mockResolvedValueOnce({ status: "running" } as Awaited<ReturnType<typeof API.getTask>>)
+      .mockResolvedValueOnce({ status: "succeeded" } as Awaited<ReturnType<typeof API.getTask>>);
+
+    expect(await waitForTask("t1", { pollMs: 0 })).toBe("succeeded");
+    expect(getTask).toHaveBeenCalledTimes(3);
   });
 });

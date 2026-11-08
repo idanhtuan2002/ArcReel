@@ -41,6 +41,8 @@ interface TimelineCanvasProps {
   /** 广告/短片分镜顺序调整（向前/向后移动一位），resolve 为是否移动成功 */
   onMoveShot?: (shotId: string, direction: "earlier" | "later", scriptFile?: string) => Promise<boolean>;
   onGenerateStoryboard?: (segmentId: string, scriptFile?: string) => void;
+  /** 为同一分镜依次生成多个版本（各用随机 seed），供在版本历史中挑选 */
+  onGenerateStoryboardVariants?: (segmentId: string, count: number, scriptFile?: string) => Promise<void>;
   onGenerateVideo?: (
     segmentId: string,
     scriptFile?: string,
@@ -89,6 +91,7 @@ export function TimelineCanvas(props: TimelineCanvasProps) {
     onUpdatePrompt,
     onMoveShot,
     onGenerateStoryboard,
+    onGenerateStoryboardVariants,
     onGenerateVideo,
     onGenerateNarration,
     onGenerateEpisodeNarration,
@@ -217,6 +220,9 @@ export function TimelineCanvas(props: TimelineCanvasProps) {
   // 而非渲染一个点了没反应的按钮。
   const handleGenSb = onGenerateStoryboard
     ? (segId: string) => onGenerateStoryboard(segId, scriptFile)
+    : undefined;
+  const handleGenSbVariants = onGenerateStoryboardVariants
+    ? (segId: string, count: number) => onGenerateStoryboardVariants(segId, count, scriptFile)
     : undefined;
   const handleGenVid = onGenerateVideo
     ? (segId: string, requestOptions?: ReferenceGenerationRequestOptions) =>
@@ -356,6 +362,7 @@ export function TimelineCanvas(props: TimelineCanvasProps) {
                 onUpdatePrompt={handleUpdatePrompt}
                 onMoveShot={handleMoveShot}
                 onGenerateStoryboard={handleGenSb}
+                onGenerateStoryboardVariants={handleGenSbVariants}
                 onGenerateVideo={handleGenVid}
                 onGenerateNarration={handleGenNarration}
                 onRestoreStoryboard={onRestoreStoryboard}
