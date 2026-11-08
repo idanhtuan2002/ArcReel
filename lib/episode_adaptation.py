@@ -65,8 +65,10 @@ class AdaptationError(RuntimeError):
 
 def adaptation_mode(project: Mapping[str, Any] | None) -> AdaptationMode:
     """``screen`` only when the project asks for it and is a narration or drama project; otherwise ``verbatim``."""
-    if not isinstance(project, Mapping) or project.get("content_mode") not in {"narration", "drama"}:
+    mode = project.get("content_mode") if isinstance(project, Mapping) else None
+    if not isinstance(mode, str) or mode not in {"narration", "drama"}:
         return "verbatim"
+    assert isinstance(project, Mapping)
     return "screen" if project.get(SETTING) == "screen" else "verbatim"
 
 
@@ -156,7 +158,11 @@ class AdaptationInputs:
 def read_inputs(project_path: Path, project: Mapping[str, Any], episode: int) -> AdaptationInputs:
     """Everything an adaptation of ``episode`` reads; raises :class:`AdaptationError` without a source slice."""
     mode = project.get("content_mode")
-    if mode not in {"narration", "drama"}:
+    if mode == "narration":
+        film: Literal["narration", "drama"] = "narration"
+    elif mode == "drama":
+        film = "drama"
+    else:
         raise AdaptationError("only narration and drama projects are adapted")
     path = episode_source_path(project_path, episode)
     if not path.is_file():
@@ -183,7 +189,7 @@ def read_inputs(project_path: Path, project: Mapping[str, Any], episode: int) ->
     characters = project.get("characters")
     return AdaptationInputs(
         episode=episode,
-        mode=mode,
+        mode=film,
         language=language,
         source=source,
         outline=outline,

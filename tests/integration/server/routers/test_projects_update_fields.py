@@ -196,6 +196,22 @@ class TestProjectsRouter:
             assert resp.status_code == 200
             assert "episode_target_duration" not in fake_pm.project_data["ready"]
 
+    def test_update_project_sets_and_clears_episode_adaptation(self, tmp_path, monkeypatch):
+        """PATCH 分集改编（ADR-0114）：screen 写入，null 清除回到 verbatim，非法值 422。"""
+        fake_pm = _FakePM(tmp_path)
+        client = build_projects_client(monkeypatch, fake_pm)
+        with client:
+            resp = client.patch("/api/v1/projects/ready", json={"episode_adaptation": "screen"})
+            assert resp.status_code == 200
+            assert fake_pm.project_data["ready"]["episode_adaptation"] == "screen"
+
+            resp = client.patch("/api/v1/projects/ready", json={"episode_adaptation": "rewrite"})
+            assert resp.status_code == 422
+
+            resp = client.patch("/api/v1/projects/ready", json={"episode_adaptation": None})
+            assert resp.status_code == 200
+            assert "episode_adaptation" not in fake_pm.project_data["ready"]
+
     @pytest.mark.parametrize("bad", [5, 900, 0, -30])
     def test_update_project_rejects_out_of_range_episode_target_duration(self, tmp_path, monkeypatch, bad):
         fake_pm = _FakePM(tmp_path)

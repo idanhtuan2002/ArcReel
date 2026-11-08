@@ -19,7 +19,13 @@ from r2.automation.identity import derive_step_identity, policy_digest
 from r2.contracts.automation import DispatchIntent, RunScope, RunSnapshot, RunStage
 from server.production_run import text_adapter
 from server.production_run.owner_support import OwnerBlocked
-from server.production_run.text_adapter import EpisodePlanAdapter, ScriptAdapter, ScriptPlanAdapter, revision_receipt
+from server.production_run.text_adapter import (
+    AdaptationAdapter,
+    EpisodePlanAdapter,
+    ScriptAdapter,
+    ScriptPlanAdapter,
+    revision_receipt,
+)
 from tests.unit.server.production_run.test_controller import _policy
 
 REVISION = "sha256:" + "5" * 64
@@ -350,3 +356,38 @@ async def test_a_quarantined_draft_no_failed_task_of_the_run_left_stays_for_the_
         await adapter.inspect(intent=intent, receipt=intent.input_refs[0])
     assert draft.exists()
     assert tasks.submitted == []
+
+
+class _Basis:
+    def basis(self) -> str:
+        return "sha256:" + "ab" * 32
+
+
+async def test_a_verbatim_project_passes_adaptation_with_that_fact_as_evidence(tasks, monkeypatch):
+    adapter = _adapter(AdaptationAdapter, Statuses({1: [_status(A.PREPARE_SCRIPT_PLAN)]}), monkeypatch)
+    intent = _intent(RunStage.ADAPTATION)
+    passed = await adapter.inspect(intent=intent, receipt=intent.input_refs[0])
+    assert passed.kind == "PASS"
+    assert [r.receipt_ref for r in passed.receipts] == ["episode:1:adaptation@verbatim"]
+    assert tasks.submitted == []
+
+
+async def test_an_episode_to_adapt_runs_one_task_per_basis_and_a_spent_task_blocks(tasks, monkeypatch):
+    monkeypatch.setattr(text_adapter, "read_inputs", lambda path, project, episode: _Basis())
+    adapter = _adapter(AdaptationAdapter, Statuses({1: [_status(A.ADAPT_EPISODE)]}), monkeypatch)
+    intent = _intent(RunStage.ADAPTATION)
+    waiting = await adapter.inspect(intent=intent, receipt=intent.input_refs[0])
+    assert waiting.kind == "WAIT"
+    key = "adaptation:1:" + "ab" * 12
+    assert tasks.submitted == [(key, "text_episode_adaptation", {"episode": 1, "projects_root": "/projects"})]
+    for attempt in range(1, 4):
+        tasks.tasks[key if attempt == 1 else f"{key}#attempt-{attempt}"] = {"status": "failed"}
+    with pytest.raises(OwnerBlocked, match="ADAPTATION_FAILED"):
+        await adapter.inspect(intent=intent, receipt=intent.input_refs[0])
+
+
+async def test_script_planning_after_a_stale_adaptation_is_an_external_change(tasks, monkeypatch):
+    adapter = _adapter(ScriptPlanAdapter, Statuses({1: [_status(A.ADAPT_EPISODE)]}), monkeypatch)
+    intent = _intent(RunStage.SCRIPT_PLAN)
+    with pytest.raises(OwnerBlocked, match="EXTERNAL_INPUT_CHANGED"):
+        await adapter.inspect(intent=intent, receipt=intent.input_refs[0])

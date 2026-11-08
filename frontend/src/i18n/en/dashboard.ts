@@ -1638,6 +1638,7 @@ export default {
   'tool_name_discard_draft': 'Discard draft',
   'tool_name_get_video_capabilities': 'Query video model capabilities',
   'tool_name_plan_episodes': 'Plan episodes',
+  'tool_name_adapt_episode': 'Adapt episode',
   'tool_name_reset_episode_planning': 'Reset episode planning',
   'tool_name_patch_episode_script': 'Edit script',
   'tool_name_patch_episode_meta': 'Edit episode title',
