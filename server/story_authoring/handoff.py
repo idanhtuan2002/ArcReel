@@ -26,6 +26,7 @@ from enum import StrEnum
 from pathlib import Path
 from typing import Literal
 
+from lib.episode_ledger import is_derived_episode_name
 from lib.project_manager import resolve_source_kind
 from server.story_authoring.artifacts import StoryBlobStore
 from server.story_authoring.commit import load_offered_manifest
@@ -90,8 +91,24 @@ def narration_source(markdown: str) -> str:
     return "\n\n".join([title, *paragraphs] if title else paragraphs) + "\n"
 
 
-def _choose_filename(title: str, export_digest: str, source_dir: Path, text: str) -> str:
-    base = slug_filename(title)
+def _after_existing(title: str, source_dir: Path) -> str | None:
+    """A name that sorts after every story file already in ``source_dir`` (``~`` sorts after letters, digits, ``.``
+    and ``-``), so a continuation is planned after the parts before it; ``None`` in an empty directory."""
+    names = sorted(
+        path.stem
+        for path in (source_dir.iterdir() if source_dir.is_dir() else ())
+        if path.is_file()
+        and path.suffix in {".txt", ".md"}
+        and not path.name.startswith(("_", "."))
+        and not is_derived_episode_name(path.name)
+    )
+    if not names:
+        return None
+    return f"{names[-1]}~{Path(slug_filename(title)).stem}.md"
+
+
+def _choose_filename(title: str, export_digest: str, source_dir: Path, text: str, *, after: bool = False) -> str:
+    base = (_after_existing(title, source_dir) if after else None) or slug_filename(title)
     existing = _source_text(source_dir / (Path(base).stem + SOURCE_SUFFIX))
     if existing is None or existing == text:
         return base
@@ -109,6 +126,7 @@ async def send_to_video(
     upload: SourceUpload,
     on_conflict: OnConflict = "fail",
     clock: Callable[[], datetime] = lambda: datetime.now(UTC),
+    after_existing: bool = False,
 ) -> HandoffRecord:
     state = await store.load()
     if state.handoff is not None and state.handoff.done:
@@ -133,7 +151,7 @@ async def send_to_video(
         raise HandoffRefused(HandoffRefusal.ALREADY_HANDED_OFF, f"a hand-off as {pending.filename} is in progress")
     if pending is None:
         title = text.splitlines()[0].removeprefix("# ") if text else ""
-        filename = _choose_filename(title, manifest.export_digest, source_dir, source)
+        filename = _choose_filename(title, manifest.export_digest, source_dir, source, after=after_existing)
         pending = HandoffRecord(command_id=command_id, filename=filename, export_digest=manifest.export_digest)
         pending = await _record_pending(store, pending)
 

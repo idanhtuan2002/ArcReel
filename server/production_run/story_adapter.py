@@ -18,6 +18,7 @@ import json
 import math
 from collections.abc import Callable
 from pathlib import Path
+from typing import Literal
 
 from lib.db.repositories.task_repo import TaskRepository
 from lib.project_manager import ProjectManager
@@ -54,7 +55,7 @@ from server.story_authoring.contracts import StoryLimits
 from server.story_authoring.driver import StoryBrief
 from server.story_authoring.handoff import STORY_SOURCE_LANGUAGE, HandoffRefused, SourceUpload, send_to_video
 from server.story_authoring.runtime import RunPhase, RunState, RunStateStore
-from server.story_authoring.service import StoryActionRefused, StoryAuthoringService
+from server.story_authoring.service import StoryActionRefused, StoryAuthoringService, brief_idea
 
 STORY_GENRE = "truyện ngắn"
 # Share of the run's caps the story may spend; the rest belongs to script, media and Quality.
@@ -126,15 +127,28 @@ class BriefAdapter:
         command = await start_command(self._sessions, intent)
         # Quality reviewers never take part in writing, so the story's own reviews use the writer route.
         writer = route_for(run, "writer")
-        if writer is None or command.idea is None:
+        if writer is None:
             raise OwnerBlocked("MISSING_MODEL_ROLE")
+        # ADR-0115: a continuation reads this project's story; a variant reads its source project's.
+        prior_mode: Literal["continuation", "variant"] | None = (
+            "continuation"
+            if command.story_source == "continue"
+            else "variant"
+            if command.story_source == "variant"
+            else None
+        )
         try:
+            idea = brief_idea(command.idea, command.variant_profile)
             drafted = await self._stories.draft_brief(
-                idea=command.idea,
+                idea=idea,
                 genre=STORY_GENRE,
                 provider_id=writer[0],
                 model_id=writer[1],
                 max_cost_minor_units=max(1, min(10_000, run.policy.max_cost_minor_units)),
+                project_name=run.project_name,
+                prior_mode=prior_mode,
+                prior_project=command.source_project,
+                prior_origin=command.variant_profile or "instruction",
             )
         except StoryActionRefused as refused:
             raise OwnerBlocked(refused.code) from None
@@ -362,6 +376,7 @@ class HandoffAdapter:
                 command_id=intent.identity.command_id,
                 upload=self._upload_for(intent),
                 on_conflict="rename",
+                after_existing=(await start_command(self._sessions, intent)).story_source == "continue",
             )
         except HandoffRefused as refused:
             raise OwnerBlocked(f"HANDOFF_{refused.code.value}") from None

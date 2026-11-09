@@ -55,7 +55,10 @@ class StartBody(_Body):
     mode: AutomationMode = AutomationMode.AUTO
     #: Required unless ``story_source`` is ``project`` (the story already in the project's sources, ADR-0115).
     idea: str | None = Field(default=None, min_length=1, max_length=4000)
-    story_source: Literal["idea", "project"] = "idea"
+    story_source: Literal["idea", "project", "continue", "variant"] = "idea"
+    #: A variant reads this project's story (ADR-0115) and may apply a named variant profile.
+    source_project: str | None = Field(default=None, min_length=1)
+    variant_profile: str | None = Field(default=None, min_length=1)
     targets: tuple[str, ...] = ("episode:1",)
     expected_input_digest: str = Field(pattern=_DIGEST)
     policy_digest: str = Field(pattern=_DIGEST)
@@ -231,6 +234,8 @@ async def start_run(
             idea=body.idea,
             targets=body.targets,
             story_source=body.story_source,
+            source_project=body.source_project,
+            variant_profile=body.variant_profile,
         )
     except ValueError as error:
         raise _invalid() from error

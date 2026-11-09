@@ -21,7 +21,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
@@ -31,6 +31,7 @@ from lib.db.models.task import Task
 from lib.db.repositories.custom_provider_repo import CustomProviderRepository
 from lib.db.repositories.gates import GreenlightRepository
 from lib.db.repositories.task_repo import STORY_RUN_TASK_TYPE, TaskRepository
+from lib.episode_ledger import discover_sources
 from r2.host_hardening.paid_routes import PaidRouteUnqualifiedError
 from r2.narrative_lifecycle.errors import NarrativeDecisionAuthorizationError
 from server.story_authoring.artifacts import StoryBlobStore
@@ -38,10 +39,11 @@ from server.story_authoring.authority import GrantNarrativeShowrunnerAuthority
 from server.story_authoring.cloud import CLOUD_ADAPTERS, OPENAI_ENDPOINT, OPENAI_MAX_INPUT_BOUND
 from server.story_authoring.commit import ManuscriptCommitter, load_offered_manifest
 from server.story_authoring.contracts import OLLAMA_CHAT_ENDPOINT, StoryLimits, StoryModelSelection
-from server.story_authoring.driver import CHAPTERS, StoryBrief, run_call_bound, story_bible_input
+from server.story_authoring.driver import CHAPTERS, StoryBrief, StoryPrior, run_call_bound, story_bible_input
 from server.story_authoring.handoff import OnConflict, SourceUpload, send_to_video, upload_in_flight
 from server.story_authoring.narrative import StoryIdentity
 from server.story_authoring.pipeline import intent_targets, node_kind
+from server.story_authoring.prompts.prior import MAX_PRIOR_CHUNKS
 from server.story_authoring.prompts.schemas import StorySeed, StyleBibleOut
 from server.story_authoring.routes import max_prices, resolve_cloud_route, story_routes, validate_cloud_brief
 from server.story_authoring.runtime import (
@@ -54,6 +56,7 @@ from server.story_authoring.runtime import (
     reopen_unconverged,
     set_phase,
 )
+from server.story_authoring.variant_profiles import profile_instruction
 
 type Factory = async_sessionmaker[AsyncSession]
 
@@ -100,6 +103,25 @@ class StoryRunRef:
     brief: StoryBrief
 
 
+def is_continuation(brief: StoryBrief) -> bool:
+    """A continuation's manuscript is handed to video after the parts already in the project (ADR-0115)."""
+    return brief.prior is not None and brief.prior.mode == "continuation"
+
+
+def brief_idea(idea: str | None, variant_profile: str | None) -> str:
+    """The idea a brief carries: the author's text, a named variant profile's instruction, or both."""
+    try:
+        instruction = profile_instruction(variant_profile) if variant_profile else None
+    except KeyError:
+        raise StoryActionRefused(
+            "VARIANT_PROFILE_UNKNOWN", f"no variant profile {variant_profile!r}", status=422
+        ) from None
+    parts = [part for part in (instruction, idea) if part]
+    if not parts:
+        raise StoryActionRefused("IDEA_REQUIRED", "a brief needs an idea or a variant profile", status=422)
+    return "\n\n".join(parts)
+
+
 def run_id_for(gate_a_decision_id: str) -> str:
     return "story-" + hashlib.sha256(gate_a_decision_id.encode("utf-8")).hexdigest()[:24]
 
@@ -131,9 +153,18 @@ class StoryAuthoringService:
         judge_provider_id: str | None = None,
         judge_model_id: str | None = None,
         max_cost_minor_units: int = 500,
+        project_name: str | None = None,
+        prior_mode: Literal["continuation", "variant"] | None = None,
+        prior_project: str | None = None,
+        prior_origin: str = "instruction",
     ) -> StoryBrief:
         """The brief with its frozen routes; its digest is what the Human greenlights at Gate A. A judge route is
-        optional; without one the writer's route also reviews."""
+        optional; without one the writer's route also reviews.
+
+        With ``prior_mode`` the run reads a story that already exists (ADR-0115): a continuation reads
+        ``project_name``'s own sources and writes the next part; a variant reads ``prior_project``'s sources and
+        writes another version of that story into ``project_name``. ``idea`` is then the author's direction or the
+        variant instruction. The prior text is stored in ``project_name``'s blob store and named in the brief."""
         if (judge_provider_id is None) != (judge_model_id is None):
             raise StoryActionRefused("ROUTE_INCOMPLETE", "a judge route needs both a provider and a model", status=422)
         selection = await self._selection(provider_id, model_id)
@@ -170,6 +201,35 @@ class StoryAuthoringService:
                     "cloud_prices": max_prices(tuple(profiles)),
                 }
             )
+        prior = None
+        if prior_mode is not None:
+            if project_name is None or (prior_mode == "variant") != (prior_project is not None):
+                raise StoryActionRefused(
+                    "PRIOR_SOURCE_INVALID", "a continuation reads its own project, a variant another one", status=422
+                )
+            source_project = prior_project if prior_mode == "variant" else project_name
+            assert source_project is not None
+            docs = discover_sources(self._project_dir_for(source_project))
+            text = "\n\n".join(doc.text.strip() for doc in docs if doc.text.strip())
+            if not text:
+                raise StoryActionRefused("PRIOR_STORY_MISSING", "the source project has no story text", status=409)
+            digest = StoryBlobStore(self._project_dir_for(project_name)).put(text.encode("utf-8"))
+            prior = StoryPrior(
+                mode=prior_mode,
+                text_digest=digest,
+                part=len(docs) + 1 if prior_mode == "continuation" else 2,
+                origin=prior_origin,
+            )
+            extra_calls = (MAX_PRIOR_CHUNKS + 1) * 3
+            limits = limits.model_copy(
+                update={
+                    "generate_calls_max": limits.generate_calls_max + extra_calls,
+                    "count_calls_max": limits.count_calls_max + extra_calls,
+                    "input_tokens_max": limits.input_tokens_max + extra_calls * limits.max_input_tokens,
+                    "output_tokens_max": limits.output_tokens_max + extra_calls * limits.max_output_tokens,
+                    "wall_clock_max_seconds": limits.wall_clock_max_seconds + extra_calls * SECONDS_PER_CALL,
+                }
+            )
         return StoryBrief(
             idea=idea,
             genre=genre,
@@ -178,6 +238,7 @@ class StoryAuthoringService:
             judge_selection=judge if judge != selection else None,
             limits=limits,
             cloud_profiles=tuple(profiles),
+            prior=prior,
         )
 
     async def list_routes(self) -> list[dict[str, Any]]:
@@ -499,6 +560,7 @@ class StoryAuthoringService:
             upload=upload,
             on_conflict=on_conflict,
             clock=self._clock,
+            after_existing=is_continuation(ref.brief),
         )
 
     # --- helpers -----------------------------------------------------------------------------------

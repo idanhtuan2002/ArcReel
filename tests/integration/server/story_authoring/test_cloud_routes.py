@@ -11,7 +11,7 @@ from server.story_authoring.cloud import OPENAI_MAX_INPUT_BOUND
 from server.story_authoring.contracts import CloudPriceBounds
 from server.story_authoring.driver import StoryBrief
 from server.story_authoring.routes import resolve_cloud_route, story_routes, validate_cloud_brief
-from server.story_authoring.service import StoryAuthoringService
+from server.story_authoring.service import StoryActionRefused, StoryAuthoringService
 
 
 async def _configure(factory, key="fixture-key"):
@@ -304,3 +304,83 @@ async def test_a_custom_cloud_story_route_still_needs_its_paid_route_qualificati
         await resolve_cloud_route(db_factory, provider_id, "brand-new-model")
     finally:
         set_qualification_lookup(None)
+
+
+async def _local_route(factory) -> str:
+    from lib.db.repositories.custom_provider_repo import CustomProviderRepository
+
+    async with factory() as session:
+        provider = await CustomProviderRepository(session).create_provider(
+            display_name="Ollama",
+            discovery_format="ollama",
+            base_url="http://127.0.0.1:11434",
+            api_key="",
+            models=[{"model_id": "writer", "display_name": "w", "endpoint": "ollama-chat", "is_enabled": True}],
+        )
+        await session.commit()
+        return f"custom-{provider.id}"
+
+
+async def test_a_continuation_brief_stores_the_projects_story_and_a_variant_reads_another(db_factory, tmp_path):
+    from server.story_authoring.artifacts import StoryBlobStore
+
+    projects = {"film": tmp_path / "film", "origin": tmp_path / "origin"}
+    for path in projects.values():
+        (path / "source").mkdir(parents=True)
+    (projects["film"] / "source" / "truyen.txt").write_text("Minh về làng.", encoding="utf-8")
+    (projects["origin"] / "source" / "goc.txt").write_text("Lan mở tiệm thuốc.", encoding="utf-8")
+    service = StoryAuthoringService(
+        session_factory=db_factory, authority=object(), project_dir_for=projects.__getitem__
+    )
+    route = await _local_route(db_factory)
+
+    continuation = await service.draft_brief(
+        idea="Minh đi tìm người lạ.",
+        genre="đời thường",
+        provider_id=route,
+        model_id="writer",
+        project_name="film",
+        prior_mode="continuation",
+    )
+    assert continuation.prior is not None
+    assert (continuation.prior.mode, continuation.prior.part) == ("continuation", 2)
+    stored = StoryBlobStore(projects["film"]).read_exact(continuation.prior.text_digest).decode("utf-8")
+    assert stored == "Minh về làng."
+    assert (
+        continuation.limits.generate_calls_max
+        > (
+            await service.draft_brief(idea="x", genre="g", provider_id=route, model_id="writer")
+        ).limits.generate_calls_max
+    )
+
+    variant = await service.draft_brief(
+        idea="Kể ở ngôi thứ nhất.",
+        genre="đời thường",
+        provider_id=route,
+        model_id="writer",
+        project_name="film",
+        prior_mode="variant",
+        prior_project="origin",
+        prior_origin="first-person",
+    )
+    assert variant.prior is not None
+    assert (
+        StoryBlobStore(projects["film"]).read_exact(variant.prior.text_digest).decode("utf-8") == "Lan mở tiệm thuốc."
+    )
+    assert variant.prior.origin == "first-person"
+
+    (projects["origin"] / "source" / "goc.txt").write_text("   ", encoding="utf-8")
+    with pytest.raises(StoryActionRefused, match="PRIOR_STORY_MISSING"):
+        await service.draft_brief(
+            idea="x",
+            genre="g",
+            provider_id=route,
+            model_id="writer",
+            project_name="film",
+            prior_mode="variant",
+            prior_project="origin",
+        )
+    with pytest.raises(StoryActionRefused, match="PRIOR_SOURCE_INVALID"):
+        await service.draft_brief(
+            idea="x", genre="g", provider_id=route, model_id="writer", project_name="film", prior_mode="variant"
+        )

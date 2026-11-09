@@ -41,6 +41,7 @@ from server.auth import get_current_interactive_user
 from server.production_run.ports import InputWitness, PolicyResolver, PreflightCheck
 from server.services.automation_grants import AutomationGrantCustodian
 from server.services.governance_startup import GovernanceStartupUnavailable
+from server.story_authoring.variant_profiles import PROFILES
 
 _TERMINAL = {RunStatus.SUCCEEDED, RunStatus.FAILED, RunStatus.FAILED_QUALITY, RunStatus.CANCELLED}
 _ACTIVE = {RunStatus.PENDING, RunStatus.RUNNING, RunStatus.WAITING_TASK}
@@ -248,8 +249,12 @@ class ProductionRunService:
                 raise ProductionRunRefused("POLICY_MOVED")
             if len(set(command.targets)) != len(command.targets) or len(command.targets) > policy.max_target_episodes:
                 raise ProductionRunRefused("TARGETS_OVER_LIMIT", 422, (str(policy.max_target_episodes),))
-            if command.story_source == "project" and not await self._has_story(command.project_name):
+            if command.story_source in {"project", "continue"} and not await self._has_story(command.project_name):
                 raise ProductionRunRefused("PROJECT_SOURCE_MISSING", 409)
+            if command.source_project is not None and not await self._has_story(command.source_project):
+                raise ProductionRunRefused("PRIOR_STORY_MISSING", 409)
+            if command.variant_profile is not None and command.variant_profile not in PROFILES:
+                raise ProductionRunRefused("VARIANT_PROFILE_UNKNOWN", 422)
             current_input = await self._witness.digest(user_id=command.user_id, project_name=command.project_name)
             if current_input != command.expected_input_digest:
                 raise ProductionRunRefused("INPUT_MOVED")

@@ -23,7 +23,8 @@ from server.story_authoring.commit import CommitRefused
 from server.story_authoring.driver import StoryBrief
 from server.story_authoring.handoff import STORY_SOURCE_LANGUAGE, HandoffRefused, OnConflict
 from server.story_authoring.runtime import RunState
-from server.story_authoring.service import StoryActionRefused, StoryAuthoringService
+from server.story_authoring.service import StoryActionRefused, StoryAuthoringService, brief_idea
+from server.story_authoring.variant_profiles import PROFILES
 from server.tool_runtime import (
     CallerContext,
     ProjectScope,
@@ -53,7 +54,7 @@ class _Request(BaseModel):
 
 
 class DraftBriefRequest(_Request):
-    idea: str = Field(min_length=1, max_length=4000)
+    idea: str | None = Field(default=None, min_length=1, max_length=4000)
     genre: str = Field(min_length=1, max_length=200)
     provider_id: str = Field(min_length=1)
     model_id: str = Field(min_length=1)
@@ -61,6 +62,11 @@ class DraftBriefRequest(_Request):
     judge_provider_id: str | None = Field(default=None, min_length=1)
     judge_model_id: str | None = Field(default=None, min_length=1)
     max_cost_minor_units: int = Field(default=500, ge=1, le=10_000)
+    #: ADR-0115: continue this project's story, or write a variant of ``prior_project``'s story here. A variant
+    #: may name a ``variant_profile`` instead of writing its instruction in ``idea``.
+    prior_mode: Literal["continuation", "variant"] | None = None
+    prior_project: str | None = Field(default=None, min_length=1)
+    variant_profile: str | None = Field(default=None, min_length=1)
 
 
 class StartRunRequest(_Request):
@@ -119,8 +125,9 @@ async def available_story_routes(_user: CurrentUser, service: Service) -> dict:
 async def draft_brief(project_name: str, req: DraftBriefRequest, _user: CurrentUser, service: Service) -> dict:
     """The brief and the digest the Human greenlights through ``POST /gates/greenlight``."""
     try:
+        idea = brief_idea(req.idea, req.variant_profile)
         brief = await service.draft_brief(
-            idea=req.idea,
+            idea=idea,
             genre=req.genre,
             provider_id=req.provider_id,
             model_id=req.model_id,
@@ -128,10 +135,22 @@ async def draft_brief(project_name: str, req: DraftBriefRequest, _user: CurrentU
             judge_provider_id=req.judge_provider_id,
             judge_model_id=req.judge_model_id,
             max_cost_minor_units=req.max_cost_minor_units,
+            project_name=project_name,
+            prior_mode=req.prior_mode,
+            prior_project=req.prior_project,
+            prior_origin=req.variant_profile or "instruction",
         )
     except REFUSALS as error:
         raise _refusal(error) from error
     return {"project_name": project_name, "brief": brief.model_dump(mode="json"), "brief_digest": brief.digest()}
+
+
+@router.get("/system/config/story-variant-profiles")
+async def story_variant_profiles(_user: CurrentUser) -> dict:
+    """The named variant profiles an automatic or manual variant may apply."""
+    return {
+        "profiles": [{"id": p.profile_id, "label": p.label, "instruction": p.instruction} for p in PROFILES.values()]
+    }
 
 
 @router.post("/projects/{project_name}/story-runs")

@@ -55,6 +55,39 @@ BRIEF = StoryBrief(
     limits=LIMITS,
 )
 
+PRIOR_TEXT = (
+    "Minh về làng sau mười năm. Lan, em gái anh, giữ căn nhà của cha.\n\n"
+    "Hai anh em tìm thấy cuốn sổ nợ trong hòm áo cũ. Trang cuối ghi tên một người lạ.\n\n"
+    "Đêm đó, có tiếng gõ cửa. Minh mở cửa và không thấy ai, chỉ có một phong thư."
+)
+PRIOR_SUMMARY = {
+    "events": ["Minh về làng.", "Hai anh em tìm thấy sổ nợ.", "Có người để lại phong thư."],
+    "characters": [{"name": "Minh", "state": "đang cầm phong thư"}, {"name": "Lan", "state": "lo lắng"}],
+    "open_threads": ["Ai để lại phong thư?"],
+    "places": ["căn nhà của cha"],
+}
+CANON_LOCK = {
+    "title_hint": "Căn nhà cũ",
+    "genre": "đời thường",
+    "tone": "trầm",
+    "pov": "ngôi thứ ba",
+    "characters": [
+        {
+            "name": name,
+            "role": "nhân vật",
+            "relation_to_protagonist": "anh em",
+            "description": "người làng",
+            "current_state": "ở nhà cha",
+        }
+        for name in ("Minh", "Lan", "Tuấn")
+    ],
+    "places": [],
+    "chapter_events": ["Minh về làng.", "Có phong thư."],
+    "open_threads": ["Ai để lại phong thư?"],
+    "ending_state": "Minh cầm phong thư trước cửa.",
+    "style_notes": "câu ngắn",
+}
+
 ACTIONS = (
     "đẩy cánh cổng gỗ",
     "nhìn giàn mướp khô",
@@ -239,6 +272,10 @@ class ScriptedModel:
             return {"patches": [], "notes": "không sửa"}
         if kind == "rewrites":
             return {"rewrites": []}
+        if kind == "events":
+            return PRIOR_SUMMARY
+        if kind == "title_hint":
+            return CANON_LOCK
         raise AssertionError(f"unscripted request kind {kind}")
 
     async def handler(self, request: httpx.Request) -> httpx.Response:
@@ -252,6 +289,8 @@ class ScriptedModel:
                 k
                 for k in (
                     *STRUCTURED,
+                    "events",
+                    "title_hint",
                     "confirmed",
                     "ending_resolves_conflict",
                     "issues",
@@ -1202,3 +1241,64 @@ async def test_a_scene_the_review_asks_to_rewrite_twice_has_calls_for_each_rewri
     assert len(state.intents[scene_draft(1, 3)]) == 2
     rounds = {a.step_id.rsplit("#", 1)[0] for a in state.attempts if a.step_id.startswith(scene_draft(1, 3))}
     assert rounds == {f"{scene_draft(1, 3)}@r0.0.0", f"{scene_draft(1, 3)}@r0.0.0+1", f"{scene_draft(1, 3)}@r0.0.0+2"}
+
+
+def _prior_driver(factory, store, model, blobs, mode):
+    from server.story_authoring.driver import StoryPrior
+
+    digest = blobs.put(PRIOR_TEXT.encode("utf-8"))
+    brief = BRIEF.model_copy(update={"prior": StoryPrior(mode=mode, text_digest=digest)})
+    client = OllamaChatClient(base_url="http://ollama:1", transport=httpx.MockTransport(model.handler))
+    sink = StoryAttemptSink(store=store, session_factory=factory, provider_id="custom-ollama", model_id=MODEL)
+    gateway = AuthoringTextGateway(selection=SELECTION, limits=LIMITS, client=client, sink=sink)
+    driver = StoryRunDriver(
+        identity=IDENTITY,
+        brief=brief,
+        store=store,
+        gateway=gateway,
+        blobs=blobs,
+        clock=lambda: NOW,
+        retry_delays=(0, 0),
+    )
+    return driver, brief
+
+
+async def test_a_continuation_reads_the_prior_story_and_opens_where_it_ended(concurrent_session_factory, tmp_path):
+    store = await _store(concurrent_session_factory)
+    model = ScriptedModel()
+    blobs = StoryBlobStore(tmp_path)
+    driver, brief = _prior_driver(concurrent_session_factory, store, model, blobs, "continuation")
+
+    state = await driver.run()
+
+    assert state.phase is RunPhase.READY_FOR_APPROVAL, state.block_reason
+    assert (model.calls["events"], model.calls["title_hint"]) == (1, 1)
+    lock = json.loads(blobs.read_exact(state.revisions[state.node("canon_lock").head_revision_id].digest))
+    assert [c["name"] for c in lock["characters"]] == ["Minh", "Lan"]  # "Tuấn" is never named in the prior text
+    seed_prompt = next(prompt for kind, prompt in model.prompts if kind == "working_title")
+    assert "PHẦN 2" in seed_prompt
+    assert "Ai để lại phong thư?" in seed_prompt
+    assert all("BẢN KHÓA CANON" in prompt for kind, prompt in model.prompts if kind in {"logline", "story_arc"})
+    prose = [prompt for kind, prompt in model.prompts if kind == "prose"]
+    assert "PHẦN TRƯỚC KẾT THÚC" in prose[0]
+    assert "chỉ có một phong thư" in prose[0]
+    assert not any("PHẦN TRƯỚC KẾT THÚC" in prompt for prompt in prose[1:])
+    assert "prior" in brief.model_dump(mode="json")
+
+
+async def test_a_variant_reads_the_whole_story_and_never_opens_on_its_ending(concurrent_session_factory, tmp_path):
+    store = await _store(concurrent_session_factory)
+    model = ScriptedModel()
+    blobs = StoryBlobStore(tmp_path)
+    driver, _ = _prior_driver(concurrent_session_factory, store, model, blobs, "variant")
+
+    state = await driver.run()
+
+    assert state.phase is RunPhase.READY_FOR_APPROVAL, state.block_reason
+    seed_prompt = next(prompt for kind, prompt in model.prompts if kind == "working_title")
+    assert "PHIÊN BẢN KHÁC" in seed_prompt
+    assert not any("PHẦN TRƯỚC KẾT THÚC" in prompt for kind, prompt in model.prompts if kind == "prose")
+
+
+def test_a_brief_without_a_prior_keeps_its_digest():
+    assert "prior" not in BRIEF.model_dump(mode="json")

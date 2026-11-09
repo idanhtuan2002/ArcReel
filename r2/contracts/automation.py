@@ -315,16 +315,36 @@ class RunCommand(AutomationContract):
     targets: tuple[ExactIdentity, ...] = ("episode:1",)
     #: ``idea`` writes a new story first; ``project`` films the story already in the project's sources (ADR-0115).
     #: Left out of the stored command at its default, so earlier commands keep their digests.
-    story_source: Literal["idea", "project"] = Field(default="idea", exclude_if=lambda value: value == "idea")
+    #: ``continue`` writes the next part of the project's story; ``variant`` writes, into this project, another
+    #: version of ``source_project``'s story (an instruction in ``idea``, a ``variant_profile``, or both).
+    story_source: Literal["idea", "project", "continue", "variant"] = Field(
+        default="idea", exclude_if=lambda value: value == "idea"
+    )
+    source_project: ExactIdentity | None = Field(default=None, exclude_if=lambda value: value is None)
+    variant_profile: ExactIdentity | None = Field(default=None, exclude_if=lambda value: value is None)
 
     @model_validator(mode="after")
     def command_shape(self) -> Self:
         if self.action == "START":
             if self.run_id is not None or self.expected_version != 0:
                 raise ValueError("start requires the genesis version")
-            if (self.idea is None) != (self.story_source == "project"):
-                raise ValueError("start requires an idea, or the project's story without one")
-        elif self.run_id is None or self.expected_version < 1 or self.idea is not None or self.story_source != "idea":
+            variant = self.story_source == "variant"
+            if self.story_source == "project" and self.idea is not None:
+                raise ValueError("a run of the project's story takes no idea")
+            if self.story_source in {"idea", "continue"} and self.idea is None:
+                raise ValueError("start requires an idea")
+            if variant and self.idea is None and self.variant_profile is None:
+                raise ValueError("a variant requires an instruction (idea) or a profile")
+            if variant != (self.source_project is not None) or (not variant and self.variant_profile is not None):
+                raise ValueError("only a variant names its source project and profile")
+        elif (
+            self.run_id is None
+            or self.expected_version < 1
+            or self.idea is not None
+            or self.story_source != "idea"
+            or self.source_project is not None
+            or self.variant_profile is not None
+        ):
             raise ValueError("control requires an exact existing run")
         if not self.targets or len(set(self.targets)) != len(self.targets):
             raise ValueError("target selection must be nonempty and unique")

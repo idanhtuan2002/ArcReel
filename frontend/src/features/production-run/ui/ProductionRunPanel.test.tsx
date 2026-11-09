@@ -4,6 +4,7 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vite
 import { ApiRequestError } from "@/api";
 import i18n from "@/i18n";
 
+import { API } from "@/api";
 import * as client from "../api/productionRunClient";
 import type { RunList, RunSnapshot } from "../api/types";
 import { ProductionRunPanel } from "./ProductionRunPanel";
@@ -88,6 +89,36 @@ describe("ProductionRunPanel", () => {
     const command = startProductionRun.mock.calls[0][1];
     expect(command).toMatchObject({ story_source: "project", targets: ["episode:1"] });
     expect(command).not.toHaveProperty("idea");
+  });
+
+  it("starts a variant of another project's story with a named profile", async () => {
+    vi.spyOn(client, "listProductionRuns").mockResolvedValue({ start: OFFER, runs: [] });
+    vi.spyOn(API, "listProjects").mockResolvedValue({
+      projects: [
+        { name: "alpha", title: "Alpha" },
+        { name: "origin", title: "Truyện gốc" },
+      ],
+    } as never);
+    vi.spyOn(API, "request").mockResolvedValue({
+      profiles: [{ id: "first-person", label: "Ngôi thứ nhất", instruction: "Kể ở ngôi thứ nhất." }],
+    } as never);
+    const startProductionRun = vi.spyOn(client, "startProductionRun").mockResolvedValue(snapshot());
+    render(<ProductionRunPanel projectName="alpha" />);
+    fireEvent.click(await screen.findByLabelText("A variant of another project's story"));
+    const button = screen.getByRole("button", { name: "Start" });
+    expect(button).toBeDisabled();
+    fireEvent.change(await screen.findByLabelText("Story from"), { target: { value: "origin" } });
+    await screen.findByRole("option", { name: "Ngôi thứ nhất" });
+    fireEvent.change(screen.getByLabelText("Variant profile"), { target: { value: "first-person" } });
+    expect(screen.queryByRole("option", { name: "Alpha" })).not.toBeInTheDocument();
+    fireEvent.click(button);
+
+    expect(startProductionRun.mock.calls[0][1]).toMatchObject({
+      story_source: "variant",
+      source_project: "origin",
+      variant_profile: "first-person",
+    });
+    expect(startProductionRun.mock.calls[0][1]).not.toHaveProperty("idea");
   });
 
   it("shows exactly the pending semi checkpoint and sends its binding", async () => {

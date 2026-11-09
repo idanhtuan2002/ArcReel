@@ -132,7 +132,12 @@ export interface RunSummary {
 }
 
 export interface DraftBriefRequest {
-  idea: string;
+  /** Optional for a variant that names a profile. */
+  idea?: string;
+  /** ADR-0115: continue this project's story, or write a variant of ``prior_project``'s story here. */
+  prior_mode?: "continuation" | "variant";
+  prior_project?: string;
+  variant_profile?: string;
   genre: string;
   provider_id: string;
   model_id: string;

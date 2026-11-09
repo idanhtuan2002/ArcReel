@@ -57,6 +57,7 @@ class StoryStepKind(StrEnum):
     CHAPTER_REVIEW = "CHAPTER_REVIEW"
     MANUSCRIPT_REVIEW = "MANUSCRIPT_REVIEW"
     PACKAGING = "PACKAGING"
+    PRIOR_READING = "PRIOR_READING"
 
 
 class OutputMode(StrEnum):

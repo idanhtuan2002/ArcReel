@@ -294,6 +294,36 @@ async def test_a_run_from_the_projects_story_needs_no_idea_and_starts_at_asset_a
     assert started.json()["stage"] == "ASSET_ANALYSIS"
 
 
+@pytest.mark.parametrize(
+    ("changes", "status", "code"),
+    [
+        ({"story_source": "continue"}, 422, None),
+        ({"story_source": "variant", "idea": "Ngôi thứ nhất."}, 422, None),
+        (
+            {"story_source": "variant", "source_project": "origin", "variant_profile": "nope"},
+            422,
+            "VARIANT_PROFILE_UNKNOWN",
+        ),
+        ({"story_source": "variant", "source_project": "origin", "variant_profile": "first-person"}, 200, None),
+        ({"story_source": "continue", "idea": "Minh đi tìm người lạ."}, 200, None),
+    ],
+)
+async def test_continuation_and_variant_starts_name_what_they_need(host, changes, status, code):
+    offer = (await host.http.get(BASE, headers=host.headers)).json()["start"]
+    body = {
+        "command_id": "start-prior-" + str(abs(hash(str(changes)))),
+        "expected_input_digest": offer["input_digest"],
+        "policy_digest": offer["policy_digests"]["auto"],
+        **changes,
+    }
+    response = await host.http.post(BASE, json=body, headers=host.headers)
+    assert response.status_code == status, response.text
+    if code is not None:
+        assert response.json()["detail"]["code"] == code
+    if status == 200:
+        assert response.json()["stage"] == "BRIEF"
+
+
 @pytest.mark.parametrize("moved", ["input", "policy", "preflight"])
 async def test_start_refuses_moved_input_policy_or_failed_preflight(host, moved):
     offer = (await host.http.get(BASE, headers=host.headers)).json()["start"]

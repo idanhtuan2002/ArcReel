@@ -38,6 +38,7 @@ import {
   type StoryRoute,
   type StoryRun,
 } from "../api/storyClient";
+import { StorySourcePicker, type StorySource } from "@/features/production-run/ui/StorySourcePicker";
 
 const POLL_MS = 15_000;
 const TARGET_MIN = 7000;
@@ -246,6 +247,9 @@ function NewStory({
   const draftKey = `story-draft:${projectName}`;
   const ids = { idea: useId(), genre: useId(), writer: useId(), judge: useId(), target: useId(), cloudBudget: useId() };
   const [idea, setIdea] = useState(() => readDraft(draftKey).idea);
+  const [source, setSource] = useState<StorySource>("idea");
+  const [sourceProject, setSourceProject] = useState("");
+  const [variantProfile, setVariantProfile] = useState("");
   const [genre, setGenre] = useState(() => readDraft(draftKey).genre);
   const [routes, setRoutes] = useState<StoryRoute[] | null>(null);
   const [routesError, setRoutesError] = useState<string | null>(null);
@@ -289,7 +293,7 @@ function NewStory({
   const cloudCents = Math.round(Number(cloudBudget) * 100);
   const budgetValid = !usesCloud || (/^\d+(\.\d{1,2})?$/.test(cloudBudget) && cloudCents >= 1 && cloudCents <= 10000);
   const ready = Boolean(
-    idea.trim() &&
+    (source === "variant" ? sourceProject && (variantProfile || idea.trim()) : idea.trim()) &&
     genre.trim() &&
     writerRoute?.enabled &&
     (!judge || judgeRoute?.enabled) &&
@@ -316,7 +320,15 @@ function NewStory({
         draftBrief(
           projectName,
           {
-            idea: idea.trim(),
+            ...(idea.trim() ? { idea: idea.trim() } : {}),
+            ...(source === "continue" ? { prior_mode: "continuation" as const } : {}),
+            ...(source === "variant"
+              ? {
+                  prior_mode: "variant" as const,
+                  prior_project: sourceProject,
+                  ...(variantProfile ? { variant_profile: variantProfile } : {}),
+                }
+              : {}),
             genre: genre.trim(),
             provider_id: writerRoute.provider_id,
             model_id: writerRoute.model_id,
@@ -400,13 +412,23 @@ function NewStory({
       <form onSubmit={(event) => void prepare(event)} className="mt-3 space-y-3">
         <fieldset disabled={busy} className="space-y-3">
           <legend className="sr-only">{t("story_new_title")}</legend>
+          <StorySourcePicker
+            projectName={projectName}
+            source={source}
+            onSource={setSource}
+            sourceProject={sourceProject}
+            onSourceProject={setSourceProject}
+            profile={variantProfile}
+            onProfile={setVariantProfile}
+            sources={["idea", "continue", "variant"]}
+          />
           <div>
             <label htmlFor={ids.idea} className="block text-[11px] text-text-3">
               {t("story_field_idea")}
             </label>
             <textarea
               id={ids.idea}
-              required
+              required={source !== "variant"}
               rows={5}
               maxLength={4000}
               value={idea}

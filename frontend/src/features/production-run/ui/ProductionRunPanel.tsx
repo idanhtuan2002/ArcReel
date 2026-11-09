@@ -28,6 +28,7 @@ import { AutomationReadiness } from "./AutomationReadiness";
 import { AutomationSettingsEditor } from "./AutomationSettingsEditor";
 import { RunMediaStrip } from "./RunMediaStrip";
 import { RunReportDetails } from "./RunReportDetails";
+import { StorySourcePicker, type StorySource } from "./StorySourcePicker";
 import { formatDuration, stageTimes, totalTime } from "./runTimeline";
 
 const POLL_MS = 5000;
@@ -103,7 +104,12 @@ export function ProductionRunPanel({ projectName }: Props) {
     [],
   );
   const [idea, setIdea] = useState("");
-  const [fromProject, setFromProject] = useState(false);
+  const [source, setSource] = useState<StorySource>("idea");
+  const [sourceProject, setSourceProject] = useState("");
+  const [variantProfile, setVariantProfile] = useState("");
+  const canStart =
+    source === "project" ||
+    (source === "variant" ? Boolean(sourceProject) && Boolean(variantProfile || idea.trim()) : Boolean(idea.trim()));
   const [mode, setMode] = useState<AutomationMode>("auto");
   const [episodes, setEpisodes] = useState(1);
   const [historyFilter, setHistoryFilter] = useState<HistoryFilter>("all");
@@ -191,11 +197,14 @@ export function ProductionRunPanel({ projectName }: Props) {
   );
 
   const start = () => {
-    if (!offer?.input_digest || !offer.policy_digests || (!fromProject && !idea.trim())) return;
+    if (!offer?.input_digest || !offer.policy_digests || !canStart) return;
     const command = {
       command_id: newCommandId(),
       mode,
-      ...(fromProject ? { story_source: "project" as const } : { idea: idea.trim() }),
+      ...(source !== "project" && idea.trim() ? { idea: idea.trim() } : {}),
+      ...(source !== "idea" ? { story_source: source } : {}),
+      ...(source === "variant" ? { source_project: sourceProject } : {}),
+      ...(source === "variant" && variantProfile ? { variant_profile: variantProfile } : {}),
       targets: Array.from({ length: episodes }, (_, index) => `episode:${index + 1}`),
       expected_input_digest: offer.input_digest,
       policy_digest: offer.policy_digests[mode],
@@ -314,24 +323,18 @@ export function ProductionRunPanel({ projectName }: Props) {
             start();
           }}
         >
-          <fieldset className="flex flex-wrap gap-3 text-[12px]" style={{ color: "var(--color-text-2)" }}>
-            <legend className="sr-only">{t("auto_story_source")}</legend>
-            <label className="flex items-center gap-1.5">
-              <input type="radio" checked={!fromProject} onChange={() => setFromProject(false)} />
-              {t("auto_story_from_idea")}
-            </label>
-            <label className="flex items-center gap-1.5">
-              <input type="radio" checked={fromProject} onChange={() => setFromProject(true)} />
-              {t("auto_story_from_project")}
-            </label>
-          </fieldset>
-          {fromProject ? (
-            <p className="text-[12px]" style={{ color: "var(--color-text-3)" }}>
-              {t("auto_story_from_project_hint")}
-            </p>
-          ) : (
+          <StorySourcePicker
+            projectName={projectName}
+            source={source}
+            onSource={setSource}
+            sourceProject={sourceProject}
+            onSourceProject={setSourceProject}
+            profile={variantProfile}
+            onProfile={setVariantProfile}
+          />
+          {source !== "project" && (
           <label className="block text-[12px]" style={{ color: "var(--color-text-2)" }}>
-            {t("auto_idea_label")}
+            {t(source === "idea" ? "auto_idea_label" : `auto_idea_label_${source}`)}
             <textarea
               className="focus-ring mt-1 block w-full rounded-md px-2 py-1.5 text-[12.5px]"
               style={{ border: "1px solid var(--color-hairline-strong)", background: "transparent" }}
@@ -342,7 +345,7 @@ export function ProductionRunPanel({ projectName }: Props) {
             />
           </label>
           )}
-          {!fromProject && (
+          {source === "idea" && (
           <div className="flex flex-wrap items-center gap-1.5 text-[11.5px]">
             <span style={{ color: "var(--color-text-3)" }}>{t("auto_examples")}</span>
             {EXAMPLE_IDEAS.map((key) => (
@@ -386,7 +389,7 @@ export function ProductionRunPanel({ projectName }: Props) {
               </select>
             </label>
           )}
-          <button type="submit" className={BUTTON_CLS} style={PRIMARY_STYLE} disabled={busy || (!fromProject && !idea.trim())}>
+          <button type="submit" className={BUTTON_CLS} style={PRIMARY_STYLE} disabled={busy || !canStart}>
             {busy ? t("auto_starting") : t("auto_start")}
           </button>
         </form>

@@ -29,6 +29,8 @@ TEMPLATE_VERSIONS = {
     "chapter_review": "chapter-review-v1",
     "manuscript_review": "manuscript-review-v1",
     "packaging": "packaging-v2",
+    "prior_summary": "prior-summary-v1",
+    "canon_lock": "canon-lock-v1",
 }
 
 PLANNING_NODES = ("seed", "story_bible", "style_bible", "outline")

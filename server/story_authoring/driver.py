@@ -25,7 +25,7 @@ import uuid
 from collections.abc import Awaitable, Callable, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -90,6 +90,8 @@ from server.story_authoring.pipeline import chapter_plan, chapter_review, finger
 from server.story_authoring.prompts import drafting, planning
 from server.story_authoring.prompts import outline as outline_prompts
 from server.story_authoring.prompts import packaging as packaging_prompts
+from server.story_authoring.prompts import prior as prior_prompts
+from server.story_authoring.prompts.prior import CanonLock, PriorSummary
 from server.story_authoring.prompts.schemas import (
     SCENES_PER_CHAPTER_MAX,
     ChapterPlan,
@@ -115,6 +117,8 @@ NODE_CAPS = {
     "chapter_review": 12,
     "manuscript_review": 4,
     "packaging": 3,
+    "prior_summary": 3,
+    "canon_lock": 3,
 }
 TRANSPORT = frozenset({StoryFailureCode.MODEL_UNAVAILABLE, StoryFailureCode.PROVIDER_ERROR})
 TRANSPORT_RETRY_DELAYS = (5.0, 20.0)
@@ -155,6 +159,17 @@ DRAFT = {"temperature": 0.7, "top_p": 0.8, "top_k": 20, "presence_penalty": 0.0,
 REPAIR = {"temperature": 0.3, "top_p": 0.9, "top_k": 40, "presence_penalty": 0.0}
 
 
+class StoryPrior(BaseModel):
+    """A story that already exists, which this run continues or rewrites as a variant (ADR-0115). The prior text
+    is stored in the run's blob store under ``text_digest``; ``part`` numbers a continuation."""
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+    mode: Literal["continuation", "variant"]
+    text_digest: str = Field(pattern=r"^sha256:[0-9a-f]{64}$")
+    part: int = Field(default=2, ge=2, le=99)
+    origin: str = Field(default="instruction", min_length=1, max_length=80)
+
+
 class StoryBrief(BaseModel):
     """The Gate A input of a run. Its digest, which the Human greenlights, covers everything but the decision id."""
 
@@ -168,6 +183,8 @@ class StoryBrief(BaseModel):
     judge_selection: StoryModelSelection | None = None
     limits: StoryLimits
     cloud_profiles: tuple[CloudRouteProfile, ...] = Field(default=(), exclude_if=lambda value: not value)
+    #: The story this run continues or rewrites; ``idea`` is then the author's direction or variant instruction.
+    prior: StoryPrior | None = Field(default=None, exclude_if=lambda value: value is None)
 
     @property
     def judge(self) -> StoryModelSelection:
@@ -253,6 +270,8 @@ class StoryRunDriver:
         self._clock = clock
         self._retry_delays = tuple(retry_delays)
         self._outages = 0
+        self._prior_context: str | None = None
+        self._prior_tail = ""
         self._scope = StoryScope(
             user_id=identity.user_id, project_name=identity.project_name, actor_id=f"run:{identity.run_id}"
         )
@@ -423,18 +442,80 @@ class StoryRunDriver:
 
     # --- stages ------------------------------------------------------------------------------------
 
+    async def _read_prior(self, prior: StoryPrior) -> tuple[CanonLock, tuple[str, str], str]:
+        """Summaries of the prior text's chunks, then its attested canon lock (ADR-0115)."""
+        text = self._blobs.read_exact(prior.text_digest).decode("utf-8")
+        chunks = prior_prompts.split_prior(text)
+        omitted = len(chunks) > prior_prompts.MAX_PRIOR_CHUNKS
+        if omitted and prior.mode == "variant":
+            raise Blocked(RunPhase.BLOCKED_QUALITY, "variant: the story is too long to read in full")
+        chunks = chunks[-prior_prompts.MAX_PRIOR_CHUNKS :]
+        source = ("prior", prior.text_digest)
+        summaries: list[PriorSummary] = []
+        summary_ins: list[tuple[str, str]] = []
+        for k, chunk in enumerate(chunks, start=1):
+            node = f"prior_summary[{k}]"
+            raw = await self._ensure(
+                node,
+                inputs=[source],
+                decoding=PLANNING,
+                extra={"chunk": k, "of": len(chunks)},
+                produce=lambda e, node=node, chunk=chunk, k=k: self._json(
+                    node,
+                    e,
+                    StoryStepKind.PRIOR_READING,
+                    prior_prompts.PRIOR_SYSTEM,
+                    prior_prompts.prior_summary_prompt(chunk, k, len(chunks)),
+                    PriorSummary,
+                ),
+            )
+            summaries.append(PriorSummary.model_validate_json(raw))
+            summary_ins.append((node, content_digest(raw)))
+        tail = text.strip()[-prior_prompts.PRIOR_TAIL_CHARS :]
+
+        async def lock(epoch: int) -> bytes:
+            raw = await self._json(
+                "canon_lock",
+                epoch,
+                StoryStepKind.PRIOR_READING,
+                prior_prompts.PRIOR_SYSTEM,
+                prior_prompts.canon_lock_prompt(summaries, tail, mode=prior.mode, omitted=omitted),
+                CanonLock,
+            )
+            try:
+                attested = prior_prompts.attest(CanonLock.model_validate_json(raw), text)
+            except ValueError as error:
+                raise Blocked(RunPhase.BLOCKED_QUALITY, f"canon_lock: {error}") from None
+            return attested.model_dump_json().encode("utf-8")
+
+        lock_raw = await self._ensure("canon_lock", inputs=[source, *summary_ins], decoding=PLANNING, produce=lock)
+        return CanonLock.model_validate_json(lock_raw), ("canon_lock", content_digest(lock_raw)), tail
+
+    def _with_prior(self, prompt: str) -> str:
+        """A planning prompt preceded by the prior story's canon lock and the author's ask, when there is one."""
+        return prompt if self._prior_context is None else f"{self._prior_context}\n\n---\n\n{prompt}"
+
     async def _converge(self) -> _Story:
         brief = ("brief", self._brief.digest())
+        prior_ins: list[tuple[str, str]] = []
+        idea = self._brief.idea
+        if self._brief.prior is not None:
+            lock, lock_in, self._prior_tail = await self._read_prior(self._brief.prior)
+            prior_ins = [lock_in]
+            self._prior_context = prior_prompts.prior_context(
+                lock, mode=self._brief.prior.mode, direction=self._brief.idea, part=self._brief.prior.part
+            )
+            idea = self._prior_context
         seed_raw = await self._ensure(
             "seed",
-            inputs=[brief],
+            inputs=[brief, *prior_ins],
             decoding=PLANNING,
             produce=lambda e: self._json(
                 "seed",
                 e,
                 StoryStepKind.SEED,
                 planning.PLANNING_SYSTEM,
-                planning.seed_prompt(idea=self._brief.idea, genre=self._brief.genre),
+                planning.seed_prompt(idea=idea, genre=self._brief.genre),
                 StorySeed,
             ),
         )
@@ -442,14 +523,14 @@ class StoryRunDriver:
         seed_in = ("seed", content_digest(seed_raw))
         bible_raw = await self._ensure(
             "story_bible",
-            inputs=[seed_in],
+            inputs=[seed_in, *prior_ins],
             decoding=PLANNING,
             produce=lambda e: self._json(
                 "story_bible",
                 e,
                 StoryStepKind.BIBLE,
                 planning.PLANNING_SYSTEM,
-                planning.story_bible_prompt(seed),
+                self._with_prior(planning.story_bible_prompt(seed)),
                 StoryBibleOut,
             ),
         )
@@ -457,21 +538,21 @@ class StoryRunDriver:
         bible_in = ("story_bible", content_digest(bible_raw))
         style_raw = await self._ensure(
             "style_bible",
-            inputs=[seed_in, bible_in],
+            inputs=[seed_in, bible_in, *prior_ins],
             decoding=PLANNING,
             produce=lambda e: self._json(
                 "style_bible",
                 e,
                 StoryStepKind.BIBLE,
                 planning.PLANNING_SYSTEM,
-                planning.style_bible_prompt(seed, bible),
+                self._with_prior(planning.style_bible_prompt(seed, bible)),
                 StyleBibleOut,
             ),
         )
         style = StyleBibleOut.model_validate_json(style_raw)
         style_in = ("style_bible", content_digest(style_raw))
         outline_raw = await self._ensure(
-            "outline", inputs=[seed_in], decoding=PLANNING, produce=lambda e: self._outline(e, seed)
+            "outline", inputs=[seed_in, *prior_ins], decoding=PLANNING, produce=lambda e: self._outline(e, seed)
         )
         outline = ShortOutline.model_validate(json.loads(outline_raw)["outline"])
         outline_in = ("outline", content_digest(outline_raw))
@@ -484,7 +565,7 @@ class StoryRunDriver:
             node = chapter_plan(c)
             raw = await self._ensure(
                 node,
-                inputs=[seed_in, bible_in, outline_in, *plan_ins],
+                inputs=[seed_in, bible_in, outline_in, *plan_ins, *prior_ins],
                 decoding=PLANNING,
                 produce=lambda e, c=c, previous=previous: self._chapter_plan(
                     e, c, seed, bible, outline, previous, names, locations
@@ -528,14 +609,16 @@ class StoryRunDriver:
                 model=ShortOutline,
             )
 
-        outline = ShortOutline.model_validate_json(await generate(outline_prompts.outline_prompt(seed)))
+        outline = ShortOutline.model_validate_json(
+            await generate(self._with_prior(outline_prompts.outline_prompt(seed)))
+        )
         review = OutlineReview.model_validate_json(
             await self._step(
                 "outline",
                 epoch,
                 kind=StoryStepKind.OUTLINE,
                 system=outline_prompts.OUTLINE_SYSTEM,
-                prompt=outline_prompts.outline_review_prompt(seed, outline),
+                prompt=self._with_prior(outline_prompts.outline_review_prompt(seed, outline)),
                 decoding=REVIEW,
                 model=OutlineReview,
                 judge=True,
@@ -544,7 +627,7 @@ class StoryRunDriver:
         problems = [*outline_prompts.deterministic_outline_problems(outline), *review.problems]
         if problems:
             outline = ShortOutline.model_validate_json(
-                await generate(outline_prompts.outline_revision_prompt(seed, outline, problems))
+                await generate(self._with_prior(outline_prompts.outline_revision_prompt(seed, outline, problems)))
             )
         remaining = outline_prompts.deterministic_outline_problems(outline)
         if remaining:
@@ -564,13 +647,15 @@ class StoryRunDriver:
         names: dict[str, str],
         locations: dict[str, str],
     ) -> bytes:
-        prompt = planning.chapter_plan_prompt(
-            chapter_number=chapter,
-            outline=outline,
-            bible=bible,
-            character_names=list(names),
-            location_names=list(locations),
-            previous_plans=previous,
+        prompt = self._with_prior(
+            planning.chapter_plan_prompt(
+                chapter_number=chapter,
+                outline=outline,
+                bible=bible,
+                character_names=list(names),
+                location_names=list(locations),
+                previous_plans=previous,
+            )
         )
         node = chapter_plan(chapter)
         notes = (await self._store.load()).intents.get(node, ())
@@ -744,6 +829,18 @@ class StoryRunDriver:
                 target_syllables=target,
                 revision_note=note,
             )
+            prior = self._brief.prior
+            if (
+                self._prior_tail
+                and prior is not None
+                and prior.mode == "continuation"
+                and (ref.chapter, ref.scene) == (1, 1)
+            ):
+                # The seam: the new part opens right after the prior text's last lines, never retelling them.
+                prompt = (
+                    "PHẦN TRƯỚC KẾT THÚC BẰNG ĐOẠN SAU (không kể lại, viết nối tiếp ngay sau đó):\n<<<\n"
+                    f"{self._prior_tail}\n>>>\n\n{prompt}"
+                )
             prose, findings = await self._draft_until_clean(
                 ref.node_id, epoch, prompt, context, allowed, planned.dialogue_required, target, earlier
             )

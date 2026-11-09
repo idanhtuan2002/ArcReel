@@ -29,7 +29,10 @@ export interface StartCommand {
   mode: AutomationMode;
   /** Omitted when ``story_source`` is ``project``: the run films the story already in the project (ADR-0115). */
   idea?: string;
-  story_source?: "idea" | "project";
+  story_source?: "idea" | "project" | "continue" | "variant";
+  /** A variant's source project and optional named profile. */
+  source_project?: string;
+  variant_profile?: string;
   targets: string[];
   expected_input_digest: string;
   policy_digest: string;
