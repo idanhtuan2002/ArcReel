@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useLocation } from "wouter";
 import { useTranslation } from "react-i18next";
 import {
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
   Clapperboard,
@@ -33,6 +34,8 @@ interface AssetSidebarProps {
 }
 
 interface NavItem {
+  /** Rarely used: listed under the folded "More" group (ADR-0122). */
+  secondary?: boolean;
   key: string;
   path: string;
   label: string;
@@ -98,7 +101,36 @@ export function AssetSidebar({ className }: AssetSidebarProps) {
     return m ? parseInt(m[1], 10) : null;
   }, [location]);
 
-  const navItems: NavItem[] = [
+  // ADR-0122: a story project shows only its story; a film project that adapts one links to it.
+  const isStory = currentProjectData?.project_kind === "story";
+  const linkedStory = !isStory ? (currentProjectData?.story_project ?? null) : null;
+  const [moreOpen, setMoreOpen] = useState(() => {
+    try {
+      return window.localStorage.getItem("arcreel.sidebar.moreOpen") === "1";
+    } catch {
+      return false;
+    }
+  });
+  const [syncing, setSyncing] = useState(false);
+  const syncStory = async () => {
+    if (!currentProjectName) return;
+    setSyncing(true);
+    try {
+      const result = await API.syncLinkedStory(currentProjectName);
+      useAppStore
+        .getState()
+        .pushToast(
+          t("dashboard:story_sync_done", { imported: result.imported.length, conflicts: result.conflicts.length }),
+          result.conflicts.length ? "warning" : "success",
+        );
+    } catch {
+      useAppStore.getState().pushToast(t("dashboard:story_sync_failed_short"), "error");
+    } finally {
+      setSyncing(false);
+    }
+  };
+
+  const allNavItems: NavItem[] = [
     { key: "overview", path: "/", label: t("dashboard:workspace_nav_overview"), icon: LayoutDashboard },
     // 故事是项目的可选起点（写成后作为源文送往视频流程），紧随概览排在资产入口之前；演示项目隐藏
     ...(demoMode
@@ -141,10 +173,10 @@ export function AssetSidebar({ className }: AssetSidebarProps) {
     ...(demoMode
       ? []
       : [
-          { key: "formats", path: "/formats", label: t("dashboard:workspace_nav_formats"), icon: Proportions },
-          { key: "quality", path: "/quality", label: t("dashboard:workspace_nav_quality"), icon: ShieldCheck },
-          { key: "packaging", path: "/packaging", label: t("dashboard:workspace_nav_packaging"), icon: Package },
-          { key: "learning", path: "/learning", label: t("dashboard:workspace_nav_learning"), icon: ChartLine },
+          { key: "formats", path: "/formats", label: t("dashboard:workspace_nav_formats"), icon: Proportions, secondary: true },
+          { key: "quality", path: "/quality", label: t("dashboard:workspace_nav_quality"), icon: ShieldCheck, secondary: true },
+          { key: "packaging", path: "/packaging", label: t("dashboard:workspace_nav_packaging"), icon: Package, secondary: true },
+          { key: "learning", path: "/learning", label: t("dashboard:workspace_nav_learning"), icon: ChartLine, secondary: true },
         ]),
     // 商品资产仅广告/短片项目使用（v1 单商品设定），其余模式隐藏入口
     ...(isAd
@@ -163,6 +195,25 @@ export function AssetSidebar({ className }: AssetSidebarProps) {
   const isNavActive = (item: NavItem): boolean => {
     if (item.path === "/") return location === "/";
     return location === item.path || location.startsWith(item.path + "/");
+  };
+
+  const kindItems = isStory
+    ? allNavItems.filter((item) => item.key === "story" || item.key === "source")
+    : linkedStory
+      ? allNavItems.filter((item) => item.key !== "story")
+      : allNavItems;
+  const secondaryItems = kindItems.filter((item) => item.secondary);
+  const showMore = moreOpen || collapsed || secondaryItems.some(isNavActive);
+  const navItems = kindItems.filter((item) => !item.secondary || showMore);
+  const toggleMore = () => {
+    setMoreOpen((value) => {
+      try {
+        window.localStorage.setItem("arcreel.sidebar.moreOpen", value ? "0" : "1");
+      } catch {
+        /* remembered for this page only */
+      }
+      return !value;
+    });
   };
 
   // ad 隐藏搜索框，残留的 search state 不参与过滤，避免唯一视频入口被吞
@@ -246,6 +297,41 @@ export function AssetSidebar({ className }: AssetSidebarProps) {
             </button>
           );
         })}
+        {!collapsed && secondaryItems.length > 0 ? (
+          <button
+            type="button"
+            onClick={toggleMore}
+            aria-expanded={showMore}
+            className="flex w-full items-center gap-2.5 rounded-md px-2 py-1 text-[12px] text-text-3 focus-ring hover:text-text"
+          >
+            <span className="grid w-4 place-items-center">
+              {showMore ? <ChevronDown aria-hidden className="h-3.5 w-3.5" /> : <ChevronRight aria-hidden className="h-3.5 w-3.5" />}
+            </span>
+            {showMore ? t("dashboard:workspace_nav_less") : t("dashboard:workspace_nav_more", { count: secondaryItems.length })}
+          </button>
+        ) : null}
+        {linkedStory && !collapsed ? (
+          <div className="mt-1.5 flex items-center gap-1.5 rounded-md border border-hairline-soft px-2 py-1.5 text-[12px]">
+            <BookOpenText aria-hidden className="h-3.5 w-3.5 shrink-0 text-text-3" />
+            <button
+              type="button"
+              onClick={() => setLocation(`~/app/projects/${encodeURIComponent(linkedStory)}/story`)}
+              className="min-w-0 flex-1 truncate text-left text-text-2 focus-ring hover:text-text"
+              title={t("dashboard:linked_story_open", { project: linkedStory })}
+            >
+              {t("dashboard:linked_story", { project: linkedStory })}
+            </button>
+            <button
+              type="button"
+              disabled={syncing}
+              onClick={() => void syncStory()}
+              className="shrink-0 rounded px-1.5 py-0.5 text-text-3 focus-ring hover:bg-white/5 hover:text-text disabled:opacity-50"
+              title={t("dashboard:story_sync")}
+            >
+              {t("dashboard:story_sync")}
+            </button>
+          </div>
+        ) : null}
       </div>
 
       <div
@@ -253,8 +339,8 @@ export function AssetSidebar({ className }: AssetSidebarProps) {
         style={{ background: "var(--color-hairline-soft)" }}
       />
 
-      {/* ---- Episodes ---- */}
-      {!collapsed ? (
+      {/* ---- Episodes (a story project has none) ---- */}
+      {!collapsed && !isStory ? (
         <>
           <div className="flex items-center gap-2 px-3.5 pb-1.5 pt-2.5">
             <span

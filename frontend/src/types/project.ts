@@ -173,6 +173,9 @@ export interface ProjectData {
   episode_adaptation?: "screen" | "verbatim" | null;
   /** ADR-0121: how strictly stories are read for sensitive content; unset is "standard". */
   content_safety?: "strict" | "standard" | "mature" | "off" | null;
+  /** ADR-0122: "story" for a story project; absent for a film project, which may name the story it adapts. */
+  project_kind?: ProjectKind | null;
+  story_project?: string | null;
   /** 仅 ad：目标总时长（秒）。 */
   target_duration?: number;
   /** 仅 ad：创作诉求短文本（可空）。 */
@@ -236,6 +239,51 @@ export interface ProjectSummary {
   style_image?: string | null;
   thumbnail: string | null;
   status: ProjectStatus | Record<string, never>;
+  /** ADR-0122: a story project stands alone; a film project may adapt one (``story_project``). */
+  project_kind?: ProjectKind;
+  story_project?: string | null;
+  /** Index rows only: when the project's files last changed, and for a story the films that adapt it. */
+  updated_at?: string | null;
+  films?: number;
+}
+
+export type ProjectKind = "story" | "film";
+
+export interface ProjectIndexQuery {
+  q?: string;
+  kind?: "all" | ProjectKind;
+  stage?: string;
+  sort?: "updated" | "title" | "stage";
+  offset?: number;
+  limit?: number;
+}
+
+export interface ProjectIndexPage {
+  total: number;
+  counts: { all: number; story: number; film: number };
+  offset: number;
+  limit: number;
+  items: ProjectSummary[];
+}
+
+export type OperationsLane = "decision" | "blocked" | "running";
+
+export interface OperationsItem {
+  lane: OperationsLane;
+  kind: "story_run" | "production_run";
+  project: string;
+  title: string;
+  project_kind: ProjectKind;
+  run_id: string;
+  state: string;
+  stage?: string;
+  updated_at?: string | null;
+}
+
+export interface OperationsOverviewData {
+  counts: { decision: number; blocked: number; running: number; tasks: number };
+  lanes: Record<OperationsLane, OperationsItem[]>;
+  tasks: { project: string; title: string; tasks: number }[];
 }
 
 export type ImportConflictPolicy = "prompt" | "rename" | "overwrite";

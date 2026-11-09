@@ -9,6 +9,9 @@ import type {
   CharacterDerivativeStatus,
   ProjectData,
   ProjectSummary,
+  ProjectIndexPage,
+  ProjectIndexQuery,
+  OperationsOverviewData,
   ImportConflictPolicy,
   ImportProjectResponse,
   ExportDiagnostics,
@@ -477,6 +480,9 @@ export interface AgentProfileStatus {
 export interface CreateProjectPayload {
   title: string;
   name?: string;
+  /** ADR-0122: "story" makes a standalone story project; a film project may name the story it adapts. */
+  project_kind?: "story" | "film";
+  story_project?: string | null;
   content_mode?: "narration" | "drama" | "ad";
   /** 源文件性质：novel（默认）/ screenplay。仅 drama 暴露，创建即定、不可变。 */
   source_kind?: "novel" | "screenplay";
@@ -1062,6 +1068,28 @@ class API {
 
   static async listProjects(): Promise<{ projects: ProjectSummary[] }> {
     return this.request("/projects");
+  }
+
+  /** ADR-0122: one page of the project library, searched, filtered and sorted on the server. */
+  static async projectIndex(query: ProjectIndexQuery = {}, signal?: AbortSignal): Promise<ProjectIndexPage> {
+    const params = new URLSearchParams();
+    for (const [key, value] of Object.entries(query)) {
+      if (value !== undefined && value !== null && value !== "") params.set(key, String(value));
+    }
+    const suffix = params.toString();
+    return this.request(`/projects/index${suffix ? `?${suffix}` : ""}`, { signal });
+  }
+
+  /** ADR-0122: what needs the operator across every project. */
+  static async operations(signal?: AbortSignal): Promise<OperationsOverviewData> {
+    return this.request("/operations", { signal });
+  }
+
+  /** ADR-0122: a film project imports the story text of the story project it adapts. */
+  static async syncLinkedStory(
+    projectName: string,
+  ): Promise<{ story_project: string; imported: string[]; skipped: string[]; conflicts: string[] }> {
+    return this.request(`/projects/${encodeURIComponent(projectName)}/story-sync`, { method: "POST" });
   }
 
   static async createProject(

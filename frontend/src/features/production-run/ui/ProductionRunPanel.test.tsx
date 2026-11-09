@@ -133,8 +133,12 @@ describe("ProductionRunPanel", () => {
 
   it("starts a variant of another project's story with a named profile", async () => {
     vi.spyOn(client, "listProductionRuns").mockResolvedValue({ start: OFFER, runs: [] });
-    vi.spyOn(API, "listProjects").mockResolvedValue({
-      projects: [
+    vi.spyOn(API, "projectIndex").mockResolvedValue({
+      total: 2,
+      counts: { all: 2, story: 1, film: 1 },
+      offset: 0,
+      limit: 200,
+      items: [
         { name: "alpha", title: "Alpha" },
         { name: "origin", title: "Truyện gốc" },
       ],

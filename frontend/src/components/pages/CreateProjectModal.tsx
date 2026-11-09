@@ -1,5 +1,7 @@
 
 import { useState, useEffect, useRef, type CSSProperties } from "react";
+import { ProjectKindPicker } from "./create-project/ProjectKindPicker";
+import type { ProjectKind } from "@/types/project";
 import { createPortal } from "react-dom";
 import { errMsg, voidCall, voidPromise } from "@/utils/async";
 import { useLocation } from "wouter";
@@ -181,6 +183,10 @@ export function CreateProjectModal() {
   });
 
   const [creating, setCreating] = useState(false);
+  // ADR-0122: a story project needs only a title; a film project may adapt a story project.
+  const [kind, setKind] = useState<ProjectKind>("film");
+  const [storyProject, setStoryProject] = useState("");
+  const [storyTitle, setStoryTitle] = useState("");
 
   // Step2 的远端数据 hoist 到此处：前进/后退切 step 时 Step2 unmount/mount 不再触发 HTTP，
   // 只在 modal 挂载与界面语言变化时 fetch。供应商与模型名由后端按 Accept-Language 成文，
@@ -285,6 +291,26 @@ export function CreateProjectModal() {
     }));
   };
 
+  const handleCreateStory = async () => {
+    const title = storyTitle.trim();
+    if (!title) return;
+    setCreating(true);
+    try {
+      const resp = await API.createProject({
+        title,
+        project_kind: "story",
+        content_mode: "narration",
+        generation_mode: "storyboard",
+      });
+      setShowCreateModal(false);
+      navigate(`/app/projects/${resp.name}/story`);
+    } catch (err) {
+      useAppStore.getState().pushToast(`${t("dashboard:create_project_failed")}${errMsg(err)}`, "error");
+    } finally {
+      setCreating(false);
+    }
+  };
+
   const handleCreate = async () => {
     // 生成模式必选（Step1 已拦一道）：缺失时后端返回 422，此处不构造缺少生成模式的创建请求
     if (!basics.generationRoute) return;
@@ -306,6 +332,7 @@ export function CreateProjectModal() {
       const isAd = basics.contentMode === "ad";
       const resp = await API.createProject({
         title: basics.title.trim(),
+        ...(storyProject ? { story_project: storyProject } : {}),
         content_mode: basics.contentMode,
         // source_kind 仅 drama 暴露与生效；其余模式由服务端缺省 novel
         ...(basics.contentMode === "drama" ? { source_kind: basics.sourceKind } : {}),
@@ -342,6 +369,15 @@ export function CreateProjectModal() {
             t("dashboard:style_upload_failed_hint"),
             "warning"
           );
+        }
+      }
+
+      if (storyProject) {
+        // The film starts from the story it adapts: its text becomes the film's sources.
+        try {
+          await API.syncLinkedStory(resp.name);
+        } catch {
+          useAppStore.getState().pushToast(t("dashboard:story_sync_failed"), "warning");
         }
       }
 
@@ -442,6 +478,46 @@ export function CreateProjectModal() {
         {/* Current step body */}
         <div className="min-h-0 flex-1 overflow-y-auto px-7 pt-6 pb-7">
           {step === 1 && (
+            <ProjectKindPicker
+              kind={kind}
+              onKind={setKind}
+              storyProject={storyProject}
+              onStoryProject={setStoryProject}
+            />
+          )}
+          {step === 1 && kind === "story" && (
+            <form
+              className="space-y-4"
+              onSubmit={(event) => {
+                event.preventDefault();
+                voidCall(handleCreateStory());
+              }}
+            >
+              <label className="block text-[12.5px] text-text-2">
+                {t("dashboard:new_story_title")}
+                <input
+                  value={storyTitle}
+                  onChange={(event) => setStoryTitle(event.target.value)}
+                  maxLength={120}
+                  className="mt-1 block w-full rounded-md border border-hairline-strong bg-transparent px-3 py-2 text-[14px] text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+                />
+              </label>
+              <p className="text-[12px] text-text-3">{t("dashboard:new_story_hint")}</p>
+              <div className="flex justify-end gap-2">
+                <button type="button" onClick={handleClose} className="rounded-md border border-hairline px-3 py-1.5 text-[13px] text-text-2 hover:text-text">
+                  {t("common:cancel")}
+                </button>
+                <button
+                  type="submit"
+                  disabled={creating || !storyTitle.trim()}
+                  className="rounded-md bg-accent px-3 py-1.5 text-[13px] font-medium text-[oklch(0.14_0_0)] disabled:opacity-50"
+                >
+                  {t("dashboard:new_story_create")}
+                </button>
+              </div>
+            </form>
+          )}
+          {step === 1 && kind === "film" && (
             <WizardStep1Basics
               value={basics}
               onChange={handleBasicsChange}

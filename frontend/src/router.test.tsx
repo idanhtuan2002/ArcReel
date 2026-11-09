@@ -328,9 +328,10 @@ describe("AppRoutes", () => {
 
   it.each([
     [false, false],
-    [true, true],
+    [true, false],
   ])(
-    "无开合记忆时按内嵌智能体凭证状态初始化面板: configured=%s",
+    // ADR-0122: without a remembered choice the panel starts folded, configured or not.
+    "无开合记忆时面板默认收起: configured=%s",
     async (isEmbeddedAgentConfigured, expectedOpen) => {
       useAppStore.setState({
         assistantPanelOpen: !expectedOpen,

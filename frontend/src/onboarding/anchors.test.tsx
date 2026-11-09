@@ -134,6 +134,18 @@ describe("onboarding anchors", () => {
     useTasksStore.setState(useTasksStore.getInitialState(), true);
     vi.restoreAllMocks();
     vi.spyOn(API, "listProjects").mockResolvedValue({ projects: [] });
+    vi.spyOn(API, "projectIndex").mockResolvedValue({
+      total: 0,
+      counts: { all: 0, story: 0, film: 0 },
+      offset: 0,
+      limit: 50,
+      items: [],
+    });
+    vi.spyOn(API, "operations").mockResolvedValue({
+      counts: { decision: 0, blocked: 0, running: 0, tasks: 0 },
+      lanes: { decision: [], blocked: [], running: [] },
+      tasks: [],
+    });
   });
 
   const CASES = Object.entries(RENDERERS) as [OnboardingAnchor, () => void][];
@@ -149,7 +161,7 @@ describe("onboarding anchors", () => {
   it("shows the demo card only while the tour is running", async () => {
     renderLobby();
 
-    await waitFor(() => expect(API.listProjects).toHaveBeenCalled());
+    await waitFor(() => expect(API.projectIndex).toHaveBeenCalled());
     expect(document.querySelector(anchorSelector(ONBOARDING_ANCHORS.lobbyDemoCard))).toBeNull();
   });
 
@@ -161,6 +173,6 @@ describe("onboarding anchors", () => {
     expect(await screen.findAllByText("爱丽丝梦游仙境")).toHaveLength(2);
     // 演示卡是纯前端常量，不经过项目列表，也没有任何写入
     expect(useProjectsStore.getState().projects).toEqual([]);
-    expect(API.listProjects).toHaveBeenCalledTimes(1);
+    expect(API.listProjects).not.toHaveBeenCalled();
   });
 });

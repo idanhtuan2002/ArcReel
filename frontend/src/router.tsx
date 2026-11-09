@@ -59,7 +59,8 @@ function ConfigStatusLoader() {
       if (configStatus.initialized) {
         useAppStore
           .getState()
-          .initializeAssistantPanel(configStatus.isEmbeddedAgentConfigured);
+          // ADR-0122: the agent panel starts folded so the work area has the room; the operator's own choice is remembered.
+          .initializeAssistantPanel(false);
       } else if (attempts < 5) {
         attempts += 1;
         timer = setTimeout(() => void tick(), 800 * attempts);

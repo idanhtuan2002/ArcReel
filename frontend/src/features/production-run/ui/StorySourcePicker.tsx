@@ -50,9 +50,10 @@ export function StorySourcePicker({
   useEffect(() => {
     if (source !== "variant") return;
     let live = true;
-    void API.listProjects()
+    // ADR-0122: read through the paged index (any project with a story can be the source of a variant).
+    void API.projectIndex({ sort: "title", limit: 200 })
       .then((result) => {
-        if (live) setProjects(result.projects.filter((item) => item.name !== projectName));
+        if (live) setProjects(result.items.filter((item) => item.name !== projectName));
       })
       .catch(() => undefined);
     void API.request<{ profiles: VariantProfile[] }>("/system/config/story-variant-profiles")

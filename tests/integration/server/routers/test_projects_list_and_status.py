@@ -150,7 +150,7 @@ class TestProjectIndexRoute:
         """ADR-0122: the index returns a page of list rows with their kind, link and update time."""
         from server.services.project_index import PROJECT_INDEX
 
-        monkeypatch.setattr(PROJECT_INDEX, "_rows", {})
+        PROJECT_INDEX.clear()
         fake_pm = _FakePM(tmp_path)
         client = build_projects_client(monkeypatch, fake_pm, _FakeSummaries())
         with client:

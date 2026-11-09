@@ -40,6 +40,11 @@ class ProjectIndex:
         self._rows: dict[str, tuple[Signature, float, dict[str, Any]]] = {}
         self._lock = threading.Lock()
 
+    def clear(self) -> None:
+        """Forget every cached row (a deleted or replaced projects root)."""
+        with self._lock:
+            self._rows.clear()
+
     def rows(self, manager: Any, compute: Callable[[str], dict[str, Any]]) -> list[dict[str, Any]]:
         names = manager.list_projects()
         now = time.monotonic()
