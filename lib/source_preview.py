@@ -15,9 +15,16 @@ from dataclasses import dataclass, field
 from lib.episode_ledger import SourceDoc
 from lib.text_attestation import has_cjk
 
-#: ``Chương 1``, ``CHƯƠNG XII``, ``Chapter 3``, ``Hồi 2``, ``Phần một``, ``第3章``, or a Markdown heading.
+_NUMBER = (
+    r"(?:[0-9]+|[ivxlcdm]+|một|hai|ba|bốn|tư|năm|sáu|bảy|tám|chín|mười|mươi|cuối|đầu|one|two|three|four|five|six|"
+    r"seven|eight|nine|ten|first|last)"
+)
+#: A heading is a short line: a keyword and a number (``Chương 1``, ``CHƯƠNG XII``, ``Chapter three``, ``Hồi 2:``),
+#: ``第3章``, or a Markdown heading. ``Hồi đó, ...`` and ``Phần lớn ...`` are prose, not headings.
 _HEADING = re.compile(
-    r"^\s*(?:#{1,3}\s+.+|(?:chương|chuong|chapter|hồi|hoi|phần|phan|quyển|quyen)\s+[\w.]+.*|第\s*[0-9一二三四五六七八九十百千零两]+\s*[章回节].*)$",
+    r"^[ \t]*(?:#{1,3}[ \t]+[^\n]{1,80}|(?:chương|chuong|chapter|hồi|hoi|phần|phan|quyển|quyen)[ \t]+"
+    + _NUMBER
+    + r"\b[^\n]{0,80}|第[ \t]*[0-9一二三四五六七八九十百千零两]+[ \t]*[章回节][^\n]{0,80})[ \t]*$",
     re.IGNORECASE | re.MULTILINE,
 )
 LONG_CHAPTER_CHARS = 40_000

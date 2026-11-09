@@ -369,3 +369,30 @@ async def test_newer_real_plan_revision_blocks_stale_replay_and_scene_evidence(m
     async with sessions() as session:
         assert await session.scalar(sa.select(sa.func.count()).select_from(NarrativeDraftCandidateModel)) == 0
         assert await session.scalar(sa.select(sa.func.count()).select_from(RevisionAcceptanceDecisionModel)) == 0
+
+
+async def test_a_safety_finding_is_never_accepted_automatically_whatever_its_severity(manuscript_bound_run):
+    import hashlib
+    import json
+
+    from server.production_run.narrative_authority import AutomaticNarrativeAuthority
+
+    issuer, sessions, _, _, manifest, subject, _ = manuscript_bound_run
+    record = json.dumps(
+        {"findings": [{"id": "F001", "severity": "NARRATIVE_CRITICAL", "code": "SAFETY:hate"}], "packaging": None}
+    ).encode()
+    changed = manifest.model_copy(
+        update={
+            "findings_open": ("F001",),
+            "exceptions_offered": ("F001",),
+            "quality_record_digest": "sha256:" + hashlib.sha256(record).hexdigest(),
+        }
+    )
+    with pytest.raises(NarrativeDecisionAuthorizationError, match="UNRESOLVED_STORY_FINDINGS"):
+        await AutomaticNarrativeAuthority.bind(
+            sessions=sessions,
+            authority=issuer.authority(),
+            subject=subject.model_copy(update={"subject_digest": changed.digest()}),
+            manifest=changed,
+            quality_record=record,
+        )

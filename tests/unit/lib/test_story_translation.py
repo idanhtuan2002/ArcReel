@@ -39,15 +39,27 @@ def test_batches_keep_paragraph_order_and_bound_their_size():
 
 def test_a_batch_must_keep_count_names_length_and_script():
     terms = protected_terms(PROJECT)
-    assert terms == ["Căn nhà cũ", "Minh", "Lan"]
+    assert terms == ["Minh", "Lan"]  # characters only: scene and prop names are translated
     source = ["Minh về Căn nhà cũ.", "Lan đứng chờ."]
 
-    assert check_batch(source, ["Minh comes home to Căn nhà cũ.", "Lan waits."], target="en", terms=terms) == []
+    assert check_batch(source, ["Minh comes home to the old house.", "Lan waits."], target="en", terms=terms) == []
     assert "exactly 2" in check_batch(source, ["x"], target="en", terms=terms)[0]
-    problems = check_batch(source, ["Minh comes to the old house.", "蘭 waits."], target="en", terms=terms)
-    assert any("Căn nhà cũ" in p for p in problems)
+    problems = check_batch(source, ["He comes to the old house.", "蘭 waits, Lan."], target="en", terms=terms)
+    assert any("Minh" in p for p in problems)
     assert any("Chinese, Japanese or Korean" in p for p in problems)
-    assert check_batch(source, ["Minh comes home to Căn nhà cũ.", "蘭 waits, Lan."], target="zh", terms=terms) == []
+
+
+def test_a_name_that_is_also_a_word_is_protected_only_where_it_names_someone():
+    terms = ["Hoa"]
+    assert check_batch(["Vườn hoa nở rộ."], ["The flower garden is in bloom."], target="en", terms=terms) == []
+    assert check_batch(["Hoa cười."], ["She laughs."], target="en", terms=terms)
+
+
+def test_lengths_are_judged_per_script_and_cjk_names_are_exempt_from_the_script_rule():
+    vi = ["Ông lái đò chèo chậm qua khúc sông rộng trong buổi sớm mờ sương."]
+    assert check_batch(vi, ["老船夫在晨雾中慢慢划过宽阔的河面。"], target="zh", terms=[]) == []
+    assert check_batch(["李明回家了。"], ["Li Ming came home at last, tired."], target="en", terms=[]) == []
+    assert check_batch(["李明回家了。"], ["李明 came home."], target="en", terms=["李明"]) == []
 
 
 async def test_a_story_is_translated_retried_with_reasons_and_skipped_when_unchanged(tmp_path):
@@ -59,10 +71,10 @@ async def test_a_story_is_translated_retried_with_reasons_and_skipped_when_uncha
 
     assert result["files"] == [{"source": "source/truyen.txt", "skipped": False, "calls": 2}]
     assert "exactly 3" in calls[1]  # the retry names the failed check
-    text = (tmp_path / "translations" / "en" / "truyen.md").read_text(encoding="utf-8")
+    text = (tmp_path / "translations" / "en" / "truyen.txt.md").read_text(encoding="utf-8")
     assert text.count("\n\n") == 2
     assert "Căn nhà cũ" in text
-    record = json.loads((tmp_path / "translations" / "en" / "truyen.json").read_text(encoding="utf-8"))
+    record = json.loads((tmp_path / "translations" / "en" / "truyen.txt.json").read_text(encoding="utf-8"))
     assert (record["target_language"], record["source_relpath"]) == ("en", "source/truyen.txt")
     assert (tmp_path / "source" / "truyen.txt").read_text(encoding="utf-8") == STORY
 

@@ -41,7 +41,14 @@ from server.story_authoring.authority import GrantNarrativeShowrunnerAuthority
 from server.story_authoring.cloud import CLOUD_ADAPTERS, OPENAI_ENDPOINT, OPENAI_MAX_INPUT_BOUND
 from server.story_authoring.commit import CANON_BASE_MOVED, ManuscriptCommitter, load_offered_manifest
 from server.story_authoring.contracts import OLLAMA_CHAT_ENDPOINT, StoryLimits, StoryModelSelection
-from server.story_authoring.driver import CHAPTERS, StoryBrief, StoryPrior, run_call_bound, story_bible_input
+from server.story_authoring.driver import (
+    CHAPTERS,
+    StoryBrief,
+    StoryPrior,
+    run_call_bound,
+    story_bible_input,
+    variant_call_bound,
+)
 from server.story_authoring.handoff import OnConflict, SourceUpload, send_to_video, upload_in_flight
 from server.story_authoring.narrative import StoryIdentity
 from server.story_authoring.pipeline import intent_targets, node_kind
@@ -64,6 +71,7 @@ type Factory = async_sessionmaker[AsyncSession]
 
 RUN_CALLS = run_call_bound()
 SECONDS_PER_CALL = 120
+PRIOR_MARGIN_CALLS = 13
 DEFAULT_LIMITS = StoryLimits(
     generate_calls_max=RUN_CALLS,
     count_calls_max=RUN_CALLS,
@@ -277,7 +285,11 @@ class StoryAuthoringService:
                 part=len(docs) + 1 if prior_mode == "continuation" else 2,
                 origin=prior_origin,
             )
-            extra_calls = prior_calls(text, mode=prior_mode) * 3
+            # Reading the prior text (never less than the 13 calls the earlier fixed margin held), and for a variant
+            # its review and replan (ADR-0117).
+            extra_calls = max(prior_calls(text, mode=prior_mode), PRIOR_MARGIN_CALLS) * 3
+            if prior_mode == "variant":
+                extra_calls += variant_call_bound()
             limits = limits.model_copy(
                 update={
                     "generate_calls_max": limits.generate_calls_max + extra_calls,

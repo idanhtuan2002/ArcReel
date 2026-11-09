@@ -300,3 +300,14 @@ def test_a_long_book_chapter_is_planned_with_enough_scenes_for_its_length():
 
     scenes = bound_chapter_plan(["Minh"], ["Căn nhà cũ"], min_scenes=5).model_json_schema()["properties"]["scenes"]
     assert (scenes["minItems"], scenes["maxItems"]) == (5, 5)
+
+
+def test_the_call_bound_covers_a_last_parts_hook_rewrite_and_a_variants_replan():
+    from server.story_authoring.driver import NODE_CAPS, run_call_bound, variant_call_bound
+
+    spec = BookSpec(chapters=9, part_chapters=3)
+    digest = "sha256:" + "0" * 64
+    middle = run_call_bound(3, book=BookPart(spec=spec, part=2, state_digest=digest))
+    last = run_call_bound(3, book=BookPart(spec=spec, part=3, state_digest=digest))
+    assert last - middle >= NODE_CAPS["chapter_digest"]
+    assert variant_call_bound() >= 2 * NODE_CAPS["variant_review"] + NODE_CAPS["outline"]

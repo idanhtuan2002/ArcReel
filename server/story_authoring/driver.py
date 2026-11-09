@@ -1565,7 +1565,14 @@ class StoryRunDriver:
             findings.extend(result.findings)
             state = await self._store.load()
         claims = [i for i, f in enumerate(findings) if f.blocking and ":" in f.code]
-        claims.sort(key=lambda i: findings[i].severity is not Severity.HARD_STRUCTURAL)
+        # Safety claims are always read a second time (ADR-0117), then structural ones.
+        safety = f"{AuditDimension.SAFETY.value}:"
+        claims.sort(
+            key=lambda i: (
+                not findings[i].code.startswith(safety),
+                findings[i].severity is not Severity.HARD_STRUCTURAL,
+            )
+        )
         second_reading = set(claims[:CONFIRM_MAX])
         findings = [
             await self._confirmed(node, f, scenes, plan) if i in second_reading else f for i, f in enumerate(findings)
@@ -2016,8 +2023,13 @@ def step_prefix(state: RunState, node: str) -> str:
         chapter = int(node.split("[", 1)[1].split(",", 1)[0].rstrip("]"))
         first = 1 if node.startswith("chapter_plan[") else chapter
         replans = sum(len(state.intents.get(chapter_plan(c), ())) for c in range(first, chapter + 1))
+    if node == "variant_review":
+        # A review of plans the Human or the driver has sent back is a new round.
+        replans = sum(
+            len(notes) for n, notes in state.intents.items() if n == "outline" or n.startswith("chapter_plan[")
+        )
     rewrites = 0
-    if node.startswith("scene_draft["):
+    if node.startswith("scene_draft[") or node == "outline":
         rewrites = sum(1 for n in state.intents.get(node, ()) if n.startswith(AUTO_NOTE))
     suffix = f"+{rewrites}" if rewrites else ""
     return f"{node}@r{len(human_intents(state).get(node, ()))}.{state.retries}.{replans}{suffix}#"
@@ -2044,7 +2056,15 @@ def run_call_bound(
         memory = chapters * NODE_CAPS["chapter_digest"] + NODE_CAPS["part_summary"]
         if book.state_digest is None:
             memory += NODE_CAPS["book_outline"] + len(book.spec.volumes()) * NODE_CAPS["book_chapters"]
+        if book.is_last:
+            # ADR-0117: the final scene rewritten once for open hooks, its chapter reviewed and digested again.
+            memory += scenes_per_chapter * contracts + (1 + REVIEW_CYCLES) * review + NODE_CAPS["chapter_digest"]
     return planning + plans + scenes + reviews + ending + late + memory
+
+
+def variant_call_bound(chapters: int = CHAPTERS) -> int:
+    """ADR-0117: the variant review in two rounds and one replan of the outline and every chapter plan."""
+    return 2 * NODE_CAPS["variant_review"] + NODE_CAPS["outline"] + chapters * PLAN_CALLS
 
 
 def entity_keys(seed: StorySeed) -> tuple[dict[str, str], dict[str, str]]:
@@ -2110,7 +2130,7 @@ _EXCESS_MARKERS = ("withheld", "reveal", "do_not", "forbidden", "broken", "viola
 
 
 #: Deterministic and judged machine-voice findings; a scene with this many gets one humanizing repair (ADR-0119).
-HUMANIZE_CODES = frozenset({"STOCK_PHRASE", "NOT_BUT_PATTERN", "GENRE_FATIGUE", "UNIFORM_PARAGRAPHS"})
+HUMANIZE_CODES = frozenset({"STOCK_PHRASE", "NOT_BUT_PATTERN", "GENRE_FATIGUE"})
 HUMANIZE_MIN = 3
 
 

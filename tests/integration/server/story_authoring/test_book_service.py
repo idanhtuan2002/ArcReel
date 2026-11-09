@@ -99,7 +99,8 @@ async def test_a_continuation_of_a_book_project_writes_its_next_part_until_the_b
     assert following.prior is None
     assert following.book is not None
     assert (following.book.part, following.book.state_digest) == (2, progress.state_digest)
-    assert following.limits.generate_calls_max < brief.limits.generate_calls_max  # no book plan to write
+    # No book plan to write; as the last part it may rewrite its final scene for open hooks.
+    assert following.limits.generate_calls_max == run_call_bound(3, book=following.book)
 
     decision = await _greenlight(concurrent_session_factory, following.digest())
     ref = await service.start(

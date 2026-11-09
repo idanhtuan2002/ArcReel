@@ -1417,3 +1417,25 @@ async def test_the_genre_pack_of_the_brief_guides_planning_and_drafting(concurre
     assert "[Thể loại: Tâm lý – gia đình]" in plan
     prose = next(p for k, p in model.prompts if k == "prose")
     assert "'nước mắt lăn dài'" in prose
+
+
+async def test_a_variant_outline_sent_back_after_a_revised_first_outline_gets_a_new_round_of_calls(
+    concurrent_session_factory, tmp_path
+):
+    store = await _store(concurrent_session_factory)
+    model = ScriptedModel()
+    blobs = StoryBlobStore(tmp_path)
+    reviews: list[int] = []
+
+    def review(_prompt: str, _schema: dict[str, Any]) -> dict[str, Any]:
+        reviews.append(1)
+        return {"passed": False, "problems": ["mở đầu chưa rõ"]} if len(reviews) == 1 else STRUCTURED["passed"]
+
+    model.overrides["passed"] = review
+    model.overrides["contradicted"] = lambda _p, _s: {"missing": [2], "contradicted": [], "notes": []}
+    driver, _ = _prior_driver(concurrent_session_factory, store, model, blobs, "variant")
+
+    state = await driver.run()
+
+    assert state.phase is RunPhase.READY_FOR_APPROVAL, state.block_reason
+    assert model.calls["story_arc"] == 3  # generated, revised, generated again after the variant note

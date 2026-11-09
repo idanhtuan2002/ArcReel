@@ -141,6 +141,7 @@ class _PlanCommitFence(SqlAlchemyNarrativePlanUnitOfWork):
             await super().__aexit__(exc_type, exc, traceback)
 
 
+_SAFETY_PREFIX = "SAFETY:"
 _ACCEPTABLE_AS_IS = frozenset(
     {Severity.STYLISTIC.value, Severity.NARRATIVE_CRITICAL.value, Severity.LOCAL_MODEL_LIMIT.value}
 )
@@ -160,9 +161,14 @@ def _recorded_findings(manifest: ManuscriptCommitManifest, quality_record: bytes
     try:
         findings = json.loads(quality_record)["findings"]
         severities = {str(f["id"]): f["severity"] for f in findings}
-    except (ValueError, KeyError, TypeError):
+        codes = {str(f["id"]): str(f.get("code", "")) for f in findings}
+    except (ValueError, KeyError, TypeError, AttributeError):
         return False
-    return all(severities.get(finding) in _ACCEPTABLE_AS_IS for finding in manifest.findings_open)
+    # ADR-0117: a safety finding left open always goes to the Human, whatever its severity.
+    return all(
+        severities.get(finding) in _ACCEPTABLE_AS_IS and not codes.get(finding, "").startswith(_SAFETY_PREFIX)
+        for finding in manifest.findings_open
+    )
 
 
 class AutomaticNarrativeAuthority:

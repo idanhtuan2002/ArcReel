@@ -6,6 +6,7 @@ the service, the project's Showrunner grant.
 
 from __future__ import annotations
 
+import asyncio
 from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -191,7 +192,7 @@ async def story_sources_preview(project_name: str, user: CurrentUser, service: S
         await service.require_source_grant(user.sub, user_id=user.id, project_name=project_name)
     except REFUSALS as error:
         raise _refusal(error) from error
-    return {"sources": service.source_preview(project_name)}
+    return {"sources": await asyncio.to_thread(service.source_preview, project_name)}
 
 
 @router.get("/projects/{project_name}/story-book")

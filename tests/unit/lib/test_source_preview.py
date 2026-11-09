@@ -27,3 +27,10 @@ def test_a_file_without_headings_is_one_chapter_and_long_or_empty_files_warn():
     assert (plain.chapters, plain.warnings) == (1, ("NO_CHAPTER_HEADINGS",))
     assert (empty.chapters, empty.warnings) == (0, ("EMPTY",))
     assert long.warnings == ("LONG_CHAPTER",)
+
+
+def test_prose_that_starts_with_a_heading_word_is_not_a_chapter():
+    text = "Chương 1\nHồi đó, tôi còn nhỏ lắm.\n\nPhần lớn dân làng đã đi.\n\nChương hai\nMinh về."
+    preview = preview_source(SourceDoc(rel_path="source/a.txt", text=text))
+
+    assert preview.headings == ("Chương 1", "Chương hai")

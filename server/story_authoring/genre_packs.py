@@ -10,6 +10,7 @@ Vietnamese; huohuo's cultivation, system and officialdom genres are market categ
 
 from __future__ import annotations
 
+import re
 import unicodedata
 from collections.abc import Sequence
 from dataclasses import dataclass
@@ -178,10 +179,11 @@ def fatigue_findings(pack: GenrePack | None, scenes: Sequence[tuple[str, str]]) 
     for phrase in pack.fatigue:
         count = sum(_fold(text).count(phrase) for _, text in scenes)
         if count > FATIGUE_LIMIT:
-            node = next(n for n, text in scenes if phrase in _fold(text))
-            findings.append(
-                Finding("GENRE_FATIGUE", Severity.STYLISTIC, node, f"'{phrase}' used {count} times", phrase)
-            )
+            node, text = next((n, t) for n, t in scenes if phrase in _fold(t))
+            # The quote as the scene writes it (case kept), so a repair finds it verbatim.
+            match = re.search(re.escape(phrase), unicodedata.normalize("NFC", text), re.IGNORECASE)
+            quote = match.group(0) if match else phrase
+            findings.append(Finding("GENRE_FATIGUE", Severity.STYLISTIC, node, f"'{phrase}' used {count} times", quote))
     return tuple(findings)
 
 
