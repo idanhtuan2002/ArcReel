@@ -31,7 +31,9 @@ from server.tool_runtime import (
     ProjectScope,
     Services,
     ToolRequest,
+    TranslateStoryRequest,
     UploadSourceRequest,
+    translate_story,
     upload_source,
 )
 
@@ -151,6 +153,35 @@ async def draft_brief(project_name: str, req: DraftBriefRequest, user: CurrentUs
     except REFUSALS as error:
         raise _refusal(error) from error
     return {"project_name": project_name, "brief": brief.model_dump(mode="json"), "brief_digest": brief.digest()}
+
+
+class TranslateStoryBody(_Request):
+    target_language: Literal["en", "fr", "es", "de", "vi", "zh", "ja", "ko"]
+
+
+@router.post("/projects/{project_name}/story-translations")
+async def translate_project_story(
+    project_name: str, req: TranslateStoryBody, user: InteractiveUser, service: Service
+) -> dict:
+    """Queue a translation of the project's story (ADR-0120); the task list shows its progress."""
+    try:
+        await service.require_source_grant(user.sub, user_id=user.id, project_name=project_name)
+    except REFUSALS as error:
+        raise _refusal(error) from error
+    projects = get_project_manager()
+    outcome = await translate_story(
+        ToolRequest(TranslateStoryRequest(target_language=req.target_language)),
+        ProjectScope(project_name=project_name, projects_root=projects.projects_root),
+        CallerContext(user_id=user.id, source="mcp"),
+        Services(
+            projects=projects,
+            workflow_planner=workflow_planner.get_workflow_planner(projects),
+            capabilities=ConfigResolver(async_session_factory),
+        ),
+    )
+    if outcome.problem is not None:
+        raise HTTPException(status_code=409, detail={"code": outcome.problem.code, "detail": outcome.problem.detail})
+    return {"queued": True, "target_language": req.target_language}
 
 
 @router.get("/projects/{project_name}/story-sources/preview")

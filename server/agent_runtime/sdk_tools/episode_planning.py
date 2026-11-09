@@ -28,8 +28,10 @@ from server.tool_runtime import (
     ToolOutcome,
     ToolProblem,
     ToolRequest,
+    TranslateStoryRequest,
     adapt_episode,
     plan_episodes,
+    translate_story,
 )
 from server.tool_runtime import (
     reset_episode_planning as reset_episode_planning_handler,
@@ -130,7 +132,7 @@ def reset_episode_planning_tool(ctx: ToolContext):
     return _handler
 
 
-__all__ = ["plan_episodes_tool", "reset_episode_planning_tool"]
+__all__ = ["adapt_episode_tool", "plan_episodes_tool", "reset_episode_planning_tool", "translate_story_tool"]
 
 
 def adapt_episode_tool(ctx: ToolContext):
@@ -156,5 +158,36 @@ def adapt_episode_tool(ctx: ToolContext):
         else:
             outcome = await adapt_episode(ToolRequest(request), ctx.scope, ctx.caller, tool_services(ctx))
         return tool_outcome_response("episode_adaptation", outcome)
+
+    return _handler
+
+
+def translate_story_tool(ctx: ToolContext):
+    @tool(
+        "translate_story",
+        "故事翻译（ADR-0120）：把项目 source/ 中的故事原文逐段译为目标语言（en/fr/es/de/vi/zh/ja/ko），写入 "
+        "translations/<语言>/<原文件名>.md 与同名 .json 记录；不改动原文、分集与成片。登记的人物、场景、道具名"
+        "原样保留；机械校验（段数一致、专名保留、长度区间、非中日韩目标不得含中日韩字符）不过时带原因重试，至多三次。"
+        "原文未变的文件再次调用时跳过。用户要求把故事译成其他语言时调用。",
+        {
+            "type": "object",
+            "properties": {
+                "target_language": {
+                    "type": "string",
+                    "enum": ["en", "fr", "es", "de", "vi", "zh", "ja", "ko"],
+                    "description": "目标语言代码",
+                }
+            },
+            "required": ["target_language"],
+        },
+    )
+    async def _handler(args: dict[str, Any]) -> dict[str, Any]:
+        try:
+            request = TranslateStoryRequest.model_validate(args)
+        except ValueError as exc:
+            outcome = ToolOutcome(problem=ToolProblem("invalid_request", f"❌ 参数错误：{exc}"))
+        else:
+            outcome = await translate_story(ToolRequest(request), ctx.scope, ctx.caller, tool_services(ctx))
+        return tool_outcome_response("story_translation", outcome)
 
     return _handler

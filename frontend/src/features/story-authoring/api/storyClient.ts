@@ -175,6 +175,13 @@ function post<T>(endpoint: string, body: unknown, options: CallOptions = {}): Pr
   return API.request(endpoint, { method: "POST", body: JSON.stringify(body), signal: options.signal });
 }
 
+export type TranslationLanguage = "en" | "fr" | "es" | "de" | "zh" | "ja" | "ko";
+
+/** ADR-0120: queue a translation of the project's story; the task list shows its progress. */
+export function translateStory(projectName: string, targetLanguage: TranslationLanguage): Promise<unknown> {
+  return post(`/projects/${encodeURIComponent(projectName)}/story-translations`, { target_language: targetLanguage });
+}
+
 export async function listRoutes(options: CallOptions = {}): Promise<StoryRoute[]> {
   const { routes } = await API.request<{ routes: StoryRoute[] }>("/system/config/story-routes", {
     signal: options.signal,

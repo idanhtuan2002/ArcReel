@@ -461,6 +461,20 @@ describe("other phases", () => {
     ]);
   });
 
+  it("queues a translation of a story handed to video", async () => {
+    current = run({
+      phase: "COMMITTED",
+      handoff: { command_id: "cmd-1", filename: "cuon-so", export_digest: "sha256:export", done: true, path: "source/cuon-so.txt" },
+    });
+    routes["/story-translations"] = () => json({ queued: true, target_language: "fr" });
+    render(<StoryAuthoringPage projectName="demo" />);
+    fireEvent.change(await screen.findByLabelText("Translate the story into"), { target: { value: "fr" } });
+    fireEvent.click(screen.getByRole("button", { name: "Translate" }));
+
+    expect(await screen.findByText(/the translation is written to translations\//)).toBeInTheDocument();
+    expect(posted("/story-translations")).toEqual([{ target_language: "fr" }]);
+  });
+
   it("withdraws an approved story only on a second click and says running video jobs continue", async () => {
     current = run({
       phase: "COMMITTED",

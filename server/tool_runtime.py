@@ -138,6 +138,8 @@ from lib.source_loader import (
     UnsupportedFormatError,
 )
 from lib.source_revision import SourceScope
+from lib.story_translation import TranslationError
+from lib.story_translation import translate_story as run_story_translation
 from lib.text_backends.base import TextGenerationRequest as BackendTextGenerationRequest
 from lib.text_backends.base import TextGenerationResult as BackendTextGenerationResult
 from lib.text_backends.base import TextTaskType
@@ -416,6 +418,7 @@ _TEXT_REFERENCE_SCRIPT_PLAN = "text_reference_script_plan"
 _TEXT_EPISODE_PLAN = "text_episode_plan"
 TEXT_ASSET_INVENTORY = "text_asset_inventory"
 TEXT_EPISODE_ADAPTATION = "text_episode_adaptation"
+TEXT_STORY_TRANSLATION = "text_story_translation"
 _TEXT_TASK_SERVICES: dict[str, Services] = {}
 
 
@@ -508,6 +511,8 @@ async def _submit_text_task(
             return ToolOutcome(value=PlanEpisodesResult.model_validate(result))
         if task_type == TEXT_EPISODE_ADAPTATION:
             return ToolOutcome(value=AdaptEpisodeResult.model_validate(result))
+        if task_type == TEXT_STORY_TRANSLATION:
+            return ToolOutcome(value=TranslateStoryResult.model_validate(result))
         return ToolOutcome(value=TextGenerationResult(**result))
     except BaseException as exc:
         await cleanup_fresh_generation_batch(
@@ -1574,6 +1579,17 @@ class AdaptEpisodeRequest(BaseModel):
     episode: int = Field(gt=0)
 
 
+class TranslateStoryRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    target_language: Literal["en", "fr", "es", "de", "vi", "zh", "ja", "ko"]
+
+
+class TranslateStoryResult(BaseModel):
+    target_language: str
+    files: list[dict[str, Any]]
+
+
 class AdaptEpisodeResult(BaseModel):
     episode: int
     spoken_seconds: float
@@ -1916,6 +1932,26 @@ async def adapt_episode(
     )
 
 
+async def translate_story(
+    request: ToolRequest[TranslateStoryRequest],
+    scope: ProjectScope,
+    caller: CallerContext,
+    services: Services,
+) -> ToolOutcome[Any]:
+    """Translate the project's story into another language (ADR-0120) as a queued text task."""
+    if problem := await migration_gate(scope, services):
+        return ToolOutcome(problem=problem)
+    return await _submit_text_task(
+        task_type=TEXT_STORY_TRANSLATION,
+        operation="translate_story",
+        unit_id=f"translation-{request.value.target_language}",
+        payload=request.value.model_dump(mode="json"),
+        scope=scope,
+        caller=caller,
+        services=services,
+    )
+
+
 async def execute_queued_text_task(
     task: dict[str, Any], *, planner_cls: type[EpisodePlanner] = EpisodePlanner
 ) -> dict[str, Any]:
@@ -1935,6 +1971,8 @@ async def execute_queued_text_task(
         return await _execute_asset_inventory(task, scope, services)
     if task_type == TEXT_EPISODE_ADAPTATION:
         return await _execute_episode_adaptation(task, scope, services)
+    if task_type == TEXT_STORY_TRANSLATION:
+        return await _execute_story_translation(task, scope, services)
     if task_type == _TEXT_EPISODE_PLAN:
         cancellation_receipts: list[FormalWriteReceipt] = []
         outcome = await _execute_plan_episodes(
@@ -1998,6 +2036,27 @@ async def _execute_episode_adaptation(task: dict[str, Any], scope: ProjectScope,
         problem = ToolProblem("adaptation_failed", str(exc), action=GenerationAction.RETRY.value)
         raise RuntimeError(encode_generation_problem(_queued_generation_problem(problem))) from exc
     return AdaptEpisodeResult.model_validate(result).model_dump(mode="json")
+
+
+async def _execute_story_translation(task: dict[str, Any], scope: ProjectScope, services: Services) -> dict[str, Any]:
+    """Translate the project's story with its script text model; a batch that never passes its checks fails."""
+    payload = task.get("payload") or {}
+    if problem := await migration_gate(scope, services):
+        raise RuntimeError(encode_generation_problem(_queued_generation_problem(problem)))
+    generator = await TextGenerator.create(TextTaskType.SCRIPT, scope.project_name)
+    user_id = str(task.get("user_id") or DEFAULT_USER_ID)
+
+    async def generate(request: BackendTextGenerationRequest) -> BackendTextGenerationResult:
+        return await generator.generate(request, scope.project_name, user_id=user_id)
+
+    project_path = services.projects.get_project_path(scope.project_name)
+    project = await asyncio.to_thread(services.projects.load_project, scope.project_name)
+    try:
+        result = await run_story_translation(project_path, project, str(payload["target_language"]), generate=generate)
+    except TranslationError as exc:
+        problem = ToolProblem("translation_failed", str(exc), action=GenerationAction.RETRY.value)
+        raise RuntimeError(encode_generation_problem(_queued_generation_problem(problem))) from exc
+    return TranslateStoryResult.model_validate(result).model_dump(mode="json")
 
 
 async def _execute_asset_inventory(task: dict[str, Any], scope: ProjectScope, services: Services) -> dict[str, Any]:

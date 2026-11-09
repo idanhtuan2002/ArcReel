@@ -197,3 +197,26 @@ async def test_the_source_preview_lists_the_chapters_a_run_would_read(
         ["Chương 1", "Chương 2"],
         [],
     )
+
+
+async def test_a_story_translation_is_queued_for_the_projects_showrunner(
+    concurrent_session_factory: Factory, grants, projects: ProjectManager, monkeypatch
+):
+    queued: list[tuple[str, str, str]] = []
+
+    async def translate(request, scope, caller, services):
+        from server.tool_runtime import ToolOutcome
+
+        queued.append((request.value.target_language, scope.project_name, caller.source))
+        return ToolOutcome(value={"batch_id": "b"})
+
+    monkeypatch.setattr(story_runs, "translate_story", translate)
+    monkeypatch.setattr(story_runs, "get_project_manager", lambda: projects)
+    async with _client(concurrent_session_factory, grants, projects, interactive=True) as client:
+        response = await client.post(f"/api/v1/projects/{PROJECT}/story-translations", json={"target_language": "en"})
+        refused = await client.post(f"/api/v1/projects/{PROJECT}/story-translations", json={"target_language": "xx"})
+
+    assert response.status_code == 200, response.text
+    assert response.json() == {"queued": True, "target_language": "en"}
+    assert queued == [("en", PROJECT, "mcp")]
+    assert refused.status_code == 422

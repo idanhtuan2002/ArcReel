@@ -819,3 +819,43 @@ async def test_cancel_during_invalid_script_plan_quarantine_leaves_no_workflow_b
     assert not draft_path.exists()
     status = WorkflowStateService(projects).get_status(project_name)
     assert all(blocker.code != "script_plan_quarantined" for blocker in status.blockers)
+
+
+async def test_a_queued_story_translation_runs_the_translator_and_maps_its_failure(tmp_path: Path, monkeypatch) -> None:
+    from lib.story_translation import TranslationError
+
+    projects = ProjectManager(tmp_path / "projects")
+    projects.create_project("story", content_mode="narration")
+    projects.create_project_metadata("story", "Story", "", "narration")
+    seen: list[str] = []
+
+    class _Generator:
+        async def generate(self, request, project_name, *, user_id):
+            raise AssertionError("not called")
+
+    async def create(_task_type, _project_name):
+        return _Generator()
+
+    async def translate(project_path, project, target, *, generate):
+        seen.append(target)
+        if target == "ja":
+            raise TranslationError("a batch failed its checks after 3 attempts")
+        return {"target_language": target, "files": [{"source": "source/a.txt", "skipped": False, "calls": 1}]}
+
+    monkeypatch.setattr(tool_runtime.TextGenerator, "create", create)
+    monkeypatch.setattr(tool_runtime, "run_story_translation", translate)
+    task = {
+        "task_id": "task-translation",
+        "project_name": "story",
+        "task_type": "text_story_translation",
+        "payload": {"target_language": "en", "projects_root": str(tmp_path / "projects")},
+    }
+
+    result = await execute_queued_text_task(task)
+
+    assert result == {"target_language": "en", "files": [{"source": "source/a.txt", "skipped": False, "calls": 1}]}
+    with pytest.raises(RuntimeError) as failed:
+        await execute_queued_text_task({**task, "payload": {**task["payload"], "target_language": "ja"}})
+    problem = problem_from_task_failure(str(failed.value))
+    assert (problem.code, problem.action) == ("translation_failed", GenerationAction.RETRY)
+    assert seen == ["en", "ja"]

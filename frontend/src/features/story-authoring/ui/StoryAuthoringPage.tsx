@@ -38,6 +38,7 @@ import {
   type StoryRoute,
   type StoryRun,
 } from "../api/storyClient";
+import { TranslateStory } from "./TranslateStory";
 import { StorySourcePicker, type StorySource } from "@/features/production-run/ui/StorySourcePicker";
 import {
   BookContinuationNote,
@@ -1325,6 +1326,7 @@ function Approved({
           <Link href="/source" className="sa-btn sa-btn-accent mt-3 inline-flex">
             {t("story_continue_to_source")}
           </Link>
+          <TranslateStory projectName={projectName} />
         </>
       ) : (
         <p className="mt-1 text-xs text-text-2">{t("story_approved_hint")}</p>

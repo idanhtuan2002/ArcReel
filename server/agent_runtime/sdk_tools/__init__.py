@@ -43,6 +43,7 @@ from server.agent_runtime.sdk_tools.episode_planning import (
     adapt_episode_tool,
     plan_episodes_tool,
     reset_episode_planning_tool,
+    translate_story_tool,
 )
 from server.agent_runtime.sdk_tools.generation_batches import cancel_generation_batch_tool, get_generation_batch_tool
 from server.agent_runtime.sdk_tools.patch_episode_meta import patch_episode_meta_tool
@@ -116,6 +117,7 @@ ARCREEL_MCP_TOOL_IDS: tuple[str, ...] = (
     "plan_episodes",
     "reset_episode_planning",
     "adapt_episode",
+    "translate_story",
     "patch_episode_script",
     "patch_episode_meta",
     "patch_project",
@@ -161,6 +163,7 @@ MIGRATION_BLOCKED_TOOL_IDS: frozenset[str] = frozenset(
         "plan_episodes",
         "reset_episode_planning",
         "adapt_episode",
+        "translate_story",
         "patch_episode_script",
     }
 )
@@ -246,6 +249,7 @@ def build_arcreel_mcp_server(*, project_name: str, projects_root: Path, user_id:
         plan_episodes_tool(ctx),
         reset_episode_planning_tool(ctx),
         adapt_episode_tool(ctx),
+        translate_story_tool(ctx),
         patch_episode_script_tool(ctx),
         patch_episode_meta_tool(ctx),
         patch_project_tool(ctx),
