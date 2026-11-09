@@ -220,3 +220,61 @@ async def test_a_story_translation_is_queued_for_the_projects_showrunner(
     assert response.json() == {"queued": True, "target_language": "en"}
     assert queued == [("en", PROJECT, "mcp")]
     assert refused.status_code == 422
+
+
+async def test_a_film_project_imports_its_story_projects_text_without_overwriting_its_own(
+    concurrent_session_factory: Factory, grants, projects: ProjectManager, monkeypatch
+):
+    import json as _json
+
+    from server.story_authoring.service import StoryAuthoringService
+    from server.tool_runtime import CallerContext, CreateProjectToolRequest, Services, ToolRequest, create_project
+
+    class _Unused:
+        pass
+
+    created = await create_project(
+        ToolRequest(
+            CreateProjectToolRequest(
+                name="ben-do", title="Bến đò", content_mode="narration", generation_mode="storyboard"
+            )
+        ),
+        CallerContext(user_id=USER, source="embedded"),
+        Services(projects=projects, workflow_planner=_Unused(), capabilities=_Unused()),
+    )
+    assert created.problem is None
+    story_dir = projects.get_project_path("ben-do")
+    story_json = story_dir / "project.json"
+    story_json.write_text(
+        _json.dumps({**_json.loads(story_json.read_text()), "project_kind": "story"}), encoding="utf-8"
+    )
+    (story_dir / "source").mkdir(exist_ok=True)
+    (story_dir / "source" / "phan-1.txt").write_text("Chương 1\nMinh về làng.", encoding="utf-8")
+    (story_dir / "source" / "phan-2.txt").write_text("Chương 2\nLan đợi.", encoding="utf-8")
+    film_json = projects.get_project_path(PROJECT) / "project.json"
+    film_json.write_text(
+        _json.dumps({**_json.loads(film_json.read_text()), "story_project": "ben-do"}), encoding="utf-8"
+    )
+    film_source = projects.get_project_path(PROJECT) / "source"
+    film_source.mkdir(exist_ok=True)
+    (film_source / "phan-2.txt").write_text("Bản khác của chương 2.", encoding="utf-8")
+
+    async def granted(self, principal, *, user_id, project_name):
+        return None
+
+    monkeypatch.setattr(StoryAuthoringService, "require_source_grant", granted)
+    monkeypatch.setattr(story_runs, "get_project_manager", lambda: projects)
+    async with _client(concurrent_session_factory, grants, projects, interactive=True) as client:
+        first = await client.post(f"/api/v1/projects/{PROJECT}/story-sync")
+        again = await client.post(f"/api/v1/projects/{PROJECT}/story-sync")
+
+    assert first.status_code == 200, first.text
+    assert first.json() == {
+        "story_project": "ben-do",
+        "imported": ["phan-1.txt"],
+        "skipped": [],
+        "conflicts": ["phan-2.txt"],
+    }
+    assert (film_source / "phan-1.txt").read_text(encoding="utf-8").startswith("Chương 1")
+    assert (film_source / "phan-2.txt").read_text(encoding="utf-8") == "Bản khác của chương 2."
+    assert again.json()["skipped"] == ["phan-1.txt"]

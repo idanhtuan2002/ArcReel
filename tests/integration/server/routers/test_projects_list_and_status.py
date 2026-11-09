@@ -143,3 +143,24 @@ class TestProjectsRouter:
             assert isinstance(data["asset_fingerprints"]["storyboards/scene_E1S01.png"], int)
 
     # ---------------------------------------------------------------------------
+
+
+class TestProjectIndexRoute:
+    def test_the_index_pages_the_library_with_kind_and_link(self, tmp_path, monkeypatch):
+        """ADR-0122: the index returns a page of list rows with their kind, link and update time."""
+        from server.services.project_index import PROJECT_INDEX
+
+        monkeypatch.setattr(PROJECT_INDEX, "_rows", {})
+        fake_pm = _FakePM(tmp_path)
+        client = build_projects_client(monkeypatch, fake_pm, _FakeSummaries())
+        with client:
+            resp = client.get("/api/v1/projects/index", params={"kind": "film", "limit": 2})
+            refused = client.get("/api/v1/projects/index", params={"limit": 500})
+
+        assert resp.status_code == 200, resp.text
+        body = resp.json()
+        assert set(body) == {"total", "counts", "offset", "limit", "items"}
+        assert body["limit"] == 2
+        assert len(body["items"]) <= 2
+        assert all(item["project_kind"] == "film" and "updated_at" in item for item in body["items"])
+        assert refused.status_code == 422

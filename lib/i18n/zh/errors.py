@@ -17,6 +17,8 @@ MESSAGES = {
     "jianying_export_failed": "剪映草稿导出失败，请稍后重试",
     "title_required": "项目标题不能为空",
     "project_exists": "项目 '{name}' 已存在",
+    "story_link_on_story_project": "故事项目不能关联故事项目",
+    "story_link_not_a_story": "'{name}' 不是故事项目",
     "script_not_found": "脚本 '{name}' 不存在",
     "script_item_not_found": "剧本中不存在分镜「{id}」",
     "prompt_preview_missing": "该分镜还没有填写提示词",

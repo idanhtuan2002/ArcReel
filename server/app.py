@@ -69,6 +69,7 @@ from server.routers import (
     grids,
     learning,
     onboarding,
+    operations,
     packaging,
     presentations,
     production_runs,
@@ -677,6 +678,7 @@ async def request_logging_middleware(request: Request, call_next):
 # 端点签名里的 CurrentUser 只表示「处理函数要用用户对象」，不承担授权职责。
 # 不挂依赖的两组另有说明，见下方分组注释。
 app.include_router(projects.router, prefix="/api/v1", dependencies=[Depends(get_current_user)], tags=["项目管理"])
+app.include_router(operations.router, prefix="/api/v1", dependencies=[Depends(get_current_user)], tags=["运营总览"])
 app.include_router(characters.router, prefix="/api/v1", dependencies=[Depends(get_current_user)], tags=["角色管理"])
 app.include_router(scenes.router, prefix="/api/v1", dependencies=[Depends(get_current_user)], tags=["场景管理"])
 app.include_router(props.router, prefix="/api/v1", dependencies=[Depends(get_current_user)], tags=["道具管理"])

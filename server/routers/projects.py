@@ -54,6 +54,7 @@ from lib.i18n import Translator
 from lib.json_io import domain_error_on_value_error
 from lib.profile_manifest import ContentMode
 from lib.project_change_hints import project_change_source
+from lib.project_kinds import KIND_FIELD, STORY_LINK_FIELD, linked_story, project_kind
 from lib.project_manager import EmptySourceError, EpisodeScriptReboundError, SourceKind, get_project_manager
 from lib.script_batch_edit import ScriptBatchEditCommand, ScriptBatchEditor, script_revision
 from lib.script_references import annotate_derivative_references
@@ -76,6 +77,7 @@ from server.services.project_archive import (
     ProjectArchiveValidationError,
 )
 from server.services.project_cover import resolve_project_cover
+from server.services.project_index import PROJECT_INDEX, page_of
 from server.services.prompt_preview import ScriptItemNotFound, preview_item_prompts
 from server.story_authoring.audits import CONTENT_SAFETY_SETTING
 
@@ -211,6 +213,9 @@ def _validated_speech_rate(value: float, _t: Translator) -> float:
 class CreateProjectRequest(BaseModel):
     name: str | None = None
     title: str | None = None
+    # ADR-0122：story = 独立的故事项目；film（缺省）= 成片项目，可经 story_project 关联其改编的故事项目
+    project_kind: Literal["story", "film"] = "film"
+    story_project: str | None = None
     style: str | None = ""  # 保留但不再是用户入口
     content_mode: ContentMode | None = "narration"
     # 源文件性质（novel / screenplay），缺省 novel；创建即定、之后不可变。
@@ -545,87 +550,116 @@ async def export_jianying_draft(
     )
 
 
+def _project_row(manager: Any, summaries: WorkflowStateService, name: str) -> dict[str, Any]:
+    """One project's list row: title, style, cover and project-level status (the library and the index)."""
+    try:
+        # 尝试加载项目元数据
+        if manager.project_exists(name):
+            project = manager.load_project(name)
+            # 一次性预加载每集剧本，喂给 cover + status 两路下游，去除重复 JSON I/O。
+            # key 为 episode['script_file'] 原值（match resolve_project_cover /
+            # 项目摘要投影对 key 的期望）。任何一集加载失败都不影响列表：
+            # 仅跳过入 map，下游消费者自然按"缺失"路径兜底。
+            preloaded_scripts: dict[str, dict] = {}
+            for ep in project.get("episodes") or []:
+                script_file = ep.get("script_file")
+                if not script_file:
+                    continue
+                try:
+                    preloaded_scripts[script_file] = manager.load_script(name, script_file)
+                except (FileNotFoundError, OSError, json.JSONDecodeError, ValueError) as load_err:
+                    # 与 resolve_project_cover / 项目摘要投影对齐：I/O 缺失 +
+                    # JSON/schema 解析失败 → 跳过此集，继续预加载其他集；
+                    # 非预期异常（RuntimeError/MemoryError 等）让其冒泡到外层 try，走 basic info 兜底行。
+                    logger.debug(
+                        "list_projects 预加载剧本失败 project=%s script=%s err=%s",
+                        name,
+                        script_file,
+                        load_err,
+                    )
+
+            # 封面走 resolve_project_cover fallback 链：
+            # video_thumbnail → storyboard_image → scene_sheet → character_sheet
+            # —— 同时覆盖分镜图生视频（含宫格装配）与参考生视频。
+            thumbnail = resolve_project_cover(manager, name, project, preloaded_scripts=preloaded_scripts)
+
+            # 阶段与产物计数一律来自项目摘要投影（读时计算，产物口径取产物清单）。
+            # 列表只看清单登记与文件在场：逐件比对规范状态要哈希每个项目的
+            # 全部分镜图与引用图，N 个项目的列表付不起这个代价。
+            status = _project_status_payload(
+                summaries.get_project_summary(
+                    name,
+                    preloaded_scripts=preloaded_scripts,
+                    currency="registered",
+                )
+            )
+
+            raw_title = project.get("title")
+            return {
+                "name": name,
+                # title 缺失/为 None/类型异常时统一归一为空串,前端 i18n
+                # 兜底显示「未命名项目」,确保接口契约始终返回 str。
+                "title": raw_title if isinstance(raw_title, str) else "",
+                "style": project.get("style", ""),
+                "style_template_id": project.get("style_template_id"),
+                "style_image": project.get("style_image"),
+                "thumbnail": thumbnail,
+                "status": status,
+                "project_kind": project_kind(project),
+                "story_project": linked_story(project),
+            }
+        # 没有 project.json 的项目
+        return {
+            "name": name,
+            "title": "",
+            "style": "",
+            "thumbnail": None,
+            "status": {},
+            "project_kind": "film",
+            "story_project": None,
+        }
+    except Exception as e:
+        # 出错时返回基本信息
+        logger.warning("加载项目 '%s' 元数据失败: %s", name, e)
+        return {
+            "name": name,
+            "title": "",
+            "style": "",
+            "thumbnail": None,
+            "status": {},
+            "project_kind": "film",
+            "story_project": None,
+        }
+
+
 @router.get("/projects")
 async def list_projects(summaries: WorkflowStateServiceDep):
     """列出所有项目"""
 
     def _sync():
         manager = get_project_manager()
-        projects = []
-        for name in manager.list_projects():
-            try:
-                # 尝试加载项目元数据
-                if manager.project_exists(name):
-                    project = manager.load_project(name)
-                    # 一次性预加载每集剧本，喂给 cover + status 两路下游，去除重复 JSON I/O。
-                    # key 为 episode['script_file'] 原值（match resolve_project_cover /
-                    # 项目摘要投影对 key 的期望）。任何一集加载失败都不影响列表：
-                    # 仅跳过入 map，下游消费者自然按"缺失"路径兜底。
-                    preloaded_scripts: dict[str, dict] = {}
-                    for ep in project.get("episodes") or []:
-                        script_file = ep.get("script_file")
-                        if not script_file:
-                            continue
-                        try:
-                            preloaded_scripts[script_file] = manager.load_script(name, script_file)
-                        except (FileNotFoundError, OSError, json.JSONDecodeError, ValueError) as load_err:
-                            # 与 resolve_project_cover / 项目摘要投影对齐：I/O 缺失 +
-                            # JSON/schema 解析失败 → 跳过此集，继续预加载其他集；
-                            # 非预期异常（RuntimeError/MemoryError 等）让其冒泡到外层 try，走 basic info 兜底行。
-                            logger.debug(
-                                "list_projects 预加载剧本失败 project=%s script=%s err=%s",
-                                name,
-                                script_file,
-                                load_err,
-                            )
+        return {"projects": [_project_row(manager, summaries, name) for name in manager.list_projects()]}
 
-                    # 封面走 resolve_project_cover fallback 链：
-                    # video_thumbnail → storyboard_image → scene_sheet → character_sheet
-                    # —— 同时覆盖分镜图生视频（含宫格装配）与参考生视频。
-                    thumbnail = resolve_project_cover(manager, name, project, preloaded_scripts=preloaded_scripts)
+    return await asyncio.to_thread(_sync)
 
-                    # 阶段与产物计数一律来自项目摘要投影（读时计算，产物口径取产物清单）。
-                    # 列表只看清单登记与文件在场：逐件比对规范状态要哈希每个项目的
-                    # 全部分镜图与引用图，N 个项目的列表付不起这个代价。
-                    status = _project_status_payload(
-                        summaries.get_project_summary(
-                            name,
-                            preloaded_scripts=preloaded_scripts,
-                            currency="registered",
-                        )
-                    )
 
-                    raw_title = project.get("title")
-                    projects.append(
-                        {
-                            "name": name,
-                            # title 缺失/为 None/类型异常时统一归一为空串,前端 i18n
-                            # 兜底显示「未命名项目」,确保接口契约始终返回 str。
-                            "title": raw_title if isinstance(raw_title, str) else "",
-                            "style": project.get("style", ""),
-                            "style_template_id": project.get("style_template_id"),
-                            "style_image": project.get("style_image"),
-                            "thumbnail": thumbnail,
-                            "status": status,
-                        }
-                    )
-                else:
-                    # 没有 project.json 的项目
-                    projects.append(
-                        {
-                            "name": name,
-                            "title": "",
-                            "style": "",
-                            "thumbnail": None,
-                            "status": {},
-                        }
-                    )
-            except Exception as e:
-                # 出错时返回基本信息
-                logger.warning("加载项目 '%s' 元数据失败: %s", name, e)
-                projects.append({"name": name, "title": "", "style": "", "thumbnail": None, "status": {}})
+@router.get("/projects/index")
+async def project_index(
+    summaries: WorkflowStateServiceDep,
+    q: Annotated[str | None, Query(max_length=200)] = None,
+    kind: Annotated[Literal["all", "story", "film"], Query()] = "all",
+    stage: Annotated[str | None, Query(max_length=64)] = None,
+    sort: Annotated[Literal["updated", "title", "stage"], Query()] = "updated",
+    offset: Annotated[int, Query(ge=0)] = 0,
+    limit: Annotated[int, Query(ge=1, le=200)] = 50,
+):
+    """ADR-0122: one page of the project library for thousands of projects — searched, filtered by kind and stage,
+    sorted, with counts per kind. Rows come from a cache refreshed only for projects whose files changed."""
 
-        return {"projects": projects}
+    def _sync():
+        manager = get_project_manager()
+        rows = PROJECT_INDEX.rows(manager, lambda name: _project_row(manager, summaries, name))
+        return page_of(rows, q=q, kind=kind, stage=stage, sort=sort, offset=offset, limit=limit)
 
     return await asyncio.to_thread(_sync)
 
@@ -691,6 +725,12 @@ async def create_project(
                 else _validated_episode_target_duration(req.episode_target_duration, _t)
             )
 
+            story_link = (req.story_project or "").strip() or None
+            if story_link is not None:
+                if req.project_kind == "story":
+                    raise HTTPException(status_code=400, detail=_t("story_link_on_story_project"))
+                if not manager.project_exists(story_link) or project_kind(manager.load_project(story_link)) != "story":
+                    raise HTTPException(status_code=400, detail=_t("story_link_not_a_story", name=story_link))
             try:
                 manager.create_project(project_name, content_mode=req.content_mode or "narration")
             except FileExistsError as exc:
@@ -702,6 +742,10 @@ async def create_project(
             # 两字段恒写显式值（grid_storyboard 默认 false 也落盘），新项目即 v5 完整形态
             extras["generation_mode"] = req.generation_mode
             extras["grid_storyboard"] = req.grid_storyboard
+            if req.project_kind == "story":
+                extras[KIND_FIELD] = "story"
+            elif story_link is not None:
+                extras[STORY_LINK_FIELD] = story_link
             if speech_rate is not None:
                 extras[SPEECH_RATE_FIELD] = speech_rate
             with project_change_source("webui"):

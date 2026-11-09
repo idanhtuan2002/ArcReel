@@ -17,6 +17,8 @@ MESSAGES = {
     "jianying_export_failed": "Jianying draft export failed, please try again later",
     "title_required": "Project title cannot be empty",
     "project_exists": "Project '{name}' already exists",
+    "story_link_on_story_project": "A story project cannot link a story project",
+    "story_link_not_a_story": "'{name}' is not a story project",
     "script_not_found": "Script '{name}' does not exist",
     "script_item_not_found": "Shot '{id}' does not exist in this script",
     "prompt_preview_missing": "This shot has no prompt written yet",

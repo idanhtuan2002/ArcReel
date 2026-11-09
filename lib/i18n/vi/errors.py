@@ -17,6 +17,8 @@ MESSAGES = {
     "jianying_export_failed": "Xuất bản nháp Jianying thất bại, vui lòng thử lại sau",
     "title_required": "Tên dự án không được để trống",
     "project_exists": "Dự án '{name}' đã tồn tại",
+    "story_link_on_story_project": "Dự án truyện không liên kết tới dự án truyện khác",
+    "story_link_not_a_story": "'{name}' không phải dự án truyện",
     "script_not_found": "Kịch bản '{name}' không tồn tại",
     "script_item_not_found": "Không có phân cảnh '{id}' trong kịch bản này",
     "prompt_preview_missing": "Phân cảnh này chưa có lời nhắc",

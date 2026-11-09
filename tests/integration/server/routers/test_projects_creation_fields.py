@@ -320,3 +320,36 @@ class TestProjectsRouter:
             )
             assert enabled.status_code == 200
             assert enabled.json()["project"]["grid_storyboard"] is True
+
+
+class TestProjectKinds:
+    def test_a_story_project_and_a_film_project_that_adapts_it(self, tmp_path, monkeypatch):
+        """ADR-0122: a story project is marked; a film project names the story project it adapts."""
+        fake_pm = _FakePM(tmp_path)
+        fake_pm.project_exists = lambda name: name in fake_pm.project_data
+        client = build_projects_client(monkeypatch, fake_pm)
+        base = {"generation_mode": "storyboard", "content_mode": "narration"}
+        with client:
+            story = client.post(
+                "/api/v1/projects", json={**base, "title": "Bến đò", "name": "ben-do", "project_kind": "story"}
+            )
+            assert story.status_code == 200, story.text
+            assert fake_pm.project_data["ben-do"]["project_kind"] == "story"
+
+            film = client.post(
+                "/api/v1/projects",
+                json={**base, "title": "Bến đò phim", "name": "ben-do-phim", "story_project": "ben-do"},
+            )
+            assert film.status_code == 200, film.text
+            assert fake_pm.project_data["ben-do-phim"]["story_project"] == "ben-do"
+            assert "project_kind" not in fake_pm.project_data["ben-do-phim"]
+
+            not_story = client.post(
+                "/api/v1/projects", json={**base, "title": "x", "name": "x-1", "story_project": "ben-do-phim"}
+            )
+            assert not_story.status_code == 400
+            story_link = client.post(
+                "/api/v1/projects",
+                json={**base, "title": "y", "name": "y-1", "project_kind": "story", "story_project": "ben-do"},
+            )
+            assert story_link.status_code == 400

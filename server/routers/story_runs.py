@@ -7,6 +7,7 @@ the service, the project's Showrunner grant.
 from __future__ import annotations
 
 import asyncio
+from pathlib import Path
 from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -15,6 +16,8 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from lib.config.resolver import ConfigResolver
 from lib.db import async_session_factory
+from lib.episode_ledger import discover_sources, normalize_source_text
+from lib.project_kinds import linked_story
 from lib.project_manager import get_project_manager
 from r2.narrative_lifecycle.errors import NarrativeDecisionAuthorizationError
 from server.auth import CurrentUser, InteractiveUser
@@ -183,6 +186,55 @@ async def translate_project_story(
     if outcome.problem is not None:
         raise HTTPException(status_code=409, detail={"code": outcome.problem.code, "detail": outcome.problem.detail})
     return {"queued": True, "target_language": req.target_language}
+
+
+@router.post("/projects/{project_name}/story-sync")
+async def sync_linked_story(project_name: str, user: InteractiveUser, service: Service) -> dict:
+    """ADR-0122: a film project imports the story text of the story project it adapts. Files it does not hold yet
+    are added to its sources; files it holds with the same text are skipped; a file it holds with other text is
+    never overwritten and is reported, because episodes may already be planned from it."""
+    projects = get_project_manager()
+    try:
+        film = await asyncio.to_thread(projects.load_project, project_name)
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail={"code": "PROJECT_NOT_FOUND", "detail": project_name}) from None
+    story = linked_story(film)
+    if story is None:
+        raise HTTPException(status_code=409, detail={"code": "NO_STORY_LINK", "detail": "the project adapts no story"})
+    try:
+        await service.require_source_grant(user.sub, user_id=user.id, project_name=project_name)
+        await service.require_source_grant(user.sub, user_id=user.id, project_name=story)
+    except REFUSALS as error:
+        raise _refusal(error) from error
+    docs = await asyncio.to_thread(discover_sources, projects.get_project_path(story))
+    source_dir = projects.get_project_path(project_name) / "source"
+    scope = ProjectScope(project_name=project_name, projects_root=projects.projects_root)
+    services = Services(
+        projects=projects,
+        workflow_planner=workflow_planner.get_workflow_planner(projects),
+        capabilities=ConfigResolver(async_session_factory),
+    )
+    imported: list[str] = []
+    skipped: list[str] = []
+    conflicts: list[str] = []
+    for doc in docs:
+        filename = Path(doc.rel_path).name
+        target = source_dir / filename
+        if target.exists():
+            held = await asyncio.to_thread(target.read_text, encoding="utf-8")
+            (skipped if normalize_source_text(held) == doc.text else conflicts).append(filename)
+            continue
+        outcome = await upload_source(
+            ToolRequest(UploadSourceRequest(filename=filename, content=doc.text, on_conflict="fail")),
+            scope,
+            CallerContext(user_id=user.id, source="embedded"),
+            services,
+        )
+        if outcome.problem is not None:
+            conflicts.append(filename)
+        else:
+            imported.append(filename)
+    return {"story_project": story, "imported": imported, "skipped": skipped, "conflicts": conflicts}
 
 
 @router.get("/projects/{project_name}/story-sources/preview")
