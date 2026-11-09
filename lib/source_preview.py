@@ -17,7 +17,8 @@ from lib.text_attestation import has_cjk
 
 _NUMBER = (
     r"(?:[0-9]+|[ivxlcdm]+|một|hai|ba|bốn|tư|năm|sáu|bảy|tám|chín|mười|mươi|cuối|đầu|one|two|three|four|five|six|"
-    r"seven|eight|nine|ten|first|last)"
+    r"seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty|"
+    r"thirty|forty|fifty|first|last)"
 )
 #: A heading is a short line: a keyword and a number (``Chương 1``, ``CHƯƠNG XII``, ``Chapter three``, ``Hồi 2:``),
 #: ``第3章``, or a Markdown heading. ``Hồi đó, ...`` and ``Phần lớn ...`` are prose, not headings.
@@ -27,6 +28,8 @@ _HEADING = re.compile(
     + r"\b[^\n]{0,80}|第[ \t]*[0-9一二三四五六七八九十百千零两]+[ \t]*[章回节][^\n]{0,80})[ \t]*$",
     re.IGNORECASE | re.MULTILINE,
 )
+_SENTENCE_END = re.compile(r"[.!?…,;][ \t]*$")
+_STRONG = re.compile(r"[ \t]*(?:#|第|chương|chuong|chapter)", re.IGNORECASE)
 LONG_CHAPTER_CHARS = 40_000
 HEADINGS_SHOWN = 40
 
@@ -42,7 +45,8 @@ class SourcePreview:
 
 def preview_source(doc: SourceDoc) -> SourcePreview:
     text = doc.text
-    matches = list(_HEADING.finditer(text))
+    # "Hồi năm ấy, ..." or "Phần ba còn lại ..." is a sentence: a heading never ends like one.
+    matches = [m for m in _HEADING.finditer(text) if not _SENTENCE_END.search(m.group(0)) or _STRONG.match(m.group(0))]
     warnings: list[str] = []
     if not text.strip():
         warnings.append("EMPTY")

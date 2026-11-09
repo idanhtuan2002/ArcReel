@@ -96,3 +96,14 @@ async def test_a_batch_that_never_passes_fails_and_the_story_language_is_refused
         await translate_story(tmp_path, PROJECT, "vi", generate=broken)
     with pytest.raises(TranslationError, match="no story text"):
         await translate_story(tmp_path / "empty", PROJECT, "en", generate=broken)
+
+
+def test_a_vietnamese_batch_with_a_stray_han_character_is_judged_as_vietnamese():
+    source = ["Lão đạo sĩ viết chữ 道 lên tấm bảng gỗ trước cổng chùa, rồi lặng lẽ bỏ đi trong sương sớm."]
+    assert (
+        check_batch(source, ["老道士在寺门前的木板上写了一个道字，然后在晨雾中悄然离去。"], target="zh", terms=[]) == []
+    )
+
+
+def test_a_cjk_name_must_be_kept_as_written():
+    assert check_batch(["李明走进房间。"], ["Lý Minh bước vào phòng."], target="vi", terms=["李明"])

@@ -34,3 +34,10 @@ def test_prose_that_starts_with_a_heading_word_is_not_a_chapter():
     preview = preview_source(SourceDoc(rel_path="source/a.txt", text=text))
 
     assert preview.headings == ("Chương 1", "Chương hai")
+
+
+def test_sentences_with_numeral_words_are_not_headings_and_english_numbers_go_past_ten():
+    text = "Hồi năm ấy, mẹ tôi còn trẻ.\n\nPhần ba còn lại thuộc về anh.\n\nChapter Eleven\nRain.\n\nChương 3.\nĐêm."
+    preview = preview_source(SourceDoc(rel_path="source/a.txt", text=text))
+
+    assert preview.headings == ("Chapter Eleven", "Chương 3.")

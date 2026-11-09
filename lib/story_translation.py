@@ -88,8 +88,11 @@ def protected_terms(project: Mapping[str, Any]) -> list[str]:
 
 
 def _written_as_name(term: str, text: str) -> bool:
-    """``term`` occurs in ``text`` exactly as written, capitalized, and not as part of a longer word: "Hoa" names
-    someone in "Hoa cười", not in "vườn hoa"."""
+    """``term`` occurs in ``text`` as a name: a CJK name as written; any other one capitalized and not part of a
+    longer word ("Hoa" names someone in "Hoa cười", not in "vườn hoa"). A name that is also a word and opens a
+    sentence ("Hoa nở khắp vườn") is still read as a name; the model is told to keep names, so it rarely matters."""
+    if has_cjk(term):
+        return term in text
     if not term[:1].isupper():
         return False
     return re.search(rf"(?<!\w){re.escape(term)}(?!\w)", text) is not None
@@ -129,13 +132,24 @@ def check_batch(source: Sequence[str], translated: Sequence[str], *, target: str
             bare = bare.replace(term, "")
         if target not in CJK_TARGETS and has_cjk(bare):
             problems.append(f"paragraph {index} contains Chinese, Japanese or Korean characters")
-    source_cjk = has_cjk("".join(source))
+    source_cjk = _mostly_cjk("".join(source), terms)
     kind = "same" if source_cjk == (target in CJK_TARGETS) else ("to_cjk" if target in CJK_TARGETS else "from_cjk")
     low, high = LENGTH_BANDS[kind]
     ratio = sum(len(t) for t in translated) / max(1, sum(len(s) for s in source))
     if not low <= ratio <= high:
         problems.append(f"the translation is {ratio:.1f} times the source length; translate fully and only")
     return problems
+
+
+CJK_SHARE = 0.3
+
+
+def _mostly_cjk(text: str, terms: Sequence[str]) -> bool:
+    """Whether the text is written in a CJK script: a stray Han character or a CJK name does not make it so."""
+    for term in terms:
+        text = text.replace(term, "")
+    letters = [c for c in text if not c.isspace()]
+    return bool(letters) and sum(1 for c in letters if has_cjk(c)) / len(letters) > CJK_SHARE
 
 
 def _digest(text: str) -> str:

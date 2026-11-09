@@ -164,9 +164,12 @@ def _recorded_findings(manifest: ManuscriptCommitManifest, quality_record: bytes
         codes = {str(f["id"]): str(f.get("code", "")) for f in findings}
     except (ValueError, KeyError, TypeError, AttributeError):
         return False
-    # ADR-0117: a safety finding left open always goes to the Human, whatever its severity.
+    # ADR-0117: a safety finding left open above stylistic always goes to the Human.
     return all(
-        severities.get(finding) in _ACCEPTABLE_AS_IS and not codes.get(finding, "").startswith(_SAFETY_PREFIX)
+        severities.get(finding) in _ACCEPTABLE_AS_IS
+        and not (
+            codes.get(finding, "").startswith(_SAFETY_PREFIX) and severities.get(finding) != Severity.STYLISTIC.value
+        )
         for finding in manifest.findings_open
     )
 

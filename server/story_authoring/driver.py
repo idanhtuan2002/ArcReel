@@ -2064,7 +2064,8 @@ def run_call_bound(
 
 def variant_call_bound(chapters: int = CHAPTERS) -> int:
     """ADR-0117: the variant review in two rounds and one replan of the outline and every chapter plan."""
-    return 2 * NODE_CAPS["variant_review"] + NODE_CAPS["outline"] + chapters * PLAN_CALLS
+    # A chapter plan repaired after its review sends the plans back to the variant review once more.
+    return (2 + chapters) * NODE_CAPS["variant_review"] + NODE_CAPS["outline"] + chapters * PLAN_CALLS
 
 
 def entity_keys(seed: StorySeed) -> tuple[dict[str, str], dict[str, str]]:
