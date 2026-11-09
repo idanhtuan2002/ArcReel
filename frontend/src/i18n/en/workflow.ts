@@ -163,6 +163,10 @@ export default {
   // ---- Automatic production ----
   'auto_title': 'Automatic production',
   'auto_idea_label': 'Story idea',
+  'auto_story_source': 'Story',
+  'auto_story_from_idea': 'From an idea (write a new story)',
+  'auto_story_from_project': 'From the story in this project',
+  'auto_story_from_project_hint': "The run skips writing and films the story already uploaded to this project's sources (complete or still growing: newly appended chapters become new episodes).",
   'auto_idea_placeholder': 'One or two sentences about the story',
   'auto_mode_auto': 'Automatic',
   'auto_mode_semi': 'Semi-automatic',

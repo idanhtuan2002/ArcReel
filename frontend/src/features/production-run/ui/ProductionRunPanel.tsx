@@ -103,6 +103,7 @@ export function ProductionRunPanel({ projectName }: Props) {
     [],
   );
   const [idea, setIdea] = useState("");
+  const [fromProject, setFromProject] = useState(false);
   const [mode, setMode] = useState<AutomationMode>("auto");
   const [episodes, setEpisodes] = useState(1);
   const [historyFilter, setHistoryFilter] = useState<HistoryFilter>("all");
@@ -190,11 +191,11 @@ export function ProductionRunPanel({ projectName }: Props) {
   );
 
   const start = () => {
-    if (!offer?.input_digest || !offer.policy_digests || !idea.trim()) return;
+    if (!offer?.input_digest || !offer.policy_digests || (!fromProject && !idea.trim())) return;
     const command = {
       command_id: newCommandId(),
       mode,
-      idea: idea.trim(),
+      ...(fromProject ? { story_source: "project" as const } : { idea: idea.trim() }),
       targets: Array.from({ length: episodes }, (_, index) => `episode:${index + 1}`),
       expected_input_digest: offer.input_digest,
       policy_digest: offer.policy_digests[mode],
@@ -313,6 +314,22 @@ export function ProductionRunPanel({ projectName }: Props) {
             start();
           }}
         >
+          <fieldset className="flex flex-wrap gap-3 text-[12px]" style={{ color: "var(--color-text-2)" }}>
+            <legend className="sr-only">{t("auto_story_source")}</legend>
+            <label className="flex items-center gap-1.5">
+              <input type="radio" checked={!fromProject} onChange={() => setFromProject(false)} />
+              {t("auto_story_from_idea")}
+            </label>
+            <label className="flex items-center gap-1.5">
+              <input type="radio" checked={fromProject} onChange={() => setFromProject(true)} />
+              {t("auto_story_from_project")}
+            </label>
+          </fieldset>
+          {fromProject ? (
+            <p className="text-[12px]" style={{ color: "var(--color-text-3)" }}>
+              {t("auto_story_from_project_hint")}
+            </p>
+          ) : (
           <label className="block text-[12px]" style={{ color: "var(--color-text-2)" }}>
             {t("auto_idea_label")}
             <textarea
@@ -324,6 +341,8 @@ export function ProductionRunPanel({ projectName }: Props) {
               onChange={(event) => setIdea(event.target.value)}
             />
           </label>
+          )}
+          {!fromProject && (
           <div className="flex flex-wrap items-center gap-1.5 text-[11.5px]">
             <span style={{ color: "var(--color-text-3)" }}>{t("auto_examples")}</span>
             {EXAMPLE_IDEAS.map((key) => (
@@ -338,6 +357,7 @@ export function ProductionRunPanel({ projectName }: Props) {
               </button>
             ))}
           </div>
+          )}
           <fieldset className="flex flex-wrap items-center gap-3 text-[12px]" style={{ color: "var(--color-text-2)" }}>
             <label className="flex items-center gap-1">
               <input type="radio" checked={mode === "auto"} onChange={() => setMode("auto")} />
@@ -366,7 +386,7 @@ export function ProductionRunPanel({ projectName }: Props) {
               </select>
             </label>
           )}
-          <button type="submit" className={BUTTON_CLS} style={PRIMARY_STYLE} disabled={busy || !idea.trim()}>
+          <button type="submit" className={BUTTON_CLS} style={PRIMARY_STYLE} disabled={busy || (!fromProject && !idea.trim())}>
             {busy ? t("auto_starting") : t("auto_start")}
           </button>
         </form>

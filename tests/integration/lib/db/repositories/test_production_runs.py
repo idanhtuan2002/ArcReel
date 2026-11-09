@@ -81,6 +81,29 @@ def intent_for(run, unit="project", cost=60):
     )
 
 
+def test_a_story_source_left_at_its_default_never_enters_the_stored_command():
+    written = command()
+    assert "story_source" not in written.model_dump(mode="json")
+    assert command(idea=None, story_source="project").model_dump(mode="json")["story_source"] == "project"
+    with pytest.raises(ValueError, match="idea"):
+        command(story_source="project")
+    with pytest.raises(ValueError, match="idea"):
+        command(idea=None)
+
+
+async def test_a_run_of_the_projects_story_starts_at_asset_analysis(concurrent_session_factory):
+    from lib.db.repositories.production_runs import ProductionRunRepository
+    from r2.contracts.automation import RunScope, RunStage
+
+    run = await create_run(concurrent_session_factory, idea=None, story_source="project")
+    assert run.stage is RunStage.ASSET_ANALYSIS
+    async with concurrent_session_factory() as session:
+        stored = await ProductionRunRepository(session).start_command(
+            RunScope(user_id=run.user_id, project_name=run.project_name, run_id=run.run_id)
+        )
+    assert (stored.story_source, stored.idea) == ("project", None)
+
+
 async def test_start_command_replay_returns_same_run(concurrent_session_factory):
     from lib.db.models.production_run import ProductionRunModel
 

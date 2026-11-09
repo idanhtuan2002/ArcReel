@@ -313,13 +313,18 @@ class RunCommand(AutomationContract):
     run_id: ExactIdentity | None = None
     idea: Annotated[str, StringConstraints(min_length=1, max_length=4000)] | None = None
     targets: tuple[ExactIdentity, ...] = ("episode:1",)
+    #: ``idea`` writes a new story first; ``project`` films the story already in the project's sources (ADR-0115).
+    #: Left out of the stored command at its default, so earlier commands keep their digests.
+    story_source: Literal["idea", "project"] = Field(default="idea", exclude_if=lambda value: value == "idea")
 
     @model_validator(mode="after")
     def command_shape(self) -> Self:
         if self.action == "START":
-            if self.idea is None or self.run_id is not None or self.expected_version != 0:
-                raise ValueError("start requires idea and genesis version")
-        elif self.run_id is None or self.expected_version < 1 or self.idea is not None:
+            if self.run_id is not None or self.expected_version != 0:
+                raise ValueError("start requires the genesis version")
+            if (self.idea is None) != (self.story_source == "project"):
+                raise ValueError("start requires an idea, or the project's story without one")
+        elif self.run_id is None or self.expected_version < 1 or self.idea is not None or self.story_source != "idea":
             raise ValueError("control requires an exact existing run")
         if not self.targets or len(set(self.targets)) != len(self.targets):
             raise ValueError("target selection must be nonempty and unique")

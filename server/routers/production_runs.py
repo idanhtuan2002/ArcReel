@@ -53,7 +53,9 @@ class _Body(BaseModel):
 
 class StartBody(_Body):
     mode: AutomationMode = AutomationMode.AUTO
-    idea: str = Field(min_length=1, max_length=4000)
+    #: Required unless ``story_source`` is ``project`` (the story already in the project's sources, ADR-0115).
+    idea: str | None = Field(default=None, min_length=1, max_length=4000)
+    story_source: Literal["idea", "project"] = "idea"
     targets: tuple[str, ...] = ("episode:1",)
     expected_input_digest: str = Field(pattern=_DIGEST)
     policy_digest: str = Field(pattern=_DIGEST)
@@ -228,6 +230,7 @@ async def start_run(
             mode=body.mode,
             idea=body.idea,
             targets=body.targets,
+            story_source=body.story_source,
         )
     except ValueError as error:
         raise _invalid() from error

@@ -27,7 +27,9 @@ const base = (projectName: string) => `/projects/${encodeURIComponent(projectNam
 export interface StartCommand {
   command_id: string;
   mode: AutomationMode;
-  idea: string;
+  /** Omitted when ``story_source`` is ``project``: the run films the story already in the project (ADR-0115). */
+  idea?: string;
+  story_source?: "idea" | "project";
   targets: string[];
   expected_input_digest: string;
   policy_digest: string;

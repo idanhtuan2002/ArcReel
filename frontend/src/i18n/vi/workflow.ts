@@ -165,6 +165,10 @@ export default {
   // ---- Automatic production ----
   'auto_title': 'Sản xuất tự động',
   'auto_idea_label': 'Ý tưởng truyện',
+  'auto_story_source': 'Truyện',
+  'auto_story_from_idea': 'Từ ý tưởng (viết truyện mới)',
+  'auto_story_from_project': 'Từ truyện có sẵn trong dự án',
+  'auto_story_from_project_hint': 'Run bỏ qua bước viết truyện và làm phim từ truyện đã tải vào nguồn của dự án (đã hoàn thành hay đang viết dở: chương thêm sau sẽ thành tập mới).',
   'auto_idea_placeholder': 'Một hai câu về câu chuyện',
   'auto_mode_auto': 'Tự động',
   'auto_mode_semi': 'Bán tự động',

@@ -324,6 +324,7 @@ def compose_production(
         preflight=preflight,
         activation=activation,
         on_change=scheduler.wake,
+        has_story=witness.has_source_text,
     )
     return service, scheduler
 

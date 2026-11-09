@@ -153,6 +153,7 @@ async def host(concurrent_session_factory, tmp_path, interactive_env):
             preflight=preflight,
             activation=ProductionActivation(enabled=True),
             on_change=scheduler.wake,
+            has_story=_has_story,
         )
         app.include_router(production_runs.router, prefix="/api/v1", dependencies=AUTH_DEPENDENCIES)
         register_error_handlers(app)
@@ -263,6 +264,34 @@ async def test_start_requires_an_authenticated_session(host):
         },
     )
     assert response.status_code == 401
+
+
+STORIES = {"has": True}
+
+
+async def _has_story(_project_name: str) -> bool:
+    return STORIES["has"]
+
+
+async def test_a_run_from_the_projects_story_needs_no_idea_and_starts_at_asset_analysis(host):
+    offer = (await host.http.get(BASE, headers=host.headers)).json()["start"]
+    body = {
+        "command_id": "start-from-project",
+        "story_source": "project",
+        "expected_input_digest": offer["input_digest"],
+        "policy_digest": offer["policy_digests"]["auto"],
+    }
+    both = await host.http.post(BASE, json={**body, "idea": "Chuyến đò cuối."}, headers=host.headers)
+    assert both.status_code == 422
+    STORIES["has"] = False
+    try:
+        missing = await host.http.post(BASE, json=body, headers=host.headers)
+    finally:
+        STORIES["has"] = True
+    assert (missing.status_code, missing.json()["detail"]["code"]) == (409, "PROJECT_SOURCE_MISSING")
+    started = await host.http.post(BASE, json=body, headers=host.headers)
+    assert started.status_code == 200, started.text
+    assert started.json()["stage"] == "ASSET_ANALYSIS"
 
 
 @pytest.mark.parametrize("moved", ["input", "policy", "preflight"])

@@ -38,6 +38,11 @@ _TERMINAL = {RunStatus.SUCCEEDED, RunStatus.FAILED, RunStatus.FAILED_QUALITY, Ru
 _CLAIMABLE = (RunStatus.PENDING.value, RunStatus.RUNNING.value, RunStatus.WAITING_TASK.value)
 
 
+def first_stage(command: RunCommand) -> RunStage:
+    """Where a run starts: writing a story from its idea, or analysing the project's story (ADR-0115)."""
+    return RunStage.ASSET_ANALYSIS if command.story_source == "project" else RunStage.BRIEF
+
+
 class ProductionRunConflict(RuntimeError):
     """A command or scope does not match its durable identity."""
 
@@ -167,6 +172,7 @@ class ProductionRunRepository:
             input_digest=command.expected_input_digest,
             targets=command.targets,
             created_at=now,
+            stage=first_stage(command),
         )
         self.session.add(
             ProductionPolicyModel(

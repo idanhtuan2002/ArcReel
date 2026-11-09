@@ -7,7 +7,7 @@ them. Each command fences the controller lease of the run it changes.
 
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime, timedelta
 
 from fastapi import HTTPException
@@ -19,6 +19,7 @@ from lib.db.repositories.production_runs import (
     ProductionRunConflict,
     ProductionRunRepository,
     StaleProductionRunError,
+    first_stage,
 )
 from r2.automation.identity import digest_value, policy_digest
 from r2.contracts.automation import (
@@ -96,6 +97,10 @@ def _changed(run: RunSnapshot, **changes: object) -> RunSnapshot:
     )
 
 
+async def _always_has_story(_project_name: str) -> bool:
+    return True
+
+
 class ProductionRunService:
     def __init__(
         self,
@@ -108,6 +113,7 @@ class ProductionRunService:
         activation: ProductionActivation = RELEASE_GATE_PENDING,
         grant_ttl_seconds: int = 86_400,
         on_change: Callable[[], None] | None = None,
+        has_story: Callable[[str], Awaitable[bool]] | None = None,
     ) -> None:
         self._sessions = sessions
         self._custodian = custodian
@@ -117,6 +123,7 @@ class ProductionRunService:
         self.activation = activation
         self._grant_ttl = timedelta(seconds=grant_ttl_seconds)
         self._on_change = on_change or (lambda: None)
+        self._has_story = has_story or _always_has_story
 
     # Reads ---------------------------------------------------------------------------------------------------
 
@@ -241,6 +248,8 @@ class ProductionRunService:
                 raise ProductionRunRefused("POLICY_MOVED")
             if len(set(command.targets)) != len(command.targets) or len(command.targets) > policy.max_target_episodes:
                 raise ProductionRunRefused("TARGETS_OVER_LIMIT", 422, (str(policy.max_target_episodes),))
+            if command.story_source == "project" and not await self._has_story(command.project_name):
+                raise ProductionRunRefused("PROJECT_SOURCE_MISSING", 409)
             current_input = await self._witness.digest(user_id=command.user_id, project_name=command.project_name)
             if current_input != command.expected_input_digest:
                 raise ProductionRunRefused("INPUT_MOVED")
@@ -327,7 +336,8 @@ class ProductionRunService:
             repository = ProductionRunRepository(session)
             run = await repository.locked(scope)
             if command.action == "RESUME":
-                updated = self._resume(run, command, rebind=rebind)
+                start = await repository.start_command(scope)
+                updated = self._resume(run, command, rebind=rebind, restart=first_stage(start))
             else:
                 updated = await self._mode(repository, run, command, target_policy)
             if updated is run:
@@ -438,7 +448,9 @@ class ProductionRunService:
         reason = None if target is RunStatus.PAUSED else "CANCELLED_BY_USER"
         return _changed(run, status=target, pending_review=None, reason=reason)
 
-    def _resume(self, run: RunSnapshot, command: RunCommand, *, rebind: bool) -> RunSnapshot:
+    def _resume(
+        self, run: RunSnapshot, command: RunCommand, *, rebind: bool, restart: RunStage = RunStage.BRIEF
+    ) -> RunSnapshot:
         if run.status in _ACTIVE and (command.expected_input_digest, command.policy_digest) == (
             run.input_digest,
             policy_digest(run.policy),
@@ -461,7 +473,7 @@ class ProductionRunService:
             pending_review=None,
             input_digest=command.expected_input_digest,
             generation=run.generation + 1,
-            stage=RunStage.BRIEF,
+            stage=restart,
             completed_targets=(),
         )
 

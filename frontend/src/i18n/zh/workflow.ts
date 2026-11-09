@@ -165,6 +165,10 @@ export default {
   // ---- Automatic production ----
   'auto_title': '自动制作',
   'auto_idea_label': '故事构想',
+  'auto_story_source': '故事',
+  'auto_story_from_idea': '从创意出发（写新故事）',
+  'auto_story_from_project': '使用本项目已有的故事',
+  'auto_story_from_project_hint': '运行跳过写作，直接用项目源文件中已上传的故事制作（完结或连载中均可：之后追加的章节会成为新的分集）。',
   'auto_idea_placeholder': '用一两句话描述故事',
   'auto_mode_auto': '全自动',
   'auto_mode_semi': '半自动',

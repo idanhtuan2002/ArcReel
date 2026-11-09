@@ -76,6 +76,20 @@ describe("ProductionRunPanel", () => {
     expect(await screen.findByText("Stage: Story")).toBeInTheDocument();
   });
 
+  it("starts from the project's own story without an idea", async () => {
+    vi.spyOn(client, "listProductionRuns").mockResolvedValue({ start: OFFER, runs: [] });
+    const startProductionRun = vi.spyOn(client, "startProductionRun").mockResolvedValue(snapshot());
+    render(<ProductionRunPanel projectName="alpha" />);
+    fireEvent.click(await screen.findByLabelText("From the story in this project"));
+    expect(screen.queryByPlaceholderText("One or two sentences about the story")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Start" }));
+
+    expect(startProductionRun).toHaveBeenCalledTimes(1);
+    const command = startProductionRun.mock.calls[0][1];
+    expect(command).toMatchObject({ story_source: "project", targets: ["episode:1"] });
+    expect(command).not.toHaveProperty("idea");
+  });
+
   it("shows exactly the pending semi checkpoint and sends its binding", async () => {
     const pending = snapshot({
       status: "WAITING_REVIEW",

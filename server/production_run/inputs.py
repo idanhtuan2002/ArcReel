@@ -54,6 +54,17 @@ class ProjectInputWitness:
     def __init__(self, sessions: Sessions, *, projects: ProjectManager) -> None:
         self._sessions, self._projects = sessions, projects
 
+    async def has_source_text(self, project_name: str) -> bool:
+        """Whether the project's sources hold story text a run can film (ADR-0115 ``story_source = project``)."""
+
+        def read() -> bool:
+            project = self._projects.load_project(project_name)
+            path = self._projects.get_project_path(project_name)
+            revision = compute_source_revision(path, project, SourceScope(kind="all"))
+            return any(doc.text.strip() for doc in revision.documents)
+
+        return await asyncio.to_thread(read)
+
     async def digest(self, *, user_id: str, project_name: str) -> str:
         handed_off = await self._run_sources(user_id, project_name)
         return await asyncio.to_thread(self._digest, project_name, handed_off)
