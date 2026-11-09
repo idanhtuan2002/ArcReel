@@ -178,3 +178,22 @@ async def test_a_book_brief_is_drafted_over_http_and_the_project_has_no_book_yet
     }
     assert refused.status_code == 422
     assert book.json() == {"book": None}
+
+
+async def test_the_source_preview_lists_the_chapters_a_run_would_read(
+    concurrent_session_factory: Factory, grants, projects: ProjectManager
+):
+    source = projects.get_project_path(PROJECT) / "source"
+    source.mkdir(parents=True, exist_ok=True)
+    (source / "truyen.txt").write_text("Chương 1\nMinh về làng.\n\nChương 2\nLan đợi.", encoding="utf-8")
+    async with _client(concurrent_session_factory, grants, projects, interactive=False) as client:
+        response = await client.get(f"/api/v1/projects/{PROJECT}/story-sources/preview")
+
+    assert response.status_code == 200, response.text
+    [preview] = response.json()["sources"]
+    assert (preview["rel_path"], preview["chapters"], preview["headings"], preview["warnings"]) == (
+        "source/truyen.txt",
+        2,
+        ["Chương 1", "Chương 2"],
+        [],
+    )

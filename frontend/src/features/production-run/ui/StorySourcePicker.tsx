@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { API } from "@/api";
+import { SourcePreviewNote } from "./SourcePreviewNote";
 
 /** Where an automatic run's story comes from (ADR-0115). */
 export type StorySource = "idea" | "project" | "continue" | "variant";
@@ -80,6 +81,7 @@ export function StorySourcePicker({
           {t(`auto_story_from_${source}_hint`)}
         </p>
       )}
+      {(source === "project" || source === "continue") && <SourcePreviewNote projectName={projectName} />}
       {source === "variant" && (
         <div className="flex flex-wrap items-center gap-3 text-[12px]" style={{ color: "var(--color-text-2)" }}>
           <label className="flex items-center gap-1.5">

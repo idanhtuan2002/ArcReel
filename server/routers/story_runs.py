@@ -153,6 +153,16 @@ async def draft_brief(project_name: str, req: DraftBriefRequest, user: CurrentUs
     return {"project_name": project_name, "brief": brief.model_dump(mode="json"), "brief_digest": brief.digest()}
 
 
+@router.get("/projects/{project_name}/story-sources/preview")
+async def story_sources_preview(project_name: str, user: CurrentUser, service: Service) -> dict:
+    """What a run would read from the project's sources: each file's chapters, size and warnings (ADR-0118)."""
+    try:
+        await service.require_source_grant(user.sub, user_id=user.id, project_name=project_name)
+    except REFUSALS as error:
+        raise _refusal(error) from error
+    return {"sources": service.source_preview(project_name)}
+
+
 @router.get("/projects/{project_name}/story-book")
 async def story_book(project_name: str, user: CurrentUser, service: Service) -> dict:
     """The project's book (ADR-0116): its spec and how many parts are committed and handed to video."""

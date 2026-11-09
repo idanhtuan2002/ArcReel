@@ -118,6 +118,7 @@ CANON_BASE_NODE = "canon_base"
 NODE_CAPS = {
     "canon_base": 1,
     "variant_review": 2,
+    "arc_summary": 3,
     "seed": 3,
     "story_bible": 3,
     "style_bible": 3,
@@ -517,6 +518,30 @@ class StoryRunDriver:
             summaries.append(PriorSummary.model_validate_json(raw))
             summary_ins.append((node, content_digest(raw)))
         tail = text.strip()[-prior_prompts.PRIOR_TAIL_CHARS :]
+        read = summaries
+        if len(summaries) > prior_prompts.RECENT_CHUNKS:
+            # ADR-0118: earlier chunks reach the lock through arc summaries, so a long novel is read whole.
+            early = summaries[: -prior_prompts.RECENT_CHUNKS]
+            arcs: list[PriorSummary] = []
+            for g in range(0, len(early), prior_prompts.ARC_CHUNKS):
+                group = early[g : g + prior_prompts.ARC_CHUNKS]
+                node = f"arc_summary[{g // prior_prompts.ARC_CHUNKS + 1}]"
+                raw = await self._ensure(
+                    node,
+                    inputs=summary_ins[g : g + len(group)],
+                    decoding=PLANNING,
+                    produce=lambda e, node=node, group=group, g=g: self._json(
+                        node,
+                        e,
+                        StoryStepKind.PRIOR_READING,
+                        prior_prompts.PRIOR_SYSTEM,
+                        prior_prompts.arc_summary_prompt(group, g + 1, g + len(group)),
+                        PriorSummary,
+                    ),
+                )
+                arcs.append(PriorSummary.model_validate_json(raw))
+                summary_ins.append((node, content_digest(raw)))
+            read = [*arcs, *summaries[-prior_prompts.RECENT_CHUNKS :]]
 
         async def lock(epoch: int) -> bytes:
             raw = await self._json(
@@ -524,7 +549,7 @@ class StoryRunDriver:
                 epoch,
                 StoryStepKind.PRIOR_READING,
                 prior_prompts.PRIOR_SYSTEM,
-                prior_prompts.canon_lock_prompt(summaries, tail, mode=prior.mode, omitted=omitted),
+                prior_prompts.canon_lock_prompt(read, tail, mode=prior.mode, omitted=omitted),
                 CanonLock,
             )
             try:
@@ -564,7 +589,11 @@ class StoryRunDriver:
             self._lock = lock
             prior_ins = [lock_in]
             self._prior_context = prior_prompts.prior_context(
-                lock, mode=self._brief.prior.mode, direction=self._brief.idea, part=self._brief.prior.part
+                lock,
+                mode=self._brief.prior.mode,
+                direction=self._brief.idea,
+                part=self._brief.prior.part,
+                style=prior_prompts.style_line(self._blobs.read_exact(self._brief.prior.text_digest).decode("utf-8")),
             )
             idea = self._prior_context
         carried = self._book_state()

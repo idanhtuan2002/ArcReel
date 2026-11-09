@@ -1362,3 +1362,43 @@ async def test_a_variant_that_drops_a_source_event_is_replanned_once_then_offere
     spine = [f for f in _exceptions(blobs, state) if f["code"] == "VARIANT_SPINE"]
     assert len(spine) == 1
     assert "Có phong thư." in spine[0]["message"]
+
+
+async def test_a_long_prior_story_is_read_whole_through_arc_summaries_and_its_voice_is_kept(
+    concurrent_session_factory, tmp_path
+):
+    from server.story_authoring.driver import StoryPrior
+    from server.story_authoring.prompts.prior import split_prior
+
+    store = await _store(concurrent_session_factory)
+    model = ScriptedModel()
+    blobs = StoryBlobStore(tmp_path)
+    paragraph = "Minh và Lan ngồi bên bếp lửa, kể lại chuyện cũ của làng cho nhau nghe trong đêm dài. " * 9
+    text = "\n\n".join(f"{paragraph}Lần thứ {i}." for i in range(140))
+    chunks = len(split_prior(text))
+    assert chunks > 12
+    digest = blobs.put(text.encode("utf-8"))
+    brief = BRIEF.model_copy(update={"prior": StoryPrior(mode="continuation", text_digest=digest)})
+    client = OllamaChatClient(base_url="http://ollama:1", transport=httpx.MockTransport(model.handler))
+    sink = StoryAttemptSink(
+        store=store, session_factory=concurrent_session_factory, provider_id="custom-ollama", model_id=MODEL
+    )
+    gateway = AuthoringTextGateway(selection=SELECTION, limits=LIMITS, client=client, sink=sink)
+    driver = StoryRunDriver(
+        identity=IDENTITY,
+        brief=brief,
+        store=store,
+        gateway=gateway,
+        blobs=blobs,
+        clock=lambda: NOW,
+        retry_delays=(0, 0),
+    )
+
+    state = await driver.run()
+
+    assert state.phase is RunPhase.READY_FOR_APPROVAL, state.block_reason
+    arcs = -(-(chunks - 12) // 12)
+    assert model.calls["events"] == chunks + arcs  # every chunk summarized, earlier ones condensed into arcs
+    assert any(node.startswith("arc_summary[") for node in state.nodes)
+    seed_prompt = next(prompt for kind, prompt in model.prompts if kind == "working_title")
+    assert "Văn phong truyện gốc" in seed_prompt

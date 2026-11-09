@@ -55,7 +55,7 @@ export function useStoryBook(projectName: string): StoryBookProgress | null {
       `/projects/${encodeURIComponent(projectName)}/story-book`,
     )
       .then((result) => {
-        if (live) setBook(result.book);
+        if (live) setBook(result?.book ?? null);
       })
       .catch(() => undefined);
     return () => {

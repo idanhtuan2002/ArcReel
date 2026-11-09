@@ -18,7 +18,7 @@ from __future__ import annotations
 import hashlib
 import json
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Literal
@@ -32,6 +32,7 @@ from lib.db.repositories.custom_provider_repo import CustomProviderRepository
 from lib.db.repositories.gates import GreenlightRepository
 from lib.db.repositories.task_repo import STORY_RUN_TASK_TYPE, TaskRepository
 from lib.episode_ledger import discover_sources
+from lib.source_preview import preview_sources
 from r2.host_hardening.paid_routes import PaidRouteUnqualifiedError
 from r2.narrative_lifecycle.errors import NarrativeDecisionAuthorizationError
 from server.story_authoring import book as books
@@ -44,7 +45,7 @@ from server.story_authoring.driver import CHAPTERS, StoryBrief, StoryPrior, run_
 from server.story_authoring.handoff import OnConflict, SourceUpload, send_to_video, upload_in_flight
 from server.story_authoring.narrative import StoryIdentity
 from server.story_authoring.pipeline import intent_targets, node_kind
-from server.story_authoring.prompts.prior import MAX_PRIOR_CHUNKS
+from server.story_authoring.prompts.prior import prior_calls
 from server.story_authoring.prompts.schemas import StorySeed, StyleBibleOut
 from server.story_authoring.routes import max_prices, resolve_cloud_route, story_routes, validate_cloud_brief
 from server.story_authoring.runtime import (
@@ -276,7 +277,7 @@ class StoryAuthoringService:
                 part=len(docs) + 1 if prior_mode == "continuation" else 2,
                 origin=prior_origin,
             )
-            extra_calls = (MAX_PRIOR_CHUNKS + 1) * 3
+            extra_calls = prior_calls(text, mode=prior_mode) * 3
             limits = limits.model_copy(
                 update={
                     "generate_calls_max": limits.generate_calls_max + extra_calls,
@@ -299,6 +300,10 @@ class StoryAuthoringService:
             cloud_profiles=tuple(profiles),
             prior=prior,
         )
+
+    def source_preview(self, project_name: str) -> list[dict[str, Any]]:
+        """The project's story sources as a run would read them: chapters found, size, warnings (ADR-0118)."""
+        return [asdict(p) for p in preview_sources(discover_sources(self._project_dir_for(project_name)))]
 
     async def book_progress(self, project_name: str, *, user_id: str | None = None) -> BookProgress | None:
         """The project's book: the latest part committed and handed to video, read from its quality record;

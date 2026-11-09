@@ -17,10 +17,15 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field
 
 from lib.text_attestation import named_in
+from server.story_authoring.craft_checks import voice_stats
 
 PRIOR_CHUNK_CHARS = 8000
-#: A continuation reads at most the last chunks; a variant must read all of a story within this bound.
-MAX_PRIOR_CHUNKS = 12
+#: A continuation reads at most the last chunks; a variant must read all of a story within this bound (ADR-0118:
+#: about 480 000 characters, a long novel).
+MAX_PRIOR_CHUNKS = 60
+#: Chunks summarized one by one into the canon lock; earlier ones reach it through arc summaries of this many.
+RECENT_CHUNKS = 12
+ARC_CHUNKS = 12
 PRIOR_TAIL_CHARS = 1500
 
 PRIOR_SYSTEM = (
@@ -101,6 +106,26 @@ Không suy đoán điều văn bản không viết.
 >>>"""
 
 
+def arc_summary_prompt(summaries: list[PriorSummary], first: int, last: int) -> str:
+    """Condense the summaries of chunks ``first``..``last`` into one (shenbi ``memory-distill``)."""
+    return f"""Gộp các bản tóm tắt của đoạn {first}–{last} trong một truyện đã viết sẵn thành MỘT bản tóm tắt cho cả
+khúc truyện này, theo đúng thứ tự: events (sự kiện chính, tối đa 14), characters (trạng thái của mỗi nhân vật ở cuối
+khúc), open_threads (mạch còn mở ở cuối khúc), places. Chỉ dùng điều đã ghi.
+
+{json.dumps([s.model_dump() for s in summaries], ensure_ascii=False, indent=1)}"""
+
+
+def style_line(text: str) -> str:
+    """The prior text's voice in numbers, for the planning prompts to keep (shenbi ``style-learning``)."""
+    stats = voice_stats(text)
+    if stats is None:
+        return ""
+    return (
+        f"Văn phong truyện gốc (đo trên văn bản): câu trung bình {stats.sentence_words:.0f} từ, đoạn trung bình "
+        f"{stats.paragraph_words:.0f} từ, {stats.dialogue_share:.0%} số đoạn có thoại."
+    )
+
+
 def canon_lock_prompt(
     summaries: list[PriorSummary], tail: str, *, mode: Literal["continuation", "variant"], omitted: bool
 ) -> str:
@@ -140,7 +165,9 @@ def attest(lock: CanonLock, text: str) -> CanonLock:
     return lock.model_copy(update={"characters": characters, "places": places})
 
 
-def prior_context(lock: CanonLock, *, mode: Literal["continuation", "variant"], direction: str, part: int) -> str:
+def prior_context(
+    lock: CanonLock, *, mode: Literal["continuation", "variant"], direction: str, part: int, style: str = ""
+) -> str:
     """The block the planning prompts receive: the canon lock and what the author asks of this part."""
     if mode == "continuation":
         task = (
@@ -159,9 +186,18 @@ def prior_context(lock: CanonLock, *, mode: Literal["continuation", "variant"], 
     return f"""TRUYỆN ĐÃ CÓ — {task}
 BẢN KHÓA CANON:
 {json.dumps(lock.model_dump(), ensure_ascii=False, indent=1)}
+{style}
 
 {ask}:
 {direction}"""
+
+
+def prior_calls(text: str, *, mode: Literal["continuation", "variant"]) -> int:
+    """The reading calls a prior text needs: one summary per chunk read, one per arc, the canon lock."""
+    chunks = min(len(split_prior(text)), MAX_PRIOR_CHUNKS)
+    arcs = -(-max(0, chunks - RECENT_CHUNKS) // ARC_CHUNKS)
+    del mode
+    return chunks + arcs + 1
 
 
 class VariantReview(_Model):
@@ -198,16 +234,21 @@ KẾ HOẠCH CÁC CHƯƠNG MỚI:
 
 
 __all__ = [
+    "ARC_CHUNKS",
     "MAX_PRIOR_CHUNKS",
     "PRIOR_SYSTEM",
     "PRIOR_TAIL_CHARS",
+    "RECENT_CHUNKS",
     "CanonLock",
     "PriorSummary",
     "VariantReview",
+    "arc_summary_prompt",
     "attest",
     "canon_lock_prompt",
+    "prior_calls",
     "prior_context",
     "prior_summary_prompt",
     "split_prior",
+    "style_line",
     "variant_review_prompt",
 ]

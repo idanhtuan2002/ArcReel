@@ -107,6 +107,20 @@ describe("ProductionRunPanel", () => {
     expect(startProductionRun.mock.calls[0][1]).toMatchObject({ idea: "Chuyến đò cuối.", book_chapters: 40 });
   });
 
+  it("previews the chapters a run would read from the project's sources", async () => {
+    vi.spyOn(client, "listProductionRuns").mockResolvedValue({ start: OFFER, runs: [] });
+    vi.spyOn(API, "request").mockResolvedValue({
+      sources: [
+        { rel_path: "source/a.txt", chars: 12000, chapters: 7, headings: ["Chương 1"], warnings: [] },
+        { rel_path: "source/b.txt", chars: 300, chapters: 1, headings: [], warnings: ["NO_CHAPTER_HEADINGS"] },
+      ],
+    } as never);
+    render(<ProductionRunPanel projectName="alpha" />);
+    fireEvent.click(await screen.findByLabelText("From the story in this project"));
+    expect(await screen.findByText(/2 file\(s\), 8 chapter\(s\) found/)).toBeInTheDocument();
+    expect(screen.getByText(/source\/b.txt: no chapter headings found/)).toBeInTheDocument();
+  });
+
   it("names the book's next part when continuing a novel project", async () => {
     vi.spyOn(client, "listProductionRuns").mockResolvedValue({ start: OFFER, runs: [] });
     vi.spyOn(API, "request").mockResolvedValue({
