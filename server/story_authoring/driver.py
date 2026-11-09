@@ -29,6 +29,7 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from r2.narrative.canon_state import ResolvedCanonView
 from server.story_authoring import book as books
 from server.story_authoring.artifacts import StoryBlobStore, content_digest
 from server.story_authoring.audits import (
@@ -83,6 +84,7 @@ from server.story_authoring.narrative import (
     provisional_canon_view,
     provisional_plan,
     provisional_readers,
+    recent_indices,
     revision_decision_id,
     scene_contract,
     scene_refs,
@@ -110,7 +112,10 @@ from server.story_authoring.repair import deterministic_fixes, normalize_length,
 from server.story_authoring.runtime import RunPhase, RunState, RunStateStore, add_intent, promote, require, set_phase
 
 CHAPTERS = 3
+#: The node recording which committed Canon head the run branches from, so a resume keeps the same base.
+CANON_BASE_NODE = "canon_base"
 NODE_CAPS = {
+    "canon_base": 1,
     "seed": 3,
     "story_bible": 3,
     "style_bible": 3,
@@ -277,7 +282,10 @@ class StoryRunDriver:
         judge_gateway: AuthoringTextGateway | None = None,
         clock: Callable[[], datetime] = lambda: datetime.now(UTC),
         retry_delays: Sequence[float] = TRANSPORT_RETRY_DELAYS,
+        canon_base: ResolvedCanonView | None = None,
     ) -> None:
+        """``canon_base`` is the project's committed ``MAIN`` head when an earlier story holds it; this run's Canon
+        then branches from it."""
         if (brief.judge_selection is None) != (judge_gateway is None):
             raise ValueError("a judge gateway is given exactly when the brief names a judge route")
         if brief.gate_a_decision_id is None:
@@ -294,6 +302,7 @@ class StoryRunDriver:
         self._outages = 0
         self._prior_context: str | None = None
         self._prior_tail = ""
+        self._canon_base = canon_base
         self._book = brief.book
         self._chapters = brief.chapters
         self._plan: books.BookPlan | None = None
@@ -531,6 +540,14 @@ class StoryRunDriver:
 
     async def _converge(self) -> _Story:
         brief = ("brief", self._brief.digest())
+        base = self._canon_base
+        recorded = None if base is None else [base.branch_id, base.canon_version_id]
+        await self._ensure(
+            CANON_BASE_NODE,
+            inputs=[],
+            decoding=PLANNING,
+            produce=_constant(json.dumps(recorded).encode("utf-8")),
+        )
         prior_ins: list[tuple[str, str]] = []
         idea = self._brief.idea
         if self._brief.prior is not None:
@@ -1039,7 +1056,11 @@ class StoryRunDriver:
 
     def _plan_state(self, story: _Story) -> tuple[Any, str, Any, Any]:
         delta = build_genesis_delta(
-            self._identity, story.bible_input, created_by=f"run:{self._identity.run_id}", created_at=self._started
+            self._identity,
+            story.bible_input,
+            created_by=f"run:{self._identity.run_id}",
+            created_at=self._started,
+            base=self._canon_base,
         )
         version = genesis_canon_version_id(delta)
         proposal = build_plan_proposal(
@@ -1115,13 +1136,12 @@ class StoryRunDriver:
         inputs: list[tuple[str, str]],
     ) -> None:
         acceptances = await self._acceptances(refs, ref.global_index, version, proposal)
-        visible = acceptances
+        # A book scene sees its own chapter, or the scene just before; the book memory stands for the rest.
+        visible = [
+            acceptances[i] for i in recent_indices(refs, ref.global_index, chapter_window=self._book is not None)
+        ]
         memory = ""
         if self._book is not None:
-            # A book scene sees its own chapter and the scene just before; the book memory stands for the rest.
-            visible = [a for a, r in zip(acceptances, refs, strict=False) if r.chapter == ref.chapter][-4:]
-            if acceptances and refs[ref.global_index - 1].chapter != ref.chapter:
-                visible = [acceptances[-1]]
             digests = await self._digests(ref.chapter)
             inputs = [
                 *inputs,
@@ -1140,9 +1160,9 @@ class StoryRunDriver:
         readers = provisional_readers(
             self._identity,
             story.bible_input,
-            canon_view=provisional_canon_view(delta),
+            canon_view=provisional_canon_view(delta, self._canon_base),
             plan=plan,
-            acceptances=visible,
+            acceptances=acceptances,
         )
         contract = scene_contract(proposal, ref)
         pack = await compile_scene_context(
@@ -1776,6 +1796,12 @@ class StoryRunDriver:
             exceptions_offered=exceptions,
             export_digest=export_digest,
             quality_record_digest=quality_digest,
+            context_window="all" if self._book is None else "chapter",
+            canon_parent=(
+                None
+                if self._canon_base is None
+                else (self._canon_base.branch_id, self._canon_base.canon_version_id or "")
+            ),
         )
 
 

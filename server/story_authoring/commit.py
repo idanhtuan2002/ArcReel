@@ -22,11 +22,14 @@ import hashlib
 from collections.abc import Callable, Sequence
 from datetime import UTC, datetime
 from enum import StrEnum
+from typing import Literal
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from lib.db.canon_uow import canon_authority_uow_factory
+from lib.db.models.canon import CanonBranchModel
 from lib.db.narrative_lifecycle_uow import narrative_lifecycle_uow_factory
 from lib.db.narrative_plan_uow import narrative_plan_uow_factory
 from r2.contracts import (
@@ -68,6 +71,7 @@ from server.story_authoring.narrative import (
     committed_readers,
     compile_scene_context,
     provisional_canon_view,
+    recent_indices,
     revision_decision_id,
     scene_contract,
 )
@@ -124,6 +128,10 @@ class ManuscriptCommitManifest(_Frozen):
     exceptions_offered: tuple[str, ...] = ()
     export_digest: str
     quality_record_digest: str | None = None
+    #: ``(branch, version)`` of the project's ``MAIN`` head this run's Canon branches from; none for the first story.
+    canon_parent: tuple[str, str] | None = Field(default=None, exclude_if=lambda value: value is None)
+    #: ``chapter`` when each scene's context was compiled from its own chapter only (a book part, ADR-0116).
+    context_window: Literal["all", "chapter"] = Field(default="all", exclude_if=lambda value: value == "all")
 
     def digest(self) -> str:
         return manifest_digest(self)
@@ -242,7 +250,12 @@ async def compile_manifest_scene(
         contract=scene_contract(manifest.plan, entry.ref),
         canon_version_id=manifest.canon_version_id,
         plan_version=(manifest.plan.expected_version or 0) + 1,
-        recent_decision_ids=[earlier.decision_id for earlier in manifest.scenes[:index]],
+        recent_decision_ids=[
+            manifest.scenes[i].decision_id
+            for i in recent_indices(
+                [scene.ref for scene in manifest.scenes], index, chapter_window=manifest.context_window == "chapter"
+            )
+        ],
     )
     if binding(pack) != (entry.context_pack_id, entry.context_content_hash):
         raise BindingMismatch(
@@ -262,14 +275,19 @@ async def commit_manifest_canon(
     canon: CanonTransactionService,
     clock: Callable[[], datetime],
 ) -> CanonCommitResult:
-    """Commit the exact manifest Canon through its existing owner."""
+    """Commit the exact manifest Canon through its existing owner. The project's first story is its ``MAIN``
+    branch; a later story (a continuation, a book's next part) is a narrative branch pinned to the ``MAIN`` head
+    its manifest names."""
     delta = manifest.canon_genesis
+    parent = manifest.canon_parent
     await canon.create_branch(
         CreateCanonBranch(
             branch_id=identity.canon_branch_id,
             user_id=identity.user_id,
             project_name=identity.project_name,
-            branch_type=CanonBranchType.MAIN,
+            branch_type=CanonBranchType.MAIN if parent is None else CanonBranchType.NARRATIVE_BRANCH,
+            parent_branch_id=None if parent is None else parent[0],
+            parent_version_id=None if parent is None else parent[1],
             created_at=delta.created_at,
             created_by=delta.created_by,
         )
@@ -298,6 +316,24 @@ async def commit_manifest_canon(
             f"Canon genesis committed as {result.version.canon_version_id}, manifest names {manifest.canon_version_id}"
         )
     return result
+
+
+async def canon_parent(factory: async_sessionmaker[AsyncSession], identity: StoryIdentity) -> tuple[str, str] | None:
+    """The project's committed ``MAIN`` head when another run holds it: a later story branches from there."""
+    async with factory() as session:
+        main = (
+            await session.execute(
+                select(CanonBranchModel).where(
+                    CanonBranchModel.user_id == identity.user_id,
+                    CanonBranchModel.project_name == identity.project_name,
+                    CanonBranchModel.branch_type == CanonBranchType.MAIN.value,
+                    CanonBranchModel.branch_id != identity.canon_branch_id,
+                )
+            )
+        ).scalar_one_or_none()
+    if main is None or main.head_version_id is None:
+        return None
+    return main.branch_id, main.head_version_id
 
 
 async def commit_manifest_plan(
@@ -592,7 +628,15 @@ class ManuscriptCommitter:
             project_name=identity.project_name,
             user_id=identity.user_id,
         )
-        if view is None or view.content_hash != provisional_canon_view(manifest.canon_genesis).content_hash:
+        base = None
+        if manifest.canon_parent is not None:
+            base = await readers.canon_reader.get_exact(
+                branch_id=manifest.canon_parent[0],
+                canon_version_id=manifest.canon_parent[1],
+                project_name=identity.project_name,
+                user_id=identity.user_id,
+            )
+        if view is None or view.content_hash != provisional_canon_view(manifest.canon_genesis, base).content_hash:
             problems.append("Canon genesis does not read back as approved")
         plan = await readers.plan_reader.get_exact_plan(
             plan_id=identity.plan_id, plan_version=1, project_name=identity.project_name, user_id=identity.user_id

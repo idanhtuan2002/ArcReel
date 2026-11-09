@@ -9,6 +9,7 @@ gateway, credential and usage sink for review calls; both routes must resolve be
 
 from __future__ import annotations
 
+import json
 from collections.abc import Callable
 from datetime import UTC, datetime
 from pathlib import Path
@@ -23,12 +24,14 @@ from lib.db.repositories.task_repo import StoryRunStateConflict
 from lib.project_manager import get_project_manager
 from lib.text_backends.ollama import OllamaChatClient
 from r2.host_hardening.paid_routes import PaidRouteUnqualifiedError
+from r2.narrative.canon_state import ResolvedCanonView
 from server.story_authoring.artifacts import StoryBlobStore
 from server.story_authoring.cloud import CloudStoryGateway, StoryCloudClient, story_cloud_client
+from server.story_authoring.commit import canon_parent
 from server.story_authoring.contracts import StoryModelSelection
-from server.story_authoring.driver import StoryBrief, StoryRunDriver
+from server.story_authoring.driver import CANON_BASE_NODE, StoryBrief, StoryRunDriver
 from server.story_authoring.generation import AuthoringTextGateway
-from server.story_authoring.narrative import StoryIdentity
+from server.story_authoring.narrative import StoryIdentity, committed_canon_reader
 from server.story_authoring.routes import resolve_cloud_route, validate_cloud_brief
 from server.story_authoring.runtime import (
     RunPhase,
@@ -139,6 +142,7 @@ async def execute_story_run_task(
                 selection=route, limits=brief.limits, client=client, sink=sink, revalidate=revalidate
             )
         gateways.append(gateway)
+    canon_base = await story_canon_base(session_factory, identity, store, blobs)
     driver = StoryRunDriver(
         identity=identity,
         brief=brief,
@@ -147,6 +151,7 @@ async def execute_story_run_task(
         judge_gateway=gateways[1] if len(gateways) > 1 else None,
         blobs=blobs,
         clock=clock,
+        canon_base=canon_base,
     )
     try:
         state = await driver.run()
@@ -154,3 +159,28 @@ async def execute_story_run_task(
     finally:
         for client in cloud_clients:
             await client.close()
+
+
+async def story_canon_base(
+    session_factory: async_sessionmaker[AsyncSession],
+    identity: StoryIdentity,
+    store: RunStateStore,
+    blobs: StoryBlobStore,
+) -> ResolvedCanonView | None:
+    """The committed ``MAIN`` head this run's Canon branches from: the one the run recorded on its first execution,
+    else the project's current one, else none (the run's Canon becomes the project's ``MAIN``)."""
+    state = await store.load()
+    head = state.nodes.get(CANON_BASE_NODE)
+    if head is not None and head.head_revision_id is not None:
+        recorded = json.loads(blobs.read_exact(state.revisions[head.head_revision_id].digest))
+        parent = None if recorded is None else (recorded[0], recorded[1])
+    else:
+        parent = await canon_parent(session_factory, identity)
+    if parent is None:
+        return None
+    view = await committed_canon_reader(session_factory).get_exact(
+        branch_id=parent[0], canon_version_id=parent[1], project_name=identity.project_name, user_id=identity.user_id
+    )
+    if view is None:
+        raise RouteUnavailable(f"the project's Canon head {parent[1]} cannot be read")
+    return view

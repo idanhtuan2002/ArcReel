@@ -167,6 +167,15 @@ def scene_refs(outline: StoryOutlineInput) -> tuple[SceneRef, ...]:
     return tuple(refs)
 
 
+def recent_indices(refs: Sequence[SceneRef], index: int, *, chapter_window: bool) -> list[int]:
+    """The earlier scenes a scene's context is compiled from: every one, or in a book (ADR-0116) the scenes of its
+    own chapter, else the scene just before. Generation and commit both use this, so their packs agree."""
+    if not chapter_window:
+        return list(range(index))
+    same = [i for i in range(index) if refs[i].chapter == refs[index].chapter]
+    return same or ([index - 1] if index else [])
+
+
 @dataclass(frozen=True)
 class StoryIdentity:
     """Stable R2 identities of one run inside one project; nothing here is minted by the model."""
@@ -209,9 +218,19 @@ def location_id(key: str) -> str:
 
 
 def build_genesis_delta(
-    identity: StoryIdentity, bible: StoryBibleInput, *, created_by: str, created_at: datetime
+    identity: StoryIdentity,
+    bible: StoryBibleInput,
+    *,
+    created_by: str,
+    created_at: datetime,
+    base: ResolvedCanonView | None = None,
 ) -> CanonDelta:
-    """Characters and locations as entities, each with its bible description as a fact."""
+    """Characters and locations as entities, each with its bible description as a fact. A later story of the same
+    project (a continuation, a book's next part) is a narrative branch on ``base``, the project's committed
+    ``MAIN`` head: it adds only the entities and facts the base lacks, and records which run it is, so it is never
+    a no-op."""
+    known_entities = set(base.content.entities_by_id) if base is not None else set()
+    known_facts = set(base.content.facts_by_id) if base is not None else set()
     operations: list[CanonOperation] = []
     for entity_type, entities, make_id in (
         (EntityType.CHARACTER, bible.characters, character_id),
@@ -219,6 +238,8 @@ def build_genesis_delta(
     ):
         for entity in entities:
             target = make_id(entity.key)
+            if target in known_entities:
+                continue
             operations.append(
                 AddEntityOperation(
                     operation_id=f"op-entity-{target}",
@@ -227,6 +248,8 @@ def build_genesis_delta(
                 )
             )
             fact_id = f"fact-{target}-description"
+            if fact_id in known_facts:
+                continue
             operations.append(
                 AddFactOperation(
                     operation_id=f"op-{fact_id}",
@@ -234,10 +257,20 @@ def build_genesis_delta(
                     fact=Fact(fact_id=fact_id, subject_ref=target, predicate="description", value=entity.description),
                 )
             )
+    if base is not None and bible.characters:
+        subject = character_id(bible.characters[0].key)
+        fact_id = f"fact-{identity.canon_branch_id}-story-run"
+        operations.append(
+            AddFactOperation(
+                operation_id=f"op-{fact_id}",
+                target_id=fact_id,
+                fact=Fact(fact_id=fact_id, subject_ref=subject, predicate="story_run", value=identity.run_id),
+            )
+        )
     payload = CanonDeltaPayload(
         canon_delta_id=f"{identity.canon_branch_id}-genesis",
         target_branch_id=identity.canon_branch_id,
-        base_canon_version_id=None,
+        base_canon_version_id=None if base is None else base.canon_version_id,
         operations=operations,
         source_change_set_refs=[],
         author_decision_refs=[],
@@ -254,8 +287,8 @@ def genesis_canon_version_id(delta: CanonDelta) -> str:
     return "canon-version-" + hashlib.sha256(f"{delta.canon_delta_id}|{delta.payload_hash}".encode()).hexdigest()[:32]
 
 
-def provisional_canon_view(delta: CanonDelta) -> ResolvedCanonView:
-    content = apply_canon_delta(empty_canon_content(), delta)
+def provisional_canon_view(delta: CanonDelta, base: ResolvedCanonView | None = None) -> ResolvedCanonView:
+    content = apply_canon_delta(empty_canon_content() if base is None else base.content, delta)
     return ResolvedCanonView(
         canon_version_id=genesis_canon_version_id(delta),
         branch_id=delta.target_branch_id,
