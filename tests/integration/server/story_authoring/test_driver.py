@@ -1402,3 +1402,18 @@ async def test_a_long_prior_story_is_read_whole_through_arc_summaries_and_its_vo
     assert any(node.startswith("arc_summary[") for node in state.nodes)
     seed_prompt = next(prompt for kind, prompt in model.prompts if kind == "working_title")
     assert "Văn phong truyện gốc" in seed_prompt
+
+
+async def test_the_genre_pack_of_the_brief_guides_planning_and_drafting(concurrent_session_factory, tmp_path):
+    store = await _store(concurrent_session_factory)
+    model = ScriptedModel()
+
+    state = await _driver(concurrent_session_factory, store, model, StoryBlobStore(tmp_path)).run()
+
+    assert state.phase is RunPhase.READY_FOR_APPROVAL, state.block_reason
+    outline = next(p for k, p in model.prompts if k == "story_arc")
+    assert "[Thể loại: Tâm lý – gia đình]" in outline  # the brief's genre "đời thường"
+    plan = next(p for k, p in model.prompts if k == "chapter_goal")
+    assert "[Thể loại: Tâm lý – gia đình]" in plan
+    prose = next(p for k, p in model.prompts if k == "prose")
+    assert "'nước mắt lăn dài'" in prose

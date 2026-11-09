@@ -66,6 +66,7 @@ from server.story_authoring.contracts import (
 )
 from server.story_authoring.craft_checks import drift_findings, long_span_findings, opening_findings
 from server.story_authoring.generation import AuthoringTextGateway, StoryStepError
+from server.story_authoring.genre_packs import GenrePack, craft_rules, fatigue_findings, pack_for, planning_block
 from server.story_authoring.narrative import (
     ChapterOutlineInput,
     ProvisionalAcceptance,
@@ -312,6 +313,7 @@ class StoryRunDriver:
         self._prior_tail = ""
         self._canon_base = canon_base
         self._lock: CanonLock | None = None
+        self._pack: GenrePack | None = None
         self._book = brief.book
         self._chapters = brief.chapters
         self._plan: books.BookPlan | None = None
@@ -562,7 +564,11 @@ class StoryRunDriver:
         return CanonLock.model_validate_json(lock_raw), ("canon_lock", content_digest(lock_raw)), tail
 
     def _with_prior(self, prompt: str) -> str:
-        """A planning prompt preceded by the prior story's canon lock and the author's ask, when there is one."""
+        """A planning prompt preceded by the prior story's canon lock and the author's ask, when there is one, and by
+        the genre pack's planning guidance (ADR-0119)."""
+        genre = planning_block(self._pack)
+        if genre:
+            prompt = f"{genre}\n\n{prompt}"
         return prompt if self._prior_context is None else f"{self._prior_context}\n\n---\n\n{prompt}"
 
     def _book_state(self) -> books.BookState | None:
@@ -681,6 +687,7 @@ class StoryRunDriver:
             )
             style = StyleBibleOut.model_validate_json(style_raw)
             style_in = ("style_bible", content_digest(style_raw))
+        self._pack = pack_for(self._brief.genre, seed.genre)
         if self._book is not None:
             plan, plan_in = await self._book_plan(seed_in, bible_in, seed, bible, carried)
             seed = books.merged_seed(seed, plan.book_outline())
@@ -783,7 +790,9 @@ class StoryRunDriver:
                 e,
                 StoryStepKind.BOOK_PLANNING,
                 book_prompts.BOOK_SYSTEM,
-                book_prompts.book_outline_prompt(seed, bible, chapters=spec.chapters, volumes=volumes),
+                self._with_prior(
+                    book_prompts.book_outline_prompt(seed, bible, chapters=spec.chapters, volumes=volumes)
+                ),
                 books.bound_book_outline(len(volumes)),
             ),
         )
@@ -827,15 +836,17 @@ class StoryRunDriver:
         while start <= last:
             count = min(books.ROWS_PER_CALL, last - start + 1)
             model = books.bound_rows(count, [*books.open_hook_ids(hooks), *books.next_hook_ids(hooks, 2 * count)])
-            base = book_prompts.book_rows_prompt(
-                outline,
-                volume=volume,
-                first=start,
-                count=count,
-                total=total,
-                earlier=rows,
-                open_hooks=[h for h in hooks if h.paid is None],
-                next_id=len(hooks) + 1,
+            base = self._with_prior(
+                book_prompts.book_rows_prompt(
+                    outline,
+                    volume=volume,
+                    first=start,
+                    count=count,
+                    total=total,
+                    earlier=rows,
+                    open_hooks=[h for h in hooks if h.paid is None],
+                    next_id=len(hooks) + 1,
+                )
             )
 
             async def generate(prompt: str, model: type[books.BookRows] = model) -> list[books.BookRow]:
@@ -1349,6 +1360,7 @@ class StoryRunDriver:
                 is_final_scene=is_final,
                 target_syllables=target,
                 revision_note=note,
+                genre_rules=craft_rules(self._pack),
             )
             prior = self._brief.prior
             if (
@@ -1530,6 +1542,7 @@ class StoryRunDriver:
         facts = "\n".join(f"- {c.name}: {c.relation_to_protagonist}. {c.description}" for c in story.seed.characters)
         previous = " ".join(p.chapter_goal for p in story.plans[: chapter - 1])
         findings: list[Finding] = [f for n, h in heads.items() for f in anti_ai_findings(h["prose"], node_id=n)]
+        findings.extend(fatigue_findings(self._pack, [(n, h["prose"]) for n, h in heads.items()]))
         for dimension in CHAPTER_DIMENSIONS:
             result = await self._judge(
                 node,
@@ -1558,6 +1571,7 @@ class StoryRunDriver:
             await self._confirmed(node, f, scenes, plan) if i in second_reading else f for i, f in enumerate(findings)
         ]
         repairable = [f for f in findings if f.severity in REPAIRABLE]
+        repairable.extend(humanize_targets(findings))
         if not final and repairable:
             changed = False
             for scene_node in sorted({f.node_id for f in repairable}):
@@ -2093,6 +2107,27 @@ def story_outline_input(
 
 
 _EXCESS_MARKERS = ("withheld", "reveal", "do_not", "forbidden", "broken", "violat", "leak")
+
+
+#: Deterministic and judged machine-voice findings; a scene with this many gets one humanizing repair (ADR-0119).
+HUMANIZE_CODES = frozenset({"STOCK_PHRASE", "NOT_BUT_PATTERN", "GENRE_FATIGUE", "UNIFORM_PARAGRAPHS"})
+HUMANIZE_MIN = 3
+
+
+def humanize_targets(findings: Sequence[Finding]) -> list[Finding]:
+    """Stylistic machine-voice findings of the scenes that carry at least ``HUMANIZE_MIN`` of them: huohuo's
+    humanize loop as a span repair bounded by the chapter's review cycles, never a gate."""
+    voice = [
+        f
+        for f in findings
+        if f.severity is Severity.STYLISTIC
+        and (f.code in HUMANIZE_CODES or f.code.startswith(f"{AuditDimension.ANTI_AI.value}:"))
+        and f.quote
+    ]
+    counts: dict[str, int] = {}
+    for f in voice:
+        counts[f.node_id] = counts.get(f.node_id, 0) + 1
+    return [f for f in voice if counts[f.node_id] >= HUMANIZE_MIN]
 
 
 def _excess(finding: Finding) -> bool:

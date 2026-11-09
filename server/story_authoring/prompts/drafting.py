@@ -154,6 +154,7 @@ def scene_draft_prompt(
     is_final_scene: bool,
     target_syllables: int,
     revision_note: str | None = None,
+    genre_rules: Sequence[str] = (),
 ) -> str:
     duties: list[str] = []
     if is_last_scene_of_chapter:
@@ -186,7 +187,7 @@ def scene_draft_prompt(
 {chr(10).join("- " + rule for rule in HARD_RULES)}
 
 [Kỹ thuật viết]
-{chr(10).join("- " + rule for rule in CRAFT_RULES)}
+{chr(10).join("- " + rule for rule in (*CRAFT_RULES, *genre_rules))}
 
 [Bối cảnh]
 {context}"""
