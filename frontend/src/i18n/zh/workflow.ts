@@ -177,6 +177,7 @@ export default {
   'auto_idea_label_variant': "要改变什么（已选方案时可留空）",
   'auto_variant_source_project': "故事来源项目",
   'auto_variant_profile': "改写方案",
+  'auto_variant_source_search': "查找项目",
   'auto_variant_profile_none': "（只按我的要求）",
   'book_enable': '长篇小说（多章，分部写作）',
   'book_chapters': '章数',

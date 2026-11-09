@@ -189,7 +189,7 @@ async def translate_project_story(
 
 
 @router.post("/projects/{project_name}/story-sync")
-async def sync_linked_story(project_name: str, user: InteractiveUser, service: Service) -> dict:
+async def sync_linked_story(project_name: str, user: InteractiveUser) -> dict:
     """ADR-0122: a film project imports the story text of the story project it adapts. Files it does not hold yet
     are added to its sources; files it holds with the same text are skipped; a file it holds with other text is
     never overwritten and is reported, because episodes may already be planned from it."""
@@ -201,12 +201,13 @@ async def sync_linked_story(project_name: str, user: InteractiveUser, service: S
     story = linked_story(film)
     if story is None:
         raise HTTPException(status_code=409, detail={"code": "NO_STORY_LINK", "detail": "the project adapts no story"})
+    # Writing the film's sources needs what an upload to the film needs (an interactive user); the story was named
+    # at the film's creation, which checked that it is a story project.
     try:
-        await service.require_source_grant(user.sub, user_id=user.id, project_name=project_name)
-        await service.require_source_grant(user.sub, user_id=user.id, project_name=story)
-    except REFUSALS as error:
-        raise _refusal(error) from error
-    docs = await asyncio.to_thread(discover_sources, projects.get_project_path(story))
+        story_dir = projects.get_project_path(story)
+    except (FileNotFoundError, ValueError):
+        raise HTTPException(status_code=409, detail={"code": "STORY_PROJECT_MISSING", "detail": story}) from None
+    docs = await asyncio.to_thread(discover_sources, story_dir)
     source_dir = projects.get_project_path(project_name) / "source"
     scope = ProjectScope(project_name=project_name, projects_root=projects.projects_root)
     services = Services(
@@ -218,7 +219,8 @@ async def sync_linked_story(project_name: str, user: InteractiveUser, service: S
     skipped: list[str] = []
     conflicts: list[str] = []
     for doc in docs:
-        filename = Path(doc.rel_path).name
+        # A source is stored as ``<stem>.txt`` whatever its upload suffix; compare against what an upload writes.
+        filename = Path(doc.rel_path).stem + ".txt"
         target = source_dir / filename
         if target.exists():
             held = await asyncio.to_thread(target.read_text, encoding="utf-8")

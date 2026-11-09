@@ -177,6 +177,7 @@ export default {
   'auto_idea_label_variant': "Muốn thay đổi gì (không bắt buộc nếu đã chọn hồ sơ)",
   'auto_variant_source_project': "Truyện từ dự án",
   'auto_variant_profile': "Hồ sơ biến thể",
+  'auto_variant_source_search': "Tìm dự án",
   'auto_variant_profile_none': "(chỉ theo yêu cầu của tôi)",
   'book_enable': 'Tiểu thuyết (nhiều chương, viết theo từng phần)',
   'book_chapters': 'Số chương',

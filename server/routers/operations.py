@@ -13,12 +13,12 @@ import re
 from typing import Any
 
 from fastapi import APIRouter
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 
 from lib.db import async_session_factory
 from lib.db.models.production_run import ProductionRunModel
 from lib.db.models.task import Task
-from lib.db.repositories.task_repo import STORY_RUN_TASK_TYPE
+from lib.db.repositories.task_repo import ACTIVE_TASK_STATUSES, STORY_RUN_TASK_TYPE
 from lib.project_kinds import project_kind
 from lib.project_manager import get_project_manager
 from server.auth import CurrentUser
@@ -41,13 +41,17 @@ STORY_BLOCKED = frozenset(
     }
 )
 STORY_RUNNING = frozenset({"RUNNING", "APPROVING", "PARTIALLY_COMMITTED"})
+STORY_DECISION_EXTRA = frozenset({"AWAITING_GATE_A"})
 RUN_TERMINAL = frozenset({"SUCCEEDED", "FAILED", "FAILED_QUALITY", "CANCELLED"})
-RUN_RUNNING = frozenset({"PENDING", "RUNNING", "WAITING_TASK"})
-ACTIVE_TASKS = ("queued", "running")
+RUN_RUNNING = frozenset({"PENDING", "RUNNING", "WAITING_TASK", "CANCELLING"})
+ACTIVE_TASKS = ACTIVE_TASK_STATUSES
+
+
+WATCHED_PHASES = sorted(STORY_DECISION | STORY_DECISION_EXTRA | STORY_BLOCKED | STORY_RUNNING)
 
 
 def _lane_of_story(phase: str) -> str | None:
-    if phase in STORY_DECISION:
+    if phase in STORY_DECISION or phase in STORY_DECISION_EXTRA:
         return "decision"
     if phase in STORY_BLOCKED:
         return "blocked"
@@ -73,7 +77,13 @@ async def operations(user: CurrentUser) -> dict[str, Any]:
         story_rows = (
             await session.execute(
                 select(Task.project_name, Task.resource_id, Task.execution_checkpoint_json, Task.updated_at)
-                .where(Task.task_type == STORY_RUN_TASK_TYPE, Task.user_id == user.id)
+                .where(
+                    Task.task_type == STORY_RUN_TASK_TYPE,
+                    Task.user_id == user.id,
+                    # Only runs in a phase the operator acts on: a run that waits long is never pushed out of the
+                    # window by finished ones.
+                    or_(*(Task.execution_checkpoint_json.like(f'%"phase":"{phase}"%') for phase in WATCHED_PHASES)),
+                )
                 .order_by(Task.queued_at.desc())
                 .limit(STORY_RUNS_READ)
             )

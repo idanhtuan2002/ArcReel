@@ -47,15 +47,27 @@ export function StorySourcePicker({
   const [projects, setProjects] = useState<{ name: string; title: string }[]>([]);
   const [profiles, setProfiles] = useState<VariantProfile[]>([]);
 
+  // ADR-0122: the source is searched through the paged index, so any of thousands of projects can be found.
+  const [query, setQuery] = useState("");
   useEffect(() => {
     if (source !== "variant") return;
     let live = true;
-    // ADR-0122: read through the paged index (any project with a story can be the source of a variant).
-    void API.projectIndex({ sort: "title", limit: 200 })
-      .then((result) => {
-        if (live) setProjects(result.items.filter((item) => item.name !== projectName));
-      })
-      .catch(() => undefined);
+    const timer = window.setTimeout(() => {
+      void API.projectIndex({ q: query, sort: "title", limit: 100 })
+        .then((result) => {
+          if (live) setProjects(result.items.filter((item) => item.name !== projectName));
+        })
+        .catch(() => undefined);
+    }, 200);
+    return () => {
+      live = false;
+      window.clearTimeout(timer);
+    };
+  }, [source, projectName, query]);
+
+  useEffect(() => {
+    if (source !== "variant") return;
+    let live = true;
     void API.request<{ profiles: VariantProfile[] }>("/system/config/story-variant-profiles")
       .then((result) => {
         if (live) setProfiles(result.profiles);
@@ -85,6 +97,15 @@ export function StorySourcePicker({
       {(source === "project" || source === "continue") && <SourcePreviewNote projectName={projectName} />}
       {source === "variant" && (
         <div className="flex flex-wrap items-center gap-3 text-[12px]" style={{ color: "var(--color-text-2)" }}>
+          <input
+            type="search"
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder={t("auto_variant_source_search")}
+            aria-label={t("auto_variant_source_search")}
+            className={`${SELECT_CLS} w-40`}
+            style={SELECT_STYLE}
+          />
           <label className="flex items-center gap-1.5">
             {t("auto_variant_source_project")}
             <select
@@ -94,6 +115,9 @@ export function StorySourcePicker({
               onChange={(event) => onSourceProject(event.target.value)}
             >
               <option value="">—</option>
+              {sourceProject && !projects.some((item) => item.name === sourceProject) ? (
+                <option value={sourceProject}>{sourceProject}</option>
+              ) : null}
               {projects.map((item) => (
                 <option key={item.name} value={item.name}>
                   {item.title || item.name}

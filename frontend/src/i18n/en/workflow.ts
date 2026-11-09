@@ -175,6 +175,7 @@ export default {
   'auto_idea_label_variant': "What should change (optional with a profile)",
   'auto_variant_source_project': "Story from",
   'auto_variant_profile': "Variant profile",
+  'auto_variant_source_search': "Find a project",
   'auto_variant_profile_none': "(my instruction only)",
   'book_enable': 'Novel (many chapters, written part by part)',
   'book_chapters': 'Chapters',

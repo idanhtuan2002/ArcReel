@@ -679,6 +679,9 @@ async def create_project(
             if not title and not manual_name:
                 raise HTTPException(status_code=400, detail=_t("title_required"))
             project_name = manual_name or manager.generate_project_name(title)
+            if project_name.lower() == "index":
+                # ``/projects/index`` is the library page (ADR-0122).
+                raise HTTPException(status_code=400, detail=_t("project_exists", name=project_name))
 
             style_prompt = req.style or ""
             if req.style_template_id:

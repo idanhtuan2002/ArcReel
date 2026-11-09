@@ -132,7 +132,7 @@ export function OperationsStrip() {
           type="button"
           onClick={toggle}
           aria-expanded={!collapsed}
-          aria-controls="cr-ops-lanes"
+          aria-controls={!collapsed && data && !quiet ? "cr-ops-lanes" : undefined}
           className="flex items-center gap-1.5 text-[13px] font-medium text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
         >
           {collapsed ? <ChevronRight aria-hidden className="h-4 w-4" /> : <ChevronDown aria-hidden className="h-4 w-4" />}

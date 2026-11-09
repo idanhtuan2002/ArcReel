@@ -117,6 +117,7 @@ export function AssetSidebar({ className }: AssetSidebarProps) {
     setSyncing(true);
     try {
       const result = await API.syncLinkedStory(currentProjectName);
+      useAppStore.getState().invalidateSourceFiles();
       useAppStore
         .getState()
         .pushToast(

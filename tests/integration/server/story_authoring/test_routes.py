@@ -227,7 +227,6 @@ async def test_a_film_project_imports_its_story_projects_text_without_overwritin
 ):
     import json as _json
 
-    from server.story_authoring.service import StoryAuthoringService
     from server.tool_runtime import CallerContext, CreateProjectToolRequest, Services, ToolRequest, create_project
 
     class _Unused:
@@ -250,7 +249,7 @@ async def test_a_film_project_imports_its_story_projects_text_without_overwritin
     )
     (story_dir / "source").mkdir(exist_ok=True)
     (story_dir / "source" / "phan-1.txt").write_text("Chương 1\nMinh về làng.", encoding="utf-8")
-    (story_dir / "source" / "phan-2.txt").write_text("Chương 2\nLan đợi.", encoding="utf-8")
+    (story_dir / "source" / "phan-2.md").write_text("Chương 2\nLan đợi.", encoding="utf-8")
     film_json = projects.get_project_path(PROJECT) / "project.json"
     film_json.write_text(
         _json.dumps({**_json.loads(film_json.read_text()), "story_project": "ben-do"}), encoding="utf-8"
@@ -259,10 +258,6 @@ async def test_a_film_project_imports_its_story_projects_text_without_overwritin
     film_source.mkdir(exist_ok=True)
     (film_source / "phan-2.txt").write_text("Bản khác của chương 2.", encoding="utf-8")
 
-    async def granted(self, principal, *, user_id, project_name):
-        return None
-
-    monkeypatch.setattr(StoryAuthoringService, "require_source_grant", granted)
     monkeypatch.setattr(story_runs, "get_project_manager", lambda: projects)
     async with _client(concurrent_session_factory, grants, projects, interactive=True) as client:
         first = await client.post(f"/api/v1/projects/{PROJECT}/story-sync")

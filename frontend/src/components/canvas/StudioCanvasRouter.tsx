@@ -624,6 +624,8 @@ export function StudioCanvasRouter() {
   return (
     <Switch>
       <Route path="/">
+        {/* ADR-0122: a story project has no film overview; it opens on its story. */}
+        {currentProjectData?.project_kind === "story" ? <Redirect to={`/${WORKSPACE_ROUTE_STORY}`} replace /> : null}
         <OverviewCanvas
           projectName={currentProjectName}
           projectData={currentProjectData}

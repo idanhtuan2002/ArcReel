@@ -35,7 +35,7 @@ async def test_story_runs_and_tasks_fall_into_lanes_with_project_titles(
         )
         state = {"schema_id": "s", "state_version": 1, "run_id": "story-1", "phase": "READY_FOR_APPROVAL"}
         await repo.write_story_run_state(
-            story["task_id"], expected_version=None, state_json=json.dumps(state), new_version=1
+            story["task_id"], expected_version=None, state_json=json.dumps(state, separators=(",", ":")), new_version=1
         )
         await repo.enqueue(project_name="phim-b", task_type="image", media_type="image", resource_id="E1S01")
         await session.commit()

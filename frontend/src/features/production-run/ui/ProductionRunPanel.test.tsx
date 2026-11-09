@@ -151,7 +151,9 @@ describe("ProductionRunPanel", () => {
     fireEvent.click(await screen.findByLabelText("A variant of another project's story"));
     const button = screen.getByRole("button", { name: "Start" });
     expect(button).toBeDisabled();
-    fireEvent.change(await screen.findByLabelText("Story from"), { target: { value: "origin" } });
+    // The source list is searched through the index after a short pause.
+    await screen.findByRole("option", { name: "Truyện gốc" });
+    fireEvent.change(screen.getByLabelText("Story from"), { target: { value: "origin" } });
     await screen.findByRole("option", { name: "Ngôi thứ nhất" });
     fireEvent.change(screen.getByLabelText("Variant profile"), { target: { value: "first-person" } });
     expect(screen.queryByRole("option", { name: "Alpha" })).not.toBeInTheDocument();

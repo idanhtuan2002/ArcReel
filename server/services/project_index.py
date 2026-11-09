@@ -9,6 +9,7 @@ stage and a text query, sorted, and counted per kind.
 
 from __future__ import annotations
 
+import random
 import threading
 import time
 import unicodedata
@@ -17,8 +18,23 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-TTL_SECONDS = 300
-WATCHED = ("project.json", "source", "scripts", "storyboards", "videos", "adaptations")
+#: A row whose files did not change is still recomputed after about this long (spread over 0.5–1.5×, so rows do
+#: not all expire together), for inputs the signature cannot see.
+TTL_SECONDS = 1800
+WATCHED = (
+    "project.json",
+    ".arcreel_artifacts.json",
+    ".migration_failure.json",
+    "source",
+    "scripts",
+    "storyboards",
+    "videos",
+    "adaptations",
+    "characters",
+    "scenes",
+    "props",
+    "products",
+)
 
 type Signature = tuple[tuple[str, int], ...]
 
@@ -39,6 +55,8 @@ class ProjectIndex:
         self._ttl = ttl
         self._rows: dict[str, tuple[Signature, float, dict[str, Any]]] = {}
         self._lock = threading.Lock()
+        # One request recomputes stale rows at a time; the others wait and then read the fresh cache.
+        self._compute = threading.Lock()
 
     def clear(self) -> None:
         """Forget every cached row (a deleted or replaced projects root)."""
@@ -46,6 +64,10 @@ class ProjectIndex:
             self._rows.clear()
 
     def rows(self, manager: Any, compute: Callable[[str], dict[str, Any]]) -> list[dict[str, Any]]:
+        with self._compute:
+            return self._rows_locked(manager, compute)
+
+    def _rows_locked(self, manager: Any, compute: Callable[[str], dict[str, Any]]) -> list[dict[str, Any]]:
         names = manager.list_projects()
         now = time.monotonic()
         out: list[dict[str, Any]] = []
@@ -53,17 +75,18 @@ class ProjectIndex:
             try:
                 sig = signature(Path(manager.get_project_path(name)))
             except (OSError, ValueError):
-                sig = ()  # a folder that vanished or is not a valid project: its row is recomputed every time
+                sig = ()  # a folder that vanished or is not a valid project: cached until it expires
             with self._lock:
                 cached = self._rows.get(name)
-            if cached is not None and cached[0] == sig and now - cached[1] < self._ttl:
+            if cached is not None and cached[0] == sig and now < cached[1]:
                 out.append(cached[2])
                 continue
             row = dict(compute(name))
             stamp = max((mark for _, mark in sig), default=0)
             row["updated_at"] = datetime.fromtimestamp(stamp / 1e9, UTC).isoformat() if stamp else None
+            expires = now + self._ttl * random.uniform(0.5, 1.5)
             with self._lock:
-                self._rows[name] = (sig, now, row)
+                self._rows[name] = (sig, expires, row)
             out.append(row)
         with self._lock:
             for gone in set(self._rows) - set(names):

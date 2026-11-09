@@ -52,7 +52,7 @@ function KindCell({ project }: { project: ProjectSummary }) {
       {t("cr_kind_film")}
       {project.story_project ? (
         <Link
-          href={`/app/projects/${encodeURIComponent(project.story_project)}`}
+          href={`/app/projects/${encodeURIComponent(project.story_project)}/story`}
           onClick={(event) => event.stopPropagation()}
           className="truncate text-text-3 underline-offset-2 hover:text-text hover:underline"
           title={t("cr_adapts", { project: project.story_project })}
@@ -104,6 +104,11 @@ export function ProjectLibrary({
     const controller = new AbortController();
     API.projectIndex({ q: query, kind, stage: stage || undefined, sort, offset, limit: PAGE }, controller.signal)
       .then((result) => {
+        // A page emptied by a delete moves back to the last page that still has rows.
+        if (result.items.length === 0 && result.total > 0 && offset > 0) {
+          setOffset(Math.floor((result.total - 1) / PAGE) * PAGE);
+          return;
+        }
         setPage(result);
         setFailed(false);
       })
