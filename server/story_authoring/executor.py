@@ -171,10 +171,14 @@ async def story_canon_base(
     else the project's current one, else none (the run's Canon becomes the project's ``MAIN``)."""
     state = await store.load()
     head = state.nodes.get(CANON_BASE_NODE)
+    parent = None
+    recorded = False
     if head is not None and head.head_revision_id is not None:
-        recorded = json.loads(blobs.read_exact(state.revisions[head.head_revision_id].digest))
-        parent = None if recorded is None else (recorded[0], recorded[1])
-    else:
+        value = json.loads(blobs.read_exact(state.revisions[head.head_revision_id].digest))
+        parent, recorded = (None if value is None else (value[0], value[1])), True
+    committed = state.commit is not None and bool(state.commit.completed_steps)
+    if not recorded or (parent is None and not committed):
+        # First execution, or a run that would become MAIN and has committed nothing: another run may hold MAIN now.
         parent = await canon_parent(session_factory, identity)
     if parent is None:
         return None

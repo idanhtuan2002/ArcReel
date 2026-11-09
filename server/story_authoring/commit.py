@@ -220,6 +220,9 @@ class BindingMismatch(Exception):
     pass
 
 
+#: Block reason of a run whose Canon must be rebased on a MAIN branch another run committed first.
+CANON_BASE_MOVED = "CANON_BASE_MOVED"
+
 _BLOCKING_ERRORS = (
     CanonError,
     NarrativeError,
@@ -522,6 +525,11 @@ class ManuscriptCommitter:
         for step in manifest.steps():
             if step in completed:
                 continue
+            if step == STEP_CANON and manifest.canon_parent is None:
+                # Another run took the project's MAIN branch after this one recorded none: rebase, never collide.
+                moved = await canon_parent(self._session_factory, self._identity)
+                if moved is not None:
+                    return await self._block(step, f"{CANON_BASE_MOVED}: the project's MAIN Canon is {moved[0]}")
             try:
                 if narrative is None:
                     await self._run_step(step, manifest, approval, digest)

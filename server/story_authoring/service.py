@@ -38,7 +38,7 @@ from server.story_authoring import book as books
 from server.story_authoring.artifacts import StoryBlobStore
 from server.story_authoring.authority import GrantNarrativeShowrunnerAuthority
 from server.story_authoring.cloud import CLOUD_ADAPTERS, OPENAI_ENDPOINT, OPENAI_MAX_INPUT_BOUND
-from server.story_authoring.commit import ManuscriptCommitter, load_offered_manifest
+from server.story_authoring.commit import CANON_BASE_MOVED, ManuscriptCommitter, load_offered_manifest
 from server.story_authoring.contracts import OLLAMA_CHAT_ENDPOINT, StoryLimits, StoryModelSelection
 from server.story_authoring.driver import CHAPTERS, StoryBrief, StoryPrior, run_call_bound, story_bible_input
 from server.story_authoring.handoff import OnConflict, SourceUpload, send_to_video, upload_in_flight
@@ -117,6 +117,17 @@ def is_continuation(brief: StoryBrief) -> bool:
     if brief.book is not None:
         return brief.book.part > 1
     return brief.prior is not None and brief.prior.mode == "continuation"
+
+
+def rebasable(state: RunState) -> bool:
+    """A run blocked before any commit step because another run took the project's MAIN Canon first: a retry
+    rebases it on that branch (its scenes are written again on the new Canon) and offers it again."""
+    return (
+        state.phase is RunPhase.COMMIT_BLOCKED
+        and state.commit is not None
+        and not state.commit.completed_steps
+        and CANON_BASE_MOVED in (state.block_reason or "")
+    )
 
 
 def book_limits(limits: StoryLimits, part: books.BookPart) -> StoryLimits:
@@ -554,7 +565,7 @@ class StoryAuthoringService:
         ref, _ = await self.get(user_id=user_id, project_name=project_name, run_id=run_id)
 
         def change(current: RunState) -> tuple[RunState, bool]:
-            if current.phase not in BLOCKED_PHASES:
+            if current.phase not in BLOCKED_PHASES and not rebasable(current):
                 return current, False
             return set_phase(reopen_unconverged(current), RunPhase.RUNNING), True
 

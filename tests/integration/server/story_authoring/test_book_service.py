@@ -125,3 +125,54 @@ async def test_a_continuation_of_a_book_project_writes_its_next_part_until_the_b
         prior_mode="continuation",
     )
     assert (after.book, after.prior is not None) == (None, True)
+
+
+async def test_a_story_whose_main_canon_was_taken_first_is_rebased_on_retry_and_commits_as_a_branch(
+    concurrent_session_factory: Factory, grants, projects: ProjectManager
+):
+    service = _service(concurrent_session_factory, grants, projects)
+    provider_id = await _provider(concurrent_session_factory)
+    refs = []
+    for idea in ("Một người con về làng.", "Một người lái đò già."):
+        brief = await service.draft_brief(idea=idea, genre="đời thường", provider_id=provider_id, model_id=MODEL)
+        decision = await _greenlight(concurrent_session_factory, brief.digest())
+        refs.append(
+            await service.start(
+                user_id=USER, project_name=PROJECT, principal=SPONSOR, brief=brief, gate_a_decision_id=decision
+            )
+        )
+    for ref in refs:  # both record no Canon parent: neither has committed yet
+        assert (await _execute(concurrent_session_factory, ref, projects, BookModel()))["phase"] == "READY_FOR_APPROVAL"
+
+    async def approve(ref: StoryRunRef) -> RunPhase:
+        _, state = await service.get(user_id=USER, project_name=PROJECT, run_id=ref.run_id)
+        offered = service.offered(PROJECT, state)
+        assert offered is not None
+        done = await service.approve(
+            user_id=USER,
+            project_name=PROJECT,
+            run_id=ref.run_id,
+            principal=SPONSOR,
+            manifest_digest_seen=offered["manifest_digest"],
+            accepted_exceptions=offered["exceptions_offered"],
+        )
+        return done.phase
+
+    assert await approve(refs[0]) is RunPhase.COMMITTED
+    assert await approve(refs[1]) is RunPhase.COMMIT_BLOCKED
+    _, blocked = await service.get(user_id=USER, project_name=PROJECT, run_id=refs[1].run_id)
+    assert "CANON_BASE_MOVED" in (blocked.block_reason or "")
+
+    retried = await service.retry(user_id=USER, project_name=PROJECT, run_id=refs[1].run_id, principal=SPONSOR)
+    assert retried.phase is RunPhase.RUNNING
+    rerun = BookModel()
+    assert (await _execute(concurrent_session_factory, refs[1], projects, rerun))["phase"] == "READY_FOR_APPROVAL"
+    assert rerun.calls["working_title"] == 0  # planning is kept; only the scenes are written again on the new Canon
+    assert rerun.calls["prose"] > 0
+    assert await approve(refs[1]) is RunPhase.COMMITTED
+    async with concurrent_session_factory() as session:
+        branches = (
+            await session.execute(select(CanonBranchModel).where(CanonBranchModel.project_name == PROJECT))
+        ).scalars()
+        kinds = sorted((b.branch_type, b.parent_branch_id is not None) for b in branches)
+    assert kinds == [("MAIN", False), ("NARRATIVE_BRANCH", True)]

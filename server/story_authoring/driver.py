@@ -547,6 +547,7 @@ class StoryRunDriver:
             inputs=[],
             decoding=PLANNING,
             produce=_constant(json.dumps(recorded).encode("utf-8")),
+            extra={"base": recorded},
         )
         prior_ins: list[tuple[str, str]] = []
         idea = self._brief.idea
