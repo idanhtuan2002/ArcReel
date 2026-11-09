@@ -147,3 +147,34 @@ async def test_a_run_started_over_http_is_approved_exported_and_handed_off(
     assert repeated.json() == sent.json()
     assert (withdrawn.status_code, withdrawn.json()["phase"]) == (200, "WITHDRAWN")
     assert (refused.status_code, refused.json()["detail"]["code"]) == (409, "ALREADY_HANDED_OFF")
+
+
+async def test_a_book_brief_is_drafted_over_http_and_the_project_has_no_book_yet(
+    concurrent_session_factory: Factory, grants, projects: ProjectManager
+):
+    provider_id = await _provider(concurrent_session_factory)
+    async with _client(concurrent_session_factory, grants, projects, interactive=False) as client:
+        drafted = await client.post(
+            f"/api/v1/projects/{PROJECT}/story-runs/brief",
+            json={
+                "idea": "Một người con về làng.",
+                "genre": "đời thường",
+                "provider_id": provider_id,
+                "model_id": MODEL,
+                "book": {"chapters": 30, "part_chapters": 5},
+            },
+        )
+        refused = await client.post(
+            f"/api/v1/projects/{PROJECT}/story-runs/brief",
+            json={"genre": "g", "provider_id": provider_id, "model_id": MODEL, "book": {"chapters": 3}},
+        )
+        book = await client.get(f"/api/v1/projects/{PROJECT}/story-book")
+
+    assert drafted.status_code == 200, drafted.text
+    assert drafted.json()["brief"]["book"] == {
+        "spec": {"chapters": 30, "chapter_syllables": 3000, "part_chapters": 5},
+        "part": 1,
+        "state_digest": None,
+    }
+    assert refused.status_code == 422
+    assert book.json() == {"book": None}

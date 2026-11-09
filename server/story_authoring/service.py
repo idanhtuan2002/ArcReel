@@ -184,6 +184,7 @@ class StoryAuthoringService:
         prior_project: str | None = None,
         prior_origin: str = "instruction",
         book: books.BookSpec | None = None,
+        user_id: str | None = None,
     ) -> StoryBrief:
         """The brief with its frozen routes; its digest is what the Human greenlights at Gate A. A judge route is
         optional; without one the writer's route also reviews.
@@ -235,7 +236,7 @@ class StoryAuthoringService:
             part = books.BookPart(spec=book)
         elif prior_mode == "continuation" and project_name is not None:
             # ADR-0116: a continuation of a book with parts left writes its next part from the book state.
-            progress = await self.book_progress(project_name)
+            progress = await self.book_progress(project_name, user_id=user_id)
             if progress is not None and progress.parts_done < len(progress.spec.parts()):
                 part = books.BookPart(
                     spec=progress.spec, part=progress.parts_done + 1, state_digest=progress.state_digest
@@ -288,14 +289,14 @@ class StoryAuthoringService:
             prior=prior,
         )
 
-    async def book_progress(self, project_name: str) -> BookProgress | None:
-        """The project's book: the latest part committed and handed to video, read from its quality record."""
+    async def book_progress(self, project_name: str, *, user_id: str | None = None) -> BookProgress | None:
+        """The project's book: the latest part committed and handed to video, read from its quality record;
+        ``user_id`` limits it to that user's runs."""
+        query = select(Task).where(Task.task_type == STORY_RUN_TASK_TYPE, Task.project_name == project_name)
+        if user_id is not None:
+            query = query.where(Task.user_id == user_id)
         async with self._factory() as session:
-            tasks = (
-                await session.execute(
-                    select(Task).where(Task.task_type == STORY_RUN_TASK_TYPE, Task.project_name == project_name)
-                )
-            ).scalars()
+            tasks = (await session.execute(query)).scalars()
             found = [(t.task_id, json.loads(t.payload_json or "{}")) for t in tasks]
         blobs = self._blobs(project_name)
         best: BookProgress | None = None

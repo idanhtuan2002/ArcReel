@@ -274,3 +274,29 @@ def test_a_brief_without_a_book_keeps_its_digest_and_a_part_takes_its_chapter_co
     part = brief.model_copy(update={"book": BookPart(spec=BookSpec(chapters=13, part_chapters=5), part=2)})
     assert part.chapters == 4
     assert part.digest() != brief.digest()
+
+
+def test_a_run_command_carries_a_book_only_from_an_idea_and_drops_it_at_its_default():
+    from r2.contracts.automation import RunCommand
+
+    base = {
+        "user_id": "u",
+        "project_name": "p",
+        "command_id": "c",
+        "action": "START",
+        "expected_version": 0,
+        "expected_input_digest": "sha256:" + "0" * 64,
+        "policy_digest": "sha256:" + "0" * 64,
+        "idea": "i",
+    }
+    assert "book_chapters" not in RunCommand.model_validate(base).model_dump(mode="json")
+    assert RunCommand.model_validate({**base, "book_chapters": 30}).book_chapters == 30
+    with pytest.raises(ValidationError):
+        RunCommand.model_validate({**base, "story_source": "continue", "book_chapters": 30})
+
+
+def test_a_long_book_chapter_is_planned_with_enough_scenes_for_its_length():
+    from server.story_authoring.prompts.schemas import bound_chapter_plan
+
+    scenes = bound_chapter_plan(["Minh"], ["Căn nhà cũ"], min_scenes=5).model_json_schema()["properties"]["scenes"]
+    assert (scenes["minItems"], scenes["maxItems"]) == (5, 5)

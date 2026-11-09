@@ -29,6 +29,13 @@ import { AutomationSettingsEditor } from "./AutomationSettingsEditor";
 import { RunMediaStrip } from "./RunMediaStrip";
 import { RunReportDetails } from "./RunReportDetails";
 import { StorySourcePicker, type StorySource } from "./StorySourcePicker";
+import {
+  BookContinuationNote,
+  BookLengthField,
+  bookLengthValid,
+  useStoryBook,
+  type BookLength,
+} from "./BookLengthField";
 import { formatDuration, stageTimes, totalTime } from "./runTimeline";
 
 const POLL_MS = 5000;
@@ -107,9 +114,12 @@ export function ProductionRunPanel({ projectName }: Props) {
   const [source, setSource] = useState<StorySource>("idea");
   const [sourceProject, setSourceProject] = useState("");
   const [variantProfile, setVariantProfile] = useState("");
+  const [book, setBook] = useState<BookLength | null>(null);
+  const storyBook = useStoryBook(projectName);
   const canStart =
-    source === "project" ||
-    (source === "variant" ? Boolean(sourceProject) && Boolean(variantProfile || idea.trim()) : Boolean(idea.trim()));
+    (source !== "idea" || bookLengthValid(book)) &&
+    (source === "project" ||
+      (source === "variant" ? Boolean(sourceProject) && Boolean(variantProfile || idea.trim()) : Boolean(idea.trim())));
   const [mode, setMode] = useState<AutomationMode>("auto");
   const [episodes, setEpisodes] = useState(1);
   const [historyFilter, setHistoryFilter] = useState<HistoryFilter>("all");
@@ -205,6 +215,7 @@ export function ProductionRunPanel({ projectName }: Props) {
       ...(source !== "idea" ? { story_source: source } : {}),
       ...(source === "variant" ? { source_project: sourceProject } : {}),
       ...(source === "variant" && variantProfile ? { variant_profile: variantProfile } : {}),
+      ...(source === "idea" && book !== null ? { book_chapters: book.chapters } : {}),
       targets: Array.from({ length: episodes }, (_, index) => `episode:${index + 1}`),
       expected_input_digest: offer.input_digest,
       policy_digest: offer.policy_digests[mode],
@@ -332,6 +343,8 @@ export function ProductionRunPanel({ projectName }: Props) {
             profile={variantProfile}
             onProfile={setVariantProfile}
           />
+          {source === "idea" && <BookLengthField value={book} onChange={setBook} compact />}
+          {source === "continue" && <BookContinuationNote book={storyBook} />}
           {source !== "project" && (
           <label className="block text-[12px]" style={{ color: "var(--color-text-2)" }}>
             {t(source === "idea" ? "auto_idea_label" : `auto_idea_label_${source}`)}

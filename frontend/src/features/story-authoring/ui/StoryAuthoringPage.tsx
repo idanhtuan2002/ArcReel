@@ -39,6 +39,14 @@ import {
   type StoryRun,
 } from "../api/storyClient";
 import { StorySourcePicker, type StorySource } from "@/features/production-run/ui/StorySourcePicker";
+import {
+  BookContinuationNote,
+  BookLengthField,
+  bookLengthValid,
+  bookSpec,
+  useStoryBook,
+  type BookLength,
+} from "@/features/production-run/ui/BookLengthField";
 
 const POLL_MS = 15_000;
 const TARGET_MIN = 7000;
@@ -250,6 +258,8 @@ function NewStory({
   const [source, setSource] = useState<StorySource>("idea");
   const [sourceProject, setSourceProject] = useState("");
   const [variantProfile, setVariantProfile] = useState("");
+  const [book, setBook] = useState<BookLength | null>(null);
+  const storyBook = useStoryBook(projectName);
   const [genre, setGenre] = useState(() => readDraft(draftKey).genre);
   const [routes, setRoutes] = useState<StoryRoute[] | null>(null);
   const [routesError, setRoutesError] = useState<string | null>(null);
@@ -298,7 +308,8 @@ function NewStory({
     writerRoute?.enabled &&
     (!judge || judgeRoute?.enabled) &&
     targetValid &&
-    budgetValid,
+    budgetValid &&
+    (source !== "idea" || bookLengthValid(book)),
   );
   const routeLabel = (route: StoryRoute) => {
     const reason =
@@ -322,6 +333,7 @@ function NewStory({
           {
             ...(idea.trim() ? { idea: idea.trim() } : {}),
             ...(source === "continue" ? { prior_mode: "continuation" as const } : {}),
+            ...(source === "idea" ? bookSpec(book) : {}),
             ...(source === "variant"
               ? {
                   prior_mode: "variant" as const,
@@ -422,6 +434,8 @@ function NewStory({
             onProfile={setVariantProfile}
             sources={["idea", "continue", "variant"]}
           />
+          {source === "idea" && <BookLengthField value={book} onChange={setBook} />}
+          {source === "continue" && <BookContinuationNote book={storyBook} />}
           <div>
             <label htmlFor={ids.idea} className="block text-[11px] text-text-3">
               {t("story_field_idea")}

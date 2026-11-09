@@ -138,6 +138,8 @@ export interface DraftBriefRequest {
   prior_mode?: "continuation" | "variant";
   prior_project?: string;
   variant_profile?: string;
+  /** ADR-0116: write a long story part by part. */
+  book?: { chapters: number; part_chapters: number; chapter_syllables: number };
   genre: string;
   provider_id: string;
   model_id: string;

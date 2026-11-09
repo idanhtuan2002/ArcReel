@@ -322,6 +322,11 @@ class RunCommand(AutomationContract):
     )
     source_project: ExactIdentity | None = Field(default=None, exclude_if=lambda value: value is None)
     variant_profile: ExactIdentity | None = Field(default=None, exclude_if=lambda value: value is None)
+    #: ADR-0116: a run from an idea may start a book of this many chapters (it writes part 1); a ``continue`` run
+    #: of a book project writes the book's next part on its own.
+    book_chapters: Annotated[int, Field(ge=6, le=120)] | None = Field(
+        default=None, exclude_if=lambda value: value is None
+    )
 
     @model_validator(mode="after")
     def command_shape(self) -> Self:
@@ -339,6 +344,8 @@ class RunCommand(AutomationContract):
                 raise ValueError("only a variant names its source project and profile")
             if self.source_project == self.project_name:
                 raise ValueError("a variant is written into another project than its source")
+            if self.book_chapters is not None and self.story_source != "idea":
+                raise ValueError("only a run from an idea starts a book")
         elif (
             self.run_id is None
             or self.expected_version < 1
@@ -346,6 +353,7 @@ class RunCommand(AutomationContract):
             or self.story_source != "idea"
             or self.source_project is not None
             or self.variant_profile is not None
+            or self.book_chapters is not None
         ):
             raise ValueError("control requires an exact existing run")
         if not self.targets or len(set(self.targets)) != len(self.targets):

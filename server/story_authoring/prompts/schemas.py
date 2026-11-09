@@ -115,7 +115,9 @@ class ChapterPlan(_Out):
     scenes: list[PlannedScene] = Field(min_length=3, max_length=SCENES_PER_CHAPTER_MAX)
 
 
-def bound_chapter_plan(characters: Sequence[str], locations: Sequence[str]) -> type[ChapterPlan]:
+def bound_chapter_plan(
+    characters: Sequence[str], locations: Sequence[str], *, min_scenes: int = 3
+) -> type[ChapterPlan]:
     """The chapter plan of one story: a scene's POV and location are enums of the bible's names, so the grammar
     cannot emit others; the scene's other participants stay free text (minor or collective characters)."""
     pov = StrEnum("BoundPov", {f"v{i}": name for i, name in enumerate(characters)})
@@ -124,7 +126,7 @@ def bound_chapter_plan(characters: Sequence[str], locations: Sequence[str]) -> t
     return create_model(
         "BoundChapterPlan",
         __base__=ChapterPlan,
-        scenes=(list[scene], Field(min_length=3, max_length=SCENES_PER_CHAPTER_MAX)),
+        scenes=(list[scene], Field(min_length=min_scenes, max_length=SCENES_PER_CHAPTER_MAX)),
     )
 
 

@@ -50,6 +50,7 @@ from server.production_run.owner_tasks import actor_scope, sub_command
 from server.production_run.ports import StepPlan
 from server.services.automation_grants import RunAutomationAuthority
 from server.story_authoring.artifacts import StoryBlobStore
+from server.story_authoring.book import BookSpec
 from server.story_authoring.commit import CommitRefused, load_offered_manifest
 from server.story_authoring.contracts import StoryLimits
 from server.story_authoring.driver import StoryBrief
@@ -149,6 +150,8 @@ class BriefAdapter:
                 prior_mode=prior_mode,
                 prior_project=command.source_project,
                 prior_origin=command.variant_profile or "instruction",
+                book=None if command.book_chapters is None else BookSpec(chapters=command.book_chapters),
+                user_id=run.user_id,
             )
         except StoryActionRefused as refused:
             raise OwnerBlocked(refused.code) from None

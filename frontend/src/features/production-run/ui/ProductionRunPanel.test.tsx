@@ -91,6 +91,32 @@ describe("ProductionRunPanel", () => {
     expect(command).not.toHaveProperty("idea");
   });
 
+  it("starts a novel from an idea with its chapter count", async () => {
+    vi.spyOn(client, "listProductionRuns").mockResolvedValue({ start: OFFER, runs: [] });
+    const startProductionRun = vi.spyOn(client, "startProductionRun").mockResolvedValue(snapshot());
+    render(<ProductionRunPanel projectName="alpha" />);
+    fireEvent.change(await screen.findByPlaceholderText("One or two sentences about the story"), {
+      target: { value: "Chuyến đò cuối." },
+    });
+    fireEvent.click(screen.getByLabelText("Novel (many chapters, written part by part)"));
+    fireEvent.change(screen.getByLabelText("Chapters"), { target: { value: "5" } });
+    expect(screen.getByRole("button", { name: "Start" })).toBeDisabled();
+    fireEvent.change(screen.getByLabelText("Chapters"), { target: { value: "40" } });
+    fireEvent.click(screen.getByRole("button", { name: "Start" }));
+
+    expect(startProductionRun.mock.calls[0][1]).toMatchObject({ idea: "Chuyến đò cuối.", book_chapters: 40 });
+  });
+
+  it("names the book's next part when continuing a novel project", async () => {
+    vi.spyOn(client, "listProductionRuns").mockResolvedValue({ start: OFFER, runs: [] });
+    vi.spyOn(API, "request").mockResolvedValue({
+      book: { spec: { chapters: 30, part_chapters: 5, chapter_syllables: 3000 }, parts_done: 2, parts_total: 6 },
+    } as never);
+    render(<ProductionRunPanel projectName="alpha" />);
+    fireEvent.click(await screen.findByLabelText("Continue the story in this project"));
+    expect(await screen.findByText(/continuing writes part 3 of 6/)).toBeInTheDocument();
+  });
+
   it("starts a variant of another project's story with a named profile", async () => {
     vi.spyOn(client, "listProductionRuns").mockResolvedValue({ start: OFFER, runs: [] });
     vi.spyOn(API, "listProjects").mockResolvedValue({

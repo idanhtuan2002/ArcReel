@@ -1006,7 +1006,14 @@ class StoryRunDriver:
         if notes:
             prompt += "\n\n[Yêu cầu sửa kế hoạch]\n" + "\n".join(f"- {n}" for n in notes)
 
-        bound = bound_chapter_plan(list(names), list(locations))
+        # A book chapter needs enough scenes to reach its length: a scene holds at most 1 000 syllables.
+        min_scenes = 3
+        if self._book is not None:
+            min_scenes = min(SCENES_PER_CHAPTER_MAX, max(3, -(-self._book.spec.chapter_syllables // 1000)))
+            prompt += (
+                f"\n\nChương này dài khoảng {self._book.spec.chapter_syllables} chữ: chia ít nhất {min_scenes} cảnh."
+            )
+        bound = bound_chapter_plan(list(names), list(locations), min_scenes=min_scenes)
 
         async def generate(text: str) -> tuple[ChapterPlan, list[str]]:
             plan = ChapterPlan.model_validate_json(

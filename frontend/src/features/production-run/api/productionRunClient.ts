@@ -33,6 +33,8 @@ export interface StartCommand {
   /** A variant's source project and optional named profile. */
   source_project?: string;
   variant_profile?: string;
+  /** ADR-0116: start a book of this many chapters; the run writes its first part. */
+  book_chapters?: number;
   targets: string[];
   expected_input_digest: string;
   policy_digest: string;

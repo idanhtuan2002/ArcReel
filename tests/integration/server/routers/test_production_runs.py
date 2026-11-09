@@ -307,6 +307,10 @@ async def test_a_run_from_the_projects_story_needs_no_idea_and_starts_at_asset_a
             "NOT_AUTHORIZED",
         ),
         ({"story_source": "continue", "idea": "Minh đi tìm người lạ."}, 200, None),
+        # ADR-0116: only a run from an idea starts a book, of 6 to 120 chapters.
+        ({"story_source": "continue", "idea": "Phần sau.", "book_chapters": 30}, 422, None),
+        ({"idea": "Chuyến đò cuối.", "book_chapters": 5}, 422, None),
+        ({"idea": "Chuyến đò cuối.", "book_chapters": 30}, 200, None),
     ],
 )
 async def test_continuation_and_variant_starts_name_what_they_need(host, changes, status, code):

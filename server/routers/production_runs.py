@@ -59,6 +59,8 @@ class StartBody(_Body):
     #: A variant reads this project's story (ADR-0115) and may apply a named variant profile.
     source_project: str | None = Field(default=None, min_length=1)
     variant_profile: str | None = Field(default=None, min_length=1)
+    #: ADR-0116: start a book of this many chapters (a run from an idea writes its first part).
+    book_chapters: int | None = Field(default=None, ge=6, le=120)
     targets: tuple[str, ...] = ("episode:1",)
     expected_input_digest: str = Field(pattern=_DIGEST)
     policy_digest: str = Field(pattern=_DIGEST)
@@ -236,6 +238,7 @@ async def start_run(
             story_source=body.story_source,
             source_project=body.source_project,
             variant_profile=body.variant_profile,
+            book_chapters=body.book_chapters,
         )
     except ValueError as error:
         raise _invalid() from error

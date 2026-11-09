@@ -19,6 +19,7 @@ from r2.narrative_lifecycle.errors import NarrativeDecisionAuthorizationError
 from server.auth import CurrentUser, InteractiveUser
 from server.services import workflow_planner
 from server.story_authoring.authority import GrantNarrativeShowrunnerAuthority
+from server.story_authoring.book import BookSpec
 from server.story_authoring.commit import CommitRefused
 from server.story_authoring.driver import StoryBrief
 from server.story_authoring.handoff import STORY_SOURCE_LANGUAGE, HandoffRefused, OnConflict
@@ -67,6 +68,8 @@ class DraftBriefRequest(_Request):
     prior_mode: Literal["continuation", "variant"] | None = None
     prior_project: str | None = Field(default=None, min_length=1)
     variant_profile: str | None = Field(default=None, min_length=1)
+    #: ADR-0116: write a long story part by part; a continuation of a book project writes its next part.
+    book: BookSpec | None = None
 
 
 class StartRunRequest(_Request):
@@ -142,10 +145,27 @@ async def draft_brief(project_name: str, req: DraftBriefRequest, user: CurrentUs
             prior_mode=req.prior_mode,
             prior_project=req.prior_project,
             prior_origin=req.variant_profile or "instruction",
+            book=req.book,
+            user_id=user.id,
         )
     except REFUSALS as error:
         raise _refusal(error) from error
     return {"project_name": project_name, "brief": brief.model_dump(mode="json"), "brief_digest": brief.digest()}
+
+
+@router.get("/projects/{project_name}/story-book")
+async def story_book(project_name: str, user: CurrentUser, service: Service) -> dict:
+    """The project's book (ADR-0116): its spec and how many parts are committed and handed to video."""
+    progress = await service.book_progress(project_name, user_id=user.id)
+    if progress is None:
+        return {"book": None}
+    return {
+        "book": {
+            "spec": progress.spec.model_dump(mode="json"),
+            "parts_done": progress.parts_done,
+            "parts_total": len(progress.spec.parts()),
+        }
+    }
 
 
 @router.get("/system/config/story-variant-profiles")
