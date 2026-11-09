@@ -109,7 +109,7 @@ class ProjectInputWitness:
         sources: list[dict[str, Any]] = [
             {"path": doc.rel_path, "sha256": hashlib.sha256(doc.text.encode("utf-8")).hexdigest()}
             for doc in revision.documents
-            if written.get(doc.rel_path) != doc.text
+            if written.get(doc.rel_path) != normalize_source_text(doc.text)
         ]
         body = {
             "settings": {key: project.get(key) for key in WITNESSED_SETTINGS}
