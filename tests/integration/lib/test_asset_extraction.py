@@ -100,3 +100,16 @@ async def test_a_moved_source_is_refused_before_any_model_call(tmp_path: Path):
         await extract_asset_inventory(pm, "demo", scope=ALL, expected_source_revision=revision, generate=generate)
 
     assert seen == []
+
+
+async def test_a_character_the_source_never_names_is_not_registered(tmp_path: Path):
+    pm, revision = _project(tmp_path)
+    invented = {**EXTRACTED, "characters": [*EXTRACTED["characters"], {"name": "Hùng", "description": "Chàng trai."}]}
+    generate, _ = _answer(invented)
+
+    completed = await extract_asset_inventory(
+        pm, "demo", scope=ALL, expected_source_revision=revision, generate=generate
+    )
+
+    assert completed.counts["characters"] == 1
+    assert set(pm.load_project("demo")["characters"]) == {"Lan"}

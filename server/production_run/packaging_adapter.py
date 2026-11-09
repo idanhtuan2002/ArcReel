@@ -1,6 +1,7 @@
 """``PACKAGE`` and ``EXPORT``: one immutable archive per target, then verified finality of the whole run.
 
 PACKAGE writes, for each target, a deterministic zip of the final MP4, its subtitle sidecar, the render manifest,
+publishing metadata (``publish.json``: title, description, tags, language, duration) with a thumbnail frame,
 both quality reviews with their verdict and a lineage manifest naming the run, generation, input, policy and every
 upstream owner receipt, plus one run-level manifest of the archives. EXPORT re-reads every archive and passes only
 when each target's archive hashes to its package receipt, holds exactly the final the render manifest names and
@@ -21,6 +22,7 @@ from typing import Literal
 from lib.db.repositories.quality_dispositions import QualityDispositionRepository
 from lib.presentation_renderer import sha256_file
 from lib.project_manager import ProjectManager
+from lib.publish_metadata import publish_metadata, thumbnail_frame
 from r2.automation.identity import digest_value, policy_digest
 from r2.contracts.automation import (
     BudgetReservation,
@@ -169,6 +171,7 @@ class PackagingAdapter(_Upstream):
 
     def _package(self, run: RunSnapshot, intent: DispatchIntent, decisions: dict[int, QualityDecision]) -> None:
         project = self._projects.get_project_path(run.project_name)
+        project_data = self._projects.load_project(run.project_name)
         refs: dict[str, dict[int, OwnerReceipt]] = {"renderer": {}, "gate-c": {}, "quality": {}}
         for ref in intent.input_refs:
             refs.setdefault(ref.owner, {})[_episode(ref)] = ref
@@ -202,6 +205,15 @@ class PackagingAdapter(_Upstream):
                 "quality.json": json.dumps(
                     [json.loads(r.read_text(encoding="utf-8")) for r in reviews], ensure_ascii=False, sort_keys=True
                 ).encode(),
+                "publish.json": json.dumps(
+                    publish_metadata(
+                        project_data, project, episode, duration_seconds=float(manifest.get("duration_seconds") or 0)
+                    ),
+                    ensure_ascii=False,
+                    sort_keys=True,
+                    indent=2,
+                ).encode(),
+                "thumbnail.jpg": thumbnail_frame(final),
             }
             data = _archive_bytes(members)
             target = project / package_dir(run) / f"episode_{episode}.zip"

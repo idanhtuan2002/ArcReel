@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 
 import pytest
 import sqlalchemy as sa
@@ -324,10 +325,16 @@ async def test_a_passed_final_is_packaged_exported_and_the_run_succeeds(quality_
             "episode_1.mp4",
             "episode_1.srt",
             "lineage.json",
+            "publish.json",
             "quality.json",
             "render_manifest.json",
+            "thumbnail.jpg",
         ]
         assert "sha256:" + hashlib.sha256(opened.read("episode_1.mp4")).hexdigest() == output.final_digest
+        publish = json.loads(opened.read("publish.json"))
+        assert (publish["episode"], publish["thumbnail"]) == (1, "thumbnail.jpg")
+        assert publish["duration_seconds"] > 0
+        assert opened.read("thumbnail.jpg").startswith(b"\xff\xd8")
 
 
 async def test_a_substituted_archive_prevents_run_success(quality_host):

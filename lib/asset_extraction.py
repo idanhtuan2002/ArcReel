@@ -20,6 +20,7 @@ from lib.asset_inventory import AssetInventoryCompletion, AssetInventoryError, c
 from lib.asset_types import resolve_asset_key, validate_asset_name
 from lib.project_manager import ProjectManager
 from lib.source_revision import SourceScope, compute_source_revision
+from lib.text_attestation import named_in
 from lib.text_backends.base import TextGenerationRequest, TextGenerationResult
 
 MAX_PER_BUCKET = 12
@@ -71,7 +72,7 @@ Source text:
 """
 
 
-def _entries(extraction: AssetExtraction, project: dict[str, Any]) -> dict[str, dict[str, dict[str, str]]]:
+def _entries(extraction: AssetExtraction, project: dict[str, Any], source: str) -> dict[str, dict[str, dict[str, str]]]:
     buckets: dict[str, dict[str, dict[str, str]]] = {}
     for bucket, items in (
         ("characters", extraction.characters),
@@ -86,6 +87,10 @@ def _entries(extraction: AssetExtraction, project: dict[str, Any]) -> dict[str, 
             except ValueError:
                 continue
             if resolve_asset_key(existing, name) is not None or resolve_asset_key(chosen, name) is not None:
+                continue
+            # A character the source never names is invented (DramaClaw's name attestation); places and objects
+            # may carry a descriptive name, so only characters are held to the source's words.
+            if bucket == "characters" and not named_in(name, source):
                 continue
             entry = {"description": item.description.strip()}
             if isinstance(item, _Character) and item.voice_style.strip():
@@ -125,7 +130,7 @@ async def extract_asset_inventory(
         extraction = AssetExtraction.model_validate(json.loads(result.text))
     except (ValueError, ValidationError) as error:
         raise AssetExtractionError(f"extraction response is invalid: {error}") from None
-    entries = _entries(extraction, project)
+    entries = _entries(extraction, project, source)
     existing_characters = project.get("characters") if isinstance(project.get("characters"), dict) else {}
     if not entries["characters"] and not existing_characters:
         raise AssetExtractionError("extraction found no character")

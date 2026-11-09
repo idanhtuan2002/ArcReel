@@ -19,11 +19,9 @@ basis makes the adaptation stale.
 
 from __future__ import annotations
 
-import bisect
 import hashlib
 import itertools
 import json
-import unicodedata
 from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
@@ -31,12 +29,12 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from lib.cjk_ranges import CJK_RANGES
 from lib.episode_ledger import episode_outline_context
 from lib.episode_paths import episode_source_path, episode_source_relpath
 from lib.episode_target_volume import resolve_episode_target_volume
 from lib.path_safety import PathTraversalError, safe_join
 from lib.speech_rate import estimate_spoken_seconds, project_speech_rate_override, speech_rate_units_per_second
+from lib.text_attestation import has_cjk, named_in, skeleton
 
 type AdaptationMode = Literal["screen", "verbatim"]
 
@@ -205,46 +203,6 @@ def read_inputs(project_path: Path, project: Mapping[str, Any], episode: int) ->
 # --- checks ----------------------------------------------------------------------------------------------------------
 
 
-def _skeleton(text: str) -> tuple[str, list[int]]:
-    """Lower-case letters and digits of ``text`` (accents kept) with each one's offset in ``text``."""
-    chars, offsets = [], []
-    for index, char in enumerate(unicodedata.normalize("NFC", text)):
-        if char.isalnum():
-            chars.append(char.lower())
-            offsets.append(index)
-    return "".join(chars), offsets
-
-
-_CJK_STARTS = [start for start, _ in CJK_RANGES]
-
-
-def _cjk(text: str) -> bool:
-    for char in text:
-        code = ord(char)
-        position = bisect.bisect_right(_CJK_STARTS, code) - 1
-        if position >= 0 and code <= CJK_RANGES[position][1]:
-            return True
-    return False
-
-
-def _words(text: str) -> str:
-    """Lower-case words of ``text`` separated by single spaces, with spaces at both ends."""
-    words = "".join(char.lower() if char.isalnum() else " " for char in unicodedata.normalize("NFC", text)).split()
-    return " " + " ".join(words) + " "
-
-
-def _named_in(name: str, source: str) -> bool:
-    """Whether ``source`` writes ``name`` as whole words (``Ann`` is not named by ``annual``); scripts without spaces
-    between words (CJK) are matched as text."""
-    skeleton = _skeleton(name)[0]
-    if not skeleton:
-        return False  # a name of punctuation only names nobody
-    if _cjk(source):
-        return skeleton in _skeleton(source)[0]
-    words = _words(name)
-    return words.strip() != "" and words in _words(source)
-
-
 def spoken_text(draft: EpisodeAdaptationDraft) -> list[str]:
     return [line.text for scene in draft.scenes for line in scene.lines if line.kind in SPOKEN]
 
@@ -259,11 +217,11 @@ def screen_seconds(draft: EpisodeAdaptationDraft, inputs: AdaptationInputs) -> f
 def check_adaptation(draft: EpisodeAdaptationDraft, inputs: AdaptationInputs) -> list[str]:
     """The checks a draft fails, as sentences the model can act on; empty when it is accepted."""
     problems: list[str] = []
-    source_skeleton, _ = _skeleton(inputs.source)
+    source_skeleton, _ = skeleton(inputs.source)
     total = max(1, len(source_skeleton))
     positions: list[tuple[int, int]] = []
     for number, scene in enumerate(draft.scenes, start=1):
-        excerpt, _ = _skeleton(scene.source_excerpt)
+        excerpt, _ = skeleton(scene.source_excerpt)
         if len(excerpt) < EXCERPT_MIN_SKELETON:
             problems.append(f"scene {number}: source_excerpt is too short; copy a full sentence from the source")
             continue
@@ -286,7 +244,7 @@ def check_adaptation(draft: EpisodeAdaptationDraft, inputs: AdaptationInputs) ->
     problems.extend(
         f"cast member {name!r} is neither a registered character nor named in the source"
         for name in sorted(cast)
-        if name not in inputs.characters and not _named_in(name, inputs.source)
+        if name not in inputs.characters and not named_in(name, inputs.source)
     )
     for number, scene in enumerate(draft.scenes, start=1):
         for line in scene.lines:
@@ -335,7 +293,7 @@ def check_adaptation(draft: EpisodeAdaptationDraft, inputs: AdaptationInputs) ->
     elif kinds & {"action", "voiceover"}:
         problems.append("a narration script has only narration lines and quoted dialogue")
     rendered = render_script(draft, inputs.mode)
-    if _cjk(rendered) and not _cjk(inputs.source):
+    if has_cjk(rendered) and not has_cjk(inputs.source):
         problems.append("write in the source's language only; the answer contains CJK characters")
     return problems
 
