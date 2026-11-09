@@ -64,6 +64,7 @@ from server.story_authoring.contracts import (
     StoryStepKind,
     StoryStepRequest,
 )
+from server.story_authoring.craft_checks import drift_findings, long_span_findings, opening_findings
 from server.story_authoring.generation import AuthoringTextGateway, StoryStepError
 from server.story_authoring.narrative import (
     ChapterOutlineInput,
@@ -89,13 +90,13 @@ from server.story_authoring.narrative import (
     scene_contract,
     scene_refs,
 )
-from server.story_authoring.pipeline import chapter_plan, chapter_review, fingerprint
+from server.story_authoring.pipeline import chapter_plan, chapter_review, fingerprint, scene_draft
 from server.story_authoring.prompts import book as book_prompts
 from server.story_authoring.prompts import drafting, planning
 from server.story_authoring.prompts import outline as outline_prompts
 from server.story_authoring.prompts import packaging as packaging_prompts
 from server.story_authoring.prompts import prior as prior_prompts
-from server.story_authoring.prompts.prior import CanonLock, PriorSummary
+from server.story_authoring.prompts.prior import CanonLock, PriorSummary, VariantReview, variant_review_prompt
 from server.story_authoring.prompts.schemas import (
     SCENES_PER_CHAPTER_MAX,
     ChapterPlan,
@@ -116,6 +117,7 @@ CHAPTERS = 3
 CANON_BASE_NODE = "canon_base"
 NODE_CAPS = {
     "canon_base": 1,
+    "variant_review": 2,
     "seed": 3,
     "story_bible": 3,
     "style_bible": 3,
@@ -159,6 +161,11 @@ REGENERATE_NOTE = (
 PART_ENDING_NOTE = AUTO_NOTE + (
     "biên tập viên thấy cảnh này chưa đưa phần truyện tới bước ngoặt đã định trong dàn ý. Viết lại để phần kết ở đúng "
     "bước ngoặt đó, không giải quyết xung đột trung tâm của cả tiểu thuyết."
+)
+HOOKS_NOTE = AUTO_NOTE + "chương cuối của tiểu thuyết phải giải nốt các phục bút còn mở: "
+VARIANT_NOTE = AUTO_NOTE + (
+    "dàn ý phiên bản khác đã bỏ hoặc làm trái các diễn biến của truyện gốc mà yêu cầu không cho đổi; giữ lại đúng "
+    "thứ tự các diễn biến: "
 )
 ENDING_NOTE = AUTO_NOTE + (
     "biên tập viên thấy cảnh này chưa khép lại xung đột trung tâm. Viết lại để kết thúc giải quyết trọn vẹn xung đột, "
@@ -303,6 +310,7 @@ class StoryRunDriver:
         self._prior_context: str | None = None
         self._prior_tail = ""
         self._canon_base = canon_base
+        self._lock: CanonLock | None = None
         self._book = brief.book
         self._chapters = brief.chapters
         self._plan: books.BookPlan | None = None
@@ -553,6 +561,7 @@ class StoryRunDriver:
         idea = self._brief.idea
         if self._brief.prior is not None:
             lock, lock_in, self._prior_tail = await self._read_prior(self._brief.prior)
+            self._lock = lock
             prior_ins = [lock_in]
             self._prior_context = prior_prompts.prior_context(
                 lock, mode=self._brief.prior.mode, direction=self._brief.idea, part=self._brief.prior.part
@@ -686,6 +695,9 @@ class StoryRunDriver:
             plans.append(ChapterPlan.model_validate_json(raw))
             plan_ins.append((node, content_digest(raw)))
 
+        if self._lock is not None and self._brief.prior is not None and self._brief.prior.mode == "variant":
+            await self._variant_review(outline, plans, plan_ins)
+
         bible_input = story_bible_input(seed, style)
         outline_input = story_outline_input(outline, plans, names, locations)
         story = _Story(
@@ -706,6 +718,11 @@ class StoryRunDriver:
         return story
 
     # --- the book (ADR-0116) -----------------------------------------------------------------------
+
+    def _young_readers(self) -> bool:
+        """A variant written for readers from 12 (ADR-0115 profile) is audited for safety more strictly."""
+        prior = self._brief.prior
+        return prior is not None and prior.origin == "young-readers"
 
     def _first(self) -> int:
         """The book-wide number of this run's first chapter."""
@@ -881,6 +898,92 @@ class StoryRunDriver:
         )
         return node, content_digest(raw)
 
+    def _open_hooks(self, digests: Sequence[tuple[int, books.ChapterDigest]]) -> list[books.HookStatus]:
+        folded = books.fold(self._memory, digests, part=0, part_summary="", tail="")
+        return [h for h in folded.hooks if h.status != "resolved"]
+
+    async def _close_open_hooks(self, final_scene: str) -> None:
+        """The book's last chapter: the final scene is rewritten once with the hooks still open (ADR-0117)."""
+        open_hooks = self._open_hooks(await self._digests(self._chapters + 1))
+        if not open_hooks:
+            return
+        state = await self._store.load()
+        if any(n.startswith(HOOKS_NOTE) for n in state.intents.get(final_scene, ())):
+            return
+        note = HOOKS_NOTE + "; ".join(f"{h.hook_id}: {h.text}" for h in open_hooks)
+        await self._store.apply(lambda s: (add_intent(s, node_ids=(final_scene,), note=note), None))
+        raise _Restart(final_scene)
+
+    async def _book_findings(self) -> list[Finding]:
+        """Hooks the plan pays in a chapter whose digest does not resolve them; at the book's end, any still open."""
+        assert self._plan is not None
+        digests = await self._digests(self._chapters + 1)
+        findings: list[Finding] = []
+        for number, digest in digests:
+            row = next(r for r in self._plan.rows if r.chapter == number)
+            resolved = {str(getattr(op.hook, "value", op.hook)) for op in digest.hooks if op.op == "resolved"}
+            node = f"chapter_digest[{number - self._first() + 1}]"
+            findings.extend(
+                Finding("HOOK_NOT_PAID", Severity.STYLISTIC, node, f"{hook} planned for chapter {number} stays open")
+                for hook in row.payoffs
+                if hook not in resolved
+            )
+        if self._ends_story():
+            findings.extend(
+                Finding("HOOK_OPEN_AT_END", Severity.STYLISTIC, "manuscript", f"{h.hook_id} stays open: {h.text}")
+                for h in self._open_hooks(digests)
+            )
+        return findings
+
+    async def _variant_review(
+        self, outline: ShortOutline, plans: Sequence[ChapterPlan], plan_ins: Sequence[tuple[str, str]]
+    ) -> None:
+        """The variant's plans against the source spine; one automatic outline note, then an exception."""
+        assert self._lock is not None
+        events = list(self._lock.chapter_events)
+        prompt = variant_review_prompt(events, outline, plans, self._brief.idea)
+
+        async def produce(epoch: int) -> bytes:
+            review = VariantReview.model_validate_json(
+                await self._step(
+                    "variant_review",
+                    epoch,
+                    kind=StoryStepKind.OUTLINE,
+                    system=planning.PLANNING_SYSTEM,
+                    prompt=prompt,
+                    decoding=REVIEW,
+                    model=VariantReview,
+                    judge=True,
+                )
+            )
+            lost = sorted({i for i in (*review.missing, *review.contradicted) if 1 <= i <= len(events)})
+            return json.dumps({"lost": lost, "notes": review.notes}, ensure_ascii=False).encode("utf-8")
+
+        raw = await self._ensure("variant_review", inputs=list(plan_ins), decoding=REVIEW, produce=produce)
+        lost = json.loads(raw)["lost"]
+        if not lost:
+            return
+        state = await self._store.load()
+        if any(n.startswith(VARIANT_NOTE) for n in state.intents.get("outline", ())):
+            return
+        note = VARIANT_NOTE + "; ".join(f"{i}. {events[i - 1]}" for i in lost)
+        await self._store.apply(lambda s: (add_intent(s, node_ids=("outline",), note=note), None))
+        raise _Restart("outline")
+
+    async def _variant_findings(self) -> list[Finding]:
+        if self._lock is None or not (await self._store.load()).nodes.get("variant_review"):
+            return []
+        lost = json.loads(await self._head("variant_review"))["lost"]
+        return [
+            Finding(
+                "VARIANT_SPINE",
+                Severity.NARRATIVE_CRITICAL,
+                "outline",
+                f"the variant drops or contradicts source event {i}: {self._lock.chapter_events[i - 1]}",
+            )
+            for i in lost
+        ]
+
     async def _digests(self, upto: int) -> list[tuple[int, books.ChapterDigest]]:
         """The digests of this run's chapters before ``upto``, numbered across the book."""
         found = []
@@ -950,9 +1053,11 @@ class StoryRunDriver:
                 model=bound_short_outline(),
             )
 
-        outline = ShortOutline.model_validate_json(
-            await generate(self._with_prior(outline_prompts.outline_prompt(seed)))
-        )
+        base_prompt = self._with_prior(outline_prompts.outline_prompt(seed))
+        notes = (await self._store.load()).intents.get("outline", ())
+        if notes:
+            base_prompt += "\n\n[Yêu cầu sửa dàn ý]\n" + "\n".join(f"- {n}" for n in notes)
+        outline = ShortOutline.model_validate_json(await generate(base_prompt))
         review = OutlineReview.model_validate_json(
             await self._step(
                 "outline",
@@ -1106,6 +1211,8 @@ class StoryRunDriver:
             await self._review_chapter(story, c, chapter_refs, final=True)
             if self._book is not None:
                 await self._chapter_digest(c, chapter_refs)
+                if c == self._chapters and self._ends_story():
+                    await self._close_open_hooks(chapter_refs[-1].node_id)
 
     async def _acceptances(
         self, refs: Sequence[SceneRef], upto: int, version: str, proposal: Any
@@ -1410,6 +1517,7 @@ class StoryRunDriver:
                     plan=plan,
                     facts=facts,
                     previous_summary=previous,
+                    young_readers=self._young_readers(),
                 ),
             )
             findings.extend(result.findings)
@@ -1475,6 +1583,12 @@ class StoryRunDriver:
                 )
                 raise _Restart(plan_node)
         if final:
+            # ADR-0117: a craft finding still open at the seal is recorded, never a stop or an exception.
+            craft = f"{AuditDimension.CRAFT.value}:"
+            findings = [
+                Finding(f.code, Severity.STYLISTIC, f.node_id, f.message, f.quote) if f.code.startswith(craft) else f
+                for f in findings
+            ]
             findings, blocking = escalate_or_block(findings)
             if blocking:
                 raise Blocked(
@@ -1756,6 +1870,15 @@ class StoryRunDriver:
         packaged = json.loads(await self._head("packaging"))
         packaging = Packaging.model_validate(packaged["packaging"])
         findings.extend(_finding_from(f) for f in packaged["findings"])
+        texts = [(scene_draft(c, 1), "\n\n".join(chapters[c])) for c in sorted(chapters)]
+        findings.extend(long_span_findings(texts))
+        findings.extend(opening_findings(texts))
+        reference = self._memory.tail if self._book is not None and self._book.part > 1 else self._prior_tail
+        if reference and (self._book is not None or (self._brief.prior and self._brief.prior.mode == "continuation")):
+            findings.extend(drift_findings(reference, texts[0][1], node=texts[0][0]))
+        if self._book is not None:
+            findings.extend(await self._book_findings())
+        findings.extend(await self._variant_findings())
         if self._book is None:
             findings.extend(story_length_findings([chapters[c] for c in sorted(chapters)]))
         else:

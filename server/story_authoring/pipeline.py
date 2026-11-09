@@ -37,6 +37,7 @@ TEMPLATE_VERSIONS = {
     "part_summary": "part-summary-v1",
     "book_state": "book-state-v1",
     "canon_base": "canon-base-v1",
+    "variant_review": "variant-review-v1",
 }
 
 PLANNING_NODES = ("seed", "story_bible", "style_bible", "outline")

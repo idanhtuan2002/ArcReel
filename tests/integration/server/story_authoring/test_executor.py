@@ -149,7 +149,7 @@ async def test_a_judge_route_gets_its_own_gateway_and_reviews_the_run(concurrent
     )
 
     assert result["phase"] == "READY_FOR_APPROVAL"
-    assert judge.calls["issues"] == 12
+    assert judge.calls["issues"] == 18
     assert "issues" not in writer.calls
 
 

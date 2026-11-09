@@ -11,6 +11,7 @@ state rebuild, ``novel-continuity.ts:621``) and the canon-lock prefix (``NC:141`
 from __future__ import annotations
 
 import json
+from collections.abc import Sequence
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -163,15 +164,50 @@ BẢN KHÓA CANON:
 {direction}"""
 
 
+class VariantReview(_Model):
+    missing: list[int] = Field(max_length=40)
+    contradicted: list[int] = Field(max_length=40)
+    notes: list[str] = Field(max_length=6)
+
+
+def variant_review_prompt(events: list[str], outline: object, plans: Sequence[object], instruction: str) -> str:
+    """The variant's outline and chapter plans against the source's events in order (ADR-0117)."""
+    listed = "\n".join(f"{i}. {e}" for i, e in enumerate(events, start=1))
+    planned = [
+        {"chapter_goal": getattr(p, "chapter_goal", ""), "scenes": [s.summary for s in getattr(p, "scenes", [])]}
+        for p in plans
+    ]
+    return f"""So sánh dàn ý một PHIÊN BẢN KHÁC với các diễn biến của truyện gốc.
+Yêu cầu biến thể (chỉ được thay đổi những gì yêu cầu này nêu):
+{instruction}
+
+Trả về:
+- missing: số thứ tự các diễn biến gốc mà dàn ý mới bỏ mất (không có tương đương nào).
+- contradicted: số thứ tự các diễn biến gốc mà dàn ý mới làm trái (kết quả khác) khi yêu cầu không cho đổi.
+- notes: tối đa 6 ghi chú ngắn.
+Đổi giọng, ngôi kể, bối cảnh hay tên theo đúng yêu cầu không phải lỗi. Không có lỗi thì trả danh sách rỗng.
+
+DIỄN BIẾN TRUYỆN GỐC:
+{listed}
+
+DÀN Ý MỚI:
+{json.dumps(getattr(outline, "model_dump", dict)(), ensure_ascii=False, indent=1)}
+
+KẾ HOẠCH CÁC CHƯƠNG MỚI:
+{json.dumps(planned, ensure_ascii=False, indent=1)}"""
+
+
 __all__ = [
     "MAX_PRIOR_CHUNKS",
     "PRIOR_SYSTEM",
     "PRIOR_TAIL_CHARS",
     "CanonLock",
     "PriorSummary",
+    "VariantReview",
     "attest",
     "canon_lock_prompt",
     "prior_context",
     "prior_summary_prompt",
     "split_prior",
+    "variant_review_prompt",
 ]

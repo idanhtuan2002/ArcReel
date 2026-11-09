@@ -155,6 +155,7 @@ async def test_a_book_is_planned_once_and_its_second_part_continues_from_the_com
     assert [(s.chapter, s.scene) for s in manifest.scenes] == [(c, s) for c in (1, 2, 3) for s in (1, 2, 3)]
     assert manifest.quality_record_digest is not None
     record = json.loads(blobs.read_exact(manifest.quality_record_digest))
+    assert [f["node_id"] for f in record["findings"] if f["code"] == "HOOK_NOT_PAID"] == ["chapter_digest[3]"]
     book = BookState.model_validate_json(blobs.read_exact(record["book_state"]))
     assert (book.parts_done, book.title, record["book_part"]) == (1, "Căn nhà cũ", 1)
     assert [c for c, _ in book.memory.chapter_summaries] == [1, 2, 3]
@@ -202,3 +203,8 @@ async def test_a_book_is_planned_once_and_its_second_part_continues_from_the_com
     assert "Đây là cảnh cuối của truyện" in prose[-1]
     record = json.loads(blobs.read_exact(load_offered_manifest(blobs, state).quality_record_digest or ""))
     assert BookState.model_validate_json(blobs.read_exact(record["book_state"])).parts_done == 2
+    # The book's last scene was rewritten once with the hook still open; it stayed open and is recorded.
+    rewrites = [p for p in prose if "giải nốt các phục bút còn mở" in p]
+    assert len(rewrites) == 1
+    assert "lá thư không ký tên" in rewrites[0]
+    assert [f["code"] for f in record["findings"] if f["code"] == "HOOK_OPEN_AT_END"] == ["HOOK_OPEN_AT_END"]

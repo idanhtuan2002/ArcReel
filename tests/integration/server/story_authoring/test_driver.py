@@ -272,6 +272,8 @@ class ScriptedModel:
             return {"patches": [], "notes": "không sửa"}
         if kind == "rewrites":
             return {"rewrites": []}
+        if kind == "contradicted":
+            return {"missing": [], "contradicted": [], "notes": []}
         if kind == "events":
             return PRIOR_SUMMARY
         if kind == "title_hint":
@@ -299,6 +301,7 @@ class ScriptedModel:
                     "checks",
                     "patches",
                     "rewrites",
+                    "contradicted",
                 )
                 if k in properties
             )
@@ -396,7 +399,7 @@ async def test_a_clean_run_converges_and_offers_one_manifest(concurrent_session_
     ]
     assert all(s.revision.normalized_content in export for s in manifest.scenes)
     assert model.calls["prose"] == 9
-    assert model.calls["issues"] == 12
+    assert model.calls["issues"] == 18
     assert (model.calls["ending_resolves_conflict"], model.calls["titles"]) == (1, 1)
 
 
@@ -454,7 +457,7 @@ async def test_a_scene_revision_regenerates_that_scene_and_everything_after_it(
     assert [a.decision_id for a in after.scenes[:6]] == [b.decision_id for b in before.scenes[:6]]
     assert all(a.decision_id != b.decision_id for a, b in zip(after.scenes[6:], before.scenes[6:], strict=True))
     assert revised.calls["prose"] == 3
-    assert revised.calls["issues"] == 4
+    assert revised.calls["issues"] == 6
     assert "Cho Lan nói nhiều hơn." in next(p for k, p in revised.prompts if k == "prose")
 
 
@@ -525,7 +528,7 @@ async def test_a_quoted_continuity_error_is_repaired_before_the_chapter_is_seale
     assert "Minh đứng yên rất lâu bên hiên." in manifest.scenes[0].revision.normalized_content
     assert flagged[0] not in manifest.scenes[0].revision.normalized_content
     assert model.calls["patches"] == 1
-    assert model.calls["issues"] == 16
+    assert model.calls["issues"] == 24
 
 
 async def test_an_output_that_never_validates_stops_at_the_node_cap(concurrent_session_factory: Factory, tmp_path):
@@ -558,7 +561,7 @@ async def test_an_unresolved_ending_rewrites_the_final_scene_once(concurrent_ses
 
     assert state.phase is RunPhase.READY_FOR_APPROVAL, state.block_reason
     assert (model.calls["prose"], model.calls["ending_resolves_conflict"]) == (10, 2)
-    assert model.calls["issues"] == 16
+    assert model.calls["issues"] == 24
     last_prose_prompt = [p for k, p in model.prompts if k == "prose"][-1]
     assert "chưa khép lại xung đột trung tâm" in last_prose_prompt
 
@@ -954,7 +957,7 @@ async def test_a_truncated_audit_is_retried_under_a_new_step(concurrent_session_
     state = await _driver(concurrent_session_factory, store, model, StoryBlobStore(tmp_path)).run()
 
     assert state.phase is RunPhase.READY_FOR_APPROVAL, state.block_reason
-    assert model.calls["issues"] == 13
+    assert model.calls["issues"] == 19
 
 
 JUDGE = StoryModelSelection.create(
@@ -998,7 +1001,7 @@ async def test_review_calls_go_to_the_judge_route_and_drafting_stays_with_the_wr
 
     assert state.phase is RunPhase.READY_FOR_APPROVAL, state.block_reason
     assert set(judge.calls) == {"passed", "issues", "ending_resolves_conflict", "unsupported"}
-    assert judge.calls["issues"] == 12
+    assert judge.calls["issues"] == 18
     assert not {"passed", "issues", "ending_resolves_conflict", "unsupported"} & set(writer.calls)
     assert writer.calls["prose"] == 9
 
@@ -1302,3 +1305,60 @@ async def test_a_variant_reads_the_whole_story_and_never_opens_on_its_ending(con
 
 def test_a_brief_without_a_prior_keeps_its_digest():
     assert "prior" not in BRIEF.model_dump(mode="json")
+
+
+def _quality(blobs: StoryBlobStore, state) -> list[dict[str, Any]]:
+    manifest = load_offered_manifest(blobs, state)
+    assert manifest.quality_record_digest is not None
+    return json.loads(blobs.read_exact(manifest.quality_record_digest))["findings"]
+
+
+async def test_a_craft_finding_that_repair_leaves_open_is_recorded_as_stylistic(concurrent_session_factory, tmp_path):
+    store = await _store(concurrent_session_factory)
+    model = ScriptedModel()
+    blobs = StoryBlobStore(tmp_path)
+
+    def audit(prompt: str, _schema: dict[str, Any]) -> dict[str, Any]:
+        if "KỸ THUẬT VÀ SỨC KÉO" not in prompt:
+            return {"issues": []}
+        issue = {
+            "severity": "major",
+            "issue_type": "flat_ending",
+            "description": "chương kết bằng khoảng lắng",
+            "quote": model.last_sentence(),
+            "suggested_fix": "kết bằng một móc",
+        }
+        return {"issues": [issue]}
+
+    model.overrides["issues"] = audit
+
+    state = await _driver(concurrent_session_factory, store, model, blobs).run()
+
+    assert state.phase is RunPhase.READY_FOR_APPROVAL, state.block_reason
+    craft = [f for f in _quality(blobs, state) if f["code"].startswith("CRAFT:")]
+    assert craft
+    assert {f["severity"] for f in craft} == {"STYLISTIC"}
+    assert not [f for f in _exceptions(blobs, state) if f["code"].startswith("CRAFT:")]
+    assert model.calls["patches"] + model.calls["rewrites"] > 0  # repair was tried before the seal
+
+
+async def test_a_variant_that_drops_a_source_event_is_replanned_once_then_offered_as_an_exception(
+    concurrent_session_factory, tmp_path
+):
+    store = await _store(concurrent_session_factory)
+    model = ScriptedModel()
+    blobs = StoryBlobStore(tmp_path)
+    model.overrides["contradicted"] = lambda _p, _s: {"missing": [2], "contradicted": [], "notes": ["bỏ sổ nợ"]}
+    driver, _ = _prior_driver(concurrent_session_factory, store, model, blobs, "variant")
+
+    state = await driver.run()
+
+    assert state.phase is RunPhase.READY_FOR_APPROVAL, state.block_reason
+    # The scripted plans come back identical, so the review is not asked again and its verdict stands.
+    assert model.calls["contradicted"] == 1
+    outline_prompts = [p for k, p in model.prompts if k == "story_arc"]
+    assert "[Yêu cầu sửa dàn ý]" in outline_prompts[-1]
+    assert "2. Có phong thư." in outline_prompts[-1]
+    spine = [f for f in _exceptions(blobs, state) if f["code"] == "VARIANT_SPINE"]
+    assert len(spine) == 1
+    assert "Có phong thư." in spine[0]["message"]
