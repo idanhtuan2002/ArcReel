@@ -203,7 +203,11 @@ class StoryAuthoringService:
             )
         prior = None
         if prior_mode is not None:
-            if project_name is None or (prior_mode == "variant") != (prior_project is not None):
+            if (
+                project_name is None
+                or (prior_mode == "variant") != (prior_project is not None)
+                or prior_project == project_name
+            ):
                 raise StoryActionRefused(
                     "PRIOR_SOURCE_INVALID", "a continuation reads its own project, a variant another one", status=422
                 )
@@ -567,6 +571,10 @@ class StoryAuthoringService:
 
     def _blobs(self, project_name: str) -> StoryBlobStore:
         return StoryBlobStore(self._project_dir_for(project_name))
+
+    async def require_source_grant(self, principal: str, *, user_id: str, project_name: str) -> None:
+        """A variant copies another project's story into a brief: its reader must be that project's Showrunner."""
+        await self._require_grant(principal, user_id=user_id, project_name=project_name)
 
     async def _require_grant(self, principal: str, *, user_id: str, project_name: str) -> None:
         try:

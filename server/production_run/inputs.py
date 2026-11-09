@@ -9,12 +9,14 @@ from __future__ import annotations
 
 import asyncio
 import hashlib
+from pathlib import Path
 from typing import Any
 
 from sqlalchemy import select
 
 from lib.db.models.production_run import ProductionStepModel
 from lib.episode_adaptation import SETTING as ADAPTATION_SETTING
+from lib.episode_ledger import normalize_source_text
 from lib.episode_target_duration import EPISODE_TARGET_DURATION_FIELD
 from lib.episode_target_volume import EPISODE_TARGET_UNITS_FIELD
 from lib.project_manager import ProjectManager
@@ -23,6 +25,8 @@ from r2.automation.identity import digest_value
 from r2.contracts.automation import OwnerReceipt, RunStage
 from r2.contracts.common import ensure_json_value
 from server.production_run.owner_support import Sessions
+from server.story_authoring.artifacts import StoryBlobStore
+from server.story_authoring.handoff import narration_source
 
 #: Witnessed only when present (ADR-0114's ``episode_adaptation``).
 LATER_WITNESSED_SETTINGS = (ADAPTATION_SETTING,)
@@ -69,7 +73,7 @@ class ProjectInputWitness:
         handed_off = await self._run_sources(user_id, project_name)
         return await asyncio.to_thread(self._digest, project_name, handed_off)
 
-    async def _run_sources(self, user_id: str, project_name: str) -> frozenset[str]:
+    async def _run_sources(self, user_id: str, project_name: str) -> frozenset[tuple[str, str]]:
         async with self._sessions() as session:
             rows = (
                 await session.execute(
@@ -81,16 +85,31 @@ class ProjectInputWitness:
                     )
                 )
             ).scalars()
-            return frozenset(OwnerReceipt.model_validate_json(row).receipt_ref for row in rows if row is not None)
+            receipts = [OwnerReceipt.model_validate_json(row) for row in rows if row is not None]
+            return frozenset((receipt.receipt_ref, receipt.digest) for receipt in receipts)
 
-    def _digest(self, project_name: str, handed_off: frozenset[str]) -> str:
+    def _handed_off_unchanged(self, project_path: Path, handed_off: frozenset[tuple[str, str]]) -> dict[str, str]:
+        """Each handed-off source path with the text the hand-off wrote, rebuilt from its export (ADR-0115): a run's
+        own hand-off never moves its input, but an edit to any handed-off story part does."""
+        blobs = StoryBlobStore(project_path)
+        written: dict[str, str] = {}
+        for path, export_digest in handed_off:
+            try:
+                markdown = blobs.read_exact(export_digest).decode("utf-8")
+            except Exception:  # an export that cannot be read leaves the file an ordinary input
+                continue
+            written[path] = normalize_source_text(narration_source(markdown))
+        return written
+
+    def _digest(self, project_name: str, handed_off: frozenset[tuple[str, str]]) -> str:
         project = self._projects.load_project(project_name)
         project_path = self._projects.get_project_path(project_name)
         revision = compute_source_revision(project_path, project, SourceScope(kind="all"))
+        written = self._handed_off_unchanged(project_path, handed_off)
         sources: list[dict[str, Any]] = [
             {"path": doc.rel_path, "sha256": hashlib.sha256(doc.text.encode("utf-8")).hexdigest()}
             for doc in revision.documents
-            if doc.rel_path not in handed_off
+            if written.get(doc.rel_path) != doc.text
         ]
         body = {
             "settings": {key: project.get(key) for key in WITNESSED_SETTINGS}

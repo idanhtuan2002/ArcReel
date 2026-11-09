@@ -122,9 +122,12 @@ async def available_story_routes(_user: CurrentUser, service: Service) -> dict:
 
 
 @router.post("/projects/{project_name}/story-runs/brief")
-async def draft_brief(project_name: str, req: DraftBriefRequest, _user: CurrentUser, service: Service) -> dict:
-    """The brief and the digest the Human greenlights through ``POST /gates/greenlight``."""
+async def draft_brief(project_name: str, req: DraftBriefRequest, user: CurrentUser, service: Service) -> dict:
+    """The brief and the digest the Human greenlights through ``POST /gates/greenlight``. A variant reads another
+    project's story only for that project's Showrunner (ADR-0115)."""
     try:
+        if req.prior_project is not None:
+            await service.require_source_grant(user.sub, user_id=user.id, project_name=req.prior_project)
         idea = brief_idea(req.idea, req.variant_profile)
         brief = await service.draft_brief(
             idea=idea,

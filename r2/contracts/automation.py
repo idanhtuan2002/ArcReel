@@ -337,6 +337,8 @@ class RunCommand(AutomationContract):
                 raise ValueError("a variant requires an instruction (idea) or a profile")
             if variant != (self.source_project is not None) or (not variant and self.variant_profile is not None):
                 raise ValueError("only a variant names its source project and profile")
+            if self.source_project == self.project_name:
+                raise ValueError("a variant is written into another project than its source")
         elif (
             self.run_id is None
             or self.expected_version < 1

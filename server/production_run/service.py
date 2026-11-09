@@ -251,8 +251,13 @@ class ProductionRunService:
                 raise ProductionRunRefused("TARGETS_OVER_LIMIT", 422, (str(policy.max_target_episodes),))
             if command.story_source in {"project", "continue"} and not await self._has_story(command.project_name):
                 raise ProductionRunRefused("PROJECT_SOURCE_MISSING", 409)
-            if command.source_project is not None and not await self._has_story(command.source_project):
-                raise ProductionRunRefused("PRIOR_STORY_MISSING", 409)
+            if command.source_project is not None:
+                # A variant copies another project's story: its starter must be that project's Showrunner too.
+                await self.require_showrunner(
+                    interactive_token=interactive_token, user_id=command.user_id, project_name=command.source_project
+                )
+                if not await self._has_story(command.source_project):
+                    raise ProductionRunRefused("PRIOR_STORY_MISSING", 409)
             if command.variant_profile is not None and command.variant_profile not in PROFILES:
                 raise ProductionRunRefused("VARIANT_PROFILE_UNKNOWN", 422)
             current_input = await self._witness.digest(user_id=command.user_id, project_name=command.project_name)

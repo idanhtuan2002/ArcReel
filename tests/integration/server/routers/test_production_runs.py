@@ -299,12 +299,13 @@ async def test_a_run_from_the_projects_story_needs_no_idea_and_starts_at_asset_a
     [
         ({"story_source": "continue"}, 422, None),
         ({"story_source": "variant", "idea": "Ngôi thứ nhất."}, 422, None),
+        ({"story_source": "variant", "source_project": "project", "variant_profile": "first-person"}, 422, None),
+        # Reading another project's story needs its Showrunner grant, which this actor lacks on "origin".
         (
-            {"story_source": "variant", "source_project": "origin", "variant_profile": "nope"},
-            422,
-            "VARIANT_PROFILE_UNKNOWN",
+            {"story_source": "variant", "source_project": "origin", "variant_profile": "first-person"},
+            403,
+            "NOT_AUTHORIZED",
         ),
-        ({"story_source": "variant", "source_project": "origin", "variant_profile": "first-person"}, 200, None),
         ({"story_source": "continue", "idea": "Minh đi tìm người lạ."}, 200, None),
     ],
 )

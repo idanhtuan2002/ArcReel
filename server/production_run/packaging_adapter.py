@@ -15,6 +15,7 @@ import hashlib
 import io
 import json
 import os
+import tempfile
 import zipfile
 from pathlib import Path
 from typing import Literal
@@ -22,6 +23,7 @@ from typing import Literal
 from lib.db.repositories.quality_dispositions import QualityDispositionRepository
 from lib.presentation_renderer import sha256_file
 from lib.project_manager import ProjectManager
+from lib.publish_metadata import SCHEMA as PUBLISH_SCHEMA
 from lib.publish_metadata import publish_metadata, thumbnail_frame
 from r2.automation.identity import digest_value, policy_digest
 from r2.contracts.automation import (
@@ -226,6 +228,25 @@ class PackagingAdapter(_Upstream):
         _place(project / package_dir(run) / "run_manifest.json", run_manifest)
 
 
+def _publish_matches(publish: object, episode: int, manifest: dict) -> bool:
+    """The archived publishing metadata belongs to this episode and its rendered duration."""
+    return (
+        isinstance(publish, dict)
+        and publish.get("schema") == PUBLISH_SCHEMA
+        and publish.get("episode") == episode
+        and publish.get("thumbnail") == "thumbnail.jpg"
+        and publish.get("duration_seconds") == round(float(manifest.get("duration_seconds") or 0), 3)
+    )
+
+
+def _thumbnail_of(final_bytes: bytes) -> bytes:
+    """The thumbnail frame of the archived final itself, extracted again (bit-exact)."""
+    with tempfile.TemporaryDirectory() as work:
+        final = Path(work) / "final.mp4"
+        final.write_bytes(final_bytes)
+        return thumbnail_frame(final)
+
+
 def verify_run_outputs(
     *,
     run: RunSnapshot,
@@ -250,11 +271,18 @@ def verify_run_outputs(
         with zipfile.ZipFile(archive) as opened:
             final_bytes = opened.read(f"episode_{episode}.mp4")
             lineage = json.loads(opened.read("lineage.json"))
+            try:
+                publish = json.loads(opened.read("publish.json"))
+                thumbnail = opened.read("thumbnail.jpg")
+            except KeyError:
+                raise OwnerBlocked("ARCHIVE_CHANGED") from None
         final_sha = hashlib.sha256(final_bytes).hexdigest()
         if (
             final_sha != manifest["final_sha256"]
             or lineage.get("master", {}).get("digest") != masters[episode].digest
             or lineage.get("quality_decision") != decisions[episode]
+            or not _publish_matches(publish, episode, manifest)
+            or thumbnail != _thumbnail_of(final_bytes)
         ):
             raise OwnerBlocked("ARCHIVE_CHANGED")
         outputs.append(

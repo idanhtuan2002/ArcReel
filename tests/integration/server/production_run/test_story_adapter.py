@@ -305,6 +305,12 @@ async def test_a_new_idea_reaches_a_committed_manuscript_handed_to_video(story_h
     stopped = await _tick(host)
     assert (stopped.status, stopped.reason) == (RunStatus.BLOCKED_CONFIGURATION, "STAGE_CAPABILITY_INCOMPLETE")
 
+    # The run's own hand-off leaves its input as it was; an edit to that handed-off story part moves it (ADR-0115).
+    witness = ProjectInputWitness(host.sessions, projects=host.projects)
+    assert await witness.digest(user_id="default", project_name="project") == handed.input_digest
+    source.write_text(source.read_text(encoding="utf-8") + "\nMột câu thêm vào.", encoding="utf-8")
+    assert await witness.digest(user_id="default", project_name="project") != handed.input_digest
+
 
 async def test_succeeded_task_with_blocked_story_never_handoffs(story_host: Host):
     host = story_host
