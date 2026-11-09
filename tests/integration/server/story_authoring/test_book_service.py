@@ -226,3 +226,24 @@ async def test_a_main_canon_still_being_created_by_another_run_blocks_the_commit
     assert "CANON_BASE_MOVED" in (blocked.block_reason or "")
     retried = await service.retry(user_id=USER, project_name=PROJECT, run_id=ref.run_id, principal=SPONSOR)
     assert retried.phase is RunPhase.RUNNING
+
+
+async def test_a_brief_carries_the_projects_content_safety_level(
+    concurrent_session_factory: Factory, grants, projects: ProjectManager
+):
+    import json as _json
+
+    service = _service(concurrent_session_factory, grants, projects)
+    provider_id = await _provider(concurrent_session_factory)
+    path = projects.get_project_path(PROJECT) / "project.json"
+    draft = {"idea": "Một người lái đò.", "genre": "đời thường", "provider_id": provider_id, "model_id": MODEL}
+
+    plain = await service.draft_brief(**draft, project_name=PROJECT)
+    data = _json.loads(path.read_text(encoding="utf-8"))
+    path.write_text(_json.dumps({**data, "content_safety": "mature"}), encoding="utf-8")
+    mature = await service.draft_brief(**draft, project_name=PROJECT)
+
+    assert plain.content_safety == "standard"
+    assert "content_safety" not in plain.model_dump(mode="json")
+    assert mature.content_safety == "mature"
+    assert mature.digest() != plain.digest()

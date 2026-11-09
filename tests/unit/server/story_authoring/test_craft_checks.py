@@ -61,3 +61,16 @@ def test_a_critical_safety_finding_is_a_hard_integrity_defect_and_minor_craft_is
 
     assert safety[0].severity is Severity.HARD_INTEGRITY
     assert craft[0].severity is Severity.STYLISTIC
+
+
+def test_every_safety_level_blocks_sexual_content_involving_minors_and_only_off_records_the_rest():
+    from server.story_authoring.audits import SAFETY_LEVELS, safety_instruction
+
+    for level in SAFETY_LEVELS:
+        critical = safety_instruction(level).split("Lỗi critical:", 1)[1].split(".", 1)[0]
+        assert "người dưới 18 tuổi" in critical
+    assert "tự hại" not in safety_instruction("off").split("Lỗi critical:", 1)[1].split(".", 1)[0]
+    assert "chỉ ghi là minor" in safety_instruction("off")
+    assert "tình dục giữa người trưởng thành, bạo lực và máu me không phải lỗi" in safety_instruction("mature")
+    assert "cảnh rùng rợn" in safety_instruction("strict")
+    assert "cảnh rùng rợn" not in safety_instruction("standard")

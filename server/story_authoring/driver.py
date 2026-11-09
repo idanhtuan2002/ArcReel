@@ -35,6 +35,7 @@ from server.story_authoring.artifacts import StoryBlobStore, content_digest
 from server.story_authoring.audits import (
     CHAPTER_DIMENSIONS,
     AuditDimension,
+    SafetyLevel,
     anti_ai_findings,
     audit_chapter,
     confirm_finding,
@@ -215,6 +216,8 @@ class StoryBrief(BaseModel):
     cloud_profiles: tuple[CloudRouteProfile, ...] = Field(default=(), exclude_if=lambda value: not value)
     #: The story this run continues or rewrites; ``idea`` is then the author's direction or variant instruction.
     prior: StoryPrior | None = Field(default=None, exclude_if=lambda value: value is None)
+    #: How strictly the story is read for sensitive content (ADR-0121), from the project's setting.
+    content_safety: SafetyLevel = Field(default="standard", exclude_if=lambda value: value == "standard")
     #: The part of a book this run writes (ADR-0116); none for a three-chapter story.
     book: books.BookPart | None = Field(default=None, exclude_if=lambda value: value is None)
 
@@ -755,10 +758,12 @@ class StoryRunDriver:
 
     # --- the book (ADR-0116) -----------------------------------------------------------------------
 
-    def _young_readers(self) -> bool:
-        """A variant written for readers from 12 (ADR-0115 profile) is audited for safety more strictly."""
+    def _safety(self) -> SafetyLevel:
+        """The brief's content safety level (ADR-0121); a variant for readers from 12 is always ``strict``."""
         prior = self._brief.prior
-        return prior is not None and prior.origin == "young-readers"
+        if prior is not None and prior.origin == "young-readers":
+            return "strict"
+        return self._brief.content_safety
 
     def _first(self) -> int:
         """The book-wide number of this run's first chapter."""
@@ -1559,7 +1564,7 @@ class StoryRunDriver:
                     plan=plan,
                     facts=facts,
                     previous_summary=previous,
-                    young_readers=self._young_readers(),
+                    safety=self._safety(),
                 ),
             )
             findings.extend(result.findings)

@@ -144,12 +144,7 @@ _INSTRUCTIONS: dict[AuditDimension, str] = {
         "nhân vật nói cùng một giọng; câu thoại không đẩy xung đột hay hé lộ gì; người kể biết điều nhân vật điểm nhìn "
         "không thể biết; bước ngoặt của chương bị kể lướt trong một câu thay vì diễn ra thành cảnh."
     ),
-    AuditDimension.SAFETY: (
-        "Thẩm định NỘI DUNG KHÔNG ĐƯỢC PHÉP. Lỗi critical: nội dung tình dục liên quan người dưới 18 tuổi; mô tả cách tự "
-        "hại hay tự sát; hướng dẫn chế tạo hay sử dụng ma túy, vũ khí. Lỗi major: mô tả tình dục trần trụi; bạo lực, tra "
-        "tấn, máu me chi tiết quá mức cần cho câu chuyện; lời lẽ kích động thù ghét một nhóm người. Chỉ báo điều văn bản "
-        "thật sự viết ra; bạo lực hay cái chết được kể có chừng mực để phục vụ câu chuyện không phải lỗi."
-    ),
+    AuditDimension.SAFETY: "",  # by the project's content safety level, see safety_instruction
     AuditDimension.ANTI_AI: (
         "Thẩm định GIỌNG VĂN MÁY. Lỗi: người kể kết luận thay người đọc; câu kiểu 'anh cảm thấy...' thay vì hành động; "
         "phản ứng tập thể chung chung kiểu 'tất cả đều sững sờ'; ngôn ngữ báo cáo hoặc lời bình về chính câu chuyện; "
@@ -169,10 +164,44 @@ class AuditResult:
     discarded_unquoted: int
 
 
-YOUNG_READERS_SAFETY = (
-    " Truyện dành cho độc giả từ 12 tuổi: thêm lỗi major cho bạo lực tả chi tiết, cảnh rùng rợn, ngôn từ thô tục và "
-    "cảnh gợi dục dù không trần trụi."
+#: How strictly a story is read for sensitive content (ADR-0121): ``strict`` for readers from 12, ``standard`` by
+#: default, ``mature`` for adult fiction, ``off`` records everything but never stops a run. Sexual content involving
+#: minors is a critical defect at every level.
+type SafetyLevel = Literal["strict", "standard", "mature", "off"]
+SAFETY_LEVELS: tuple[SafetyLevel, ...] = ("strict", "standard", "mature", "off")
+#: The project.json key a project sets its level with.
+CONTENT_SAFETY_SETTING = "content_safety"
+
+_ALWAYS_CRITICAL = "nội dung tình dục hay gợi dục liên quan người dưới 18 tuổi"
+_HARMFUL = "mô tả cách tự hại hay tự sát; hướng dẫn chế tạo hay sử dụng ma túy, vũ khí, chất nổ"
+_ADULT = (
+    "mô tả tình dục trần trụi; bạo lực, tra tấn, máu me chi tiết quá mức cần cho câu chuyện; lời lẽ kích động thù "
+    "ghét một nhóm người"
 )
+_YOUNG = "bạo lực tả chi tiết, cảnh rùng rợn, ngôn từ thô tục, cảnh gợi dục dù không trần trụi"
+_FAIR = (
+    " Chỉ báo điều văn bản thật sự viết ra; bạo lực hay cái chết được kể có chừng mực để phục vụ câu chuyện không "
+    "phải lỗi."
+)
+
+
+def safety_instruction(level: SafetyLevel) -> str:
+    """The SAFETY audit's instruction at a content safety level (ADR-0121)."""
+    head = "Thẩm định NỘI DUNG NHẠY CẢM. "
+    if level == "off":
+        return (
+            head + f"Lỗi critical: {_ALWAYS_CRITICAL}. Mọi nội dung nhạy cảm khác ({_HARMFUL}; {_ADULT}) chỉ ghi là "
+            "minor." + _FAIR
+        )
+    if level == "mature":
+        return (
+            head
+            + f"Lỗi critical: {_ALWAYS_CRITICAL}; {_HARMFUL}. Lỗi major: lời lẽ kích động thù ghét một nhóm người. "
+            "Đây là truyện cho người lớn: tình dục giữa người trưởng thành, bạo lực và máu me không phải lỗi." + _FAIR
+        )
+    extra = f"; {_YOUNG}" if level == "strict" else ""
+    note = " Truyện dành cho độc giả từ 12 tuổi." if level == "strict" else ""
+    return head + f"Lỗi critical: {_ALWAYS_CRITICAL}; {_HARMFUL}. Lỗi major: {_ADULT}{extra}.{note}" + _FAIR
 
 
 def _severity(dimension: AuditDimension | Literal["CRITIC"], level: str) -> Severity:
@@ -309,11 +338,9 @@ def chapter_audit_prompt(
     plan: ChapterPlan,
     facts: str,
     previous_summary: str,
-    young_readers: bool = False,
+    safety: SafetyLevel = "standard",
 ) -> str:
-    instruction = _INSTRUCTIONS[dimension]
-    if dimension is AuditDimension.SAFETY and young_readers:
-        instruction += YOUNG_READERS_SAFETY
+    instruction = safety_instruction(safety) if dimension is AuditDimension.SAFETY else _INSTRUCTIONS[dimension]
     return f"""{instruction}
 
 Trả về "issues": mỗi lỗi có severity (critical/major/minor), issue_type (tên ngắn của loại lỗi), description,
@@ -378,7 +405,7 @@ async def audit_chapter(
     facts: str,
     previous_summary: str,
     max_output_tokens: int = 2048,
-    young_readers: bool = False,
+    safety: SafetyLevel = "standard",
 ) -> AuditResult:
     chapter_text = "\n\n".join(text for _, text in scenes)
     report = await _structured(
@@ -396,7 +423,7 @@ async def audit_chapter(
             plan=plan,
             facts=facts,
             previous_summary=previous_summary,
-            young_readers=young_readers,
+            safety=safety,
         ),
         model=AuditReport,
         max_output_tokens=max_output_tokens,

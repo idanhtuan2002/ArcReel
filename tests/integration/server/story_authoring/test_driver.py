@@ -1439,3 +1439,29 @@ async def test_a_variant_outline_sent_back_after_a_revised_first_outline_gets_a_
 
     assert state.phase is RunPhase.READY_FOR_APPROVAL, state.block_reason
     assert model.calls["story_arc"] == 3  # generated, revised, generated again after the variant note
+
+
+async def test_the_safety_audit_reads_at_the_briefs_content_safety_level(concurrent_session_factory, tmp_path):
+    store = await _store(concurrent_session_factory)
+    model = ScriptedModel()
+    client = OllamaChatClient(base_url="http://ollama:1", transport=httpx.MockTransport(model.handler))
+    sink = StoryAttemptSink(
+        store=store, session_factory=concurrent_session_factory, provider_id="custom-ollama", model_id=MODEL
+    )
+    gateway = AuthoringTextGateway(selection=SELECTION, limits=LIMITS, client=client, sink=sink)
+    driver = StoryRunDriver(
+        identity=IDENTITY,
+        brief=BRIEF.model_copy(update={"content_safety": "off"}),
+        store=store,
+        gateway=gateway,
+        blobs=StoryBlobStore(tmp_path),
+        clock=lambda: NOW,
+        retry_delays=(0, 0),
+    )
+
+    state = await driver.run()
+
+    assert state.phase is RunPhase.READY_FOR_APPROVAL, state.block_reason
+    safety = [p for k, p in model.prompts if k == "issues" and "NỘI DUNG NHẠY CẢM" in p]
+    assert safety
+    assert all("chỉ ghi là minor" in p and "người dưới 18 tuổi" in p for p in safety)

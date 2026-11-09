@@ -77,6 +77,7 @@ from server.services.project_archive import (
 )
 from server.services.project_cover import resolve_project_cover
 from server.services.prompt_preview import ScriptItemNotFound, preview_item_prompts
+from server.story_authoring.audits import CONTENT_SAFETY_SETTING
 
 router = APIRouter()
 
@@ -267,6 +268,8 @@ class UpdateProjectRequest(BaseModel):
     episode_target_duration: int | None = None
     # 分集改编（ADR-0114）：screen 先把每集改编为剧本再做脚本规划；null 清除即回到 verbatim；ad 项目拒绝
     episode_adaptation: Literal["screen", "verbatim"] | None = None
+    # 故事内容安全等级（ADR-0121）：strict / standard / mature / off；null 清除即回到 standard
+    content_safety: Literal["strict", "standard", "mature", "off"] | None = None
     # 仅 ad 项目：目标总时长（秒），任意正整数合法，不可清空
     target_duration: int | None = Field(default=None, gt=0)
     # 仅 ad 项目：创作诉求短文本；显式 null 清为空字符串
@@ -1019,6 +1022,11 @@ async def update_project(name: str, req: UpdateProjectRequest, _t: Translator):
                         project.pop(ADAPTATION_SETTING, None)
                     else:
                         project[ADAPTATION_SETTING] = req.episode_adaptation
+                if "content_safety" in req.model_fields_set:
+                    if req.content_safety is None or req.content_safety == "standard":
+                        project.pop(CONTENT_SAFETY_SETTING, None)
+                    else:
+                        project[CONTENT_SAFETY_SETTING] = req.content_safety
                 if "target_duration" in req.model_fields_set:
                     if not is_ad:
                         raise HTTPException(status_code=400, detail=_t("ad_only_field", field="target_duration"))

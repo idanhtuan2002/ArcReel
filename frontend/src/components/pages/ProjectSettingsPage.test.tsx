@@ -409,6 +409,41 @@ describe("ProjectSettingsPage – style picker", () => {
     });
   });
 
+  it("loads and saves the project's content safety level and the episode adaptation switch", async () => {
+    vi.spyOn(API, "getProject").mockResolvedValue({
+      project: {
+        title: "Demo",
+        content_mode: "narration",
+        content_safety: "mature",
+        episode_adaptation: "screen",
+        episodes: [],
+        characters: {},
+        clues: {},
+      },
+      scripts: {},
+    } as unknown as Awaited<ReturnType<typeof API.getProject>>);
+    const updateSpy = vi.spyOn(API, "updateProject").mockResolvedValue({
+      success: true,
+      project: { title: "Demo" } as unknown as Awaited<ReturnType<typeof API.updateProject>>["project"],
+    });
+
+    renderAt("/app/projects/demo/settings");
+
+    const select = await screen.findByLabelText(/敏感内容|Sensitive content/);
+    await waitFor(() => expect(select).toHaveValue("mature"));
+    // The episode adaptation switch shows the stored "screen" (it used to load unchecked).
+    expect(document.getElementById("episode-adaptation")).toBeChecked();
+    fireEvent.change(select, { target: { value: "off" } });
+    expect(screen.getByText(/always blocked|始终拦截/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /^(保存|Save)$/i }));
+    await waitFor(() => {
+      expect(updateSpy).toHaveBeenCalledWith(
+        "demo",
+        expect.objectContaining({ content_safety: "off", episode_adaptation: "screen" }),
+      );
+    });
+  });
+
   it("omits the character voice binding on the storyboard route", async () => {
     vi.spyOn(API, "getProject").mockResolvedValue({
       project: {

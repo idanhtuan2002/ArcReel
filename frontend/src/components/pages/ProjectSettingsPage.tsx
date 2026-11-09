@@ -1,3 +1,4 @@
+import { CONTENT_SAFETY_LEVELS, ContentSafetyField, type ContentSafety } from "@/components/pages/settings/ContentSafetyField";
 import { useParams, useLocation } from "wouter";
 import { errMsg, voidCall, voidPromise } from "@/utils/async";
 import { useState, useEffect, useCallback, useRef } from "react";
@@ -170,6 +171,7 @@ export function ProjectSettingsPage() {
   const [speechRate, setSpeechRate] = useState<number | null>(null);
   const [episodeTargetDuration, setEpisodeTargetDuration] = useState<number | null>(null);
   const [episodeAdaptation, setEpisodeAdaptation] = useState(false);
+  const [contentSafety, setContentSafety] = useState<ContentSafety>("standard");
   // 源文语言由内容分析写入，此页只读——只用来决定语速的单位名词（字 / 词）
   const [sourceLanguage, setSourceLanguage] = useState<string | null>(null);
   const [videoResolution, setVideoResolution] = useState<string | null>(null);
@@ -211,6 +213,7 @@ export function ProjectSettingsPage() {
     speechRate: null as number | null,
     episodeTargetDuration: null as number | null,
     episodeAdaptation: false,
+    contentSafety: "standard",
     videoResolution: null as string | null,
     imageResolution: null as string | null,
   });
@@ -303,6 +306,9 @@ export function ProjectSettingsPage() {
       const rawEtd = project.episode_target_duration;
       const etd = typeof rawEtd === "number" && Number.isFinite(rawEtd) ? rawEtd : null;
       const adapt = project.episode_adaptation === "screen";
+      const safety: ContentSafety = CONTENT_SAFETY_LEVELS.includes(project.content_safety as ContentSafety)
+        ? (project.content_safety as ContentSafety)
+        : "standard";
       const rawRate = project.speech_rate_units_per_second;
       const sr = typeof rawRate === "number" && Number.isFinite(rawRate) ? rawRate : null;
       const sl = typeof project.source_language === "string" ? project.source_language : null;
@@ -328,6 +334,8 @@ export function ProjectSettingsPage() {
       setDefaultDuration(dd);
       setSpeechRate(sr);
       setEpisodeTargetDuration(etd);
+      setEpisodeAdaptation(adapt);
+      setContentSafety(safety);
       setSourceLanguage(sl);
       setVoiceBinding(vbind);
       setProjectTitle(typeof project.title === "string" ? project.title : "");
@@ -367,6 +375,7 @@ export function ProjectSettingsPage() {
         aspectRatio: ar, gridStoryboard: grid, defaultDuration: dd, speechRate: sr,
         episodeTargetDuration: etd,
         episodeAdaptation: adapt,
+        contentSafety: safety,
         videoResolution: vRes, imageResolution: iRes,
       };
     }));
@@ -426,6 +435,7 @@ export function ProjectSettingsPage() {
     speechRate !== initialRef.current.speechRate ||
     episodeTargetDuration !== initialRef.current.episodeTargetDuration ||
     episodeAdaptation !== initialRef.current.episodeAdaptation ||
+    contentSafety !== initialRef.current.contentSafety ||
     videoResolution !== initialRef.current.videoResolution ||
     imageResolution !== initialRef.current.imageResolution ||
     styleIsDirty;
@@ -555,6 +565,7 @@ export function ProjectSettingsPage() {
               episode_target_duration: episodeTargetDuration,
               episode_adaptation: episodeAdaptation ? "screen" : null,
             }),
+        content_safety: contentSafety === "standard" ? null : contentSafety,
         model_settings: newModelSettings,
       });
       setModelSettings(newModelSettings);
@@ -568,6 +579,7 @@ export function ProjectSettingsPage() {
         aspectRatio, gridStoryboard, defaultDuration, speechRate,
         episodeTargetDuration,
         episodeAdaptation,
+        contentSafety,
         videoResolution, imageResolution,
       };
       // grid_storyboard / video_backend 落盘后，/video-capabilities 按已存值解析——查询 key 未变
@@ -579,7 +591,7 @@ export function ProjectSettingsPage() {
     } finally {
       setSaving(false);
     }
-  }, [modelSettings, videoBackend, videoProviderI2V, videoProviderR2V, imageBackendDefault, imageBackendT2I, imageBackendI2I, audioOverride, audioBackend, narrationVoice, narrationSpeed, voiceBinding, textDefault, textSimple, textComplex, aspectRatio, generationRoute, gridStoryboard, gridToggleVisible, defaultDuration, speechRate, episodeTargetDuration, episodeAdaptation, contentMode, videoResolution, imageResolution, projectName, t, globalDefaults]);
+  }, [modelSettings, videoBackend, videoProviderI2V, videoProviderR2V, imageBackendDefault, imageBackendT2I, imageBackendI2I, audioOverride, audioBackend, narrationVoice, narrationSpeed, voiceBinding, textDefault, textSimple, textComplex, aspectRatio, generationRoute, gridStoryboard, gridToggleVisible, defaultDuration, speechRate, episodeTargetDuration, episodeAdaptation, contentSafety, contentMode, videoResolution, imageResolution, projectName, t, globalDefaults]);
 
   const handleResetAgentProfile = useCallback(async () => {
     if (profileResetProject !== projectName) {
@@ -963,6 +975,7 @@ export function ProjectSettingsPage() {
                     </div>
                   </div>
                 )}
+                <ContentSafetyField value={contentSafety} onChange={setContentSafety} />
               </SectionCard>
 
               {/* 角色声音绑定方式：只在参考生视频路线有效——参考音频通道属于该路线，
