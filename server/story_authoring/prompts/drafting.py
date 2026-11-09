@@ -71,9 +71,13 @@ def _constraint_lines(segment: NarrativeContextSegment) -> list[str]:
     return [f"- {beat}" for beat in beats]
 
 
-def render_context(pack: NarrativeContextPack, names: Mapping[str, str]) -> str:
+def render_context(
+    pack: NarrativeContextPack, names: Mapping[str, str], *, openings: int | None = None, memory: str = ""
+) -> str:
     """The pack as labelled Vietnamese text: locked facts, scene intent, style rules, then the last paragraphs of
-    the scene just before and the openings of older ones (the full earlier text invites copying)."""
+    the scene just before and the openings of older ones (the full earlier text invites copying). In a book
+    (ADR-0116) ``openings`` keeps only the openings of the chapter's own earlier scenes and ``memory`` is the book
+    memory block that stands for everything before."""
     facts: list[str] = []
     intent: list[str] = []
     beats: list[str] = []
@@ -100,9 +104,12 @@ def render_context(pack: NarrativeContextPack, names: Mapping[str, str]) -> str:
     if earlier:
         latest = [p for p in earlier[0].split("\n\n") if p.strip()]
         parts.append("[Đoạn cuối cảnh liền trước — để nối mạch, không chép lại]\n" + "\n\n".join(latest[-2:]))
-    if len(earlier) > 1:
-        openings = [_opening(text) for text in earlier[1:]]
-        parts.append("[Mở đầu các cảnh trước đó, mới nhất trước]\n" + "\n".join(f"- {o}" for o in openings))
+    older = earlier[1:] if openings is None else earlier[1 : 1 + max(0, openings)]
+    if older:
+        lines = [_opening(text) for text in older]
+        parts.append("[Mở đầu các cảnh trước đó, mới nhất trước]\n" + "\n".join(f"- {o}" for o in lines))
+    if memory:
+        parts.append(memory)
     return "\n\n".join(parts)
 
 

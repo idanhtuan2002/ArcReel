@@ -4,6 +4,7 @@ import asyncio
 
 import pytest
 
+from server.story_authoring.book import bound_seed
 from server.story_authoring.prompts.drafting import (
     CRAFT_RULES,
     HARD_RULES,
@@ -25,6 +26,7 @@ from server.story_authoring.prompts.schemas import (
     StoryBibleOut,
     StorySeed,
     TitleCandidate,
+    bound_short_outline,
 )
 
 
@@ -115,8 +117,10 @@ def test_outline_problems_are_named():
 
 
 def test_schemas_bound_list_sizes_for_the_grammar():
-    schema = ShortOutline.model_json_schema()
+    schema = bound_short_outline().model_json_schema()
     assert (schema["properties"]["chapters"]["minItems"], schema["properties"]["chapters"]["maxItems"]) == (3, 3)
+    seed = bound_seed(5, 4).model_json_schema()["properties"]
+    assert (seed["characters"]["maxItems"], seed["locations"]["maxItems"]) == (5, 4)
     assert ChapterPlan.model_json_schema()["properties"]["scenes"]["maxItems"] == 5
 
 

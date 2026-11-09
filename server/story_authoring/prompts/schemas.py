@@ -40,8 +40,9 @@ class StorySeed(_Out):
     pov: str = Field(min_length=1)
     central_conflict: str = Field(min_length=1)
     ending_direction: str = Field(min_length=1)
-    characters: list[SeedCharacter] = Field(min_length=2, max_length=5)
-    locations: list[SeedLocation] = Field(min_length=1, max_length=4)
+    #: A short story generates at most 5 and 4 (``book.bound_seed``); a book's cast adds its volumes' additions.
+    characters: list[SeedCharacter] = Field(min_length=2, max_length=25)
+    locations: list[SeedLocation] = Field(min_length=1, max_length=23)
 
 
 class StoryBibleOut(_Out):
@@ -72,9 +73,18 @@ class ShortOutline(_Out):
     opening: str = Field(min_length=1)
     confrontation: str = Field(min_length=1)
     resolution: str = Field(min_length=1)
-    chapters: list[OutlineChapter] = Field(min_length=3, max_length=3)
+    #: Exactly three for a short story (``bound_short_outline``); a book part has its own chapter count.
+    chapters: list[OutlineChapter] = Field(min_length=1, max_length=6)
     ending: str = Field(min_length=1)
     final_image: str = Field(min_length=1)
+
+
+def bound_short_outline() -> type[ShortOutline]:
+    return create_model(
+        "BoundShortOutline",
+        __base__=ShortOutline,
+        chapters=(list[OutlineChapter], Field(min_length=3, max_length=3)),
+    )
 
 
 class OutlineReview(_Out):

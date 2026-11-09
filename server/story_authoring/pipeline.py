@@ -31,6 +31,11 @@ TEMPLATE_VERSIONS = {
     "packaging": "packaging-v2",
     "prior_summary": "prior-summary-v1",
     "canon_lock": "canon-lock-v1",
+    "book_outline": "book-outline-v1",
+    "book_chapters": "book-chapters-v1",
+    "chapter_digest": "chapter-digest-v1",
+    "part_summary": "part-summary-v1",
+    "book_state": "book-state-v1",
 }
 
 PLANNING_NODES = ("seed", "story_bible", "style_bible", "outline")

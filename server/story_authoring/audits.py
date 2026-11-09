@@ -394,9 +394,16 @@ async def critic_manuscript(
     scenes: Sequence[tuple[str, str]],
     outline: ShortOutline,
     max_output_tokens: int = 2048,
+    synopsis: str | None = None,
 ) -> CriticResult:
+    """``synopsis`` marks a part of a book (ADR-0116): ``scenes`` is then the part's last chapter and the synopsis
+    holds the digests of its earlier chapters, so the prompt stays bounded however long the book is."""
     manuscript = "\n\n".join(text for _, text in scenes)
-    prompt = f"""Thẩm định toàn bộ truyện ngắn như một biên tập viên xuất bản.
+    if synopsis is not None:
+        manuscript = (
+            f"[Tóm tắt các chương trước của phần này]\n{synopsis}\n\n[Chương cuối của phần, nguyên văn]\n{manuscript}"
+        )
+    prompt = f"""Thẩm định {"phần này của tiểu thuyết" if synopsis is not None else "toàn bộ truyện ngắn"} như một biên tập viên xuất bản.
 
 1. ending_quote: chép NGUYÊN VĂN từ chương cuối của [Truyện] (không chép từ dàn ý) câu thể hiện rõ nhất cách xung đột
    trung tâm được giải quyết; ending_resolves_conflict: dựa trên chương cuối, xung đột trung tâm đã được giải quyết

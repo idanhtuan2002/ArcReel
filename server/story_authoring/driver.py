@@ -29,6 +29,7 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from server.story_authoring import book as books
 from server.story_authoring.artifacts import StoryBlobStore, content_digest
 from server.story_authoring.audits import (
     CHAPTER_DIMENSIONS,
@@ -87,6 +88,7 @@ from server.story_authoring.narrative import (
     scene_refs,
 )
 from server.story_authoring.pipeline import chapter_plan, chapter_review, fingerprint
+from server.story_authoring.prompts import book as book_prompts
 from server.story_authoring.prompts import drafting, planning
 from server.story_authoring.prompts import outline as outline_prompts
 from server.story_authoring.prompts import packaging as packaging_prompts
@@ -102,6 +104,7 @@ from server.story_authoring.prompts.schemas import (
     StorySeed,
     StyleBibleOut,
     bound_chapter_plan,
+    bound_short_outline,
 )
 from server.story_authoring.repair import deterministic_fixes, normalize_length, span_repair
 from server.story_authoring.runtime import RunPhase, RunState, RunStateStore, add_intent, promote, require, set_phase
@@ -119,6 +122,11 @@ NODE_CAPS = {
     "packaging": 3,
     "prior_summary": 3,
     "canon_lock": 3,
+    "book_outline": 3,
+    "book_chapters": 18,
+    "chapter_digest": 3,
+    "part_summary": 3,
+    "book_state": 1,
 }
 TRANSPORT = frozenset({StoryFailureCode.MODEL_UNAVAILABLE, StoryFailureCode.PROVIDER_ERROR})
 TRANSPORT_RETRY_DELAYS = (5.0, 20.0)
@@ -130,6 +138,10 @@ PLAN_CALLS = 4
 MIN_VERIFIED_SELLING_POINTS = 3
 STORY_HARD_RANGE = (6000, 12500)
 STORY_TARGET_RANGE = (7000, 11000)
+#: A book part's length bounds as fractions of its target (chapters x syllables per chapter).
+PART_TARGET_SPREAD = 0.2
+PART_HARD_SPREAD = 0.4
+SHORT_SEED = (5, 4)
 AUTO_NOTE = "Biên tập tự động: "
 PLAN_REPAIR_NOTE = (
     "kế hoạch chương này đã khiến các cảnh không thể đạt yêu cầu: các mục bắt buộc, giữ kín và cấm mâu thuẫn nhau. "
@@ -138,6 +150,10 @@ PLAN_REPAIR_NOTE = (
 REGENERATE_NOTE = (
     "\n\n[Lưu ý] Bản viết trước quá ngắn hoặc chép lại câu của các cảnh trước. Viết lại toàn bộ cảnh, đủ độ dài, bằng "
     "câu chữ hoàn toàn mới."
+)
+PART_ENDING_NOTE = AUTO_NOTE + (
+    "biên tập viên thấy cảnh này chưa đưa phần truyện tới bước ngoặt đã định trong dàn ý. Viết lại để phần kết ở đúng "
+    "bước ngoặt đó, không giải quyết xung đột trung tâm của cả tiểu thuyết."
 )
 ENDING_NOTE = AUTO_NOTE + (
     "biên tập viên thấy cảnh này chưa khép lại xung đột trung tâm. Viết lại để kết thúc giải quyết trọn vẹn xung đột, "
@@ -185,6 +201,12 @@ class StoryBrief(BaseModel):
     cloud_profiles: tuple[CloudRouteProfile, ...] = Field(default=(), exclude_if=lambda value: not value)
     #: The story this run continues or rewrites; ``idea`` is then the author's direction or variant instruction.
     prior: StoryPrior | None = Field(default=None, exclude_if=lambda value: value is None)
+    #: The part of a book this run writes (ADR-0116); none for a three-chapter story.
+    book: books.BookPart | None = Field(default=None, exclude_if=lambda value: value is None)
+
+    @property
+    def chapters(self) -> int:
+        return CHAPTERS if self.book is None else self.book.chapters
 
     @property
     def judge(self) -> StoryModelSelection:
@@ -272,6 +294,12 @@ class StoryRunDriver:
         self._outages = 0
         self._prior_context: str | None = None
         self._prior_tail = ""
+        self._book = brief.book
+        self._chapters = brief.chapters
+        self._plan: books.BookPlan | None = None
+        self._memory = books.BookMemory()
+        self._book_ins: list[tuple[str, str]] = []
+        self._title: str | None = None
         self._scope = StoryScope(
             user_id=identity.user_id, project_name=identity.project_name, actor_id=f"run:{identity.run_id}"
         )
@@ -495,6 +523,12 @@ class StoryRunDriver:
         """A planning prompt preceded by the prior story's canon lock and the author's ask, when there is one."""
         return prompt if self._prior_context is None else f"{self._prior_context}\n\n---\n\n{prompt}"
 
+    def _book_state(self) -> books.BookState | None:
+        """The state the previous part committed, for a book part after the first."""
+        if self._book is None or self._book.state_digest is None:
+            return None
+        return books.BookState.model_validate_json(self._blobs.read_exact(self._book.state_digest))
+
     async def _converge(self) -> _Story:
         brief = ("brief", self._brief.digest())
         prior_ins: list[tuple[str, str]] = []
@@ -506,66 +540,126 @@ class StoryRunDriver:
                 lock, mode=self._brief.prior.mode, direction=self._brief.idea, part=self._brief.prior.part
             )
             idea = self._prior_context
-        seed_raw = await self._ensure(
-            "seed",
-            inputs=[brief, *prior_ins],
-            decoding=PLANNING,
-            produce=lambda e: self._json(
+        carried = self._book_state()
+        if carried is not None:
+            # A later part keeps the book's cast, bibles and style byte for byte (ADR-0116).
+            assert self._book is not None
+            assert self._book.state_digest is not None
+            source = ("book_state", self._book.state_digest)
+            self._title = carried.title
+            seed_raw = await self._ensure(
                 "seed",
-                e,
-                StoryStepKind.SEED,
-                planning.PLANNING_SYSTEM,
-                planning.seed_prompt(idea=idea, genre=self._brief.genre),
-                StorySeed,
-            ),
-        )
-        seed = StorySeed.model_validate_json(seed_raw)
-        seed_in = ("seed", content_digest(seed_raw))
-        bible_raw = await self._ensure(
-            "story_bible",
-            inputs=[seed_in, *prior_ins],
-            decoding=PLANNING,
-            produce=lambda e: self._json(
+                inputs=[source],
+                decoding=PLANNING,
+                produce=_constant(StorySeed.model_validate(carried.seed).model_dump_json().encode("utf-8")),
+            )
+            bible_raw = await self._ensure(
                 "story_bible",
-                e,
-                StoryStepKind.BIBLE,
-                planning.PLANNING_SYSTEM,
-                self._with_prior(planning.story_bible_prompt(seed)),
-                StoryBibleOut,
-            ),
-        )
-        bible = StoryBibleOut.model_validate_json(bible_raw)
-        bible_in = ("story_bible", content_digest(bible_raw))
-        style_raw = await self._ensure(
-            "style_bible",
-            inputs=[seed_in, bible_in, *prior_ins],
-            decoding=PLANNING,
-            produce=lambda e: self._json(
+                inputs=[source],
+                decoding=PLANNING,
+                produce=_constant(StoryBibleOut.model_validate(carried.story_bible).model_dump_json().encode("utf-8")),
+            )
+            style_raw = await self._ensure(
                 "style_bible",
-                e,
-                StoryStepKind.BIBLE,
-                planning.PLANNING_SYSTEM,
-                self._with_prior(planning.style_bible_prompt(seed, bible)),
-                StyleBibleOut,
-            ),
-        )
-        style = StyleBibleOut.model_validate_json(style_raw)
-        style_in = ("style_bible", content_digest(style_raw))
-        outline_raw = await self._ensure(
-            "outline", inputs=[seed_in, *prior_ins], decoding=PLANNING, produce=lambda e: self._outline(e, seed)
-        )
+                inputs=[source],
+                decoding=PLANNING,
+                produce=_constant(StyleBibleOut.model_validate(carried.style_bible).model_dump_json().encode("utf-8")),
+            )
+            seed = StorySeed.model_validate_json(seed_raw)
+            seed_in = ("seed", content_digest(seed_raw))
+            bible = StoryBibleOut.model_validate_json(bible_raw)
+            bible_in = ("story_bible", content_digest(bible_raw))
+            style = StyleBibleOut.model_validate_json(style_raw)
+            style_in = ("style_bible", content_digest(style_raw))
+        else:
+            seed_prompt = planning.seed_prompt(idea=idea, genre=self._brief.genre)
+            cast = SHORT_SEED
+            if self._book is not None:
+                cast = (books.BOOK_SEED_CHARACTERS, books.BOOK_SEED_LOCATIONS)
+                seed_prompt = (
+                    f"Đây là hạt giống cho một TIỂU THUYẾT {self._book.spec.chapters} chương: dựng dàn nhân vật và "
+                    f"bối cảnh đủ cho truyện dài (tối đa {cast[0]} nhân vật, {cast[1]} địa điểm).\n\n{seed_prompt}"
+                )
+            seed_raw = await self._ensure(
+                "seed",
+                inputs=[brief, *prior_ins],
+                decoding=PLANNING,
+                produce=lambda e: self._json(
+                    "seed",
+                    e,
+                    StoryStepKind.SEED,
+                    planning.PLANNING_SYSTEM,
+                    seed_prompt,
+                    books.bound_seed(*cast),
+                ),
+            )
+            seed = StorySeed.model_validate_json(seed_raw)
+            seed_in = ("seed", content_digest(seed_raw))
+            bible_raw = await self._ensure(
+                "story_bible",
+                inputs=[seed_in, *prior_ins],
+                decoding=PLANNING,
+                produce=lambda e: self._json(
+                    "story_bible",
+                    e,
+                    StoryStepKind.BIBLE,
+                    planning.PLANNING_SYSTEM,
+                    self._with_prior(planning.story_bible_prompt(seed)),
+                    StoryBibleOut,
+                ),
+            )
+            bible = StoryBibleOut.model_validate_json(bible_raw)
+            bible_in = ("story_bible", content_digest(bible_raw))
+            style_raw = await self._ensure(
+                "style_bible",
+                inputs=[seed_in, bible_in, *prior_ins],
+                decoding=PLANNING,
+                produce=lambda e: self._json(
+                    "style_bible",
+                    e,
+                    StoryStepKind.BIBLE,
+                    planning.PLANNING_SYSTEM,
+                    self._with_prior(planning.style_bible_prompt(seed, bible)),
+                    StyleBibleOut,
+                ),
+            )
+            style = StyleBibleOut.model_validate_json(style_raw)
+            style_in = ("style_bible", content_digest(style_raw))
+        if self._book is not None:
+            plan, plan_in = await self._book_plan(seed_in, bible_in, seed, bible, carried)
+            seed = books.merged_seed(seed, plan.book_outline())
+            self._plan = plan
+            self._memory = carried.memory if carried is not None else books.initial_memory(plan)
+            memory_in = ("book_memory", content_digest(self._memory.model_dump_json().encode("utf-8")))
+            self._book_ins = [plan_in, memory_in]
+            part = self._book
+            outline_raw = await self._ensure(
+                "outline",
+                inputs=[plan_in],
+                decoding=PLANNING,
+                produce=_constant(
+                    json.dumps(
+                        {"outline": books.part_outline(plan, part).model_dump(), "review_problems": []},
+                        ensure_ascii=False,
+                    ).encode("utf-8")
+                ),
+            )
+        else:
+            outline_raw = await self._ensure(
+                "outline", inputs=[seed_in, *prior_ins], decoding=PLANNING, produce=lambda e: self._outline(e, seed)
+            )
         outline = ShortOutline.model_validate(json.loads(outline_raw)["outline"])
         outline_in = ("outline", content_digest(outline_raw))
 
         names, locations = entity_keys(seed)
         plans: list[ChapterPlan] = []
         plan_ins: list[tuple[str, str]] = []
-        for c in range(1, CHAPTERS + 1):
+        for c in range(1, self._chapters + 1):
             previous = tuple(plans)
             node = chapter_plan(c)
             raw = await self._ensure(
                 node,
-                inputs=[seed_in, bible_in, outline_in, *plan_ins, *prior_ins],
+                inputs=[seed_in, bible_in, outline_in, *plan_ins, *prior_ins, *self._book_ins],
                 decoding=PLANNING,
                 produce=lambda e, c=c, previous=previous: self._chapter_plan(
                     e, c, seed, bible, outline, previous, names, locations
@@ -589,7 +683,236 @@ class StoryRunDriver:
         await self._write_chapters(story, seed_in, bible_in, style_in, plan_ins)
         await self._manuscript_review(story, outline_in)
         await self._packaging(story, seed_in)
+        if self._book is not None:
+            await self._commit_book_state(story)
         return story
+
+    # --- the book (ADR-0116) -----------------------------------------------------------------------
+
+    def _first(self) -> int:
+        """The book-wide number of this run's first chapter."""
+        return 1 if self._book is None else self._book.first_chapter
+
+    def _ends_story(self) -> bool:
+        return self._book is None or self._book.is_last
+
+    async def _book_plan(
+        self,
+        seed_in: tuple[str, str],
+        bible_in: tuple[str, str],
+        seed: StorySeed,
+        bible: StoryBibleOut,
+        carried: books.BookState | None,
+    ) -> tuple[books.BookPlan, tuple[str, str]]:
+        """The book's skeleton, then each volume's chapter rows; a later part reads the plan its book committed."""
+        assert self._book is not None
+        if carried is not None:
+            return carried.plan, ("book_plan", content_digest(carried.plan.model_dump_json().encode("utf-8")))
+        spec = self._book.spec
+        volumes = spec.volumes()
+        outline_raw = await self._ensure(
+            "book_outline",
+            inputs=[seed_in, bible_in],
+            decoding=PLANNING,
+            produce=lambda e: self._json(
+                "book_outline",
+                e,
+                StoryStepKind.BOOK_PLANNING,
+                book_prompts.BOOK_SYSTEM,
+                book_prompts.book_outline_prompt(seed, bible, chapters=spec.chapters, volumes=volumes),
+                books.bound_book_outline(len(volumes)),
+            ),
+        )
+        outline = books.BookOutline.model_validate_json(outline_raw)
+        previous_in = ("book_outline", content_digest(outline_raw))
+        rows: tuple[books.PlannedRow, ...] = ()
+        hooks: tuple[books.Hook, ...] = ()
+        for v, (first, last) in enumerate(volumes):
+            node = f"book_chapters[{v + 1}]"
+            raw = await self._ensure(
+                node,
+                inputs=[previous_in],
+                decoding=PLANNING,
+                produce=lambda e, node=node, v=v, first=first, last=last, rows=rows, hooks=hooks: self._volume_rows(
+                    node, e, outline, v, first, last, rows, hooks
+                ),
+            )
+            data = json.loads(raw)
+            rows = tuple(books.PlannedRow.model_validate(r) for r in data["rows"])
+            hooks = tuple(books.Hook.model_validate(h) for h in data["hooks"])
+            previous_in = (node, content_digest(raw))
+        plan = books.BookPlan(outline=outline.model_dump(mode="json"), rows=rows, hooks=hooks)
+        return plan, ("book_plan", content_digest(plan.model_dump_json().encode("utf-8")))
+
+    async def _volume_rows(
+        self,
+        node: str,
+        epoch: int,
+        outline: books.BookOutline,
+        volume: int,
+        first: int,
+        last: int,
+        rows: tuple[books.PlannedRow, ...],
+        hooks: tuple[books.Hook, ...],
+    ) -> bytes:
+        """One volume's rows in chunks: code checks sent back for revision at most ``PLAN_REVISIONS`` times, then
+        one judged review and one revision kept only if the code checks still pass."""
+        assert self._book is not None
+        total = self._book.spec.chapters
+        start = first
+        while start <= last:
+            count = min(books.ROWS_PER_CALL, last - start + 1)
+            model = books.bound_rows(count, [*books.open_hook_ids(hooks), *books.next_hook_ids(hooks, 2 * count)])
+            base = book_prompts.book_rows_prompt(
+                outline,
+                volume=volume,
+                first=start,
+                count=count,
+                total=total,
+                earlier=rows,
+                open_hooks=[h for h in hooks if h.paid is None],
+                next_id=len(hooks) + 1,
+            )
+
+            async def generate(prompt: str, model: type[books.BookRows] = model) -> list[books.BookRow]:
+                text = await self._step(
+                    node,
+                    epoch,
+                    kind=StoryStepKind.BOOK_PLANNING,
+                    system=book_prompts.BOOK_SYSTEM,
+                    prompt=prompt,
+                    decoding=PLANNING,
+                    model=model,
+                )
+                return list(books.BookRows.model_validate_json(model.model_validate_json(text).model_dump_json()).rows)
+
+            generated = await generate(base)
+            added, ledger = books.add_rows(rows, hooks, generated, first=start, total=total)
+            problems = books.plan_problems(added, ledger, total=total)
+            for _ in range(books.PLAN_REVISIONS):
+                if not problems:
+                    break
+                generated = await generate(book_prompts.book_rows_revision_prompt(base, generated, problems))
+                added, ledger = books.add_rows(rows, hooks, generated, first=start, total=total)
+                problems = books.plan_problems(added, ledger, total=total)
+            if problems:
+                raise Blocked(RunPhase.BLOCKED_QUALITY, f"{node}: " + "; ".join(problems))
+            review = OutlineReview.model_validate_json(
+                await self._step(
+                    node,
+                    epoch,
+                    kind=StoryStepKind.BOOK_PLANNING,
+                    system=book_prompts.BOOK_SYSTEM,
+                    prompt=book_prompts.book_rows_review_prompt(outline, volume, added[len(rows) :]),
+                    decoding=REVIEW,
+                    model=OutlineReview,
+                    judge=True,
+                )
+            )
+            if review.problems:
+                revised = await generate(book_prompts.book_rows_revision_prompt(base, generated, review.problems))
+                again, again_ledger = books.add_rows(rows, hooks, revised, first=start, total=total)
+                if not books.plan_problems(again, again_ledger, total=total):
+                    added, ledger = again, again_ledger
+            rows, hooks = added, ledger
+            start += count
+        return json.dumps(
+            {"rows": [r.model_dump(mode="json") for r in rows], "hooks": [h.model_dump(mode="json") for h in hooks]},
+            ensure_ascii=False,
+        ).encode("utf-8")
+
+    def _book_note(self, chapter: int) -> str:
+        """The book row and memory a chapter plan receives: role, hooks to plant and pay, what came before."""
+        assert self._plan is not None
+        number = self._first() + chapter - 1
+        row = next(r for r in self._plan.rows if r.chapter == number)
+        hooks = {h.hook_id: h for h in self._plan.hooks}
+        lines = [f"[Chương {number} trong tiểu thuyết — vai trò: {row.role.value}]"]
+        if row.plants:
+            lines.append("Phục bút phải cài trong chương: " + "; ".join(hooks[h].text for h in row.plants))
+        if row.payoffs:
+            lines.append("Phục bút phải giải trong chương: " + "; ".join(hooks[h].text for h in row.payoffs))
+        memory = books.memory_block(self._memory, self._plan, chapter=number)
+        return "\n".join(lines) + (f"\n\n{memory}" if memory else "")
+
+    async def _chapter_text(self, refs: Sequence[SceneRef]) -> str:
+        return "\n\n".join([json.loads(await self._head(r.node_id))["prose"] for r in refs])
+
+    async def _chapter_digest(self, chapter: int, refs: Sequence[SceneRef]) -> tuple[str, str]:
+        """The memory of an accepted chapter: extracted from its text, names attested."""
+        assert self._plan is not None
+        number = self._first() + chapter - 1
+        text = await self._chapter_text(refs)
+        known = [(h.hook_id, h.text) for h in self._memory.hooks if h.status != "resolved" and h.planted <= number]
+        node = f"chapter_digest[{chapter}]"
+
+        async def produce(epoch: int) -> bytes:
+            raw = await self._json(
+                node,
+                epoch,
+                StoryStepKind.BOOK_MEMORY,
+                book_prompts.MEMORY_SYSTEM,
+                book_prompts.chapter_digest_prompt(number, text, known),
+                books.bound_digest([hook_id for hook_id, _ in known]),
+            )
+            digest = books.attest_digest(books.ChapterDigest.model_validate_json(raw), text)
+            return digest.model_dump_json().encode("utf-8")
+
+        raw = await self._ensure(
+            node, inputs=[("chapter", content_digest(text.encode("utf-8")))], decoding=PLANNING, produce=produce
+        )
+        return node, content_digest(raw)
+
+    async def _digests(self, upto: int) -> list[tuple[int, books.ChapterDigest]]:
+        """The digests of this run's chapters before ``upto``, numbered across the book."""
+        found = []
+        for c in range(1, upto):
+            raw = await self._head(f"chapter_digest[{c}]")
+            found.append((self._first() + c - 1, books.ChapterDigest.model_validate_json(raw)))
+        return found
+
+    async def _commit_book_state(self, story: _Story) -> None:
+        """The part's summary, then the book state the next part reads."""
+        assert self._book is not None
+        assert self._plan is not None
+        digests = await self._digests(self._chapters + 1)
+        digest_ins = [(f"chapter_digest[{c}]", content_digest(d.model_dump_json().encode())) for c, d in digests]
+        summary_raw = await self._ensure(
+            "part_summary",
+            inputs=digest_ins,
+            decoding=PLANNING,
+            produce=lambda e: self._json(
+                "part_summary",
+                e,
+                StoryStepKind.BOOK_MEMORY,
+                book_prompts.MEMORY_SYSTEM,
+                book_prompts.part_summary_prompt(
+                    self._book.part if self._book else 1, [(c, d.summary) for c, d in digests]
+                ),
+                books.PartSummary,
+            ),
+        )
+        summary = books.PartSummary.model_validate_json(summary_raw).summary
+        refs = scene_refs(story.outline_input)
+        text = await self._chapter_text(refs)
+        packaged = Packaging.model_validate(json.loads(await self._head("packaging"))["packaging"])
+        title = self._title or packaged.titles[0].title
+        state = books.BookState(
+            spec=self._book.spec,
+            parts_done=self._book.part,
+            title=title,
+            plan=self._plan,
+            seed=story.seed.model_dump(mode="json"),
+            story_bible=story.bible.model_dump(mode="json"),
+            style_bible=story.style.model_dump(mode="json"),
+            memory=books.fold(self._memory, digests, part=self._book.part, part_summary=summary, tail=text),
+        )
+        await self._ensure(
+            "book_state",
+            inputs=[("part_summary", content_digest(summary_raw)), ("title", title), *digest_ins, *self._book_ins],
+            decoding=PLANNING,
+            produce=_constant(state.model_dump_json().encode("utf-8")),
+        )
 
     async def _json(
         self, node: str, epoch: int, kind: StoryStepKind, system: str, prompt: str, model: type[BaseModel]
@@ -606,7 +929,7 @@ class StoryRunDriver:
                 system=outline_prompts.OUTLINE_SYSTEM,
                 prompt=prompt,
                 decoding=PLANNING,
-                model=ShortOutline,
+                model=bound_short_outline(),
             )
 
         outline = ShortOutline.model_validate_json(
@@ -655,8 +978,12 @@ class StoryRunDriver:
                 character_names=list(names),
                 location_names=list(locations),
                 previous_plans=previous,
+                first_chapter=self._first(),
+                ends_story=self._ends_story(),
             )
         )
+        if self._book is not None:
+            prompt = f"{self._book_note(chapter)}\n\n---\n\n{prompt}"
         node = chapter_plan(chapter)
         notes = (await self._store.load()).intents.get(node, ())
         if notes:
@@ -738,7 +1065,7 @@ class StoryRunDriver:
         self._started = (await self._store.load()).started_at
         delta, version, proposal, plan = self._plan_state(story)
         refs = scene_refs(story.outline_input)
-        for c in range(1, CHAPTERS + 1):
+        for c in range(1, self._chapters + 1):
             chapter_refs = [r for r in refs if r.chapter == c]
             for cycle in range(REVIEW_CYCLES + 1):
                 for ref in chapter_refs:
@@ -748,6 +1075,8 @@ class StoryRunDriver:
                 if cycle == REVIEW_CYCLES or not await self._review_chapter(story, c, chapter_refs, final=False):
                     break
             await self._review_chapter(story, c, chapter_refs, final=True)
+            if self._book is not None:
+                await self._chapter_digest(c, chapter_refs)
 
     async def _acceptances(
         self, refs: Sequence[SceneRef], upto: int, version: str, proposal: Any
@@ -786,12 +1115,34 @@ class StoryRunDriver:
         inputs: list[tuple[str, str]],
     ) -> None:
         acceptances = await self._acceptances(refs, ref.global_index, version, proposal)
+        visible = acceptances
+        memory = ""
+        if self._book is not None:
+            # A book scene sees its own chapter and the scene just before; the book memory stands for the rest.
+            visible = [a for a, r in zip(acceptances, refs, strict=False) if r.chapter == ref.chapter][-4:]
+            if acceptances and refs[ref.global_index - 1].chapter != ref.chapter:
+                visible = [acceptances[-1]]
+            digests = await self._digests(ref.chapter)
+            inputs = [
+                *inputs,
+                *(
+                    (f"chapter_digest[{c - self._first() + 1}]", content_digest(d.model_dump_json().encode()))
+                    for c, d in digests
+                ),
+            ]
+            assert self._plan is not None
+            memory = books.memory_block(
+                books.fold(self._memory, digests, part=0, part_summary="", tail="") if digests else self._memory,
+                self._plan,
+                chapter=self._first() + ref.chapter - 1,
+                names=story.plans[ref.chapter - 1].scenes[ref.scene - 1].characters,
+            )
         readers = provisional_readers(
             self._identity,
             story.bible_input,
             canon_view=provisional_canon_view(delta),
             plan=plan,
-            acceptances=acceptances,
+            acceptances=visible,
         )
         contract = scene_contract(proposal, ref)
         pack = await compile_scene_context(
@@ -801,17 +1152,23 @@ class StoryRunDriver:
             contract=contract,
             canon_version_id=version,
             plan_version=1,
-            recent_decision_ids=[a.decision_id for a in acceptances],
+            recent_decision_ids=[a.decision_id for a in visible],
         )
         binding = {"context_pack_id": pack.context_pack_id, "context_content_hash": pack.content_hash}
-        context = drafting.render_context(pack, story.names)
+        if self._book is None:
+            context = drafting.render_context(pack, story.names)
+        else:
+            context = drafting.render_context(pack, story.names, openings=max(0, ref.scene - 2), memory=memory)
         chapter = story.plans[ref.chapter - 1]
         planned = chapter.scenes[ref.scene - 1]
         is_last = ref.scene == len(chapter.scenes)
-        is_final = is_last and ref.chapter == CHAPTERS
-        target = drafting.target_syllables_for(
-            chapter.scenes, story_target=self._brief.story_target_syllables, chapters=CHAPTERS
+        is_final = is_last and ref.chapter == self._chapters and self._ends_story()
+        story_target = (
+            self._brief.story_target_syllables
+            if self._book is None
+            else self._book.spec.chapter_syllables * self._chapters
         )
+        target = drafting.target_syllables_for(chapter.scenes, story_target=story_target, chapters=self._chapters)
         allowed = _allowed_names(story)
         earlier = [a.revision.normalized_content for a in acceptances]
 
@@ -822,7 +1179,7 @@ class StoryRunDriver:
                 context=context,
                 scene=planned,
                 plan=chapter,
-                chapter_number=ref.chapter,
+                chapter_number=self._first() + ref.chapter - 1,
                 scene_number=ref.scene,
                 is_last_scene_of_chapter=is_last,
                 is_final_scene=is_final,
@@ -1167,6 +1524,16 @@ class StoryRunDriver:
         refs = scene_refs(story.outline_input)
         heads = [(ref.node_id, json.loads(await self._head(ref.node_id))["prose"]) for ref in refs]
         inputs = [outline_in, *((n, content_digest(p.encode())) for n, p in heads)]
+        reviewed = heads
+        synopsis: str | None = None
+        ending_note = ENDING_NOTE
+        if self._book is not None:
+            # A part is judged on its digests and its last chapter in full, so the prompt stays bounded.
+            digests = await self._digests(self._chapters)
+            synopsis = "\n".join(f"- Chương {c}: {d.summary}" for c, d in digests) or "(không có)"
+            reviewed = [h for ref, h in zip(refs, heads, strict=True) if ref.chapter == self._chapters]
+            if not self._ends_story():
+                ending_note = PART_ENDING_NOTE
 
         async def produce(epoch: int) -> bytes:
             result = await self._judge(
@@ -1178,8 +1545,9 @@ class StoryRunDriver:
                     step_id=step_id,
                     context_digest=self._brief.digest(),
                     decoding=decoding,
-                    scenes=heads,
+                    scenes=reviewed,
                     outline=story.outline,
+                    synopsis=synopsis,
                 ),
             )
             last_chapter = [h for ref, h in zip(refs, heads, strict=True) if ref.chapter == refs[-1].chapter]
@@ -1191,8 +1559,8 @@ class StoryRunDriver:
             final_scene = heads[-1][0]
             if [f.code for f in blocking] == ["NO_ENDING"]:
                 state = await self._store.load()
-                if ENDING_NOTE not in state.intents.get(final_scene, ()):
-                    await self._store.apply(lambda s: (add_intent(s, node_ids=(final_scene,), note=ENDING_NOTE), None))
+                if ending_note not in state.intents.get(final_scene, ()):
+                    await self._store.apply(lambda s: (add_intent(s, node_ids=(final_scene,), note=ending_note), None))
                     raise _Restart(final_scene)
             findings, blocking = escalate_or_block(findings)
             if blocking:
@@ -1220,7 +1588,11 @@ class StoryRunDriver:
             finding.code,
             finding.severity,
             finding.node_id,
-            f"Chương cuối chưa giải quyết xung đột trung tâm theo kết thúc đã duyệt: {story.outline.ending}",
+            (
+                f"Chương cuối chưa giải quyết xung đột trung tâm theo kết thúc đã duyệt: {story.outline.ending}"
+                if self._ends_story()
+                else f"Chương cuối của phần chưa tới bước ngoặt đã định: {story.outline.ending}"
+            ),
             finding.quote,
         )
         checked = await self._confirmed("manuscript_review", claim, last_chapter, story.plans[-1])
@@ -1230,6 +1602,15 @@ class StoryRunDriver:
         refs = scene_refs(story.outline_input)
         manuscript = "\n\n".join([json.loads(await self._head(r.node_id))["prose"] for r in refs])
         inputs = [seed_in, ("manuscript", content_digest(manuscript.encode()))]
+        # The model reads a bounded view of a book part: its digests, first and last chapters. Selling-point
+        # quotes are still checked in code against the whole part.
+        shown = manuscript
+        if self._book is not None:
+            digests = await self._digests(self._chapters + 1)
+            first = await self._chapter_text([r for r in refs if r.chapter == 1])
+            last = await self._chapter_text([r for r in refs if r.chapter == self._chapters])
+            synopsis = "\n".join(f"- Chương {c}: {d.summary}" for c, d in digests)
+            shown = f"[Tóm tắt các chương]\n{synopsis}\n\n[Chương đầu]\n{first}\n\n[Chương cuối]\n{last}"
 
         async def produce(epoch: int) -> bytes:
             attempts: list[tuple[Packaging, set[str]]] = []
@@ -1241,7 +1622,7 @@ class StoryRunDriver:
                         kind=StoryStepKind.PACKAGING,
                         system=packaging_prompts.PACKAGING_SYSTEM,
                         prompt=packaging_prompts.packaging_prompt(
-                            manuscript=manuscript, working_title=story.seed.working_title, premise=story.seed.premise
+                            manuscript=shown, working_title=story.seed.working_title, premise=story.seed.premise
                         ),
                         decoding=PLANNING,
                         model=Packaging,
@@ -1278,7 +1659,7 @@ class StoryRunDriver:
                     context_digest=self._brief.digest(),
                     decoding=decoding,
                     blurbs=blurbs,
-                    manuscript=manuscript,
+                    manuscript=shown,
                 ),
             )
             flagged = {c.blurb - 1 for c in claims}
@@ -1347,21 +1728,35 @@ class StoryRunDriver:
         packaged = json.loads(await self._head("packaging"))
         packaging = Packaging.model_validate(packaged["packaging"])
         findings.extend(_finding_from(f) for f in packaged["findings"])
-        findings.extend(story_length_findings([chapters[c] for c in sorted(chapters)]))
+        if self._book is None:
+            findings.extend(story_length_findings([chapters[c] for c in sorted(chapters)]))
+        else:
+            target = self._book.spec.chapter_syllables * self._chapters
+            findings.extend(part_length_findings([chapters[c] for c in sorted(chapters)], target))
         findings, blocking = escalate_or_block(findings)
         if blocking:
             raise Blocked(RunPhase.BLOCKED_QUALITY, "; ".join(f"{f.code} {f.node_id}" for f in blocking), blocking)
         record = [{**_finding_dict(f), "id": f"F{i + 1:03d}"} for i, f in enumerate(findings)]
-        quality_digest = self._blobs.put(
-            json.dumps({"findings": record, "packaging": packaging.model_dump()}, ensure_ascii=False).encode("utf-8")
-        )
+        quality: dict[str, Any] = {"findings": record, "packaging": packaging.model_dump()}
+        if self._book is not None:
+            # The next part reads this state (ADR-0116); it is bound to the approval with the quality record.
+            book_state = await self._head("book_state")
+            quality["book_state"] = self._blobs.put(book_state)
+            quality["book_part"] = self._book.part
+        quality_digest = self._blobs.put(json.dumps(quality, ensure_ascii=False).encode("utf-8"))
         exceptions = tuple(
             r["id"]
             for r in record
             if r["severity"] in (Severity.NARRATIVE_CRITICAL.value, Severity.LOCAL_MODEL_LIMIT.value)
         )
+        title = packaging.titles[0].title
+        if self._book is not None:
+            title = f"{self._title or title} — Phần {self._book.part}"
         export = render_markdown(
-            title=packaging.titles[0].title, blurb=packaging.blurbs[0], chapters=[chapters[c] for c in sorted(chapters)]
+            title=title,
+            blurb=packaging.blurbs[0],
+            chapters=[chapters[c] for c in sorted(chapters)],
+            first_chapter=self._first(),
         )
         export_digest = self._blobs.put(export.encode("utf-8"))
         state = await self._store.load()
@@ -1382,6 +1777,15 @@ class StoryRunDriver:
             export_digest=export_digest,
             quality_record_digest=quality_digest,
         )
+
+
+def _constant(data: bytes) -> Callable[[int], Awaitable[bytes]]:
+    """A node whose content is copied or computed, not generated."""
+
+    async def produce(_: int) -> bytes:
+        return data
+
+    return produce
 
 
 def human_intents(state: RunState) -> dict[str, tuple[str, ...]]:
@@ -1419,7 +1823,9 @@ def step_prefix(state: RunState, node: str) -> str:
     return f"{node}@r{len(human_intents(state).get(node, ()))}.{state.retries}.{replans}{suffix}#"
 
 
-def run_call_bound(chapters: int = CHAPTERS, scenes_per_chapter: int = SCENES_PER_CHAPTER_MAX) -> int:
+def run_call_bound(
+    chapters: int = CHAPTERS, scenes_per_chapter: int = SCENES_PER_CHAPTER_MAX, *, book: books.BookPart | None = None
+) -> int:
     """Generate calls of a run whose every chapter review fails until repair is spent: each chapter replanned once
     (regenerating its plan and every later one), every scene drafted and repaired in each review cycle of both
     contracts, each review with all its audits and second readings, and the final scene rewritten for its ending.
@@ -1432,7 +1838,13 @@ def run_call_bound(chapters: int = CHAPTERS, scenes_per_chapter: int = SCENES_PE
     reviews = chapters * contracts * (1 + REVIEW_CYCLES) * review
     ending = 1 + (1 + REVIEW_CYCLES) * review
     late = 2 * NODE_CAPS["manuscript_review"] + NODE_CAPS["packaging"] + 1
-    return planning + plans + scenes + reviews + ending + late
+    memory = 0
+    if book is not None:
+        # ADR-0116: a digest per chapter and the part summary; part 1 also writes the book plan.
+        memory = chapters * NODE_CAPS["chapter_digest"] + NODE_CAPS["part_summary"]
+        if book.state_digest is None:
+            memory += NODE_CAPS["book_outline"] + len(book.spec.volumes()) * NODE_CAPS["book_chapters"]
+    return planning + plans + scenes + reviews + ending + late + memory
 
 
 def entity_keys(seed: StorySeed) -> tuple[dict[str, str], dict[str, str]]:
@@ -1529,12 +1941,24 @@ def story_length_findings(chapters: Sequence[Sequence[str]]) -> tuple[Finding, .
     return ()
 
 
-def render_markdown(*, title: str, blurb: str, chapters: Sequence[Sequence[str]]) -> str:
-    """The exported manuscript: deterministic from the approved scene texts and the first title and blurb."""
+def render_markdown(*, title: str, blurb: str, chapters: Sequence[Sequence[str]], first_chapter: int = 1) -> str:
+    """The exported manuscript: deterministic from the approved scene texts and the first title and blurb; a book
+    part numbers its chapters across the book."""
     parts = [f"# {title}", "", f"> {blurb}", ""]
-    for number, scenes in enumerate(chapters, start=1):
+    for number, scenes in enumerate(chapters, start=first_chapter):
         parts.extend([f"## Chương {number}", "", "\n\n* * *\n\n".join(scenes), ""])
     return "\n".join(parts).rstrip() + "\n"
+
+
+def part_length_findings(chapters: Sequence[Sequence[str]], target: int) -> tuple[Finding, ...]:
+    """A book part's length against its own target: outside the hard spread is structural, outside the target
+    spread stylistic."""
+    total = syllables_of(chapters)
+    for spread, severity in ((PART_HARD_SPREAD, Severity.HARD_STRUCTURAL), (PART_TARGET_SPREAD, Severity.STYLISTIC)):
+        low, high = round(target * (1 - spread)), round(target * (1 + spread))
+        if not low <= total <= high:
+            return (Finding("STORY_LENGTH", severity, "manuscript", f"{total} syllables outside {low}-{high}"),)
+    return ()
 
 
 def syllables_of(chapters: Sequence[Sequence[str]]) -> int:

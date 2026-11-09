@@ -34,6 +34,7 @@ from lib.db.repositories.task_repo import STORY_RUN_TASK_TYPE, TaskRepository
 from lib.episode_ledger import discover_sources
 from r2.host_hardening.paid_routes import PaidRouteUnqualifiedError
 from r2.narrative_lifecycle.errors import NarrativeDecisionAuthorizationError
+from server.story_authoring import book as books
 from server.story_authoring.artifacts import StoryBlobStore
 from server.story_authoring.authority import GrantNarrativeShowrunnerAuthority
 from server.story_authoring.cloud import CLOUD_ADAPTERS, OPENAI_ENDPOINT, OPENAI_MAX_INPUT_BOUND
@@ -97,6 +98,13 @@ class StoryActionRefused(Exception):
 
 
 @dataclass(frozen=True)
+class BookProgress:
+    spec: books.BookSpec
+    parts_done: int
+    state_digest: str
+
+
+@dataclass(frozen=True)
 class StoryRunRef:
     run_id: str
     task_id: str
@@ -104,8 +112,26 @@ class StoryRunRef:
 
 
 def is_continuation(brief: StoryBrief) -> bool:
-    """A continuation's manuscript is handed to video after the parts already in the project (ADR-0115)."""
+    """A continuation's manuscript is handed to video after the parts already in the project (ADR-0115), as is
+    every part of a book after the first (ADR-0116)."""
+    if brief.book is not None:
+        return brief.book.part > 1
     return brief.prior is not None and brief.prior.mode == "continuation"
+
+
+def book_limits(limits: StoryLimits, part: books.BookPart) -> StoryLimits:
+    """A book part's limits: the call bound of its chapter count, tokens and wall clock scaled from it."""
+    calls = run_call_bound(part.chapters, book=part)
+    return limits.model_copy(
+        update={
+            "chapters": part.chapters,
+            "generate_calls_max": calls,
+            "count_calls_max": calls,
+            "input_tokens_max": calls * limits.max_input_tokens,
+            "output_tokens_max": calls * limits.max_output_tokens,
+            "wall_clock_max_seconds": calls * SECONDS_PER_CALL,
+        }
+    )
 
 
 def brief_idea(idea: str | None, variant_profile: str | None) -> str:
@@ -157,6 +183,7 @@ class StoryAuthoringService:
         prior_mode: Literal["continuation", "variant"] | None = None,
         prior_project: str | None = None,
         prior_origin: str = "instruction",
+        book: books.BookSpec | None = None,
     ) -> StoryBrief:
         """The brief with its frozen routes; its digest is what the Human greenlights at Gate A. A judge route is
         optional; without one the writer's route also reviews.
@@ -201,6 +228,19 @@ class StoryAuthoringService:
                     "cloud_prices": max_prices(tuple(profiles)),
                 }
             )
+        part: books.BookPart | None = None
+        if book is not None:
+            if prior_mode is not None:
+                raise StoryActionRefused("BOOK_WITH_PRIOR", "a new book starts from an idea", status=422)
+            part = books.BookPart(spec=book)
+        elif prior_mode == "continuation" and project_name is not None:
+            # ADR-0116: a continuation of a book with parts left writes its next part from the book state.
+            progress = await self.book_progress(project_name)
+            if progress is not None and progress.parts_done < len(progress.spec.parts()):
+                part = books.BookPart(
+                    spec=progress.spec, part=progress.parts_done + 1, state_digest=progress.state_digest
+                )
+                prior_mode = None
         prior = None
         if prior_mode is not None:
             if (
@@ -234,9 +274,12 @@ class StoryAuthoringService:
                     "wall_clock_max_seconds": limits.wall_clock_max_seconds + extra_calls * SECONDS_PER_CALL,
                 }
             )
+        if part is not None:
+            limits = book_limits(limits, part)
         return StoryBrief(
             idea=idea,
             genre=genre,
+            book=part,
             story_target_syllables=story_target_syllables,
             selection=selection,
             judge_selection=judge if judge != selection else None,
@@ -244,6 +287,34 @@ class StoryAuthoringService:
             cloud_profiles=tuple(profiles),
             prior=prior,
         )
+
+    async def book_progress(self, project_name: str) -> BookProgress | None:
+        """The project's book: the latest part committed and handed to video, read from its quality record."""
+        async with self._factory() as session:
+            tasks = (
+                await session.execute(
+                    select(Task).where(Task.task_type == STORY_RUN_TASK_TYPE, Task.project_name == project_name)
+                )
+            ).scalars()
+            found = [(t.task_id, json.loads(t.payload_json or "{}")) for t in tasks]
+        blobs = self._blobs(project_name)
+        best: BookProgress | None = None
+        for task_id, payload in found:
+            brief = StoryBrief.model_validate(payload["brief"])
+            if brief.book is None:
+                continue
+            state = await RunStateStore(self._factory, task_id=task_id).load()
+            if state.phase is not RunPhase.COMMITTED or state.handoff is None or not state.handoff.done:
+                continue
+            manifest = load_offered_manifest(blobs, state)
+            if manifest.quality_record_digest is None:
+                continue
+            record = json.loads(blobs.read_exact(manifest.quality_record_digest))
+            digest = record.get("book_state")
+            if digest is None or (best is not None and brief.book.part <= best.parts_done):
+                continue
+            best = BookProgress(spec=brief.book.spec, parts_done=brief.book.part, state_digest=digest)
+        return best
 
     async def list_routes(self) -> list[dict[str, Any]]:
         return await story_routes(self._factory)

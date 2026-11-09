@@ -85,9 +85,14 @@ def chapter_plan_prompt(
     character_names: Sequence[str],
     location_names: Sequence[str],
     previous_plans: Sequence[ChapterPlan],
+    first_chapter: int = 1,
+    ends_story: bool | None = None,
 ) -> str:
+    """``first_chapter`` numbers a book part's chapters across the book; ``ends_story`` is false for every part
+    but the last, whose final chapter alone resolves the story (ADR-0116)."""
     chapter = outline.chapters[chapter_number - 1]
-    is_final = chapter_number == len(outline.chapters)
+    is_final = chapter_number == len(outline.chapters) and ends_story is not False
+    display = first_chapter + chapter_number - 1
     previous = (
         _json(
             [
@@ -104,7 +109,7 @@ def chapter_plan_prompt(
         if is_final
         else "\n- Không giải quyết xung đột trung tâm trước chương cuối."
     )
-    return f"""Lập kế hoạch cho chương {chapter_number} và chia thành 3–5 cảnh có thể viết được.
+    return f"""Lập kế hoạch cho chương {display} và chia thành 3–5 cảnh có thể viết được.
 
 Phần ghi chú chương:
 - chapter_goal: việc cụ thể nhân vật chính phải làm trong chương này.
@@ -128,7 +133,7 @@ Quy tắc:
 - location chỉ được chọn trong: {", ".join(location_names)}.
 - pov và characters chỉ được chọn trong: {", ".join(character_names)}.{ending}
 
-Nhiệm vụ của chương {chapter_number} theo dàn ý: {chapter.core_task}
+Nhiệm vụ của chương {display} theo dàn ý: {chapter.core_task}
 Mạch truyện được đẩy: {chapter.threads_advanced}
 Bước ngoặt: {chapter.turning_point}
 
