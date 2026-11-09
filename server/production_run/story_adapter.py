@@ -51,7 +51,7 @@ from server.production_run.ports import StepPlan
 from server.services.automation_grants import RunAutomationAuthority
 from server.story_authoring.artifacts import StoryBlobStore
 from server.story_authoring.book import BookSpec
-from server.story_authoring.commit import CommitRefused, load_offered_manifest
+from server.story_authoring.commit import CANON_BASE_MOVED, CommitRefused, load_offered_manifest
 from server.story_authoring.contracts import StoryLimits
 from server.story_authoring.driver import StoryBrief
 from server.story_authoring.handoff import STORY_SOURCE_LANGUAGE, HandoffRefused, SourceUpload, send_to_video
@@ -325,6 +325,12 @@ class StoryCommitAdapter:
 
     async def inspect(self, *, intent: DispatchIntent, receipt: OwnerReceipt) -> StageOutcome:
         state = await RunStateStore(self._sessions, task_id=str(receipt.task_id)).load()
+        if state.phase is RunPhase.COMMIT_BLOCKED:
+            # A story whose project MAIN Canon was taken first needs its story run retried (rebased) by a Showrunner.
+            reason = (
+                "STORY_CANON_BASE_MOVED" if CANON_BASE_MOVED in (state.block_reason or "") else "STORY_COMMIT_BLOCKED"
+            )
+            return outcome(intent, "BLOCK", reason=reason, owner_state=state.phase.value)
         if state.phase in {RunPhase.APPROVING, RunPhase.PARTIALLY_COMMITTED}:
             return outcome(intent, "BLOCK", reason="OUTCOME_UNKNOWN", owner_state=state.phase.value)
         return outcome(intent, "PASS", receipts=(receipt,), owner_state=state.phase.value)

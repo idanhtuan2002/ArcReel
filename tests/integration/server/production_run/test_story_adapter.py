@@ -482,3 +482,36 @@ async def test_a_witnessed_setting_moves_the_witness_and_a_run_owned_field_does_
 
     host.projects.update_project("project", user)
     assert await witness.digest(user_id="default", project_name="project") != before
+
+
+async def test_a_story_whose_project_main_canon_was_taken_blocks_the_run_with_the_rebase_reason(story_host: Host):
+    from datetime import UTC, datetime
+
+    from lib.db.models.canon import CanonBranchModel
+
+    host = story_host
+    await _tick(host)
+    await _tick(host)
+    await _execute_story(host)
+    await _tick(host)
+    async with host.sessions() as session:  # another story run of the project took MAIN first
+        session.add(
+            CanonBranchModel(
+                branch_id="story-other-canon",
+                user_id=host.run.user_id,
+                project_name=host.run.project_name,
+                branch_type="MAIN",
+                parent_branch_id=None,
+                parent_version_id=None,
+                head_version_id=None,
+                created_at=datetime.now(UTC),
+                created_by="run:other",
+            )
+        )
+        await session.commit()
+
+    blocked = await _tick(host)
+
+    assert (blocked.stage, blocked.reason) == (RunStage.STORY_COMMIT, "STORY_CANON_BASE_MOVED")
+    state = await RunStateStore(host.sessions, task_id=await _story_task(host)).load()
+    assert state.phase is RunPhase.COMMIT_BLOCKED

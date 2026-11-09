@@ -47,7 +47,7 @@ from r2.contracts.fingerprints import canonical_json_bytes
 from r2.contracts.narrative import CanonBranchType
 from r2.contracts.narrative_lifecycle import DraftCandidate, NarrativeRevision
 from r2.narrative.canon_transaction import CanonTransactionService
-from r2.narrative.errors import CanonError, NarrativeError
+from r2.narrative.errors import CanonError, CanonIdentityConflictError, NarrativeError
 from r2.narrative_context.errors import NarrativeContextError
 from r2.narrative_lifecycle.acceptance import NarrativeAcceptanceService
 from r2.narrative_lifecycle.accepted_narrative_adapter import AcceptedNarrativeAdapter
@@ -339,6 +339,21 @@ async def canon_parent(factory: async_sessionmaker[AsyncSession], identity: Stor
     return main.branch_id, main.head_version_id
 
 
+async def foreign_main(factory: async_sessionmaker[AsyncSession], identity: StoryIdentity) -> str | None:
+    """Another run's ``MAIN`` branch of the project, committed or still being created."""
+    async with factory() as session:
+        return (
+            await session.execute(
+                select(CanonBranchModel.branch_id).where(
+                    CanonBranchModel.user_id == identity.user_id,
+                    CanonBranchModel.project_name == identity.project_name,
+                    CanonBranchModel.branch_type == CanonBranchType.MAIN.value,
+                    CanonBranchModel.branch_id != identity.canon_branch_id,
+                )
+            )
+        ).scalar_one_or_none()
+
+
 async def commit_manifest_plan(
     identity: StoryIdentity,
     manifest: ManuscriptCommitManifest,
@@ -527,14 +542,19 @@ class ManuscriptCommitter:
                 continue
             if step == STEP_CANON and manifest.canon_parent is None:
                 # Another run took the project's MAIN branch after this one recorded none: rebase, never collide.
-                moved = await canon_parent(self._session_factory, self._identity)
-                if moved is not None:
-                    return await self._block(step, f"{CANON_BASE_MOVED}: the project's MAIN Canon is {moved[0]}")
+                taken = await foreign_main(self._session_factory, self._identity)
+                if taken is not None:
+                    return await self._block(step, f"{CANON_BASE_MOVED}: the project's MAIN Canon is {taken}")
             try:
                 if narrative is None:
                     await self._run_step(step, manifest, approval, digest)
                 else:
                     await self._run_automatic_step(step, manifest, narrative)
+            except CanonIdentityConflictError as exc:
+                # The MAIN insert raced another run's: the same rebase as the check above.
+                if step == STEP_CANON and manifest.canon_parent is None:
+                    return await self._block(step, f"{CANON_BASE_MOVED}: {exc}")
+                return await self._block(step, f"{type(exc).__name__}: {exc}")
             except _BLOCKING_ERRORS as exc:
                 return await self._block(step, f"{type(exc).__name__}: {exc}")
             state = await self._complete(step)

@@ -424,6 +424,19 @@ describe("other phases", () => {
     await waitFor(() => expect(loads()).toBeGreaterThan(before));
   });
 
+  it("offers a retry, not a resume, for a story whose project MAIN Canon was taken first", async () => {
+    current = run({ phase: "COMMIT_BLOCKED", offered: null, block_reason: "CANON_BASE_MOVED: story-other-canon" });
+    routes["/retry"] = () => {
+      current = run({ phase: "RUNNING", offered: null });
+      return json(current);
+    };
+    render(<StoryAuthoringPage projectName="demo" />);
+    const retry = await screen.findByRole("button", { name: "Retry" });
+    expect(screen.queryByRole("button", { name: "Resume" })).not.toBeInTheDocument();
+    fireEvent.click(retry);
+    expect(await screen.findByText(/The model is planning, writing and reviewing/)).toBeInTheDocument();
+  });
+
   it("finishes a pending hand-off with its own command and offers a new name on a name clash", async () => {
     current = run({
       phase: "COMMITTED",

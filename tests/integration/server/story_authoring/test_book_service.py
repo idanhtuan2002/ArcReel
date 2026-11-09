@@ -3,6 +3,8 @@ continuation of the project that becomes the book's next part, and a plain conti
 
 from __future__ import annotations
 
+from datetime import UTC, datetime
+
 from sqlalchemy import select
 
 from lib.db.models.canon import CanonBranchModel
@@ -176,3 +178,50 @@ async def test_a_story_whose_main_canon_was_taken_first_is_rebased_on_retry_and_
         ).scalars()
         kinds = sorted((b.branch_type, b.parent_branch_id is not None) for b in branches)
     assert kinds == [("MAIN", False), ("NARRATIVE_BRANCH", True)]
+
+
+async def test_a_main_canon_still_being_created_by_another_run_blocks_the_commit_for_a_rebase(
+    concurrent_session_factory: Factory, grants, projects: ProjectManager
+):
+    service = _service(concurrent_session_factory, grants, projects)
+    provider_id = await _provider(concurrent_session_factory)
+    brief = await service.draft_brief(
+        idea="Một người lái đò già.", genre="đời thường", provider_id=provider_id, model_id=MODEL
+    )
+    decision = await _greenlight(concurrent_session_factory, brief.digest())
+    ref = await service.start(
+        user_id=USER, project_name=PROJECT, principal=SPONSOR, brief=brief, gate_a_decision_id=decision
+    )
+    assert (await _execute(concurrent_session_factory, ref, projects, BookModel()))["phase"] == "READY_FOR_APPROVAL"
+    async with concurrent_session_factory() as session:  # another run created MAIN and has not committed it yet
+        session.add(
+            CanonBranchModel(
+                branch_id="story-other-canon",
+                user_id=USER,
+                project_name=PROJECT,
+                branch_type="MAIN",
+                parent_branch_id=None,
+                parent_version_id=None,
+                head_version_id=None,
+                created_at=datetime.now(UTC),
+                created_by="run:other",
+            )
+        )
+        await session.commit()
+    _, state = await service.get(user_id=USER, project_name=PROJECT, run_id=ref.run_id)
+    offered = service.offered(PROJECT, state)
+    assert offered is not None
+
+    blocked = await service.approve(
+        user_id=USER,
+        project_name=PROJECT,
+        run_id=ref.run_id,
+        principal=SPONSOR,
+        manifest_digest_seen=offered["manifest_digest"],
+        accepted_exceptions=offered["exceptions_offered"],
+    )
+
+    assert blocked.phase is RunPhase.COMMIT_BLOCKED
+    assert "CANON_BASE_MOVED" in (blocked.block_reason or "")
+    retried = await service.retry(user_id=USER, project_name=PROJECT, run_id=ref.run_id, principal=SPONSOR)
+    assert retried.phase is RunPhase.RUNNING

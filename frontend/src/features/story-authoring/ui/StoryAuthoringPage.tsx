@@ -818,7 +818,8 @@ function PhasePanel({
     AWAITING_GATE_A: ["discard"],
     APPROVING: ["resume", "abort"],
     PARTIALLY_COMMITTED: ["resume", "abort"],
-    COMMIT_BLOCKED: ["resume", "abort"],
+    // A story whose project MAIN Canon was taken by another run is rebased by a retry (ADR-0116).
+    COMMIT_BLOCKED: run.block_reason?.includes("CANON_BASE_MOVED") ? ["retry", "abort"] : ["resume", "abort"],
     RECOVERY_INCONSISTENT: ["discard"],
     READY_FOR_APPROVAL: ["discard"],
     COMMITTED: [],
