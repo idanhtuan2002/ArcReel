@@ -132,4 +132,31 @@ def _create_film(projects: ProjectManager, story_name: str, story: dict[str, Any
     return name
 
 
-__all__ = ["TEMPLATE_FIELDS", "BatchRefused", "BatchResult", "films_for_finished_stories"]
+def adopt_automation_settings(projects: ProjectManager, project_name: str) -> str | None:
+    """Give a project without automatic production settings those of the most recently changed project of the same
+    content mode that has them; returns that project's name, or ``None`` when the project already has its own."""
+    project = projects.load_project(project_name)
+    if isinstance(project.get("automation"), dict):
+        return None
+    candidates: list[tuple[float, str, dict[str, Any]]] = []
+    for name in projects.list_projects():
+        if name == project_name:
+            continue
+        try:
+            other = projects.load_project(name)
+            changed = (projects.get_project_path(name) / "project.json").stat().st_mtime
+        except (FileNotFoundError, ValueError, OSError):
+            continue
+        settings = other.get("automation")
+        if isinstance(settings, dict) and other.get("content_mode", "narration") == project.get(
+            "content_mode", "narration"
+        ):
+            candidates.append((changed, name, settings))
+    if not candidates:
+        raise BatchRefused("AUTOPILOT_NO_SETTINGS_TEMPLATE")
+    _changed, template, settings = max(candidates, key=lambda item: (item[0], item[1]))
+    projects.update_project(project_name, lambda current: current.update(automation=copy.deepcopy(settings)))
+    return template
+
+
+__all__ = ["TEMPLATE_FIELDS", "BatchRefused", "BatchResult", "adopt_automation_settings", "films_for_finished_stories"]

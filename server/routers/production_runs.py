@@ -24,7 +24,7 @@ from r2.contracts.automation import AutomationMode, Checkpoint, ReviewCommand, R
 from r2.contracts.autopilot import FilmAutopilot, StoryAutopilot
 from server.auth import CurrentUser, InteractiveUser, oauth2_scheme_optional
 from server.production_run.autopilot import AutopilotScheduler
-from server.production_run.autopilot_batch import BatchRefused, films_for_finished_stories
+from server.production_run.autopilot_batch import BatchRefused, adopt_automation_settings, films_for_finished_stories
 from server.production_run.qualification_jobs import QualificationJobs, QualificationRefused
 from server.production_run.report import pending_final, run_progress, run_report, verified_final
 from server.production_run.service import (
@@ -491,6 +491,14 @@ async def put_autopilot(
     kind = project_kind(project)
     if body.enabled and (kind == "story") != (body.story is not None):
         raise HTTPException(status_code=422, detail={"code": "AUTOPILOT_PARAMETERS_MISMATCH", "reasons": [kind]})
+    adopted: str | None = None
+    if body.enabled:
+        # A project created for autopilot has no production settings yet: it takes those of the most recently
+        # changed configured project, which the Showrunner can change in the project's automation settings.
+        try:
+            adopted = await asyncio.to_thread(adopt_automation_settings, get_project_manager(), project_name)
+        except BatchRefused as refused:
+            raise HTTPException(status_code=409, detail={"code": refused.code, "reasons": []}) from None
     try:
         await active.set_autopilot(
             interactive_token=token,
@@ -507,7 +515,7 @@ async def put_autopilot(
         raise _http(error) from error
     if scheduler is not None:
         scheduler.wake()
-    return await _autopilot_view(scheduler, user.id, project_name)
+    return {**await _autopilot_view(scheduler, user.id, project_name), "settings_from": adopted}
 
 
 class FilmsBatchBody(_Body):

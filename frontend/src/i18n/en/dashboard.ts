@@ -3063,5 +3063,9 @@ export default {
   "auto_title_story": "Story {{when}}",
   "auto_title_film": "Film {{when}}",
   "auto_title_film_of": "{{story}} · Film",
+  "ap_error_AUTOPILOT_NO_SETTINGS_TEMPLATE": "No project has automatic production settings to copy yet. Set them up in one project first.",
+  "ap_error_AUTOPILOT_PARAMETERS_MISMATCH": "These autopilot settings do not fit this kind of project.",
+  "ap_error_AUTOPILOT_CHANGED_CONCURRENTLY": "Autopilot was changed at the same time elsewhere. Try again.",
+  "ap_error_AUTOPILOT_NOT_ACTIVATED": "Autopilot is not running on this server.",
 
 };

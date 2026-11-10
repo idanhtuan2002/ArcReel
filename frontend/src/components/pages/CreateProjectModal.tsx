@@ -1,6 +1,7 @@
 
 import { StoryAutopilotFields, storyAutopilot } from "@/features/autopilot/AutopilotPanel";
 import { setAutopilot } from "@/features/autopilot/autopilotClient";
+import { useAutopilotErrorText } from "@/features/autopilot/useAutopilotErrorText";
 import { useState, useEffect, useRef, type CSSProperties } from "react";
 import { ProjectKindPicker } from "./create-project/ProjectKindPicker";
 import type { ProjectKind } from "@/types/project";
@@ -195,6 +196,7 @@ export function CreateProjectModal() {
     uploadedPreview: null,
   });
 
+  const autopilotErrorText = useAutopilotErrorText();
   const [creating, setCreating] = useState(false);
   // ADR-0122: a story project needs only a title; a film project may adapt a story project.
   const [kind, setKind] = useState<ProjectKind>("film");
@@ -351,7 +353,7 @@ export function CreateProjectModal() {
         try {
           await setAutopilot(resp.name, { enabled: true, story: autoStory });
         } catch (err) {
-          useAppStore.getState().pushToast(`${t("dashboard:ap_create_failed")}${errMsg(err)}`, "warning");
+          useAppStore.getState().pushToast(`${t("dashboard:ap_create_failed")}${autopilotErrorText(err)}`, "warning");
         }
       }
       setShowCreateModal(false);
@@ -441,7 +443,7 @@ export function CreateProjectModal() {
         try {
           await setAutopilot(resp.name, { enabled: true, film: { episodes_per_run: 1 } });
         } catch (err) {
-          useAppStore.getState().pushToast(`${t("dashboard:ap_create_failed")}${errMsg(err)}`, "warning");
+          useAppStore.getState().pushToast(`${t("dashboard:ap_create_failed")}${autopilotErrorText(err)}`, "warning");
         }
       }
       setShowCreateModal(false);

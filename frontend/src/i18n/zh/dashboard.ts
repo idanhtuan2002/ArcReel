@@ -3062,5 +3062,9 @@ export default {
   "auto_title_story": "故事 {{when}}",
   "auto_title_film": "影片 {{when}}",
   "auto_title_film_of": "{{story}} · 影片",
+  "ap_error_AUTOPILOT_NO_SETTINGS_TEMPLATE": "还没有可复制的自动制作设置，请先在一个项目中配置。",
+  "ap_error_AUTOPILOT_PARAMETERS_MISMATCH": "这些自动运行设置不适用于此类项目。",
+  "ap_error_AUTOPILOT_CHANGED_CONCURRENTLY": "自动运行刚在别处被更改，请重试。",
+  "ap_error_AUTOPILOT_NOT_ACTIVATED": "此服务器未运行自动运行。",
 
 } satisfies Record<keyof typeof enDashboard, string>;

@@ -3061,5 +3061,9 @@ export default {
   "auto_title_story": "Truyện {{when}}",
   "auto_title_film": "Phim {{when}}",
   "auto_title_film_of": "{{story}} · Phim",
+  "ap_error_AUTOPILOT_NO_SETTINGS_TEMPLATE": "Chưa có dự án nào được cấu hình sản xuất tự động để sao chép. Hãy cấu hình ở một dự án trước.",
+  "ap_error_AUTOPILOT_PARAMETERS_MISMATCH": "Thiết lập tự động này không hợp với loại dự án.",
+  "ap_error_AUTOPILOT_CHANGED_CONCURRENTLY": "Chế độ tự động vừa được đổi ở nơi khác. Hãy thử lại.",
+  "ap_error_AUTOPILOT_NOT_ACTIVATED": "Máy chủ chưa chạy chế độ tự động.",
 
 } satisfies Record<keyof typeof enDashboard, string>;

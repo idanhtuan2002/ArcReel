@@ -4,7 +4,7 @@ import { Link } from "wouter";
 import { Bot } from "lucide-react";
 
 import { useAppStore } from "@/stores/app-store";
-import { errMsg } from "@/utils/async";
+import { useAutopilotErrorText } from "./useAutopilotErrorText";
 import {
   getAutopilot,
   setAutopilot,
@@ -97,6 +97,7 @@ export function StoryAutopilotFields({
  */
 export function AutopilotPanel({ projectName, kind }: { projectName: string; kind: "story" | "film" }) {
   const { t } = useTranslation("dashboard");
+  const errorText = useAutopilotErrorText();
   const [view, setView] = useState<AutopilotView | null>(null);
   const [editing, setEditing] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -143,7 +144,7 @@ export function AutopilotPanel({ projectName, kind }: { projectName: string; kin
       setView(result?.status ? result : null);
       setEditing(false);
     } catch (error) {
-      useAppStore.getState().pushToast(`${t("ap_failed")}${errMsg(error)}`, "error");
+      useAppStore.getState().pushToast(`${t("ap_failed")}${errorText(error)}`, "error");
     } finally {
       setBusy(false);
     }

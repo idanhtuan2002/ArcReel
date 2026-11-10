@@ -5,7 +5,7 @@ import { Clapperboard } from "lucide-react";
 import { API } from "@/api";
 import { useAppStore } from "@/stores/app-store";
 import type { ProjectSummary } from "@/types/project";
-import { errMsg } from "@/utils/async";
+import { useAutopilotErrorText } from "./useAutopilotErrorText";
 import { filmsForFinishedStories } from "./autopilotClient";
 
 /**
@@ -14,6 +14,7 @@ import { filmsForFinishedStories } from "./autopilotClient";
  */
 export function FilmsForStories({ onDone }: { onDone: () => void }) {
   const { t } = useTranslation("dashboard");
+  const errorText = useAutopilotErrorText();
   const id = useId();
   const [open, setOpen] = useState(false);
   const [films, setFilms] = useState<ProjectSummary[]>([]);
@@ -42,7 +43,7 @@ export function FilmsForStories({ onDone }: { onDone: () => void }) {
       setOpen(false);
       onDone();
     } catch (error) {
-      useAppStore.getState().pushToast(`${t("ap_batch_failed")}${errMsg(error)}`, "error");
+      useAppStore.getState().pushToast(`${t("ap_batch_failed")}${errorText(error)}`, "error");
     } finally {
       setBusy(false);
     }

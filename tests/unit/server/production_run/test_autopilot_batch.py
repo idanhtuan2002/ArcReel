@@ -80,3 +80,24 @@ async def test_limit_conflicts_and_template_checks(tmp_path):
         await _run(pm, template="two")
     with pytest.raises(BatchRefused, match="TEMPLATE_NOT_FOUND"):
         await _run(pm, template="missing")
+
+
+def test_a_project_without_settings_adopts_the_latest_configured_ones(tmp_path):
+    import os
+
+    from server.production_run.autopilot_batch import adopt_automation_settings
+
+    pm = ProjectManager(tmp_path)
+    _project(pm, "old", extras={"automation": {"routes": [], "tag": "old"}}, created="2026-01-01T00:00:00")
+    _project(pm, "new", extras={"automation": {"routes": [], "tag": "new"}}, created="2026-01-02T00:00:00")
+    _project(pm, "fresh", extras={"project_kind": "story"}, created="2026-01-03T00:00:00")
+    os.utime(pm.get_project_path("old") / "project.json", (1, 1))
+    assert adopt_automation_settings(pm, "fresh") == "new"
+    assert pm.load_project("fresh")["automation"]["tag"] == "new"
+    # A project that has its own settings keeps them.
+    assert adopt_automation_settings(pm, "fresh") is None
+
+    lonely = ProjectManager(tmp_path / "other")
+    _project(lonely, "alone", extras={}, created="2026-01-01T00:00:00")
+    with pytest.raises(BatchRefused, match="AUTOPILOT_NO_SETTINGS_TEMPLATE"):
+        adopt_automation_settings(lonely, "alone")
