@@ -3052,5 +3052,10 @@ export default {
   "ap_create_story_hint": "Tự viết cả truyện từ ý tưởng này.",
   "ap_create_film_hint": "Tự làm phim theo truyện khi truyện có phần mới.",
   "ap_create_failed": "Đã tạo dự án nhưng chưa bật được tự động: ",
+  "ap_batch_open": "Làm phim cho truyện đã xong",
+  "ap_batch_template": "Lấy cấu hình từ",
+  "ap_batch_run": "Tạo phim",
+  "ap_batch_done": "Đã tạo {{created}} phim chạy tự động, bỏ qua {{skipped}} truyện",
+  "ap_batch_failed": "Không tạo được phim: ",
 
 } satisfies Record<keyof typeof enDashboard, string>;

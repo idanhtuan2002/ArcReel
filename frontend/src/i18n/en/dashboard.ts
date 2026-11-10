@@ -3054,5 +3054,10 @@ export default {
   "ap_create_story_hint": "Writes the whole book from this idea.",
   "ap_create_film_hint": "Films the story as its parts are written.",
   "ap_create_failed": "Project created, but autopilot is not on: ",
+  "ap_batch_open": "Films for finished stories",
+  "ap_batch_template": "Copy settings from",
+  "ap_batch_run": "Make films",
+  "ap_batch_done": "{{created}} film(s) created on autopilot, {{skipped}} story(ies) skipped",
+  "ap_batch_failed": "Could not make films: ",
 
 };

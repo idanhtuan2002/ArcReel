@@ -3053,5 +3053,10 @@ export default {
   "ap_create_story_hint": "根据这个构想写完整本书。",
   "ap_create_film_hint": "故事写出新部分时自动制作影片。",
   "ap_create_failed": "项目已创建，但未能开启自动运行：",
+  "ap_batch_open": "为已完成的故事制作影片",
+  "ap_batch_template": "沿用设置自",
+  "ap_batch_run": "制作影片",
+  "ap_batch_done": "已创建 {{created}} 部自动运行的影片，跳过 {{skipped}} 个故事",
+  "ap_batch_failed": "无法制作影片：",
 
 } satisfies Record<keyof typeof enDashboard, string>;

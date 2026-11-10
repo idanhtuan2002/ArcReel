@@ -24,6 +24,7 @@ from r2.contracts.automation import AutomationMode, Checkpoint, ReviewCommand, R
 from r2.contracts.autopilot import FilmAutopilot, StoryAutopilot
 from server.auth import CurrentUser, InteractiveUser, oauth2_scheme_optional
 from server.production_run.autopilot import AutopilotScheduler
+from server.production_run.autopilot_batch import BatchRefused, films_for_finished_stories
 from server.production_run.qualification_jobs import QualificationJobs, QualificationRefused
 from server.production_run.report import pending_final, run_progress, run_report, verified_final
 from server.production_run.service import (
@@ -454,6 +455,9 @@ async def _autopilot_view(scheduler: AutopilotScheduler | None, user_id: str, pr
     if delegation is not None and scheduler is not None:
         state, _command = await scheduler.planner.state(delegation)
         status = {"state": state.state, "run_id": state.run_id, "reason": state.reason}
+        refused = scheduler.refusal(user_id, project_name)
+        if state.state == "ready" and refused is not None:
+            status = {"state": "halted", "run_id": None, "reason": refused}
     elif delegation is not None and delegation.state == "ENABLED":
         status = {"state": "waiting", "run_id": None, "reason": "RELEASE_GATE_PENDING"}
     return {
@@ -504,3 +508,53 @@ async def put_autopilot(
     if scheduler is not None:
         scheduler.wake()
     return await _autopilot_view(scheduler, user.id, project_name)
+
+
+class FilmsBatchBody(_Body):
+    #: The film project whose production settings each new film copies.
+    template_project: str = Field(min_length=1, max_length=255)
+    limit: int = Field(default=50, ge=1, le=500)
+
+
+@router.post("/autopilot/films-for-finished-stories")
+async def films_for_finished_stories_route(
+    body: FilmsBatchBody, user: InteractiveUser, token: Token, service: Service, scheduler: Autopilot
+) -> dict[str, Any]:
+    """ADR-0124 §6: one film per finished story that no film adapts yet, in creation order, each on autopilot."""
+    active = _require(service)
+    if scheduler is None:
+        raise HTTPException(status_code=503, detail={"code": "AUTOPILOT_NOT_ACTIVATED", "reasons": []})
+    planner = scheduler.planner
+
+    async def book_parts(story: str) -> tuple[int, int] | None:
+        parts = await planner.book_parts(user.id, story)
+        return None if parts is None else (parts.done, parts.total)
+
+    async def sync_story(film: str) -> list[str]:
+        return await planner.sync_story(user.id, film)
+
+    async def enable(film: str, story: str) -> None:
+        await active.set_autopilot(
+            interactive_token=token,
+            user_id=user.id,
+            project_name=film,
+            command_id=f"{body.command_id}:{story}",
+            enabled=True,
+            kind="film",
+            mode=AutomationMode.AUTO,
+            film=FilmAutopilot(),
+        )
+
+    try:
+        result = await films_for_finished_stories(
+            get_project_manager(),
+            template_project=body.template_project,
+            limit=body.limit,
+            book_parts=book_parts,
+            sync_story=sync_story,
+            enable_autopilot=enable,
+        )
+    except BatchRefused as refused:
+        raise HTTPException(status_code=422, detail={"code": refused.code, "reasons": []}) from None
+    scheduler.wake()
+    return {"created": result.created, "skipped": result.skipped}

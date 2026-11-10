@@ -49,3 +49,16 @@ export function setAutopilot(projectName: string, change: AutopilotChange): Prom
     body: JSON.stringify({ command_id: `autopilot-${crypto.randomUUID()}`, ...change }),
   });
 }
+
+export interface FilmsBatchResult {
+  created: { story: string; film: string }[];
+  skipped: { story: string; film?: string; reason: string }[];
+}
+
+/** ADR-0124 §6: one film per finished story that no film adapts yet, each on autopilot. */
+export function filmsForFinishedStories(templateProject: string): Promise<FilmsBatchResult> {
+  return API.request<FilmsBatchResult>("/autopilot/films-for-finished-stories", {
+    method: "POST",
+    body: JSON.stringify({ command_id: `films-batch-${crypto.randomUUID()}`, template_project: templateProject }),
+  });
+}

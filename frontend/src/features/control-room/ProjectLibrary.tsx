@@ -4,6 +4,7 @@ import { Link, useLocation } from "wouter";
 import { BookOpen, ChevronLeft, ChevronRight, Clapperboard, Trash2 } from "lucide-react";
 
 import { API } from "@/api";
+import { FilmsForStories } from "@/features/autopilot/FilmsForStories";
 import { asProjectStatus, usePhaseLabels } from "@/components/pages/ProjectCard";
 import { PHASE_ORDER, type Phase, type ProjectIndexPage, type ProjectIndexQuery, type ProjectSummary } from "@/types/project";
 
@@ -90,6 +91,7 @@ export function ProjectLibrary({
   const [page, setPage] = useState<ProjectIndexPage | null>(null);
   const [failed, setFailed] = useState(false);
   const [query, setQuery] = useState(search);
+  const [ownReload, setOwnReload] = useState(0);
 
   // Typing settles for a moment before the server is asked; a new query starts at the first page.
   useEffect(() => {
@@ -116,7 +118,7 @@ export function ProjectLibrary({
         if (!controller.signal.aborted) setFailed(true);
       });
     return () => controller.abort();
-  }, [query, kind, stage, sort, offset, reload]);
+  }, [query, kind, stage, sort, offset, reload, ownReload]);
 
   const choose = <T,>(set: (value: T) => void) => (value: T) => {
     set(value);
@@ -178,6 +180,7 @@ export function ProjectLibrary({
             <option value="stage">{t("cr_sort_stage")}</option>
           </select>
         </label>
+        {kind === "film" ? <FilmsForStories onDone={() => setOwnReload((value) => value + 1)} /> : null}
         <span className="ml-auto text-[12px] tabular-nums text-text-3">
           {t("cr_range", { first, last, total })}
         </span>

@@ -19,7 +19,7 @@ from typing import Any, Literal, Protocol
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from lib.db.repositories.autopilot import AutopilotRepository
-from lib.db.repositories.production_runs import ProductionRunConflict, ProductionRunRepository
+from lib.db.repositories.production_runs import ProductionRunRepository
 from lib.project_kinds import linked_story
 from r2.contracts.automation import RunCommand, RunSnapshot, RunStatus
 from r2.contracts.autopilot import AutopilotDelegation, autopilot_command_id
@@ -85,6 +85,12 @@ class AutopilotPlanner:
         self._unplanned_source = unplanned_source
         self._sync_story = sync_story
         self._max_targets = max_targets
+
+    async def book_parts(self, user_id: str, project_name: str) -> BookParts | None:
+        return await self._book_parts(user_id, project_name)
+
+    async def sync_story(self, user_id: str, project_name: str) -> list[str]:
+        return await self._sync_story(user_id, project_name)
 
     async def _runs(self, delegation: AutopilotDelegation) -> tuple[bool, list[RunSnapshot], list[RunSnapshot]]:
         async with self._sessions() as session:
@@ -199,6 +205,12 @@ class AutopilotHalted(Exception):
     """The project's autopilot cannot continue until the Showrunner acts."""
 
 
+def _refusal_text(error: Exception) -> str:
+    code = getattr(error, "code", None) or str(error) or type(error).__name__
+    reasons = getattr(error, "reasons", ())
+    return f"{code}: {', '.join(reasons)}" if reasons else str(code)
+
+
 class AutopilotScheduler:
     def __init__(
         self,
@@ -217,10 +229,15 @@ class AutopilotScheduler:
         self._stop_event = asyncio.Event()
         self._wake_event = asyncio.Event()
         self._task: asyncio.Task[None] | None = None
+        #: Why each project's last start was refused (policy or input moved, preflight blocked), until one starts.
+        self._refusals: dict[tuple[str, str], str] = {}
 
     @property
     def planner(self) -> AutopilotPlanner:
         return self._planner
+
+    def refusal(self, user_id: str, project_name: str) -> str | None:
+        return self._refusals.get((user_id, project_name))
 
     async def step(self, delegation: AutopilotDelegation) -> RunSnapshot | None:
         """Start the project's next run if it is ready; returns the run started (or replayed)."""
@@ -237,13 +254,14 @@ class AutopilotScheduler:
             async with self._sessions() as session:
                 page = await AutopilotRepository(session).enabled(limit=self._page_size, after=after)
             for delegation in page:
+                key = (delegation.user_id, delegation.project_name)
                 try:
                     if await self.step(delegation) is not None:
                         started += 1
-                except (ProductionRunConflict, PermissionError) as error:
-                    logger.info("autopilot of %s waits: %s", delegation.project_name, error)
+                    self._refusals.pop(key, None)
                 except Exception as error:
-                    # A refusal (policy or input moved, preflight blocked) is retried by a later scan.
+                    # Retried by a later scan; the project's autopilot shows why until a start succeeds.
+                    self._refusals[key] = _refusal_text(error)
                     logger.info("autopilot of %s did not start: %r", delegation.project_name, error)
             if len(page) < self._page_size:
                 return started
