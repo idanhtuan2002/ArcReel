@@ -61,9 +61,15 @@ class AutopilotDelegation(AutomationContract):
         return "sha256:" + hashlib.sha256(canonical_json_bytes(body)).hexdigest()
 
 
-def autopilot_command_id(delegation: AutopilotDelegation, ordinal: int) -> str:
-    """The start command of the delegation's ``ordinal``-th run; a replayed scan starts the same run."""
-    return f"autopilot:{delegation.digest().removeprefix('sha256:')[:32]}:{ordinal}"
+def autopilot_command_prefix(delegation: AutopilotDelegation) -> str:
+    """Every start command of the delegation begins with this."""
+    return f"autopilot:{delegation.digest().removeprefix('sha256:')[:32]}:"
+
+
+def autopilot_command_id(delegation: AutopilotDelegation, ordinal: int, *, part: int | None = None) -> str:
+    """The start command of the delegation's ``ordinal``-th run (and, for a story, the book part it writes); a
+    replayed scan starts the same run."""
+    return autopilot_command_prefix(delegation) + str(ordinal) + ("" if part is None else f":p{part}")
 
 
 __all__ = [
@@ -72,4 +78,5 @@ __all__ = [
     "FilmAutopilot",
     "StoryAutopilot",
     "autopilot_command_id",
+    "autopilot_command_prefix",
 ]

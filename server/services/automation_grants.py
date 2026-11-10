@@ -27,7 +27,7 @@ from r2.contracts.automation import (
     RunSnapshot,
     RunStatus,
 )
-from r2.contracts.autopilot import AutopilotDelegation, FilmAutopilot, StoryAutopilot, autopilot_command_id
+from r2.contracts.autopilot import AutopilotDelegation, FilmAutopilot, StoryAutopilot, autopilot_command_prefix
 from r2.governance.grant_signature import VerifiedGrantEventV1
 from r2.governance.grant_transition import GrantScopeV1
 from server.auth import get_current_interactive_user
@@ -350,7 +350,7 @@ class AutomationGrantCustodian:
             (request.user_id, request.project_name, request.issuer_id)
             != (delegation.user_id, delegation.project_name, delegation.issuer_id)
             or request.policy_digest != delegation.policy_digest
-            or not request.command_id.startswith(autopilot_command_id(delegation, 0).removesuffix("0"))
+            or not request.command_id.startswith(autopilot_command_prefix(delegation))
             or row.start_command_id != request.command_id
         ):
             raise PermissionError("AUTOMATION_DELEGATION_SCOPE_MISMATCH")
@@ -390,10 +390,12 @@ class AutomationGrantCustodian:
         )
         repository = AutopilotRepository(session)
         previous = await repository.current(user_id, project_name, lock=True)
-        if previous is not None and previous.command_id == command_id:
-            if previous.state != ("ENABLED" if enabled else "DISABLED") or previous.issuer_id != actor.sub:
+        recorded = await repository.by_command(user_id, project_name, command_id)
+        if recorded is not None:
+            # A command replays the version it recorded; a retried old command never changes the current state.
+            if recorded.state != ("ENABLED" if enabled else "DISABLED") or recorded.issuer_id != actor.sub:
                 raise PermissionError("AUTOMATION_DELEGATION_REPLAY_CONFLICT")
-            return previous
+            return recorded
         if parent is None:
             if previous is None or previous.state == "DISABLED":
                 return previous

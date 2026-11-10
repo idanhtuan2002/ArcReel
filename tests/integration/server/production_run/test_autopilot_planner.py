@@ -134,7 +134,7 @@ async def test_story_part_one_then_continuations_then_finished(session_factory):
     from server.production_run.autopilot import BookParts
 
     delegation = _delegation()
-    service = _Service()
+    service = _Service(story=False)
     state, command = await _planner(session_factory, service).state(delegation)
     assert state.state == "ready"
     assert command is not None
@@ -144,19 +144,69 @@ async def test_story_part_one_then_continuations_then_finished(session_factory):
         12,
         "HANDOFF",
     )
-    assert command.command_id == autopilot_command_id(delegation, 1)
+    assert command.command_id == autopilot_command_id(delegation, 1, part=1)
 
-    await _run(session_factory, autopilot_command_id(delegation, 1), status="SUCCEEDED")
+    await _run(session_factory, command.command_id, status="SUCCEEDED")
     state, command = await _planner(session_factory, service, parts=BookParts(done=1, total=3)).state(delegation)
     assert command is not None
     assert (command.story_source, command.end_stage, command.book_chapters) == ("continue", "HANDOFF", None)
-    assert command.command_id == autopilot_command_id(delegation, 2)
+    assert command.command_id == autopilot_command_id(delegation, 2, part=2)
 
     state, command = await _planner(session_factory, service, parts=BookParts(done=3, total=3)).state(delegation)
     assert (state.state, command) == ("finished", None)
-    # A succeeded part that left no book is not written again.
-    state, command = await _planner(session_factory, service, parts=None).state(delegation)
-    assert (state.state, command) == ("finished", None)
+
+
+@pytest.mark.parametrize("parts", [None, (0, 3)])
+async def test_a_succeeded_part_missing_from_the_book_halts_instead_of_rewriting(session_factory, parts):
+    from r2.contracts.autopilot import autopilot_command_id
+    from server.production_run.autopilot import BookParts
+
+    delegation = _delegation()
+    await _run(session_factory, autopilot_command_id(delegation, 1, part=1), status="SUCCEEDED")
+    book = None if parts is None else BookParts(done=parts[0], total=parts[1])
+    state, command = await _planner(session_factory, _Service(story=False), parts=book).state(delegation)
+    assert (state.state, state.reason, command) == ("halted", "PART_NOT_RECORDED", None)
+
+
+async def test_a_story_that_is_not_a_book_is_not_overwritten(session_factory):
+    state, command = await _planner(session_factory, _Service(story=True)).state(_delegation())
+    assert (state.state, state.reason, command) == ("halted", "STORY_WITHOUT_BOOK", None)
+
+
+async def test_an_unfinished_story_run_makes_the_story_autopilot_wait(session_factory):
+    from server.production_run.autopilot import AutopilotPlanner
+
+    async def busy(user_id, project_name):
+        return True
+
+    planner = _planner(session_factory, _Service(story=False))
+    planner = AutopilotPlanner(
+        session_factory,
+        _Service(story=False),
+        load_project=lambda name: {},
+        book_parts=planner.book_parts,
+        unplanned_source=lambda name: False,
+        sync_story=planner.sync_story,
+        max_targets=lambda d: None,  # type: ignore[arg-type]
+        story_busy=busy,
+    )
+    state, command = await planner.state(_delegation())
+    assert (state.state, state.reason, command) == ("waiting", "STORY_RUN_UNFINISHED", None)
+
+
+async def test_a_preview_does_not_sync_the_story(session_factory):
+    synced: list[str] = []
+    planner = _planner(session_factory, _Service(), episodes=(1,), unplanned=True)
+
+    async def sync_story(user_id, project_name):
+        synced.append(project_name)
+        return []
+
+    planner._sync_story = sync_story
+    await planner.state(_delegation("film"), preview=True)
+    assert synced == []
+    await planner.state(_delegation("film"))
+    assert synced == ["project"]
 
 
 @pytest.mark.parametrize("status", ["FAILED_QUALITY", "CANCELLED", "BLOCKED_BUDGET"])
@@ -164,7 +214,7 @@ async def test_a_project_halts_on_its_own_unsucceeded_run_and_waits_on_an_active
     from r2.contracts.autopilot import autopilot_command_id
 
     delegation = _delegation()
-    run = await _run(session_factory, autopilot_command_id(delegation, 1), status=status)
+    run = await _run(session_factory, autopilot_command_id(delegation, 1, part=1), status=status)
     state, command = await _planner(session_factory, _Service()).state(delegation)
     expected = "waiting" if status == "BLOCKED_BUDGET" else "halted"
     assert (state.state, state.run_id, command) == (expected, run.run_id, None)
@@ -175,7 +225,7 @@ async def test_another_delegations_failed_run_does_not_halt(session_factory):
 
     await _run(session_factory, autopilot_command_id(_delegation(project="other"), 1), status="FAILED")
     await _run(session_factory, "manual-start", status="CANCELLED")
-    state, _command = await _planner(session_factory, _Service()).state(_delegation())
+    state, _command = await _planner(session_factory, _Service(story=False)).state(_delegation())
     assert state.state == "ready"
 
 
@@ -218,7 +268,7 @@ async def test_scheduler_starts_ready_projects_only(session_factory):
         await repository.append(enabled, previous=None)
         await repository.append(disabled, previous=None)
         assert await repository.enabled(limit=10) == [enabled]
-    service = _Service()
+    service = _Service(story=False)
     scheduler = AutopilotScheduler(session_factory, service, _planner(session_factory, service), page_size=1)
     assert await scheduler.scan_once() == 1
     assert [command.project_name for command in service.started] == ["project"]

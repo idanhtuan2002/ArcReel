@@ -52,7 +52,10 @@ async def _database_now(session: AsyncSession) -> datetime:
     return datetime.now(UTC)
 
 
-async def _locked_head(session: AsyncSession, scope: GrantScopeV1) -> ShowrunnerGrantHeadModel | None:
+async def _locked_head(
+    session: AsyncSession, scope: GrantScopeV1, *, shared: bool = False
+) -> ShowrunnerGrantHeadModel | None:
+    """``shared`` (readers) still excludes an import of the head, but not other readers of a workspace chain."""
     return (
         await session.execute(
             select(ShowrunnerGrantHeadModel)
@@ -61,7 +64,7 @@ async def _locked_head(session: AsyncSession, scope: GrantScopeV1) -> Showrunner
                 ShowrunnerGrantHeadModel.project_name == scope.project_name,
                 ShowrunnerGrantHeadModel.principal == scope.principal,
             )
-            .with_for_update()
+            .with_for_update(read=shared)
             .execution_options(populate_existing=True)
         )
     ).scalar_one_or_none()
@@ -107,7 +110,7 @@ class _GrantLedger:
         return event
 
     async def _current_locked(
-        self, session: AsyncSession, head: ShowrunnerGrantHeadModel, scope: GrantScopeV1
+        self, session: AsyncSession, head: ShowrunnerGrantHeadModel, scope: GrantScopeV1, *, shared: bool = False
     ) -> tuple[ShowrunnerGrantEventModel, VerifiedGrantEventV1] | None:
         if head.current_sequence is None and head.current_event_digest is None:
             return None
@@ -123,7 +126,7 @@ class _GrantLedger:
                         ShowrunnerGrantEventModel.principal == scope.principal,
                     )
                     .order_by(ShowrunnerGrantEventModel.sequence)
-                    .with_for_update()
+                    .with_for_update(read=shared)
                     .execution_options(populate_existing=True)
                 )
             )
@@ -245,6 +248,12 @@ class ConsultedGrantHead:
     head_event_digest: str | None
 
 
+def _lock_order(scope: tuple[str, str, str]) -> tuple[str, bool, str, str]:
+    """Per user, project heads before the workspace head: the order a reader locks them in."""
+    user_id, project_name, principal = scope
+    return user_id, project_name == WORKSPACE_SCOPE, project_name, principal
+
+
 def _workspace_scope(scope: GrantScopeV1) -> GrantScopeV1:
     return GrantScopeV1(scope.user_id, WORKSPACE_SCOPE, scope.principal)
 
@@ -262,8 +271,8 @@ class CurrentShowrunnerGrantReader(_GrantLedger):
     async def _chain_locked(
         self, session: AsyncSession, scope: GrantScopeV1
     ) -> tuple[ShowrunnerGrantHeadModel | None, VerifiedGrantEventV1 | None, ConsultedGrantHead]:
-        head = await _locked_head(session, scope)
-        current = None if head is None else await self._current_locked(session, head, scope)
+        head = await _locked_head(session, scope, shared=True)
+        current = None if head is None else await self._current_locked(session, head, scope, shared=True)
         consulted = ConsultedGrantHead(
             scope=scope,
             head_sequence=None if current is None else current[1].body.sequence,
@@ -335,7 +344,7 @@ class CurrentShowrunnerGrantReader(_GrantLedger):
                             ShowrunnerGrantEventModel.principal == scope.principal,
                         )
                         .order_by(ShowrunnerGrantEventModel.sequence)
-                        .with_for_update()
+                        .with_for_update(read=True)
                         .execution_options(populate_existing=True)
                     )
                 )
@@ -440,10 +449,8 @@ class GovernanceGrantHeadExporter(_GrantLedger):
                 .tuples()
                 .all()
             )
-            # The checkpoint orders scopes by code point; the database collation may not.
-            scopes = sorted(scopes)
             records: list[GrantHeadRecordV1] = []
-            for user_id, project_name, principal in scopes:
+            for user_id, project_name, principal in sorted(scopes, key=_lock_order):
                 scope = GrantScopeV1(user_id, project_name, principal)
                 head = await _locked_head(session, scope)
                 if head is None:
@@ -463,7 +470,8 @@ class GovernanceGrantHeadExporter(_GrantLedger):
                         head_event_digest=current[1].event_digest,
                     )
                 )
-            return tuple(records)
+            # The checkpoint orders scopes by code point; the database collation may not.
+            return tuple(sorted(records, key=lambda r: (r.user_id, r.project_name, r.principal)))
 
 
 class GovernanceGrantRecoveryScanner(_GrantLedger):
@@ -517,12 +525,11 @@ class GovernanceGrantRecoveryScanner(_GrantLedger):
                 .tuples()
                 .all()
             )
-            scopes = sorted(scopes)
-            if len(scopes) != len(checkpoint.body.heads):
+            expected_heads = {(h.user_id, h.project_name, h.principal): h for h in checkpoint.body.heads}
+            if len(scopes) != len(expected_heads) or set(map(tuple, scopes)) != set(expected_heads):
                 raise GrantRecoveryUnavailable("checkpoint scope set differs from grant ledger")
-            for (user_id, project_name, principal), expected in zip(scopes, checkpoint.body.heads, strict=True):
-                if (user_id, project_name, principal) != (expected.user_id, expected.project_name, expected.principal):
-                    raise GrantRecoveryUnavailable("checkpoint scope set differs from grant ledger")
+            for user_id, project_name, principal in sorted(scopes, key=_lock_order):
+                expected = expected_heads[(user_id, project_name, principal)]
                 scope = GrantScopeV1(user_id, project_name, principal)
                 head = await _locked_head(session, scope)
                 if head is None:

@@ -14,3 +14,5 @@ Decided 2026-11-10 with the sponsor (one ceremony for every current and future p
 6. **Deployment order.** The image that reads v2 ships (app and attestor) and is approved before the first v2 event is imported. After that, an image that cannot read v2 refuses governance for every project; the rollback runbook says so.
 
 Risk accepted by the sponsor: one signed workspace event authorizes every project, so a mis-signed event or a leaked grant key is workspace-wide; expiries stay short and the ceremony is rehearsed with throwaway keys before production.
+
+Projects carry no owner of their own: "every project of the user" is every project in the deployment's projects root, which is the whole workspace in this single-operator deployment; a deployment with several accounts would need projects bound to users first. Readers lock heads in shared mode (an import still waits for them), project before workspace; the exporter and recovery scanner lock in the same order and sort by code point only what they compare and sign.

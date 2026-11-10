@@ -126,6 +126,8 @@ async def test_enable_replay_disable_are_appended_versions(autopilot_host):
     disabled = await _set(issuer, sessions, command_id="disable-1", enabled=False)
     assert (disabled.version, disabled.state, disabled.story) == (2, "DISABLED", enabled.story)
     assert await _set(issuer, sessions, command_id="disable-2", enabled=False) == disabled
+    # A retried old enable replays its own version and never turns autopilot back on.
+    assert await _set(issuer, sessions, command_id="enable-1", enabled=True) == enabled
     async with sessions() as session:
         assert await AutopilotRepository(session).current("default", "project") == disabled
     for token in ("not-a-jwt", auth.create_token("other")):

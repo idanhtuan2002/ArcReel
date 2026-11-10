@@ -453,7 +453,7 @@ async def _autopilot_view(scheduler: AutopilotScheduler | None, user_id: str, pr
         delegation = await AutopilotRepository(session).current(user_id, project_name)
     status: dict[str, Any] = {"state": "off", "run_id": None, "reason": None}
     if delegation is not None and scheduler is not None:
-        state, _command = await scheduler.planner.state(delegation)
+        state, _command = await scheduler.planner.state(delegation, preview=True)
         status = {"state": state.state, "run_id": state.run_id, "reason": state.reason}
         refused = scheduler.refusal(user_id, project_name)
         if state.state == "ready" and refused is not None:

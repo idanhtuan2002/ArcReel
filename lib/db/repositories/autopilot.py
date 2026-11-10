@@ -44,6 +44,18 @@ class AutopilotRepository:
         row = (await self.session.execute(query)).scalar_one_or_none()
         return None if row is None else _parse(row)
 
+    async def by_command(self, user_id: str, project_name: str, command_id: str) -> AutopilotDelegation | None:
+        """The version a command recorded, whichever version is current now."""
+        rows = (
+            await self.session.execute(
+                select(AutopilotDelegationModel).where(
+                    AutopilotDelegationModel.user_id == user_id,
+                    AutopilotDelegationModel.project_name == project_name,
+                )
+            )
+        ).scalars()
+        return next((d for d in map(_parse, rows) if d.command_id == command_id), None)
+
     async def append(self, delegation: AutopilotDelegation, *, previous: AutopilotDelegation | None) -> None:
         """Record the next version; a concurrent append of the same version fails on the primary key."""
         if delegation.version != (1 if previous is None else previous.version + 1) or (

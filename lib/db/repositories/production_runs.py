@@ -253,8 +253,10 @@ class ProductionRunRepository:
         ).scalars()
         return [_snapshot(row) for row in rows]
 
-    async def started_by(self, *, user_id: str, project_name: str, command_prefix: str) -> list[RunSnapshot]:
-        """The project's runs whose start command begins with ``command_prefix``, oldest first."""
+    async def started_by(
+        self, *, user_id: str, project_name: str, command_prefix: str
+    ) -> list[tuple[str, RunSnapshot]]:
+        """The project's runs whose start command begins with ``command_prefix``, with that command, oldest first."""
         escaped = command_prefix.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
         rows = (
             await self.session.execute(
@@ -267,7 +269,7 @@ class ProductionRunRepository:
                 .order_by(ProductionRunModel.created_at, ProductionRunModel.run_id)
             )
         ).scalars()
-        return [_snapshot(row) for row in rows]
+        return [(row.start_command_id, _snapshot(row)) for row in rows]
 
     async def has_active(self, *, user_id: str, project_name: str) -> bool:
         return (

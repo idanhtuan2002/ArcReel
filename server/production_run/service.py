@@ -13,6 +13,7 @@ from typing import Literal
 
 from fastapi import HTTPException
 from pydantic import BaseModel, ConfigDict
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from lib.db.repositories.automation_grants import AutomationGrantRepository
@@ -38,7 +39,7 @@ from r2.contracts.automation import (
     RunStage,
     RunStatus,
 )
-from r2.contracts.autopilot import AutopilotDelegation, FilmAutopilot, StoryAutopilot, autopilot_command_id
+from r2.contracts.autopilot import AutopilotDelegation, FilmAutopilot, StoryAutopilot, autopilot_command_prefix
 from server.auth import get_current_interactive_user
 from server.production_run.ports import InputWitness, PolicyResolver, PreflightCheck
 from server.services.automation_grants import AutomationGrantCustodian
@@ -67,7 +68,8 @@ def covering_later_stages(granted: frozenset[AutomationOperation]) -> frozenset[
 
 
 #: Checks a story-only run (ADR-0124: it ends at the handoff) does not reach: media routes and their qualification,
-#: the voice, the image judge, the quality profile its film would be judged by, and GPU room.
+#: the voice, the image judge and the quality profile its film would be judged by. Disk and GPU room still apply,
+#: since a local writer uses them.
 _FILM_ONLY_PREFLIGHT = frozenset(
     {
         "MEDIA_ROUTE_NOT_QUALIFIED",
@@ -81,8 +83,6 @@ _FILM_ONLY_PREFLIGHT = frozenset(
         "PROFILE_REQUIRES_HUMAN",
         "PROFILE_MODEL_ASSESSMENT_INCOMPLETE",
         "MISSING_VOICE",
-        "RESOURCE_ENVELOPE_UNKNOWN",
-        "INSUFFICIENT_GPU",
     }
 )
 
@@ -372,6 +372,8 @@ class ProductionRunService:
                 )
         except PermissionError as error:
             raise ProductionRunRefused(str(error), 403) from None
+        except IntegrityError:
+            raise ProductionRunRefused("AUTOPILOT_CHANGED_CONCURRENTLY", 409) from None
         self._on_change()
         return delegation
 
@@ -385,7 +387,7 @@ class ProductionRunService:
             or (command.user_id, command.project_name) != (delegation.user_id, delegation.project_name)
             or command.mode != delegation.mode
             or command.source_project is not None
-            or not command.command_id.startswith(autopilot_command_id(delegation, 0).removesuffix("0"))
+            or not command.command_id.startswith(autopilot_command_prefix(delegation))
         ):
             raise ProductionRunRefused("INVALID_COMMAND", 422)
         self._require_activated()

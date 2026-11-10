@@ -353,7 +353,7 @@ def wire_autopilot(
 ) -> AutopilotScheduler:
     """ADR-0124: the scheduler that starts each enabled project's next run under its autopilot delegation."""
     from lib.workflow_state import WorkflowActionType, WorkflowStateService
-    from server.services.story_sync import sync_linked_story
+    from server.services.story_sync import StorySyncRefused, sync_linked_story
     from server.story_authoring.authority import GrantNarrativeShowrunnerAuthority
 
     stories = StoryAuthoringService(
@@ -372,7 +372,14 @@ def wire_autopilot(
         return action in {WorkflowActionType.PLAN_EPISODES, WorkflowActionType.RESET_EPISODE_PLANNING}
 
     async def sync_story(user_id: str, project_name: str) -> list[str]:
-        return (await sync_linked_story(projects, project_name, user_id=user_id)).conflicts
+        try:
+            return (await sync_linked_story(projects, project_name, user_id=user_id)).conflicts
+        except StorySyncRefused as refused:
+            return [refused.code]
+
+    async def story_busy(user_id: str, project_name: str) -> bool:
+        runs = await stories.list_runs(user_id=user_id, project_name=project_name)
+        return any(run.get("phase") not in _STORY_RUN_ENDED for run in runs)
 
     async def max_targets(delegation: AutopilotDelegation) -> int:
         policy = await service.resolve_policy(
@@ -388,9 +395,13 @@ def wire_autopilot(
         unplanned_source=unplanned_source,
         sync_story=sync_story,
         max_targets=max_targets,
+        story_busy=story_busy,
     )
     return AutopilotScheduler(sessions, service, planner)
 
+
+#: Story-run phases after which a run no longer holds the project's story (ADR-0124 §3).
+_STORY_RUN_ENDED = frozenset({"COMMITTED", "WITHDRAWN", "DISCARDED", "ABORTED_PARTIAL"})
 
 GPU_PROBES_ENV = "ARCREEL_GPU_ADMISSION_PROBES"
 
