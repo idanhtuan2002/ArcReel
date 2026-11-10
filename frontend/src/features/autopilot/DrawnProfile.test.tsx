@@ -15,6 +15,8 @@ describe("story autopilot without an idea", () => {
     expect(storyAutopilot("  ", null, "")).toEqual({});
     expect(storyAutopilot("Chuyến đò cuối.", 12, "")).toEqual({ idea: "Chuyến đò cuối.", book_chapters: 12 });
     expect(storyAutopilot("", 3, "")).toBeNull();
+    expect(storyAutopilot("Chuyến đò cuối.", null, "")).toBeNull();
+    expect(storyAutopilot("", null, "")).toEqual({});
   });
 
   it("shows what the system chose and marks a defaulted value", () => {

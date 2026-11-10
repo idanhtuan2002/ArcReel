@@ -194,6 +194,7 @@ export default {
   'source_preview_EMPTY': "文件为空",
   'auto_idea_placeholder': '用一两句话描述故事',
   'auto_idea_placeholder_optional': '留空则由系统构思',
+  'auto_idea_drawn_note': '留空时由系统自选构想、类型与基调，并按部分写成长篇；篇幅按你设定的章数，或由系统选择。',
   'auto_mode_auto': '全自动',
   'auto_mode_semi': '半自动',
   'auto_mode_semi_hint': '在剧本和成片处停下等你审阅。',

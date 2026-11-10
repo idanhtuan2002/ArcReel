@@ -105,3 +105,27 @@ def test_a_drawn_idea_starts_only_a_new_story_and_stays_out_of_earlier_command_d
         RunCommand.model_validate(
             {**base, "action": "PAUSE", "expected_version": 1, "run_id": "r", "idea_mode": "auto"}
         )
+
+
+def test_a_repeat_is_the_same_title_or_an_overlapping_idea_and_the_safety_rule_names_minors():
+    from server.story_authoring.idea_draw import DRAW_SAFETY, AvoidedIdea, draw_prompt, near_duplicate
+
+    profile = settle_profile(_draft(), seed=profile_seed("cmd-5"))
+    same_title = AvoidedIdea(title="Học sinh thứ  MƯỜI ba", idea="Một chuyện khác hẳn về biển cả và người lái tàu.")
+    same_idea = AvoidedIdea(title="Khác", idea=IDEA)
+    unrelated = AvoidedIdea(title="Chuyến đò cuối", idea="Một lái đò già chở người khách cuối cùng trong đêm lũ.")
+    assert near_duplicate(profile, [unrelated, same_title]) == same_title
+    assert near_duplicate(profile, [same_idea]) == same_idea
+    assert near_duplicate(profile, [unrelated, AvoidedIdea(title="Truyện 10/11", idea="")]) is None
+    assert all("dưới 18 tuổi" in rule for rule in DRAW_SAFETY.values())
+    prompt = draw_prompt(profile.seed, avoid=[unrelated], safety="strict")
+    assert "Chuyến đò cuối: Một lái đò già" in prompt
+    assert DRAW_SAFETY["strict"] in prompt
+
+
+def test_a_stored_profile_outside_its_closed_sets_is_refused():
+    from pydantic import ValidationError
+
+    profile = settle_profile(_draft(), seed=profile_seed("cmd-6"))
+    with pytest.raises(ValidationError):
+        ProjectProfile.model_validate({**profile.model_dump(), "genre_pack": "cyberpunk"})

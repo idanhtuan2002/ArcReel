@@ -11,9 +11,9 @@ from __future__ import annotations
 import hashlib
 import re
 import unicodedata
-from typing import Annotated, Literal
+from typing import Annotated, Literal, Self
 
-from pydantic import BaseModel, ConfigDict, Field, StringConstraints
+from pydantic import BaseModel, ConfigDict, Field, StringConstraints, model_validator
 
 from lib.project_manager import ProjectManager
 from server.story_authoring.genre_packs import PACKS, GenrePack, pack_for
@@ -88,11 +88,33 @@ class ProjectProfile(BaseModel):
     audience: str
     book_chapters: Annotated[int, Field(ge=BOOK_CHAPTERS_MIN, le=BOOK_CHAPTERS_MAX)]
     seed: ProfileSeed
+
+    @model_validator(mode="after")
+    def closed_sets(self) -> Self:
+        if self.genre_pack not in {pack.pack_id for pack in PACKS} or self.tone not in TONES:
+            raise ValueError("genre and tone come from their closed sets")
+        if self.audience not in AUDIENCES:
+            raise ValueError("audience comes from its closed set")
+        return self
+
     #: Fields whose drawn value lay outside its closed set and were taken from the seed or a default.
     defaulted: tuple[str, ...] = ()
 
     def pack(self) -> GenrePack:
         return pack_by_id(self.genre_pack)
+
+
+class DrawRecord(BaseModel):
+    """A run's drawn profile with what drawing it spent; pinned per run so a replay reads it, and settles its spend,
+    without drawing again."""
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    schema_id: Literal["r2.story-profile-draw.v1"] = "r2.story-profile-draw.v1"
+    profile: ProjectProfile
+    model_calls: Annotated[int, Field(ge=0)]
+    cost_minor_units: Annotated[int, Field(ge=0)]
+    runtime_seconds: Annotated[int, Field(ge=0)]
 
 
 class ProfileRefused(Exception):
@@ -192,8 +214,8 @@ def settle_profile(
 PROFILE_SETTING = "story_profile"
 
 
-def profile_bytes(profile: ProjectProfile) -> bytes:
-    return profile.model_dump_json().encode("utf-8")
+def record_bytes(record: DrawRecord) -> bytes:
+    return record.model_dump_json().encode("utf-8")
 
 
 def profile_pin(run_id: str) -> str:
@@ -226,15 +248,16 @@ __all__ = [
     "PROFILE_SCHEMA",
     "PROFILE_SETTING",
     "TONES",
+    "DrawRecord",
     "ProfileDraft",
     "ProfileRefused",
     "ProfileSeed",
     "ProjectProfile",
     "pack_by_id",
-    "profile_bytes",
     "profile_idea",
     "profile_pin",
     "profile_seed",
+    "record_bytes",
     "record_profile",
     "settle_profile",
 ]

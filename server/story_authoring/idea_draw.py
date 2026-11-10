@@ -9,16 +9,19 @@ draw never spends more than :data:`DRAW_ATTEMPTS` generations.
 from __future__ import annotations
 
 import hashlib
+import math
 import re
+import time
 import unicodedata
 from collections.abc import Awaitable, Callable, Sequence
 from dataclasses import dataclass
 from uuid import uuid4
 
 from lib.project_manager import ProjectManager
-from server.story_authoring.audits import SafetyLevel, safety_instruction
+from server.story_authoring.audits import SafetyLevel
 from server.story_authoring.contracts import (
     AttemptKind,
+    CloudPriceBounds,
     OutputMode,
     StoryDecoding,
     StoryFailureCode,
@@ -53,6 +56,16 @@ DUPLICATE_THRESHOLD = 0.5
 #: Recent ideas named to the writer as ones to avoid.
 AVOID_LIMIT = 20
 
+_MINORS = "Tuyệt đối không có nội dung tình dục hay gợi dục liên quan người dưới 18 tuổi."
+#: What the drawn idea may contain at each content safety level (ADR-0121); the story's chapters are audited at
+#: the same level.
+DRAW_SAFETY: dict[SafetyLevel, str] = {
+    "strict": _MINORS + " Truyện cho độc giả từ 12 tuổi: không bạo lực chi tiết, không cảnh rùng rợn, không gợi dục.",
+    "standard": _MINORS + " Không tình dục trần trụi, không bạo lực máu me quá mức, không kích động thù ghét.",
+    "mature": _MINORS + " Truyện cho người lớn; không hướng dẫn tự hại hay chế tạo vũ khí, chất nổ, ma túy.",
+    "off": _MINORS,
+}
+
 DRAW_SYSTEM = (
     "Bạn là biên tập viên phát triển truyện tiếng Việt. Bạn nghĩ ra một ý tưởng truyện mới, cụ thể, có nhân vật, "
     "xung đột và điều đặt cược rõ ràng. Chỉ trả về JSON đúng schema, viết bằng tiếng Việt tự nhiên."
@@ -63,6 +76,17 @@ DRAW_SYSTEM = (
 class DrawnProfile:
     profile: ProjectProfile
     attempts: int
+    #: What the draw spent: every count and generation call, their cost and the wall time.
+    usage: DrawUsage
+
+
+@dataclass(frozen=True)
+class AvoidedIdea:
+    title: str
+    idea: str
+
+    def line(self) -> str:
+        return f"{self.title}: {self.idea}" if self.title and self.idea else self.title or self.idea
 
 
 def _words(text: str) -> frozenset[str]:
@@ -77,16 +101,19 @@ def overlap(a: str, b: str) -> float:
     return len(left & right) / len(left | right)
 
 
-def near_duplicate(profile: ProjectProfile, avoid: Sequence[str]) -> str | None:
-    """The first avoided idea the drawn one repeats (same title, or word overlap at or above the threshold)."""
-    title = " ".join(_words(profile.title))
+def near_duplicate(profile: ProjectProfile, avoid: Sequence[AvoidedIdea]) -> AvoidedIdea | None:
+    """The first avoided idea the drawn one repeats: the same title, or ideas whose word overlap is at or above the
+    threshold."""
+    title = _words(profile.title)
     for other in avoid:
-        if overlap(profile.idea, other) >= DUPLICATE_THRESHOLD or (title and title == " ".join(_words(other))):
+        if title and title == _words(other.title):
+            return other
+        if other.idea and overlap(profile.idea, other.idea) >= DUPLICATE_THRESHOLD:
             return other
     return None
 
 
-def recent_ideas(projects: ProjectManager, *, exclude: str, limit: int = AVOID_LIMIT) -> list[str]:
+def recent_ideas(projects: ProjectManager, *, exclude: str, limit: int = AVOID_LIMIT) -> list[AvoidedIdea]:
     """The ideas of the most recently changed projects, newest first: a drawn profile's title and idea, else the
     project's title."""
     changed: list[tuple[float, str]] = []
@@ -97,7 +124,7 @@ def recent_ideas(projects: ProjectManager, *, exclude: str, limit: int = AVOID_L
             changed.append(((projects.get_project_path(name) / "project.json").stat().st_mtime, name))
         except (OSError, ValueError):
             continue
-    ideas: list[str] = []
+    ideas: list[AvoidedIdea] = []
     for _mtime, name in sorted(changed, reverse=True):
         if len(ideas) >= limit:
             break
@@ -107,16 +134,17 @@ def recent_ideas(projects: ProjectManager, *, exclude: str, limit: int = AVOID_L
             continue
         shown = project.get(PROFILE_SETTING)
         if isinstance(shown, dict) and isinstance(shown.get("idea"), str):
-            ideas.append(f"{shown.get('title') or ''}: {shown['idea']}".strip(": "))
+            title = shown.get("title")
+            ideas.append(AvoidedIdea(title=title.strip() if isinstance(title, str) else "", idea=shown["idea"].strip()))
         elif isinstance(project.get("title"), str) and project["title"].strip():
-            ideas.append(project["title"].strip())
+            ideas.append(AvoidedIdea(title=project["title"].strip(), idea=""))
     return ideas
 
 
 def draw_prompt(
     seed: ProfileSeed,
     *,
-    avoid: Sequence[str],
+    avoid: Sequence[AvoidedIdea],
     safety: SafetyLevel,
     genre_pack: str | None = None,
     book_chapters: int | None = None,
@@ -134,7 +162,7 @@ def draw_prompt(
         if book_chapters is not None
         else f"- chapters: số chương của truyện, từ {BOOK_CHAPTERS_MIN} đến {BOOK_CHAPTERS_MAX}, vừa với ý tưởng."
     )
-    avoided = "\n".join(f"- {text}" for text in avoid[:AVOID_LIMIT]) or "- (chưa có)"
+    avoided = "\n".join(f"- {other.line()}" for other in avoid[:AVOID_LIMIT]) or "- (chưa có)"
     return f"""Nghĩ ra MỘT ý tưởng truyện dài mới, đọc được như một sản phẩm thương mại hoàn chỉnh.
 
 Yêu cầu:
@@ -146,18 +174,29 @@ Yêu cầu:
 - audience: một trong: {"; ".join(AUDIENCES)}.
 {length}
 - Góc khai thác gợi ý: {seed.angle}.
-- Mức nội dung của dự án: {safety_instruction(safety)}
+- Giới hạn nội dung: {DRAW_SAFETY[safety]}
 
 Các ý tưởng đã có, KHÔNG được lặp lại hay na ná (nhân vật, tình huống, cú ngoặt):
 {avoided}"""
 
 
-class _DrawSink:
-    """An in-memory attempt ledger for the draw: it refuses past its generation bound; usage is settled by the
-    production run's own reservation for the BRIEF step."""
+@dataclass(frozen=True)
+class DrawUsage:
+    model_calls: int
+    cost_minor_units: int
+    runtime_seconds: int
 
-    def __init__(self, generations: int) -> None:
+
+class _DrawSink:
+    """An in-memory attempt ledger for the draw: it refuses past its generation bound and counts every call it
+    reserves, with its cost on a priced route (an attempt whose outcome is unknown costs what it reserved)."""
+
+    def __init__(self, generations: int, prices: CloudPriceBounds | None) -> None:
         self._left = generations
+        self._prices = prices
+        self._reserved: dict[str, tuple[int, int]] = {}
+        self.calls = 0
+        self.cost = 0
 
     async def reserve(
         self,
@@ -169,11 +208,22 @@ class _DrawSink:
         reserved_input_tokens: int,
         reserved_output_tokens: int,
     ) -> str:
+        del scope, request_digest
         if kind is AttemptKind.GENERATE:
             if self._left <= 0:
                 raise StoryStepError(StoryFailureCode.BUDGET_EXHAUSTED, "the draw spent its calls", step_id=step_id)
             self._left -= 1
-        return uuid4().hex
+        attempt = uuid4().hex
+        self._reserved[attempt] = (reserved_input_tokens, reserved_output_tokens)
+        self.calls += 1
+        return attempt
+
+    def _charge(self, attempt_id: str, input_tokens: int | None, output_tokens: int | None) -> None:
+        reserved = self._reserved.pop(attempt_id, (0, 0))
+        if self._prices is not None:
+            used_in = reserved[0] if input_tokens is None else input_tokens
+            used_out = reserved[1] if output_tokens is None else output_tokens
+            self.cost += self._prices.minor_units(used_in, used_out)
 
     async def dispatched(self, attempt_id: str) -> None:
         return None
@@ -181,7 +231,8 @@ class _DrawSink:
     async def completed(
         self, attempt_id: str, *, input_tokens: int, output_tokens: int, done_reason: str, duration_ms: int
     ) -> None:
-        return None
+        del done_reason, duration_ms
+        self._charge(attempt_id, input_tokens, output_tokens)
 
     async def failed(
         self,
@@ -194,10 +245,12 @@ class _DrawSink:
         done_reason: str | None = None,
         duration_ms: int | None = None,
     ) -> None:
-        return None
+        del code, detail, done_reason, duration_ms
+        self._charge(attempt_id, input_tokens, output_tokens)
 
     async def unknown(self, attempt_id: str, *, detail: str) -> None:
-        return None
+        del detail
+        self._charge(attempt_id, None, None)
 
 
 def _sampling_seed(key: str) -> int:
@@ -215,14 +268,22 @@ async def draw_profile(
     scope: StoryScope,
     draw_key: str,
     seed: ProfileSeed,
-    avoid: Sequence[str],
+    avoid: Sequence[AvoidedIdea],
     safety: SafetyLevel,
     genre_pack: str | None = None,
     book_chapters: int | None = None,
 ) -> DrawnProfile:
     """Draw and settle a profile; ``IDEA_DUPLICATE`` after a second near-duplicate, ``IDEA_DRAW_FAILED`` when the
     route returns no usable draft."""
-    gateway = await gateway_for(_DrawSink(DRAW_ATTEMPTS))
+    sink = _DrawSink(DRAW_ATTEMPTS, limits.cloud_prices)
+    gateway = await gateway_for(sink)
+    started = time.monotonic()
+
+    def usage() -> DrawUsage:
+        return DrawUsage(
+            model_calls=sink.calls, cost_minor_units=sink.cost, runtime_seconds=math.ceil(time.monotonic() - started)
+        )
+
     avoided = list(avoid)
     for attempt in range(1, DRAW_ATTEMPTS + 1):
         request = StoryStepRequest(
@@ -245,8 +306,8 @@ async def draw_profile(
         profile = settle_profile(draft, seed=seed, genre_pack=genre_pack, book_chapters=book_chapters)
         repeated = near_duplicate(profile, avoided)
         if repeated is None:
-            return DrawnProfile(profile=profile, attempts=attempt)
-        avoided.insert(0, f"{profile.title}: {profile.idea}")
+            return DrawnProfile(profile=profile, attempts=attempt, usage=usage())
+        avoided.insert(0, AvoidedIdea(title=profile.title, idea=profile.idea))
     raise ProfileRefused("IDEA_DUPLICATE")
 
 
@@ -254,7 +315,10 @@ __all__ = [
     "AVOID_LIMIT",
     "DRAW_ATTEMPTS",
     "DRAW_MAX_OUTPUT_TOKENS",
+    "DRAW_SAFETY",
     "DUPLICATE_THRESHOLD",
+    "AvoidedIdea",
+    "DrawUsage",
     "DrawnProfile",
     "draw_profile",
     "draw_prompt",

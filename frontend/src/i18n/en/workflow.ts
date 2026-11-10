@@ -192,6 +192,7 @@ export default {
   'source_preview_EMPTY': "the file is empty",
   'auto_idea_placeholder': 'One or two sentences about the story',
   'auto_idea_placeholder_optional': 'Leave empty to let the system come up with the idea',
+  'auto_idea_drawn_note': 'Left empty, the run picks its own idea, genre and tone and writes a novel in parts; its length is the chapter count you set, or one the system picks.',
   'auto_mode_auto': 'Automatic',
   'auto_mode_semi': 'Semi-automatic',
   'auto_mode_semi_hint': 'Stops for your review of the script and the final film.',

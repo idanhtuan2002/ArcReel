@@ -163,6 +163,8 @@ async def test_a_story_autopilot_without_an_idea_starts_part_one_drawing_its_own
     delegation = plain.model_copy(update={"story": StoryAutopilot()})
     assert "idea" not in delegation.model_dump(mode="json")["story"]
     assert plain.digest() != delegation.digest()
+    with pytest.raises(ValueError, match="needs its book length"):
+        StoryAutopilot(idea="Chuyến đò cuối.")
     _state, command = await _planner(session_factory, _Service(story=False)).state(delegation)
     assert command is not None
     assert (command.idea_mode, command.idea, command.book_chapters, command.end_stage) == (

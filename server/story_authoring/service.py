@@ -66,7 +66,13 @@ from server.story_authoring.driver import (
 from server.story_authoring.executor import RouteUnavailable, default_ollama_client, resolve_route_credential
 from server.story_authoring.generation import AttemptSink, AuthoringTextGateway
 from server.story_authoring.handoff import OnConflict, SourceUpload, send_to_video, upload_in_flight
-from server.story_authoring.idea_draw import DRAW_ATTEMPTS, DRAW_MAX_OUTPUT_TOKENS, DrawnProfile, draw_profile
+from server.story_authoring.idea_draw import (
+    DRAW_ATTEMPTS,
+    DRAW_MAX_OUTPUT_TOKENS,
+    AvoidedIdea,
+    DrawnProfile,
+    draw_profile,
+)
 from server.story_authoring.idea_profile import ProfileSeed
 from server.story_authoring.narrative import StoryIdentity
 from server.story_authoring.pipeline import intent_targets, node_kind
@@ -354,7 +360,7 @@ class StoryAuthoringService:
         scope: StoryScope,
         draw_key: str,
         seed: ProfileSeed,
-        avoid: Sequence[str],
+        avoid: Sequence[AvoidedIdea],
         genre_pack: str | None = None,
         book_chapters: int | None = None,
         client_for: Callable[[str, str | None], OllamaChatClient] | None = None,

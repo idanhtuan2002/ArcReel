@@ -54,7 +54,7 @@ from server.production_run.owner_support import (
 from server.production_run.owner_tasks import actor_scope, sub_command
 from server.production_run.ports import StepPlan
 from server.services.automation_grants import RunAutomationAuthority
-from server.story_authoring.artifacts import StoryBlobStore
+from server.story_authoring.artifacts import BlobStoreError, StoryBlobStore
 from server.story_authoring.book import BookSpec
 from server.story_authoring.commit import CANON_BASE_MOVED, CommitRefused, load_offered_manifest
 from server.story_authoring.contracts import StoryLimits, StoryScope
@@ -62,12 +62,13 @@ from server.story_authoring.driver import StoryBrief
 from server.story_authoring.handoff import STORY_SOURCE_LANGUAGE, HandoffRefused, SourceUpload, send_to_video
 from server.story_authoring.idea_draw import DRAW_ATTEMPTS, recent_ideas
 from server.story_authoring.idea_profile import (
+    DrawRecord,
     ProfileRefused,
     ProjectProfile,
-    profile_bytes,
     profile_idea,
     profile_pin,
     profile_seed,
+    record_bytes,
     record_profile,
 )
 from server.story_authoring.runtime import RunPhase, RunState, RunStateStore
@@ -102,6 +103,13 @@ def story_limits(policy: RunPolicy, drafted: StoryLimits) -> StoryLimits:
 
 def _blobs(projects: ProjectManager, project_name: str) -> StoryBlobStore:
     return StoryBlobStore(projects.get_project_path(project_name))
+
+
+def _read_record(blobs: StoryBlobStore, digest: str) -> DrawRecord:
+    try:
+        return DrawRecord.model_validate_json(blobs.read_exact(digest))
+    except (BlobStoreError, ValueError):
+        raise OwnerBlocked("STORY_PROFILE_UNAVAILABLE") from None
 
 
 def _load_brief(projects: ProjectManager, project_name: str, digest: str) -> StoryBrief:
@@ -164,7 +172,10 @@ class BriefAdapter:
         """The run's drawn profile: the one pinned for the run, else a new draw pinned before the brief is drafted."""
         blobs = _blobs(self._projects, run.project_name)
         key = profile_pin(run.run_id)
-        pinned = blobs.pinned(key)
+        try:
+            pinned = blobs.pinned(key)
+        except BlobStoreError:
+            raise OwnerBlocked("STORY_PROFILE_UNAVAILABLE") from None
         if pinned is None:
             avoid = await asyncio.to_thread(recent_ideas, self._projects, exclude=run.project_name)
             try:
@@ -179,13 +190,23 @@ class BriefAdapter:
                     book_chapters=command.book_chapters,
                     client_for=self._client_for,
                 )
-            except StoryActionRefused as refused:
+            except (StoryActionRefused, ProfileRefused) as refused:
                 raise OwnerBlocked(refused.code) from None
-            except ProfileRefused as refused:
-                raise OwnerBlocked(refused.code) from None
-            pinned = blobs.pin(key, blobs.put(profile_bytes(drawn.profile)))
-        profile = ProjectProfile.model_validate_json(blobs.read_exact(pinned))
-        await asyncio.to_thread(record_profile, self._projects, run.project_name, run.run_id, profile)
+            record = DrawRecord(
+                profile=drawn.profile,
+                model_calls=drawn.usage.model_calls,
+                cost_minor_units=drawn.usage.cost_minor_units,
+                runtime_seconds=drawn.usage.runtime_seconds,
+            )
+            try:
+                pinned = blobs.pin(key, blobs.put(record_bytes(record)))
+            except BlobStoreError:
+                raise OwnerBlocked("STORY_PROFILE_UNAVAILABLE") from None
+        profile = _read_record(blobs, pinned).profile
+        try:
+            await asyncio.to_thread(record_profile, self._projects, run.project_name, run.run_id, profile)
+        except (OSError, ValueError):
+            raise OwnerBlocked("STORY_PROFILE_UNAVAILABLE") from None
         return profile
 
     async def dispatch(self, intent: DispatchIntent) -> OwnerReceipt:
@@ -246,7 +267,22 @@ class BriefAdapter:
         return outcome(intent, "PASS", receipts=(receipt,), owner_state="GREENLIT")
 
     async def usage(self, *, receipt: OwnerReceipt, reservation: BudgetReservation) -> UsageReceipt | None:
-        return usage_receipt(receipt, reservation)
+        """A drawn idea's calls, cost and time are the step's usage; a brief from a given idea spends none."""
+        blobs = _blobs(self._projects, reservation.scope.project_name)
+        try:
+            pinned = blobs.pinned(profile_pin(reservation.scope.run_id))
+            record = None if pinned is None else _read_record(blobs, pinned)
+        except (BlobStoreError, OwnerBlocked):
+            return usage_receipt(receipt, reservation, known=False)
+        if record is None:
+            return usage_receipt(receipt, reservation)
+        return usage_receipt(
+            receipt,
+            reservation,
+            cost_minor_units=record.cost_minor_units,
+            model_calls=record.model_calls,
+            runtime_seconds=record.runtime_seconds,
+        )
 
 
 class StoryAdapter:

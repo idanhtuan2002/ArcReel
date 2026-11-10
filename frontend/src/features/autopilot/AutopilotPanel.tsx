@@ -25,12 +25,13 @@ const TONE: Record<AutopilotStateName, string> = {
 };
 
 /**
- * Story parameters a story project's autopilot writes from; ``null`` while the length is invalid. An empty idea or
- * length is left out: the first part then draws its own (ADR-0125).
+ * Story parameters a story project's autopilot writes from; ``null`` while they are invalid. An empty idea is left
+ * out and the first part draws its own idea and, without a length, its length too (ADR-0125); a given idea needs its
+ * length.
  */
 export function storyAutopilot(idea: string, chapters: number | null, direction: string) {
   const text = idea.trim();
-  if (chapters !== null && (!Number.isInteger(chapters) || chapters < CHAPTERS.min || chapters > CHAPTERS.max)) {
+  if (chapters === null ? Boolean(text) : !Number.isInteger(chapters) || chapters < CHAPTERS.min || chapters > CHAPTERS.max) {
     return null;
   }
   return {
@@ -81,7 +82,8 @@ export function StoryAutopilotFields({
           min={CHAPTERS.min}
           max={CHAPTERS.max}
           value={chapters ?? ""}
-          placeholder={t("ap_chapters_auto")}
+          placeholder={idea.trim() ? undefined : t("ap_chapters_auto")}
+          required={Boolean(idea.trim())}
           onChange={(event) => onChapters(event.target.value === "" ? null : Number(event.target.value))}
           className={field}
         />

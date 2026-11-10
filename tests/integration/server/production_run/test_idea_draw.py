@@ -6,13 +6,15 @@ import json
 
 import httpx
 import pytest
+import sqlalchemy as sa
 
+from lib.db.models.production_run import ProductionUsageModel
 from lib.text_backends.ollama import OllamaChatClient
 from r2.contracts.automation import RunStage, RunStatus
 from server.production_run.story_adapter import _load_brief
 from server.story_authoring.artifacts import StoryBlobStore
 from server.story_authoring.genre_packs import PACKS
-from server.story_authoring.idea_profile import PROFILE_SETTING, ProjectProfile, profile_pin
+from server.story_authoring.idea_profile import PROFILE_SETTING, DrawRecord, ProjectProfile, profile_pin
 from tests.integration.server.production_run.test_story_adapter import (
     Host,
     _tick,
@@ -103,7 +105,10 @@ async def test_a_run_without_an_idea_draws_one_and_briefs_from_it(story_host: Ho
     blobs = StoryBlobStore(host.projects.get_project_path("project"))
     pinned = blobs.pinned(profile_pin(host.run.run_id))
     assert pinned is not None
-    profile = ProjectProfile.model_validate_json(blobs.read_exact(pinned))
+    record = DrawRecord.model_validate_json(blobs.read_exact(pinned))
+    profile = record.profile
+    # One generation and its count call, on a local route that costs nothing.
+    assert (record.model_calls, record.cost_minor_units) == (2, 0)
     assert (profile.title, profile.genre_pack, profile.book_chapters, profile.defaulted) == (
         "Học sinh thứ mười ba",
         "horror",
@@ -118,6 +123,11 @@ async def test_a_run_without_an_idea_draws_one_and_briefs_from_it(story_host: Ho
 
         receipt = await ProductionRunRepository(session).stage_receipt(run=briefed, stage=RunStage.BRIEF)
     assert receipt is not None
+    async with host.sessions() as session:
+        settled = (
+            await session.execute(sa.select(ProductionUsageModel).where(ProductionUsageModel.owner == "story-brief"))
+        ).scalar_one()
+    assert '"model_calls":2' in settled.usage_json
     brief = _load_brief(host.projects, "project", receipt.digest)
     assert brief.genre == next(pack.label for pack in PACKS if pack.pack_id == "horror")
     assert brief.idea.startswith(profile.idea)

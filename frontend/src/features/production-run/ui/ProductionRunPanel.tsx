@@ -361,6 +361,11 @@ export function ProductionRunPanel({ projectName }: Props) {
             />
           </label>
           )}
+          {source === "idea" && !idea.trim() && (
+            <p className="text-[11.5px]" style={{ color: "var(--color-text-3)" }}>
+              {t("auto_idea_drawn_note")}
+            </p>
+          )}
           {source === "idea" && (
           <div className="flex flex-wrap items-center gap-1.5 text-[11.5px]">
             <span style={{ color: "var(--color-text-3)" }}>{t("auto_examples")}</span>

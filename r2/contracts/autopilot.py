@@ -25,6 +25,14 @@ class StoryAutopilot(AutomationContract):
     book_chapters: Annotated[int, Field(ge=6, le=120)] | None = Field(
         default=None, exclude_if=lambda value: value is None
     )
+
+    @model_validator(mode="after")
+    def a_given_idea_has_a_length(self) -> Self:
+        # Only a drawn idea draws its length; a given idea writes a book of the length the Showrunner sets.
+        if self.idea is not None and self.book_chapters is None:
+            raise ValueError("a story autopilot with an idea needs its book length")
+        return self
+
     #: What a continuation is asked to do; a continuation run needs an instruction.
     direction: _Text = "Continue the book from where the previous part ended, following the book plan."
 
