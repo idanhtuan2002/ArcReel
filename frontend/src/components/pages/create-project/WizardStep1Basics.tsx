@@ -58,10 +58,6 @@ export function WizardStep1Basics({
   };
 
   const handleNext = () => {
-    if (!value.title.trim()) {
-      setTitleError(t("dashboard:project_title_required"));
-      return;
-    }
     // 生成模式必选：无预选、未选不放行
     if (!value.generationRoute) return;
     // 口播语速越界不放行（区间与后端同一把尺）；未填合法
@@ -74,7 +70,7 @@ export function WizardStep1Basics({
     <div className="space-y-5">
       {/* Title */}
       <div>
-        <FieldLabel htmlFor={titleId} required>
+        <FieldLabel htmlFor={titleId}>
           {t("dashboard:project_title")}
         </FieldLabel>
         <div className="relative">
@@ -83,8 +79,7 @@ export function WizardStep1Basics({
             type="text"
             value={value.title}
             onChange={handleTitleChange}
-            placeholder={t("dashboard:rebirth_empress_example")}
-            aria-required="true"
+            placeholder={t("dashboard:auto_title_placeholder")}
             aria-invalid={titleError ? "true" : undefined}
             aria-describedby={titleError ? titleErrorId : undefined}
             className="w-full rounded-[8px] border border-hairline bg-bg-grad-a/55 px-3 py-2.5 text-[14px] text-text placeholder:text-text-4 transition-colors focus:border-accent/55 focus:bg-bg-grad-a/85 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
@@ -326,7 +321,7 @@ export function WizardStep1Basics({
         <button
           type="button"
           onClick={handleNext}
-          disabled={!value.title.trim() || !value.generationRoute}
+          disabled={!value.generationRoute}
           className={ACCENT_BTN_CLS}
           style={ACCENT_BUTTON_STYLE}
         >

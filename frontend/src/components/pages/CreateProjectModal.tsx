@@ -142,6 +142,17 @@ function StepIndicator({ current }: { current: 1 | 2 | 3 }) {
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
+
+/** The first words of an idea, as a project name. */
+function titleFromIdea(idea: string): string {
+  const words = idea.trim().split(/\s+/).slice(0, 8).join(" ");
+  return words.length > 60 ? `${words.slice(0, 59)}…` : words;
+}
+
+function nowLabel(): string {
+  return new Date().toLocaleString(undefined, { dateStyle: "short", timeStyle: "short" });
+}
+
 export function CreateProjectModal() {
   const { t, i18n } = useTranslation(["dashboard", "common"]);
   const [, navigate] = useLocation();
@@ -189,6 +200,7 @@ export function CreateProjectModal() {
   const [kind, setKind] = useState<ProjectKind>("film");
   const [storyProject, setStoryProject] = useState("");
   const [storyTitle, setStoryTitle] = useState("");
+  const [storyProjectTitle, setStoryProjectTitle] = useState("");
   // ADR-0124: the new project may start on autopilot (a story from its idea; a film following its story).
   const [autopilot, setAutopilotOn] = useState(false);
   const [autoIdea, setAutoIdea] = useState("");
@@ -321,8 +333,12 @@ export function CreateProjectModal() {
   );
 
   const handleCreateStory = async () => {
-    const title = storyTitle.trim();
-    if (!title || (autopilot && !autoStory)) return;
+    if (autopilot && !autoStory) return;
+    // An empty name is filled in: the first words of the autopilot idea, else "Story" and the time.
+    const title =
+      storyTitle.trim() ||
+      (autopilot && autoStory ? titleFromIdea(autoStory.idea) : "") ||
+      t("dashboard:auto_title_story", { when: nowLabel() });
     setCreating(true);
     try {
       const resp = await API.createProject({
@@ -367,7 +383,11 @@ export function CreateProjectModal() {
 
       const isAd = basics.contentMode === "ad";
       const resp = await API.createProject({
-        title: basics.title.trim(),
+        title:
+          basics.title.trim() ||
+          (storyProject
+            ? t("dashboard:auto_title_film_of", { story: storyProjectTitle || storyProject })
+            : t("dashboard:auto_title_film", { when: nowLabel() })),
         ...(storyProject ? { story_project: storyProject } : {}),
         content_mode: basics.contentMode,
         // source_kind 仅 drama 暴露与生效；其余模式由服务端缺省 novel
@@ -529,7 +549,10 @@ export function CreateProjectModal() {
               kind={kind}
               onKind={setKind}
               storyProject={storyProject}
-              onStoryProject={setStoryProject}
+              onStoryProject={(name, title) => {
+                setStoryProject(name);
+                setStoryProjectTitle(title ?? "");
+              }}
             />
           )}
           {step === 1 && kind === "film" && <div className="mb-5">{autopilotToggle}</div>}
@@ -547,6 +570,7 @@ export function CreateProjectModal() {
                   value={storyTitle}
                   onChange={(event) => setStoryTitle(event.target.value)}
                   maxLength={120}
+                  placeholder={t("dashboard:auto_title_placeholder")}
                   className="mt-1 block w-full rounded-md border border-hairline-strong bg-transparent px-3 py-2 text-[14px] text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
                 />
               </label>
@@ -558,7 +582,7 @@ export function CreateProjectModal() {
                 </button>
                 <button
                   type="submit"
-                  disabled={creating || !storyTitle.trim() || (autopilot && !autoStory)}
+                  disabled={creating || (autopilot && !autoStory)}
                   className="rounded-md bg-accent px-3 py-1.5 text-[13px] font-medium text-[oklch(0.14_0_0)] disabled:opacity-50"
                 >
                   {t("dashboard:new_story_create")}

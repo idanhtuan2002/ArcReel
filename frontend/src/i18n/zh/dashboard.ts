@@ -3058,5 +3058,9 @@ export default {
   "ap_batch_run": "制作影片",
   "ap_batch_done": "已创建 {{created}} 部自动运行的影片，跳过 {{skipped}} 个故事",
   "ap_batch_failed": "无法制作影片：",
+  "auto_title_placeholder": "留空则自动命名",
+  "auto_title_story": "故事 {{when}}",
+  "auto_title_film": "影片 {{when}}",
+  "auto_title_film_of": "{{story}} · 影片",
 
 } satisfies Record<keyof typeof enDashboard, string>;

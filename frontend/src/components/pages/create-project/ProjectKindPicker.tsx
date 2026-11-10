@@ -18,7 +18,7 @@ export function ProjectKindPicker({
   kind: ProjectKind;
   onKind: (kind: ProjectKind) => void;
   storyProject: string;
-  onStoryProject: (name: string) => void;
+  onStoryProject: (name: string, title?: string) => void;
 }) {
   const { t } = useTranslation("dashboard");
   const id = useId();
@@ -81,7 +81,10 @@ export function ProjectKindPicker({
           <select
             id={`${id}-story`}
             value={storyProject}
-            onChange={(event) => onStoryProject(event.target.value)}
+            onChange={(event) => {
+              const chosen = stories.find((story) => story.name === event.target.value);
+              onStoryProject(event.target.value, chosen?.title || undefined);
+            }}
             className="min-w-0 max-w-full rounded-md border border-hairline-strong bg-transparent px-2 py-1 text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
           >
             <option value="">{t("new_project_story_none")}</option>

@@ -3059,5 +3059,9 @@ export default {
   "ap_batch_run": "Make films",
   "ap_batch_done": "{{created}} film(s) created on autopilot, {{skipped}} story(ies) skipped",
   "ap_batch_failed": "Could not make films: ",
+  "auto_title_placeholder": "Leave empty to name it automatically",
+  "auto_title_story": "Story {{when}}",
+  "auto_title_film": "Film {{when}}",
+  "auto_title_film_of": "{{story}} · Film",
 
 };

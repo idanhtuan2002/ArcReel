@@ -3057,5 +3057,9 @@ export default {
   "ap_batch_run": "Tạo phim",
   "ap_batch_done": "Đã tạo {{created}} phim chạy tự động, bỏ qua {{skipped}} truyện",
   "ap_batch_failed": "Không tạo được phim: ",
+  "auto_title_placeholder": "Để trống để tự đặt tên",
+  "auto_title_story": "Truyện {{when}}",
+  "auto_title_film": "Phim {{when}}",
+  "auto_title_film_of": "{{story}} · Phim",
 
 } satisfies Record<keyof typeof enDashboard, string>;

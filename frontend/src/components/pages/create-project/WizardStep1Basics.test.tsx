@@ -18,7 +18,7 @@ const baseValue = {
 const GRID_BAR_NAME = "多宫格分镜";
 
 describe("WizardStep1Basics", () => {
-  it("disables Next button when title is empty", () => {
+  it("leaves Next enabled with an empty title, which is then named automatically", () => {
     render(
       <WizardStep1Basics
         value={baseValue}
@@ -27,7 +27,7 @@ describe("WizardStep1Basics", () => {
         onCancel={() => {}}
       />,
     );
-    expect(screen.getByRole("button", { name: /下一步/ })).toBeDisabled();
+    expect(screen.getByRole("button", { name: /下一步/ })).toBeEnabled();
   });
 
   it("hides the episode target duration for ad projects", () => {
@@ -242,7 +242,7 @@ describe("WizardStep1Basics", () => {
     expect(onCancel).toHaveBeenCalledOnce();
   });
 
-  it("marks title input as aria-required", () => {
+  it("leaves the title optional", () => {
     render(
       <WizardStep1Basics
         value={baseValue}
@@ -251,7 +251,7 @@ describe("WizardStep1Basics", () => {
         onCancel={() => {}}
       />,
     );
-    expect(screen.getByRole("textbox")).toBeRequired();
+    expect(screen.getByRole("textbox")).not.toBeRequired();
   });
 
   it("renders project_id_auto_gen_hint below the title input", () => {
