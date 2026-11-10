@@ -9,7 +9,7 @@ import "./story-authoring.css";
 
 import { useCallback, useEffect, useId, useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
-import { Link } from "wouter";
+import { Link, useLocation, useSearch } from "wouter";
 import type { TFunction } from "i18next";
 
 import { API, ApiRequestError } from "@/api";
@@ -134,14 +134,28 @@ interface StoryAuthoringPageProps {
   projectName: string;
 }
 
+/** Fired when the project's story runs change, so the workspace tree can read the list again (ADR-0122). */
+export const STORY_RUNS_CHANGED = "arcreel:story-runs-changed";
+
+export function announceStoryRunsChanged() {
+  window.dispatchEvent(new Event(STORY_RUNS_CHANGED));
+}
+
 export default function StoryAuthoringPage({ projectName }: StoryAuthoringPageProps) {
   const { t } = useTranslation("dashboard");
+  // The workspace tree lists the stories; the page shows the one the URL names (``?run=``) or the form (``?new=1``).
+  const search = useSearch();
+  const [, navigate] = useLocation();
+  const params = new URLSearchParams(search);
+  const requested = params.get("run");
+  const creating = params.get("new") === "1";
   const [runs, setRuns] = useState<RunSummary[] | null>(null);
-  const [selected, setSelected] = useState<string | null>(null);
-  const [creating, setCreating] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [reloadToken, setReloadToken] = useState(0);
-  const reload = useCallback(() => setReloadToken((token) => token + 1), []);
+  const reload = useCallback(() => {
+    setReloadToken((token) => token + 1);
+    announceStoryRunsChanged();
+  }, []);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -150,9 +164,6 @@ export default function StoryAuthoringPage({ projectName }: StoryAuthoringPagePr
         if (controller.signal.aborted) return;
         setRuns(found);
         setLoadError(null);
-        setSelected((current) =>
-          current && found.some((r) => r.run_id === current) ? current : (found[0]?.run_id ?? null),
-        );
       },
       (failure: unknown) => {
         if (!controller.signal.aborted) setLoadError(failureText(t, failure, t("story_load_failed")));
@@ -161,17 +172,18 @@ export default function StoryAuthoringPage({ projectName }: StoryAuthoringPagePr
     return () => controller.abort();
   }, [projectName, reloadToken, t]);
 
+  const selected =
+    requested && runs?.some((r) => r.run_id === requested) ? requested : (runs?.[0]?.run_id ?? null);
   const showForm = creating || (runs !== null && runs.length === 0);
 
   return (
     <div className="flex h-full min-h-0 flex-col overflow-y-auto bg-bg">
       <header className="sa-header border-b border-hairline py-2.5">
-        <p className="font-mono text-[10px] tracking-[0.18em] text-text-3">PROJECT · STORY</p>
         <h1 className="font-editorial text-xl leading-tight text-text">{t("story_title")}</h1>
         <p className="mt-0.5 max-w-2xl text-xs text-text-2">{t("story_subtitle")}</p>
       </header>
 
-      <div className="sa-layout mx-auto w-full max-w-6xl px-4 py-6">
+      <div className="mx-auto w-full max-w-5xl px-4 py-6">
         {loadError ? (
           <div role="alert" className="rounded-md border border-hairline-strong p-4 text-sm text-text-2">
             {loadError}
@@ -183,60 +195,19 @@ export default function StoryAuthoringPage({ projectName }: StoryAuthoringPagePr
           <p role="status" className="text-sm text-text-3">
             {t("story_loading")}
           </p>
-        ) : (
-          <>
-            <nav aria-labelledby="sa-runs-title" className="sa-runs">
-              <div className="flex items-center justify-between gap-2">
-                <h2 id="sa-runs-title" className="font-mono text-[11px] tracking-[0.14em] text-text-3">
-                  STORIES
-                </h2>
-                <button type="button" className="sa-btn" onClick={() => setCreating(true)} disabled={showForm}>
-                  {t("story_new")}
-                </button>
-              </div>
-              {runs.length === 0 ? (
-                <p className="mt-2 text-xs text-text-3">{t("story_runs_empty")}</p>
-              ) : (
-                <ul className="mt-2 space-y-1">
-                  {runs.map((run) => (
-                    <li key={run.run_id}>
-                      <button
-                        type="button"
-                        className="sa-run-item"
-                        aria-current={!showForm && selected === run.run_id ? "true" : undefined}
-                        onClick={() => {
-                          setCreating(false);
-                          setSelected(run.run_id);
-                        }}
-                      >
-                        <span className="sa-run-idea">{run.idea}</span>
-                        <span className="sa-run-meta">
-                          {t(`story_phase_${run.phase}`)} · {new Date(run.started_at).toLocaleDateString()}
-                        </span>
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </nav>
-            <main className="min-w-0">
-              {showForm ? (
-                <NewStory
-                  key={projectName}
-                  projectName={projectName}
-                  onCancel={runs.length > 0 ? () => setCreating(false) : null}
-                  onStarted={(runId) => {
-                    setCreating(false);
-                    setSelected(runId);
-                    reload();
-                  }}
-                />
-              ) : selected ? (
-                <RunView key={selected} projectName={projectName} runId={selected} onChanged={reload} />
-              ) : null}
-            </main>
-          </>
-        )}
+        ) : showForm ? (
+          <NewStory
+            key={projectName}
+            projectName={projectName}
+            onCancel={runs.length > 0 ? () => navigate("/story") : null}
+            onStarted={(runId) => {
+              reload();
+              navigate(`/story?run=${encodeURIComponent(runId)}`);
+            }}
+          />
+        ) : selected ? (
+          <RunView key={selected} projectName={projectName} runId={selected} onChanged={reload} />
+        ) : null}
       </div>
     </div>
   );

@@ -28,6 +28,7 @@ import { useDemoWorkbench } from "@/onboarding/use-demo-workbench";
 import { isDemoProject } from "@/onboarding/demo-project";
 import { normalizeRoute } from "@/utils/generation-mode";
 import { EpisodeCard } from "./EpisodeCard";
+import { StoryRunTree } from "./StoryRunTree";
 
 interface AssetSidebarProps {
   className?: string;
@@ -241,7 +242,7 @@ export function AssetSidebar({ className }: AssetSidebarProps) {
         {navItems.map((item) => {
           const Icon = item.icon;
           const active = isNavActive(item);
-          return (
+          const button = (
             <button
               key={item.key}
               type="button"
@@ -297,6 +298,15 @@ export function AssetSidebar({ className }: AssetSidebarProps) {
               )}
             </button>
           );
+          if (item.key === "story" && !collapsed && currentProjectName && isNavActive(item)) {
+            return (
+              <div key={item.key}>
+                {button}
+                <StoryRunTree projectName={currentProjectName} />
+              </div>
+            );
+          }
+          return button;
         })}
         {!collapsed && secondaryItems.length > 0 ? (
           <button

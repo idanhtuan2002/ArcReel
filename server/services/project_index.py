@@ -74,8 +74,10 @@ class ProjectIndex:
         for name in names:
             try:
                 sig = signature(Path(manager.get_project_path(name)))
-            except (OSError, ValueError):
-                sig = ()  # a folder that vanished or is not a valid project: cached until it expires
+            except ValueError:
+                continue  # a folder whose name is not a valid project name is not a project (e.g. ``trial_runs``)
+            except OSError:
+                sig = ()  # a folder that vanished: cached until it expires
             with self._lock:
                 cached = self._rows.get(name)
             if cached is not None and cached[0] == sig and now < cached[1]:

@@ -4,18 +4,6 @@
   padding-right: 4rem;
 }
 
-.sa-layout {
-  display: grid;
-  grid-template-columns: minmax(13rem, 17rem) 1fr;
-  gap: 1.5rem;
-  align-items: start;
-}
-@media (max-width: 900px) {
-  .sa-layout {
-    grid-template-columns: 1fr;
-  }
-}
-
 .sa-panel {
   container-type: inline-size;
 }

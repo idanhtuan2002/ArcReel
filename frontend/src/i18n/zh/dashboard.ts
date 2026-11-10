@@ -2831,6 +2831,7 @@ export default {
   'story_new_title': '新故事',
   'story_new_hint': '用几句话描述想法：谁、想要什么、什么在阻碍。',
   'story_field_idea': '想法',
+  'story_tree_label': "故事列表",
   'story_drafts_title': "已写内容",
   'story_drafts_none': "还没有写成的章节，正在先做规划。",
   'story_drafts_chapter': "第 {{chapter}} 章",

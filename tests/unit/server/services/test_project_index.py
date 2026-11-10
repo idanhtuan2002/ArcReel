@@ -89,3 +89,17 @@ def test_runs_fall_into_the_operators_lanes():
     assert _lane_of_run("PAUSED") == "blocked"
     assert _lane_of_run("RUNNING") == "running"
     assert _lane_of_run("SUCCEEDED") is None
+
+
+def test_a_folder_whose_name_is_not_a_valid_project_name_is_not_listed(tmp_path):
+    class _Strict(_Manager):
+        def get_project_path(self, name: str) -> Path:
+            if "_" in name:
+                raise ValueError(f"invalid project name {name!r}")
+            return super().get_project_path(name)
+
+    manager = _Strict(tmp_path, ["a", "trial_runs"])
+
+    rows = ProjectIndex().rows(manager, lambda name: _row(name))
+
+    assert [row["name"] for row in rows] == ["a"]

@@ -2832,6 +2832,7 @@ export default {
   'story_new_title': 'New story',
   'story_new_hint': 'Describe the idea in a few sentences: who, what they want, what stands in the way.',
   'story_field_idea': 'Idea',
+  'story_tree_label': "Stories",
   'story_drafts_title': "Written so far",
   'story_drafts_none': "No chapter has been written yet; planning comes first.",
   'story_drafts_chapter': "Chapter {{chapter}}",

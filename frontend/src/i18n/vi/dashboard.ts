@@ -2830,6 +2830,7 @@ export default {
   'story_new_title': 'Truyện mới',
   'story_new_hint': 'Mô tả ý tưởng trong vài câu: ai, muốn gì, điều gì cản trở.',
   'story_field_idea': 'Ý tưởng',
+  'story_tree_label': "Danh sách truyện",
   'story_drafts_title': "Đã viết đến đâu",
   'story_drafts_none': "Chưa có chương nào được viết; đang lập kế hoạch trước.",
   'story_drafts_chapter': "Chương {{chapter}}",
