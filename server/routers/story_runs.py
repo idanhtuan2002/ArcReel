@@ -301,6 +301,15 @@ async def get_run(project_name: str, run_id: str, user: CurrentUser, service: Se
     return _view(ref.run_id, ref.brief, state, service.offered(project_name, state))
 
 
+@router.get("/projects/{project_name}/story-runs/{run_id}/drafts")
+async def run_drafts(project_name: str, run_id: str, user: CurrentUser, service: Service) -> dict:
+    """The chapters and scenes a run has written so far, readable while it works."""
+    try:
+        return await service.drafts(user_id=user.id, project_name=project_name, run_id=run_id)
+    except REFUSALS as error:
+        raise _refusal(error) from error
+
+
 @router.get("/projects/{project_name}/story-runs/{run_id}/export")
 async def export_run(project_name: str, run_id: str, user: CurrentUser, service: Service) -> Response:
     try:

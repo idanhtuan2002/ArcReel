@@ -194,6 +194,20 @@ export async function listRuns(projectName: string, options: CallOptions = {}): 
   return runs;
 }
 
+export interface StoryDrafts {
+  run_id: string;
+  phase: RunPhase;
+  title: string | null;
+  chapters: { chapter: number; goal: string | null; planned: number; reviewed: boolean; scenes: { scene: number; text: string }[] }[];
+  /** Nodes a model is generating now, e.g. "scene_draft[2,3]". */
+  working: string[];
+}
+
+/** What a run has written so far, readable while it works. */
+export function getDrafts(projectName: string, runId: string, options: CallOptions = {}): Promise<StoryDrafts> {
+  return API.request(`${base(projectName)}/${encodeURIComponent(runId)}/drafts`, { signal: options.signal });
+}
+
 export function getRun(projectName: string, runId: string, options: CallOptions = {}): Promise<StoryRun> {
   return API.request(`${base(projectName)}/${encodeURIComponent(runId)}`, { signal: options.signal });
 }

@@ -151,7 +151,10 @@ beforeEach(() => {
       method,
       body: init?.body ? (JSON.parse(String(init.body)) as Record<string, unknown>) : null,
     });
-    const route = method === "POST" ? Object.keys(routes).find((suffix) => url.endsWith(suffix)) : undefined;
+    // A POST route is keyed by its URL suffix; a GET route by "GET " and its suffix.
+    const route = Object.keys(routes).find((key) =>
+      method === "POST" ? !key.startsWith("GET ") && url.endsWith(key) : key.startsWith("GET ") && url.endsWith(key.slice(4)),
+    );
     if (route) return Promise.resolve(routes[route]());
     if (url.endsWith("/projects/demo") && method === "GET") return Promise.resolve(json({ project: projectDefaults }));
     if (url.endsWith("/system/config") && method === "GET") return Promise.resolve(json({ settings: systemDefaults }));
@@ -459,6 +462,27 @@ describe("other phases", () => {
       { command_id: "cmd-pending", on_conflict: "fail" },
       { command_id: "cmd-pending", on_conflict: "rename" },
     ]);
+  });
+
+  it("lets the reader read the scenes written so far while the run works", async () => {
+    current = run({ phase: "RUNNING", offered: null });
+    routes["GET /drafts"] = () =>
+      json({
+        run_id: "story-1",
+        phase: "RUNNING",
+        title: "Cuốn sổ",
+        chapters: [
+          { chapter: 1, goal: "Minh về làng", planned: 3, reviewed: true, scenes: [{ scene: 1, text: "Minh đẩy cổng." }] },
+          { chapter: 2, goal: "Gặp chủ nợ", planned: 4, reviewed: false, scenes: [] },
+        ],
+        working: ["scene_draft[2,1]"],
+      });
+    render(<StoryAuthoringPage projectName="demo" />);
+
+    expect(await screen.findByText("Writing chapter 2, scene 1…")).toBeInTheDocument();
+    expect(screen.getByText("0/4 scenes · draft, may still change")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /Chapter 1/ }));
+    expect(screen.getByText("Minh đẩy cổng.")).toBeInTheDocument();
   });
 
   it("queues a translation of a story handed to video", async () => {

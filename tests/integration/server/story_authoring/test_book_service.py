@@ -247,3 +247,34 @@ async def test_a_brief_carries_the_projects_content_safety_level(
     assert "content_safety" not in plain.model_dump(mode="json")
     assert mature.content_safety == "mature"
     assert mature.digest() != plain.digest()
+
+
+async def test_the_drafts_of_a_run_are_readable_chapter_by_chapter(
+    concurrent_session_factory: Factory, grants, projects: ProjectManager
+):
+    service = _service(concurrent_session_factory, grants, projects)
+    provider_id = await _provider(concurrent_session_factory)
+    brief = await service.draft_brief(
+        idea="Một người lái đò.", genre="đời thường", provider_id=provider_id, model_id=MODEL
+    )
+    decision = await _greenlight(concurrent_session_factory, brief.digest())
+    ref = await service.start(
+        user_id=USER, project_name=PROJECT, principal=SPONSOR, brief=brief, gate_a_decision_id=decision
+    )
+
+    before = await service.drafts(user_id=USER, project_name=PROJECT, run_id=ref.run_id)
+    assert (before["phase"], before["chapters"], before["working"]) == ("RUNNING", [], [])
+
+    await _execute(concurrent_session_factory, ref, projects, BookModel())
+    after = await service.drafts(user_id=USER, project_name=PROJECT, run_id=ref.run_id)
+
+    assert after["title"] == "Căn nhà cũ"
+    assert [
+        (c["chapter"], c["planned"], c["reviewed"], [s["scene"] for s in c["scenes"]]) for c in after["chapters"]
+    ] == [
+        (1, 3, True, [1, 2, 3]),
+        (2, 3, True, [1, 2, 3]),
+        (3, 3, True, [1, 2, 3]),
+    ]
+    assert all(s["text"] for c in after["chapters"] for s in c["scenes"])
+    assert after["working"] == []

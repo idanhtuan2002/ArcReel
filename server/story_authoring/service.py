@@ -36,12 +36,12 @@ from lib.source_preview import preview_sources
 from r2.host_hardening.paid_routes import PaidRouteUnqualifiedError
 from r2.narrative_lifecycle.errors import NarrativeDecisionAuthorizationError
 from server.story_authoring import book as books
-from server.story_authoring.artifacts import StoryBlobStore
+from server.story_authoring.artifacts import BlobStoreError, StoryBlobStore
 from server.story_authoring.audits import CONTENT_SAFETY_SETTING, SAFETY_LEVELS, SafetyLevel
 from server.story_authoring.authority import GrantNarrativeShowrunnerAuthority
 from server.story_authoring.cloud import CLOUD_ADAPTERS, OPENAI_ENDPOINT, OPENAI_MAX_INPUT_BOUND
 from server.story_authoring.commit import CANON_BASE_MOVED, ManuscriptCommitter, load_offered_manifest
-from server.story_authoring.contracts import OLLAMA_CHAT_ENDPOINT, StoryLimits, StoryModelSelection
+from server.story_authoring.contracts import OLLAMA_CHAT_ENDPOINT, AttemptKind, StoryLimits, StoryModelSelection
 from server.story_authoring.driver import (
     CHAPTERS,
     StoryBrief,
@@ -57,6 +57,7 @@ from server.story_authoring.prompts.prior import prior_calls
 from server.story_authoring.prompts.schemas import StorySeed, StyleBibleOut
 from server.story_authoring.routes import max_prices, resolve_cloud_route, story_routes, validate_cloud_brief
 from server.story_authoring.runtime import (
+    AttemptState,
     HandoffRecord,
     RunPhase,
     RunState,
@@ -456,6 +457,64 @@ class StoryAuthoringService:
     async def get(self, *, user_id: str, project_name: str, run_id: str) -> tuple[StoryRunRef, RunState]:
         ref = await self._require(user_id, project_name, run_id)
         return ref, await RunStateStore(self._factory, task_id=ref.task_id).load()
+
+    async def drafts(self, *, user_id: str, project_name: str, run_id: str) -> dict[str, Any]:
+        """What a run has written so far, readable while it works: each chapter's plan and the scenes drafted, whether
+        the chapter's review has sealed it, and the nodes a model is generating right now. Drafts of an unsealed chapter
+        may still be repaired or rewritten; a scene being generated has no text until its call returns."""
+        ref, state = await self.get(user_id=user_id, project_name=project_name, run_id=run_id)
+        blobs = self._blobs(project_name)
+
+        def head(node_id: str) -> Any:
+            revision = state.revisions[state.nodes[node_id].head_revision_id or ""]
+            return json.loads(blobs.read_exact(revision.digest))
+
+        first = ref.brief.book.first_chapter if ref.brief.book is not None else 1
+        chapters: dict[int, dict[str, Any]] = {}
+
+        def chapter(number: int) -> dict[str, Any]:
+            return chapters.setdefault(
+                number,
+                {"chapter": first + number - 1, "goal": None, "planned": 0, "reviewed": False, "scenes": []},
+            )
+
+        title = None
+        for node_id, node in state.nodes.items():
+            if node.head_revision_id is None or node.head_revision_id not in state.revisions:
+                continue
+            kind = node_kind(node_id)
+            try:
+                if kind == "seed":
+                    title = head(node_id).get("working_title")
+                elif kind == "chapter_plan":
+                    plan = head(node_id)
+                    entry = chapter(int(node_id.split("[", 1)[1].rstrip("]")))
+                    entry["goal"] = plan.get("chapter_goal")
+                    entry["planned"] = len(plan.get("scenes") or [])
+                elif kind == "scene_draft":
+                    c, s = (int(part) for part in node_id.split("[", 1)[1].rstrip("]").split(","))
+                    chapter(c)["scenes"].append({"scene": s, "text": head(node_id).get("prose", "")})
+                elif kind == "chapter_review":
+                    chapter(int(node_id.split("[", 1)[1].rstrip("]")))["reviewed"] = True
+            except (BlobStoreError, ValueError, KeyError):
+                continue  # a head whose blob is missing is shown as not written yet
+        for entry in chapters.values():
+            entry["scenes"].sort(key=lambda item: item["scene"])
+        working = sorted(
+            {
+                attempt.step_id.split("@", 1)[0]
+                for attempt in state.attempts
+                if attempt.kind is AttemptKind.GENERATE
+                and attempt.state in (AttemptState.RESERVED, AttemptState.DISPATCHED)
+            }
+        )
+        return {
+            "run_id": ref.run_id,
+            "phase": state.phase.value,
+            "title": title,
+            "chapters": [chapters[c] for c in sorted(chapters)],
+            "working": working,
+        }
 
     async def list_runs(self, *, user_id: str, project_name: str) -> list[dict[str, Any]]:
         """The user's runs in a project, newest first, with what a picker shows."""

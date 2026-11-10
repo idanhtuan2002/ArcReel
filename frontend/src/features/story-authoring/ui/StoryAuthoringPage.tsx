@@ -39,6 +39,7 @@ import {
   type StoryRun,
 } from "../api/storyClient";
 import { TranslateStory } from "./TranslateStory";
+import { DraftReader } from "./DraftReader";
 import { StorySourcePicker, type StorySource } from "@/features/production-run/ui/StorySourcePicker";
 import {
   BookContinuationNote,
@@ -743,6 +744,9 @@ function RunView({ projectName, runId, onChanged }: { projectName: string; runId
         {WORKING_PHASES.has(run.phase) ? <RunningNote /> : null}
         <UsageLine run={run} />
       </header>
+      {run.offered === null || run.offered === undefined ? (
+        <DraftReader projectName={projectName} runId={run.run_id} live={WORKING_PHASES.has(run.phase)} />
+      ) : null}
       <PhasePanel projectName={projectName} run={run} onChanged={changed} />
     </article>
   );
