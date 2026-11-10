@@ -846,11 +846,26 @@ function PhasePanel({
   );
 }
 
+/** A stop reason can run to many lines (every open hook of a book); it shows a few and folds the rest. */
+const REASON_SHOWN = 280;
+
 function Blocked({ run }: { run: StoryRun }) {
   const { t } = useTranslation("dashboard");
+  const [whole, setWhole] = useState(false);
+  const reason = run.block_reason ?? "";
+  const long = reason.length > REASON_SHOWN;
   return (
     <div>
-      {run.block_reason ? <p className="text-sm text-text">{run.block_reason}</p> : null}
+      {reason ? (
+        <p className="max-w-[80ch] whitespace-pre-line break-words text-sm text-text">
+          {long && !whole ? `${reason.slice(0, REASON_SHOWN)}…` : reason}
+          {long ? (
+            <button type="button" className="sa-link ml-2 text-xs" onClick={() => setWhole((value) => !value)}>
+              {whole ? t("story_reason_less") : t("story_reason_more")}
+            </button>
+          ) : null}
+        </p>
+      ) : null}
       {run.blocked_findings.length > 0 ? (
         <ul className="mt-2 space-y-2" aria-label={t("story_blocked_findings")}>
           {run.blocked_findings.map((finding, index) => (

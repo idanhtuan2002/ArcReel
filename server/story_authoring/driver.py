@@ -838,6 +838,7 @@ class StoryRunDriver:
         assert self._book is not None
         total = self._book.spec.chapters
         start = first
+        settled: list[str] = []
         while start <= last:
             count = min(books.ROWS_PER_CALL, last - start + 1)
             model = books.bound_rows(count, [*books.open_hook_ids(hooks), *books.next_hook_ids(hooks, 2 * count)])
@@ -876,7 +877,9 @@ class StoryRunDriver:
                 added, ledger = books.add_rows(rows, hooks, generated, first=start, total=total)
                 problems = books.plan_problems(added, ledger, total=total)
             if problems:
-                raise Blocked(RunPhase.BLOCKED_QUALITY, f"{node}: " + "; ".join(problems))
+                # What the revisions left is settled in code (ADR-0116 amendment): a plan never stops the run.
+                added, ledger, notes = books.settle_plan(added, ledger, total=total)
+                settled.extend(notes)
             review = OutlineReview.model_validate_json(
                 await self._step(
                     node,
@@ -897,7 +900,11 @@ class StoryRunDriver:
             rows, hooks = added, ledger
             start += count
         return json.dumps(
-            {"rows": [r.model_dump(mode="json") for r in rows], "hooks": [h.model_dump(mode="json") for h in hooks]},
+            {
+                "rows": [r.model_dump(mode="json") for r in rows],
+                "hooks": [h.model_dump(mode="json") for h in hooks],
+                "settled": settled,
+            },
             ensure_ascii=False,
         ).encode("utf-8")
 

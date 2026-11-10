@@ -83,7 +83,7 @@ def book_rows_prompt(
 
 Mỗi mục: core_task (việc cụ thể nhân vật chính làm trong chương), threads_advanced (mạch truyện được đẩy),
 turning_point (bước ngoặt / móc cuối chương khiến người đọc muốn đọc tiếp), role (một trong: {ROLE_GUIDE}),
-plants (0–2 phục bút mới cài trong chương, mỗi mục một câu cụ thể), payoffs (id các phục bút được giải trong
+plants (0–1 phục bút mới cài trong chương, một câu cụ thể; chỉ cài khi truyện cần, đừng cài tràn lan), payoffs (id các phục bút được giải trong
 chương). Phục bút mới được đánh số theo thứ tự xuất hiện, bắt đầu từ h{next_id}; một chương sau có thể giải phục bút
 cài ở chương trước bằng id đó, không bao giờ giải ngay trong chương cài.
 Quy tắc:

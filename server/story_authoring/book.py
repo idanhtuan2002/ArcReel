@@ -129,7 +129,8 @@ class BookRow(_Out):
     threads_advanced: str = Field(min_length=1, max_length=200)
     turning_point: str = Field(min_length=1, max_length=200)
     role: ChapterRole
-    plants: list[str] = Field(max_length=2)
+    #: One new hook per chapter at most: a model asked for two plants faster than it can pay them off.
+    plants: list[str] = Field(max_length=1)
     payoffs: list[str] = Field(max_length=2)
 
 
@@ -249,7 +250,8 @@ def add_rows(
     for offset, row in enumerate(new):
         chapter = first + offset
         plants: list[str] = []
-        for text in row.plants:
+        # The last chapter of the book plants nothing: no later chapter could pay it off.
+        for text in row.plants if chapter < total else []:
             hook_id = f"h{len(ledger) + 1}"
             ledger[hook_id] = Hook(
                 hook_id=hook_id, text=text, planted=chapter, due=min(chapter + HOOK_MAX_DISTANCE, total)
@@ -303,6 +305,48 @@ def plan_problems(rows: Sequence[PlannedRow], hooks: Sequence[Hook], *, total: i
         if planted.get(hook_id, row.chapter) >= row.chapter
     )
     return problems
+
+
+def settle_plan(
+    rows: Sequence[PlannedRow], hooks: Sequence[Hook], *, total: int
+) -> tuple[tuple[PlannedRow, ...], tuple[Hook, ...], list[str]]:
+    """Repair in code what the model's revisions left of :func:`plan_problems`, so a plan never stops a run: the
+    middle of three equal roles changes, the book's last chapter becomes its climax, a payoff before its plant is
+    dropped, and a hook still unpaid at its due chapter is assigned to the latest chapter after its plant that can
+    take it. The chapter plans then ask for those payoffs like any other. Returns the notes of what changed."""
+    out = list(rows)
+    notes: list[str] = []
+    for i in range(2, len(out)):
+        if out[i].role == out[i - 1].role == out[i - 2].role:
+            new = ChapterRole.BREATH if out[i - 1].role != ChapterRole.BREATH else ChapterRole.ADVANCE
+            out[i - 1] = out[i - 1].model_copy(update={"role": new})
+            notes.append(f"chapter {out[i - 1].chapter}: role set to {new.value}")
+    if out and out[-1].chapter == total and out[-1].role not in ENDING_ROLES:
+        out[-1] = out[-1].model_copy(update={"role": ChapterRole.CLIMAX})
+        notes.append(f"chapter {total}: role set to climax")
+    planted = {h.hook_id: h.planted for h in hooks}
+    for i, row in enumerate(out):
+        kept = tuple(h for h in row.payoffs if planted.get(h, row.chapter) < row.chapter)
+        if kept != row.payoffs:
+            out[i] = row.model_copy(update={"payoffs": kept})
+            notes.append(f"chapter {row.chapter}: payoff before its plant dropped")
+    paid: dict[str, int] = {}
+    for row in out:
+        for hook_id in row.payoffs:
+            paid.setdefault(hook_id, row.chapter)
+    last = out[-1].chapter if out else 0
+    for hook in sorted(hooks, key=lambda h: (h.due, h.hook_id)):
+        if hook.hook_id in paid or hook.due > last:
+            continue
+        candidates = [i for i, row in enumerate(out) if hook.planted < row.chapter <= hook.due]
+        if not candidates:
+            continue
+        target = max(candidates, key=lambda i: (len(out[i].payoffs) < 2, out[i].chapter))
+        out[target] = out[target].model_copy(update={"payoffs": (*out[target].payoffs, hook.hook_id)})
+        paid[hook.hook_id] = out[target].chapter
+        notes.append(f"chapter {out[target].chapter}: pays {hook.hook_id}")
+    settled = tuple(h.model_copy(update={"paid": paid.get(h.hook_id)}) for h in hooks)
+    return tuple(out), settled, notes
 
 
 def merged_seed(seed: StorySeed, outline: BookOutline) -> StorySeed:
@@ -510,4 +554,5 @@ __all__ = [
     "open_hook_ids",
     "part_outline",
     "plan_problems",
+    "settle_plan",
 ]

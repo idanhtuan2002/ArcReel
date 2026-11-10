@@ -393,7 +393,9 @@ export function CreateProjectModal() {
     }
   };
 
-  const stepKicker = `Reel ${step.toString().padStart(2, "0")} / 03`;
+  // A story project is made in one step; the film wizard's three steps do not apply to it.
+  const storyOnly = step === 1 && kind === "story";
+  const stepKicker = storyOnly ? "Story" : `Reel ${step.toString().padStart(2, "0")} / 03`;
 
   const modal = (
     <div
@@ -461,7 +463,7 @@ export function CreateProjectModal() {
           >
             {t("dashboard:new_project")}
           </h2>
-          <p className="mt-1.5 text-[12.5px] leading-[1.55] text-text-3">
+          <p className={`mt-1.5 text-[12.5px] leading-[1.55] text-text-3 ${storyOnly ? "hidden" : ""}`}>
             {t("templates:wizard_step_basics")}
             <span aria-hidden className="mx-1.5 text-text-4">/</span>
             {t("templates:wizard_step_models")}
@@ -471,9 +473,11 @@ export function CreateProjectModal() {
         </div>
 
         {/* Step indicator strip */}
-        <div className="shrink-0 border-y border-hairline-soft bg-[oklch(0.16_0.010_265_/_0.55)] px-6">
-          <StepIndicator current={step} />
-        </div>
+        {storyOnly ? null : (
+          <div className="shrink-0 border-y border-hairline-soft bg-[oklch(0.16_0.010_265_/_0.55)] px-6">
+            <StepIndicator current={step} />
+          </div>
+        )}
 
         {/* Current step body */}
         <div className="min-h-0 flex-1 overflow-y-auto px-7 pt-6 pb-7">

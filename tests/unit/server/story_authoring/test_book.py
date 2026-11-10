@@ -311,3 +311,31 @@ def test_the_call_bound_covers_a_last_parts_hook_rewrite_and_a_variants_replan()
     last = run_call_bound(3, book=BookPart(spec=spec, part=3, state_digest=digest))
     assert last - middle >= NODE_CAPS["chapter_digest"]
     assert variant_call_bound() >= 2 * NODE_CAPS["variant_review"] + NODE_CAPS["outline"]
+
+
+def test_what_revisions_leave_is_settled_in_code_and_never_stops_the_plan():
+    from server.story_authoring.book import settle_plan
+
+    rows, hooks = add_rows(
+        (),
+        (),
+        [
+            _row(ChapterRole.SETUP, plants=["lá thư"]),
+            _row(ChapterRole.ADVANCE, payoffs=["h1"]),  # paid in chapter 2: fine
+            _row(ChapterRole.ADVANCE, plants=["chiếc chìa khóa"]),
+            _row(ChapterRole.ADVANCE),
+            _row(ChapterRole.TURN, plants=["người lạ"]),
+            _row(ChapterRole.BREATH, plants=["không cài được ở chương cuối"]),
+        ],
+        first=1,
+        total=6,
+    )
+    assert [h.hook_id for h in hooks] == ["h1", "h2", "h3"]  # the last chapter plants nothing
+    assert plan_problems(rows, hooks, total=6)
+
+    settled_rows, settled_hooks, notes = settle_plan(rows, hooks, total=6)
+
+    assert plan_problems(settled_rows, settled_hooks, total=6) == []
+    assert settled_rows[-1].role is ChapterRole.CLIMAX
+    assert {h.hook_id: h.paid for h in settled_hooks} == {"h1": 2, "h2": 6, "h3": 6}
+    assert notes
