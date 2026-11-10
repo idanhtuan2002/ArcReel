@@ -171,6 +171,8 @@ type SafetyLevel = Literal["strict", "standard", "mature", "off"]
 SAFETY_LEVELS: tuple[SafetyLevel, ...] = ("strict", "standard", "mature", "off")
 #: The project.json key a project sets its level with.
 CONTENT_SAFETY_SETTING = "content_safety"
+#: A project that sets no level is read at the lowest one; sexual content involving minors is blocked at every level.
+DEFAULT_CONTENT_SAFETY: SafetyLevel = "off"
 
 _ALWAYS_CRITICAL = "nội dung tình dục hay gợi dục liên quan người dưới 18 tuổi"
 _HARMFUL = "mô tả cách tự hại hay tự sát; hướng dẫn chế tạo hay sử dụng ma túy, vũ khí, chất nổ"

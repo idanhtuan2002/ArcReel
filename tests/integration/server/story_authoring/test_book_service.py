@@ -243,8 +243,9 @@ async def test_a_brief_carries_the_projects_content_safety_level(
     path.write_text(_json.dumps({**data, "content_safety": "mature"}), encoding="utf-8")
     mature = await service.draft_brief(**draft, project_name=PROJECT)
 
-    assert plain.content_safety == "standard"
-    assert "content_safety" not in plain.model_dump(mode="json")
+    # A project that sets no level is read at the lowest one.
+    assert plain.content_safety == "off"
+    assert plain.model_dump(mode="json")["content_safety"] == "off"
     assert mature.content_safety == "mature"
     assert mature.digest() != plain.digest()
 

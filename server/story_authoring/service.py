@@ -37,7 +37,7 @@ from r2.host_hardening.paid_routes import PaidRouteUnqualifiedError
 from r2.narrative_lifecycle.errors import NarrativeDecisionAuthorizationError
 from server.story_authoring import book as books
 from server.story_authoring.artifacts import BlobStoreError, StoryBlobStore
-from server.story_authoring.audits import CONTENT_SAFETY_SETTING, SAFETY_LEVELS, SafetyLevel
+from server.story_authoring.audits import CONTENT_SAFETY_SETTING, DEFAULT_CONTENT_SAFETY, SAFETY_LEVELS, SafetyLevel
 from server.story_authoring.authority import GrantNarrativeShowrunnerAuthority
 from server.story_authoring.cloud import CLOUD_ADAPTERS, OPENAI_ENDPOINT, OPENAI_MAX_INPUT_BOUND
 from server.story_authoring.commit import CANON_BASE_MOVED, ManuscriptCommitter, load_offered_manifest
@@ -303,7 +303,7 @@ class StoryAuthoringService:
             )
         if part is not None:
             limits = book_limits(limits, part)
-        safety = self.content_safety(project_name) if project_name is not None else "standard"
+        safety = self.content_safety(project_name) if project_name is not None else DEFAULT_CONTENT_SAFETY
         return StoryBrief(
             content_safety=safety,
             idea=idea,
@@ -318,13 +318,14 @@ class StoryAuthoringService:
         )
 
     def content_safety(self, project_name: str) -> SafetyLevel:
-        """The project's content safety level (ADR-0121), ``standard`` when unset or unreadable."""
+        """The project's content safety level (ADR-0121), the lowest (``off``) when unset; ``standard`` when the project
+        cannot be read. Sexual content involving minors stays blocked at every level."""
         try:
             project = json.loads((self._project_dir_for(project_name) / "project.json").read_text(encoding="utf-8"))
         except (OSError, ValueError):
             return "standard"
         level = project.get(CONTENT_SAFETY_SETTING) if isinstance(project, dict) else None
-        return level if level in SAFETY_LEVELS else "standard"
+        return level if level in SAFETY_LEVELS else DEFAULT_CONTENT_SAFETY
 
     def source_preview(self, project_name: str) -> list[dict[str, Any]]:
         """The project's story sources as a run would read them: chapters found, size, warnings (ADR-0118)."""

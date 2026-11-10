@@ -79,7 +79,7 @@ from server.services.project_archive import (
 from server.services.project_cover import resolve_project_cover
 from server.services.project_index import PROJECT_INDEX, page_of
 from server.services.prompt_preview import ScriptItemNotFound, preview_item_prompts
-from server.story_authoring.audits import CONTENT_SAFETY_SETTING
+from server.story_authoring.audits import CONTENT_SAFETY_SETTING, DEFAULT_CONTENT_SAFETY
 
 router = APIRouter()
 
@@ -1070,7 +1070,7 @@ async def update_project(name: str, req: UpdateProjectRequest, _t: Translator):
                     else:
                         project[ADAPTATION_SETTING] = req.episode_adaptation
                 if "content_safety" in req.model_fields_set:
-                    if req.content_safety is None or req.content_safety == "standard":
+                    if req.content_safety is None or req.content_safety == DEFAULT_CONTENT_SAFETY:
                         project.pop(CONTENT_SAFETY_SETTING, None)
                     else:
                         project[CONTENT_SAFETY_SETTING] = req.content_safety

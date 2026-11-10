@@ -171,7 +171,7 @@ export interface ProjectData {
   episode_target_duration?: number | null;  // 单集成片目标时长（秒）软偏好，空值即未设目标；ad 项目不持有
   /** 分集改编（ADR-0114）：screen 先把每集改编为剧本再做脚本规划；未设即 verbatim（逐字）。ad 项目不持有。 */
   episode_adaptation?: "screen" | "verbatim" | null;
-  /** ADR-0121: how strictly stories are read for sensitive content; unset is "standard". */
+  /** ADR-0121: how strictly stories are read for sensitive content; unset is "off" (the lowest; minors stay blocked). */
   content_safety?: "strict" | "standard" | "mature" | "off" | null;
   /** ADR-0122: "story" for a story project; absent for a film project, which may name the story it adapts. */
   project_kind?: ProjectKind | null;

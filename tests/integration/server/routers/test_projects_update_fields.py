@@ -213,17 +213,17 @@ class TestProjectsRouter:
             assert "episode_adaptation" not in fake_pm.project_data["ready"]
 
     def test_update_project_sets_and_clears_content_safety(self, tmp_path, monkeypatch):
-        """PATCH content safety level (ADR-0121): a level is stored; standard or null clears it; others 422."""
+        """PATCH content safety level (ADR-0121): a level is stored; the default (off) or null clears it; others 422."""
         fake_pm = _FakePM(tmp_path)
         client = build_projects_client(monkeypatch, fake_pm)
         with client:
-            resp = client.patch("/api/v1/projects/ready", json={"content_safety": "off"})
+            resp = client.patch("/api/v1/projects/ready", json={"content_safety": "standard"})
             assert resp.status_code == 200
-            assert fake_pm.project_data["ready"]["content_safety"] == "off"
+            assert fake_pm.project_data["ready"]["content_safety"] == "standard"
 
             assert client.patch("/api/v1/projects/ready", json={"content_safety": "none"}).status_code == 422
 
-            resp = client.patch("/api/v1/projects/ready", json={"content_safety": "standard"})
+            resp = client.patch("/api/v1/projects/ready", json={"content_safety": "off"})
             assert resp.status_code == 200
             assert "content_safety" not in fake_pm.project_data["ready"]
 

@@ -13,3 +13,5 @@ Decided 2026-11-09 by the main agent at the sponsor's request for a per-project 
    - `off`: everything is recorded as minor and never stops a run, except the line below.
 2. **Sexual content involving minors is critical at every level, `off` included.** No setting turns this off.
 3. Severity keeps its meaning: critical stops the run (a hard integrity defect, read a second time first), major goes to the Human and is never accepted automatically, minor is recorded. A variant written with the `young-readers` profile is audited at `strict` whatever the project's level.
+
+Amended 2026-11-10 by the sponsor: a project that sets no level is read at the lowest level, `off` (it was `standard`). Sexual content involving minors stays blocked at every level. Projects that never chose a level, or chose `standard` before this change (it was stored as unset), now read as `off`.

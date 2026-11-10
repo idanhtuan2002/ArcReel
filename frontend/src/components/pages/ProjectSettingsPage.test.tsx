@@ -439,7 +439,8 @@ describe("ProjectSettingsPage – style picker", () => {
     await waitFor(() => {
       expect(updateSpy).toHaveBeenCalledWith(
         "demo",
-        expect.objectContaining({ content_safety: "off", episode_adaptation: "screen" }),
+        // The lowest level is the default, so choosing it clears the stored level.
+        expect.objectContaining({ content_safety: null, episode_adaptation: "screen" }),
       );
     });
   });

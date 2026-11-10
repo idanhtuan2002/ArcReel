@@ -171,7 +171,7 @@ export function ProjectSettingsPage() {
   const [speechRate, setSpeechRate] = useState<number | null>(null);
   const [episodeTargetDuration, setEpisodeTargetDuration] = useState<number | null>(null);
   const [episodeAdaptation, setEpisodeAdaptation] = useState(false);
-  const [contentSafety, setContentSafety] = useState<ContentSafety>("standard");
+  const [contentSafety, setContentSafety] = useState<ContentSafety>("off");
   // 源文语言由内容分析写入，此页只读——只用来决定语速的单位名词（字 / 词）
   const [sourceLanguage, setSourceLanguage] = useState<string | null>(null);
   const [videoResolution, setVideoResolution] = useState<string | null>(null);
@@ -213,7 +213,7 @@ export function ProjectSettingsPage() {
     speechRate: null as number | null,
     episodeTargetDuration: null as number | null,
     episodeAdaptation: false,
-    contentSafety: "standard",
+    contentSafety: "off",
     videoResolution: null as string | null,
     imageResolution: null as string | null,
   });
@@ -308,7 +308,7 @@ export function ProjectSettingsPage() {
       const adapt = project.episode_adaptation === "screen";
       const safety: ContentSafety = CONTENT_SAFETY_LEVELS.includes(project.content_safety as ContentSafety)
         ? (project.content_safety as ContentSafety)
-        : "standard";
+        : "off";
       const rawRate = project.speech_rate_units_per_second;
       const sr = typeof rawRate === "number" && Number.isFinite(rawRate) ? rawRate : null;
       const sl = typeof project.source_language === "string" ? project.source_language : null;
@@ -565,7 +565,7 @@ export function ProjectSettingsPage() {
               episode_target_duration: episodeTargetDuration,
               episode_adaptation: episodeAdaptation ? "screen" : null,
             }),
-        content_safety: contentSafety === "standard" ? null : contentSafety,
+        content_safety: contentSafety === "off" ? null : contentSafety,
         model_settings: newModelSettings,
       });
       setModelSettings(newModelSettings);
