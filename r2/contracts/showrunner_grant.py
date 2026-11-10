@@ -1,4 +1,9 @@
-"""Canonical signed-event wire contract for project-scoped Showrunner grants."""
+"""Canonical signed-event wire contract for Showrunner grants.
+
+A v1 event covers one project. A v2 event covers every project of its user: its ``project_name`` is the
+``WORKSPACE_SCOPE`` sentinel, which no project name can equal, and the schema id inside the signed body keeps
+the two kinds apart.
+"""
 
 from __future__ import annotations
 
@@ -17,6 +22,9 @@ from r2.contracts.common import R2ContractModel
 from r2.contracts.fingerprints import canonical_json_bytes
 
 MAX_GRANT_EVENT_BYTES = 65_536
+GRANT_EVENT_SCHEMA_V1 = "governance.showrunner_grant_event.v1"
+GRANT_EVENT_SCHEMA_V2 = "governance.showrunner_grant_event.v2"
+WORKSPACE_SCOPE = "@workspace"
 _UTC_SECOND = re.compile(r"\A[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z\Z")
 _SIGNATURE = re.compile(r"\A[A-Za-z0-9_-]{86}\Z")
 
@@ -41,7 +49,9 @@ def _timestamp(value: str) -> datetime:
 class GrantEventBodyV1(R2ContractModel):
     model_config = ConfigDict(frozen=True, extra="forbid", strict=True, serialize_by_alias=True)
 
-    event_schema: Literal["governance.showrunner_grant_event.v1"] = Field(alias="schema")
+    event_schema: Literal["governance.showrunner_grant_event.v1", "governance.showrunner_grant_event.v2"] = Field(
+        alias="schema"
+    )
     event_type: Literal["ISSUE", "REVOKE"]
     user_id: _ExactIdentity
     project_name: _ExactIdentity
@@ -63,6 +73,8 @@ class GrantEventBodyV1(R2ContractModel):
 
     @model_validator(mode="after")
     def valid_transition_shape(self) -> Self:
+        if (self.event_schema == GRANT_EVENT_SCHEMA_V2) != (self.project_name == WORKSPACE_SCOPE):
+            raise ValueError("workspace scope")
         issued = _timestamp(self.issued_at)
         if (self.sequence == 1) != (self.previous_event_digest is None):
             raise ValueError("event predecessor")
@@ -143,4 +155,13 @@ def parse_grant_event(raw: bytes) -> ParsedGrantEventV1:
     )
 
 
-__all__ = ["MAX_GRANT_EVENT_BYTES", "GrantEventBodyV1", "GrantEventInvalid", "ParsedGrantEventV1", "parse_grant_event"]
+__all__ = [
+    "GRANT_EVENT_SCHEMA_V1",
+    "GRANT_EVENT_SCHEMA_V2",
+    "MAX_GRANT_EVENT_BYTES",
+    "WORKSPACE_SCOPE",
+    "GrantEventBodyV1",
+    "GrantEventInvalid",
+    "ParsedGrantEventV1",
+    "parse_grant_event",
+]

@@ -24,7 +24,13 @@ from r2.contracts.governance_host_records import (
 )
 from r2.contracts.governance_verifier_registry import ParsedVerifierRegistryV1, parse_verifier_registry
 from r2.contracts.grant_checkpoint import GrantHeadRecordV1, ParsedGrantCheckpointV1, parse_grant_checkpoint
-from r2.contracts.showrunner_grant import ParsedGrantEventV1, parse_grant_event
+from r2.contracts.showrunner_grant import (
+    GRANT_EVENT_SCHEMA_V1,
+    GRANT_EVENT_SCHEMA_V2,
+    WORKSPACE_SCOPE,
+    ParsedGrantEventV1,
+    parse_grant_event,
+)
 
 ARCHIVE_SEQUENCE_WIDTH = 20
 
@@ -188,10 +194,11 @@ def sign_grant_event(
     expires_at: str | None = None,
     issued_at: str | None = None,
 ) -> tuple[bytes, ParsedGrantEventV1]:
-    """One signed ISSUE (with its validity interval) or REVOKE event for an exact scope."""
+    """One signed ISSUE (with its validity interval) or REVOKE event for one project, or for the whole workspace
+    when ``project_name`` is ``WORKSPACE_SCOPE``."""
     issued = issued_at or utc_second()
     body: dict[str, object] = {
-        "schema": "governance.showrunner_grant_event.v1",
+        "schema": GRANT_EVENT_SCHEMA_V2 if project_name == WORKSPACE_SCOPE else GRANT_EVENT_SCHEMA_V1,
         "event_type": event_type,
         "user_id": user_id,
         "project_name": project_name,

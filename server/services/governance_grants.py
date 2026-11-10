@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Awaitable, Callable
+from dataclasses import dataclass
 from datetime import UTC, datetime
 
 from sqlalchemy import func, select
@@ -12,7 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from lib.db.models.governance_grant import ShowrunnerGrantEventModel, ShowrunnerGrantHeadModel
 from r2.contracts.grant_checkpoint import GrantHeadRecordV1
-from r2.contracts.showrunner_grant import GrantEventInvalid
+from r2.contracts.showrunner_grant import WORKSPACE_SCOPE, GrantEventInvalid
 from r2.governance.checkpoint_signature import VerifiedGrantCheckpointV1, verify_grant_checkpoint
 from r2.governance.grant_signature import VerifiedGrantEventV1, verify_grant_event
 from r2.governance.grant_transition import GrantScopeV1, verify_next_grant_event
@@ -235,27 +236,77 @@ class GovernanceGrantImporter(_GrantLedger):
             return event
 
 
+@dataclass(frozen=True)
+class ConsultedGrantHead:
+    """One chain the reader looked at, as its locked head stood (both ``None`` when it has no event)."""
+
+    scope: GrantScopeV1
+    head_sequence: int | None
+    head_event_digest: str | None
+
+
+def _workspace_scope(scope: GrantScopeV1) -> GrantScopeV1:
+    return GrantScopeV1(scope.user_id, WORKSPACE_SCOPE, scope.principal)
+
+
+def _active_issue(event: VerifiedGrantEventV1, now: datetime) -> bool:
+    return (
+        event.body.event_type == "ISSUE"
+        and event.body.not_before is not None
+        and event.body.expires_at is not None
+        and event.body.not_before <= now.strftime("%Y-%m-%dT%H:%M:%SZ") < event.body.expires_at
+    )
+
+
 class CurrentShowrunnerGrantReader(_GrantLedger):
-    async def require_current_locked(self, session: AsyncSession, *, scope: GrantScopeV1) -> VerifiedGrantEventV1:
-        """Read local grant state under the caller's transaction; activation needs external custody."""
+    async def _chain_locked(
+        self, session: AsyncSession, scope: GrantScopeV1
+    ) -> tuple[ShowrunnerGrantHeadModel | None, VerifiedGrantEventV1 | None, ConsultedGrantHead]:
+        head = await _locked_head(session, scope)
+        current = None if head is None else await self._current_locked(session, head, scope)
+        consulted = ConsultedGrantHead(
+            scope=scope,
+            head_sequence=None if current is None else current[1].body.sequence,
+            head_event_digest=None if current is None else current[1].event_digest,
+        )
+        return head, None if current is None else current[1], consulted
+
+    async def resolve_current_locked(
+        self, session: AsyncSession, *, scope: GrantScopeV1
+    ) -> tuple[VerifiedGrantEventV1, tuple[ConsultedGrantHead, ...]]:
+        """The project's own current ISSUE; else, unless the project's chain ends in a REVOKE, the workspace's.
+
+        Heads are locked project first, then workspace. Returns the chains consulted so a checkpoint can cover them.
+        """
 
         if not session.in_transaction():
             raise ShowrunnerGrantUnavailableError("grant read requires a transaction")
-        head = await _locked_head(session, scope)
-        if head is None:
-            raise ShowrunnerGrantUnavailableError("grant head is missing")
-        current = await self._current_locked(session, head, scope)
-        if current is None:
-            raise ShowrunnerGrantUnavailableError("grant has no current event")
-        event = current[1]
+        if scope.project_name.startswith("@"):
+            raise ShowrunnerGrantUnavailableError("grant scope is not a project")
+        head, event, consulted = await self._chain_locked(session, scope)
         now = await _database_now(session)
-        if (
-            event.body.event_type != "ISSUE"
-            or event.body.not_before is None
-            or event.body.expires_at is None
-            or not event.body.not_before <= now.strftime("%Y-%m-%dT%H:%M:%SZ") < event.body.expires_at
-        ):
+        if event is not None and _active_issue(event, now):
+            return event, (consulted,)
+        if event is not None and event.body.event_type == "REVOKE":
             raise ShowrunnerGrantUnavailableError("grant is not currently active")
+        reason = (
+            "grant head is missing"
+            if head is None
+            else "grant has no current event"
+            if event is None
+            else "grant is not currently active"
+        )
+        ws_head, ws_event, ws_consulted = await self._chain_locked(session, _workspace_scope(scope))
+        if ws_head is None:
+            raise ShowrunnerGrantUnavailableError(reason)
+        if ws_event is None or not _active_issue(ws_event, now):
+            raise ShowrunnerGrantUnavailableError("grant is not currently active")
+        return ws_event, (consulted, ws_consulted)
+
+    async def require_current_locked(self, session: AsyncSession, *, scope: GrantScopeV1) -> VerifiedGrantEventV1:
+        """Read local grant state under the caller's transaction; activation needs external custody."""
+
+        event, _ = await self.resolve_current_locked(session, scope=scope)
         return event
 
     async def require_historical_issue_locked(
@@ -269,25 +320,31 @@ class CurrentShowrunnerGrantReader(_GrantLedger):
         """Verify a replay's signed ISSUE reference within the locked, current grant chain."""
         if authenticated_at.tzinfo is None:
             raise ShowrunnerGrantUnavailableError("historical authorization time is not UTC-aware")
-        await self.require_current_locked(session, scope=scope)
-        rows = (
-            (
-                await session.execute(
-                    select(ShowrunnerGrantEventModel)
-                    .where(
-                        ShowrunnerGrantEventModel.user_id == scope.user_id,
-                        ShowrunnerGrantEventModel.project_name == scope.project_name,
-                        ShowrunnerGrantEventModel.principal == scope.principal,
+        _, consulted = await self.resolve_current_locked(session, scope=scope)
+        rows: list[ShowrunnerGrantEventModel] = []
+        match_index: int | None = None
+        for chain in consulted:
+            scope = chain.scope
+            rows = list(
+                (
+                    await session.execute(
+                        select(ShowrunnerGrantEventModel)
+                        .where(
+                            ShowrunnerGrantEventModel.user_id == scope.user_id,
+                            ShowrunnerGrantEventModel.project_name == scope.project_name,
+                            ShowrunnerGrantEventModel.principal == scope.principal,
+                        )
+                        .order_by(ShowrunnerGrantEventModel.sequence)
+                        .with_for_update()
+                        .execution_options(populate_existing=True)
                     )
-                    .order_by(ShowrunnerGrantEventModel.sequence)
-                    .with_for_update()
-                    .execution_options(populate_existing=True)
                 )
+                .scalars()
+                .all()
             )
-            .scalars()
-            .all()
-        )
-        match_index = next((index for index, row in enumerate(rows) if row.event_digest == event_digest), None)
+            match_index = next((index for index, row in enumerate(rows) if row.event_digest == event_digest), None)
+            if match_index is not None:
+                break
         if match_index is None:
             raise ShowrunnerGrantUnavailableError("historical grant event reference is missing")
         event = self._verify_row(rows[match_index], scope)
@@ -326,8 +383,10 @@ class CheckpointedShowrunnerGrantReader(CurrentShowrunnerGrantReader):
         self._checkpoint_public_key = checkpoint_public_key
         self._load_checkpoint = load_checkpoint
 
-    async def require_current_locked(self, session: AsyncSession, *, scope: GrantScopeV1) -> VerifiedGrantEventV1:
-        event = await super().require_current_locked(session, scope=scope)
+    async def resolve_current_locked(
+        self, session: AsyncSession, *, scope: GrantScopeV1
+    ) -> tuple[VerifiedGrantEventV1, tuple[ConsultedGrantHead, ...]]:
+        event, consulted = await super().resolve_current_locked(session, scope=scope)
         try:
             raw = await self._load_checkpoint()
             checkpoint = verify_grant_checkpoint(
@@ -338,16 +397,17 @@ class CheckpointedShowrunnerGrantReader(CurrentShowrunnerGrantReader):
             )
         except Exception:
             raise ShowrunnerGrantUnavailableError("signed grant checkpoint is unavailable") from None
-        expected = checkpoint.head_for_scope(
-            user_id=scope.user_id, project_name=scope.project_name, principal=scope.principal
-        )
-        if (
-            expected is None
-            or expected.head_sequence != event.body.sequence
-            or expected.head_event_digest != event.event_digest
-        ):
-            raise ShowrunnerGrantUnavailableError("signed grant checkpoint differs from current head")
-        return event
+        # Every chain consulted must match: an absent head where the checkpoint lists one (a deleted per-project
+        # REVOKE) cannot fall through to the workspace grant.
+        for chain in consulted:
+            expected = checkpoint.head_for_scope(
+                user_id=chain.scope.user_id, project_name=chain.scope.project_name, principal=chain.scope.principal
+            )
+            if (None if expected is None else (expected.head_sequence, expected.head_event_digest)) != (
+                None if chain.head_sequence is None else (chain.head_sequence, chain.head_event_digest)
+            ):
+                raise ShowrunnerGrantUnavailableError("signed grant checkpoint differs from current head")
+        return event, consulted
 
 
 class GovernanceGrantHeadExporter(_GrantLedger):
@@ -380,6 +440,8 @@ class GovernanceGrantHeadExporter(_GrantLedger):
                 .tuples()
                 .all()
             )
+            # The checkpoint orders scopes by code point; the database collation may not.
+            scopes = sorted(scopes)
             records: list[GrantHeadRecordV1] = []
             for user_id, project_name, principal in scopes:
                 scope = GrantScopeV1(user_id, project_name, principal)
@@ -455,6 +517,7 @@ class GovernanceGrantRecoveryScanner(_GrantLedger):
                 .tuples()
                 .all()
             )
+            scopes = sorted(scopes)
             if len(scopes) != len(checkpoint.body.heads):
                 raise GrantRecoveryUnavailable("checkpoint scope set differs from grant ledger")
             for (user_id, project_name, principal), expected in zip(scopes, checkpoint.body.heads, strict=True):
@@ -479,6 +542,7 @@ class GovernanceGrantRecoveryScanner(_GrantLedger):
 
 __all__ = [
     "CheckpointedShowrunnerGrantReader",
+    "ConsultedGrantHead",
     "CurrentShowrunnerGrantReader",
     "GovernanceGrantHeadExporter",
     "GovernanceGrantImporter",

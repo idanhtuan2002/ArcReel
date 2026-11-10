@@ -114,3 +114,20 @@ def test_unexpected_failures_print_only_a_category(
     assert _run("keygen", "--private", tmp_path / "a.key", "--public", tmp_path / "a.pub") == 1
     error = capsys.readouterr().err
     assert error.strip() == "Governance ceremony refused: RuntimeError"
+
+
+def test_sign_event_workspace_signs_a_v2_event_and_excludes_project(tmp_path: Path) -> None:
+    assert _run("keygen", "--private", tmp_path / "grant.key", "--public", tmp_path / "grant.pub") == 0
+    common = ("--key", tmp_path / "grant.key", "--key-id", "grant-key-a", "--type", "ISSUE", "--user-id", "default",
+              "--principal", "reviewer-a", "--sequence", "1", "--expires-at", "2099-01-01T00:00:00Z")  # fmt: skip
+    assert _run("sign-event", *common, "--workspace", "--out", tmp_path / "ws.json") == 0
+    event = verify_grant_event(
+        (tmp_path / "ws.json").read_bytes(),
+        key_id="grant-key-a",
+        public_key=decode_public_key((tmp_path / "grant.pub").read_text().strip()),
+    )
+    assert (event.body.event_schema, event.body.project_name) == ("governance.showrunner_grant_event.v2", "@workspace")
+    with pytest.raises(SystemExit):
+        _run("sign-event", *common, "--workspace", "--project", "show-a", "--out", tmp_path / "both.json")
+    with pytest.raises(SystemExit):
+        _run("sign-event", *common, "--out", tmp_path / "neither.json")

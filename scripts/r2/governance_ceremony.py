@@ -23,6 +23,7 @@ from typing import cast
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 from r2.contracts.governance_verifier_registry import parse_verifier_registry
+from r2.contracts.showrunner_grant import WORKSPACE_SCOPE
 from r2.governance.ceremony import (
     CeremonyInvalid,
     build_approved_deployment,
@@ -117,7 +118,9 @@ def build_parser() -> argparse.ArgumentParser:
     sign_ev.add_argument("--key-id", required=True)
     sign_ev.add_argument("--type", choices=("ISSUE", "REVOKE"), required=True)
     sign_ev.add_argument("--user-id", required=True)
-    sign_ev.add_argument("--project", required=True)
+    scope = sign_ev.add_mutually_exclusive_group(required=True)
+    scope.add_argument("--project", help="one project")
+    scope.add_argument("--workspace", action="store_true", help="every project of --user-id, now and later")
     sign_ev.add_argument("--principal", required=True)
     sign_ev.add_argument("--sequence", type=int, required=True)
     sign_ev.add_argument("--previous-event-digest", help="omit only for sequence 1")
@@ -192,7 +195,7 @@ def run_offline(args: argparse.Namespace) -> str:
         signer_key_id=args.key_id,
         event_type=args.type,
         user_id=args.user_id,
-        project_name=args.project,
+        project_name=WORKSPACE_SCOPE if args.workspace else args.project,
         principal=args.principal,
         sequence=args.sequence,
         previous_event_digest=args.previous_event_digest,
