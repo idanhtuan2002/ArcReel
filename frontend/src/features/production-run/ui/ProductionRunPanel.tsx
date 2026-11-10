@@ -119,6 +119,7 @@ export function ProductionRunPanel({ projectName }: Props) {
   const canStart =
     (source !== "idea" || bookLengthValid(book)) &&
     (source === "project" ||
+      source === "idea" ||
       (source === "variant" ? Boolean(sourceProject) && Boolean(variantProfile || idea.trim()) : Boolean(idea.trim())));
   const [mode, setMode] = useState<AutomationMode>("auto");
   const [episodes, setEpisodes] = useState(1);
@@ -212,6 +213,8 @@ export function ProductionRunPanel({ projectName }: Props) {
       command_id: newCommandId(),
       mode,
       ...(source !== "project" && idea.trim() ? { idea: idea.trim() } : {}),
+      // ADR-0125: a new story without an idea draws its own idea and settings.
+      ...(source === "idea" && !idea.trim() ? { idea_mode: "auto" as const } : {}),
       ...(source !== "idea" ? { story_source: source } : {}),
       ...(source === "variant" ? { source_project: sourceProject } : {}),
       ...(source === "variant" && variantProfile ? { variant_profile: variantProfile } : {}),
@@ -353,7 +356,7 @@ export function ProductionRunPanel({ projectName }: Props) {
               style={{ border: "1px solid var(--color-hairline-strong)", background: "transparent" }}
               rows={3}
               value={idea}
-              placeholder={t("auto_idea_placeholder")}
+              placeholder={t(source === "idea" ? "auto_idea_placeholder_optional" : "auto_idea_placeholder")}
               onChange={(event) => setIdea(event.target.value)}
             />
           </label>

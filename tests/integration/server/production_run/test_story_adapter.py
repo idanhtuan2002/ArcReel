@@ -112,6 +112,12 @@ def story_policy():
     return overrides
 
 
+@pytest.fixture
+def story_start() -> dict:
+    """Start command fields a test module replaces."""
+    return {"idea": "Một người con về làng bán căn nhà của cha."}
+
+
 @dataclass
 class Host:
     sessions: async_sessionmaker[AsyncSession]
@@ -125,7 +131,7 @@ class Host:
 
 
 @pytest.fixture
-async def story_host(concurrent_session_factory, tmp_path, interactive_env, story_policy):
+async def story_host(concurrent_session_factory, tmp_path, interactive_env, story_policy, story_start):
     from server.services.governance_attestation import serve_governance_attestor
 
     sessions = concurrent_session_factory
@@ -157,7 +163,7 @@ async def story_host(concurrent_session_factory, tmp_path, interactive_env, stor
                     expected_version=0,
                     expected_input_digest=start_input,
                     policy_digest=policy_digest(policy),
-                    idea="Một người con về làng bán căn nhà của cha.",
+                    **story_start,
                 ),
                 policy=policy,
             )

@@ -4,7 +4,15 @@ from __future__ import annotations
 
 from server.story_authoring.checks import Finding, Severity
 from server.story_authoring.driver import humanize_targets
-from server.story_authoring.genre_packs import PACKS, craft_rules, fatigue_findings, pack_for, planning_block
+from server.story_authoring.genre_packs import (
+    PACKS,
+    craft_rules,
+    fatigue_findings,
+    genre_menu,
+    pack_for,
+    planning_block,
+)
+from server.story_authoring.prompts.planning import seed_prompt
 
 
 def test_the_brief_genre_wins_then_the_seed_genre_and_unknown_genres_get_no_pack():
@@ -50,3 +58,19 @@ def test_humanize_targets_only_scenes_with_three_quoted_machine_voice_findings()
 
     assert {x.node_id for x in humanize_targets(findings)} == {"a"}
     assert len(humanize_targets(findings)) == 3
+
+
+def test_an_alias_counts_only_as_a_whole_word():
+    assert pack_for("chuyện mai sau") is None
+    horror = pack_for("chuyện ma làng")
+    assert horror is not None
+    assert horror.pack_id == "horror"
+
+
+def test_a_seed_whose_brief_names_no_pack_chooses_one_from_the_menu_and_a_named_pack_is_kept():
+    open_genre = seed_prompt(idea="Một người con về làng bán căn nhà của cha.", genre="truyện ngắn")
+    assert genre_menu() in open_genre
+    assert all(pack.label in open_genre for pack in PACKS)
+    named = seed_prompt(idea="Một vụ mất tích.", genre="Trinh thám")
+    assert "- genre: Trinh thám." in named
+    assert genre_menu() not in named

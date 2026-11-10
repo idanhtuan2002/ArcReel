@@ -191,6 +191,7 @@ export default {
   'source_preview_LONG_CHAPTER': "a chapter is over 40,000 characters; check the headings",
   'source_preview_EMPTY': "the file is empty",
   'auto_idea_placeholder': 'One or two sentences about the story',
+  'auto_idea_placeholder_optional': 'Leave empty to let the system come up with the idea',
   'auto_mode_auto': 'Automatic',
   'auto_mode_semi': 'Semi-automatic',
   'auto_mode_semi_hint': 'Stops for your review of the script and the final film.',

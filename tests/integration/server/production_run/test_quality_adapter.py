@@ -32,6 +32,7 @@ from tests.integration.server.production_run.test_render_master_adapter import (
 from tests.integration.server.production_run.test_story_adapter import OWNER, Host
 from tests.integration.server.production_run.test_story_adapter import interactive_env as interactive_env
 from tests.integration.server.production_run.test_story_adapter import story_host as story_host
+from tests.integration.server.production_run.test_story_adapter import story_start as story_start
 
 
 @pytest.fixture

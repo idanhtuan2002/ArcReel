@@ -193,6 +193,7 @@ export default {
   'source_preview_LONG_CHAPTER': "có chương dài hơn 40.000 ký tự; hãy kiểm tra tiêu đề chương",
   'source_preview_EMPTY': "tệp rỗng",
   'auto_idea_placeholder': 'Một hai câu về câu chuyện',
+  'auto_idea_placeholder_optional': 'Để trống để hệ thống tự nghĩ ý tưởng',
   'auto_mode_auto': 'Tự động',
   'auto_mode_semi': 'Bán tự động',
   'auto_mode_semi_hint': 'Dừng để bạn duyệt kịch bản và phim cuối.',

@@ -176,6 +176,8 @@ export interface ProjectData {
   /** ADR-0122: "story" for a story project; absent for a film project, which may name the story it adapts. */
   project_kind?: ProjectKind | null;
   story_project?: string | null;
+  /** ADR-0125: the idea and settings the latest automatic story drew when it was started without an idea. */
+  story_profile?: StoryProfile | null;
   /** 仅 ad：目标总时长（秒）。 */
   target_duration?: number;
   /** 仅 ad：创作诉求短文本（可空）。 */
@@ -363,4 +365,16 @@ export interface VideoCapabilities {
   duration_constraints: DurationConstraints;
   /** 时长这一维由端点固定（ComfyUI workflow 自己定片长）：档位为空集不是「声明缺失」。 */
   duration_endpoint_fixed?: boolean;
+}
+
+/** ADR-0125: what a run started without an idea chose for itself; ``defaulted`` names values that fell back. */
+export interface StoryProfile {
+  title: string;
+  idea: string;
+  genre_pack: string;
+  tone: string;
+  audience: string;
+  book_chapters: number;
+  defaulted?: string[];
+  run_id?: string;
 }

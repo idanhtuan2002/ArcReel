@@ -101,3 +101,28 @@ def test_a_project_without_settings_adopts_the_latest_configured_ones(tmp_path):
     _project(lonely, "alone", extras={}, created="2026-01-01T00:00:00")
     with pytest.raises(BatchRefused, match="AUTOPILOT_NO_SETTINGS_TEMPLATE"):
         adopt_automation_settings(lonely, "alone")
+
+
+async def test_a_film_of_a_story_with_a_drawn_genre_takes_that_genres_look(tmp_path):
+    from lib.style_templates import resolve_template_prompt
+    from server.story_authoring.film_looks import LOOKS, film_look
+
+    pm = ProjectManager(tmp_path)
+    _project(pm, "tpl", extras={"automation": {"routes": []}}, created="2026-01-01T00:00:00")
+    pm.update_project("tpl", lambda p: p.update(style_template_id="anim_ghibli", episode_target_duration=300))
+    drawn = {"project_kind": "story", "story_profile": {"genre_pack": "horror", "idea": "x"}}
+    _project(pm, "drawn", extras=drawn, created="2026-02-01T00:00:00", text="Hết.")
+    _project(pm, "given", extras={"project_kind": "story"}, created="2026-03-01T00:00:00", text="Hết.")
+
+    result, _enabled = await _run(pm)
+    films = {entry["story"]: pm.load_project(entry["film"]) for entry in result.created}
+    horror = films["drawn"]
+    assert (horror["style_template_id"], horror["aspect_ratio"], horror["episode_target_duration"]) == (
+        "live_lynch",
+        "9:16",
+        90,
+    )
+    assert horror["style"] == resolve_template_prompt("live_lynch")
+    assert (films["given"]["style_template_id"], films["given"]["episode_target_duration"]) == ("anim_ghibli", 300)
+    assert all(film_look(pack) is not None for pack in LOOKS)
+    assert film_look("cyberpunk") is None

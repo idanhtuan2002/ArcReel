@@ -14,7 +14,7 @@ import {
 } from "./autopilotClient";
 
 const POLL_MS = 30_000;
-const CHAPTERS = { min: 6, max: 120, initial: 30 };
+const CHAPTERS = { min: 6, max: 120 };
 
 const TONE: Record<AutopilotStateName, string> = {
   off: "text-text-3",
@@ -24,11 +24,20 @@ const TONE: Record<AutopilotStateName, string> = {
   finished: "text-text-2",
 };
 
-/** Story parameters a story project's autopilot writes from; ``null`` until they are valid. */
-export function storyAutopilot(idea: string, chapters: number, direction: string) {
+/**
+ * Story parameters a story project's autopilot writes from; ``null`` while the length is invalid. An empty idea or
+ * length is left out: the first part then draws its own (ADR-0125).
+ */
+export function storyAutopilot(idea: string, chapters: number | null, direction: string) {
   const text = idea.trim();
-  if (!text || !Number.isInteger(chapters) || chapters < CHAPTERS.min || chapters > CHAPTERS.max) return null;
-  return { idea: text, book_chapters: chapters, ...(direction.trim() ? { direction: direction.trim() } : {}) };
+  if (chapters !== null && (!Number.isInteger(chapters) || chapters < CHAPTERS.min || chapters > CHAPTERS.max)) {
+    return null;
+  }
+  return {
+    ...(text ? { idea: text } : {}),
+    ...(chapters !== null ? { book_chapters: chapters } : {}),
+    ...(direction.trim() ? { direction: direction.trim() } : {}),
+  };
 }
 
 export function StoryAutopilotFields({
@@ -41,8 +50,8 @@ export function StoryAutopilotFields({
 }: {
   idea: string;
   onIdea: (value: string) => void;
-  chapters: number;
-  onChapters: (value: number) => void;
+  chapters: number | null;
+  onChapters: (value: number | null) => void;
   direction?: string;
   onDirection?: (value: string) => void;
 }) {
@@ -60,6 +69,7 @@ export function StoryAutopilotFields({
           onChange={(event) => onIdea(event.target.value)}
           rows={3}
           maxLength={4000}
+          placeholder={t("ap_idea_auto")}
           className={field}
         />
       </label>
@@ -70,8 +80,9 @@ export function StoryAutopilotFields({
           type="number"
           min={CHAPTERS.min}
           max={CHAPTERS.max}
-          value={chapters}
-          onChange={(event) => onChapters(Number(event.target.value))}
+          value={chapters ?? ""}
+          placeholder={t("ap_chapters_auto")}
+          onChange={(event) => onChapters(event.target.value === "" ? null : Number(event.target.value))}
           className={field}
         />
       </label>
@@ -102,7 +113,7 @@ export function AutopilotPanel({ projectName, kind }: { projectName: string; kin
   const [editing, setEditing] = useState(false);
   const [busy, setBusy] = useState(false);
   const [idea, setIdea] = useState("");
-  const [chapters, setChapters] = useState(CHAPTERS.initial);
+  const [chapters, setChapters] = useState<number | null>(null);
   const [direction, setDirection] = useState("");
   const [episodes, setEpisodes] = useState(1);
   const episodesId = useId();
@@ -129,8 +140,8 @@ export function AutopilotPanel({ projectName, kind }: { projectName: string; kin
   const startEditing = () => {
     const previous = view?.delegation;
     if (previous?.story) {
-      setIdea(previous.story.idea);
-      setChapters(previous.story.book_chapters);
+      setIdea(previous.story.idea ?? "");
+      setChapters(previous.story.book_chapters ?? null);
       setDirection(previous.story.direction ?? "");
     }
     if (previous?.film) setEpisodes(previous.film.episodes_per_run);
@@ -203,7 +214,9 @@ export function AutopilotPanel({ projectName, kind }: { projectName: string; kin
       {on && view?.delegation ? (
         <p className="mt-1 text-[12px] text-text-3">
           {view.delegation.story
-            ? t("ap_story_summary", { chapters: view.delegation.story.book_chapters })
+            ? view.delegation.story.book_chapters
+              ? t("ap_story_summary", { chapters: view.delegation.story.book_chapters })
+              : t("ap_story_summary_auto")
             : t("ap_film_summary", { count: view.delegation.film?.episodes_per_run ?? 1 })}
         </p>
       ) : null}

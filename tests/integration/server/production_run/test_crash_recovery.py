@@ -24,6 +24,7 @@ from tests.integration.server.production_run.test_quality_adapter import story_p
 from tests.integration.server.production_run.test_render_master_adapter import MediaPassed, RunInput, _Settings
 from tests.integration.server.production_run.test_story_adapter import interactive_env as interactive_env
 from tests.integration.server.production_run.test_story_adapter import story_host as story_host
+from tests.integration.server.production_run.test_story_adapter import story_start as story_start
 
 
 def _restarted(host, reviewer):

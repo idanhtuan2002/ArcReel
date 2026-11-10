@@ -66,6 +66,8 @@ class StartBody(_Body):
     variant_profile: str | None = Field(default=None, min_length=1)
     #: ADR-0116: start a book of this many chapters (a run from an idea writes its first part).
     book_chapters: int | None = Field(default=None, ge=6, le=120)
+    #: ADR-0125: ``auto`` starts without an idea; the run draws its idea and settings.
+    idea_mode: Literal["given", "auto"] = "given"
     targets: tuple[str, ...] = ("episode:1",)
     expected_input_digest: str = Field(pattern=_DIGEST)
     policy_digest: str = Field(pattern=_DIGEST)
@@ -244,6 +246,7 @@ async def start_run(
             source_project=body.source_project,
             variant_profile=body.variant_profile,
             book_chapters=body.book_chapters,
+            idea_mode=body.idea_mode,
         )
     except ValueError as error:
         raise _invalid() from error

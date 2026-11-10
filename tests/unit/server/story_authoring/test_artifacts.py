@@ -94,3 +94,16 @@ def test_listing_ignores_temporary_and_foreign_files(tmp_path: Path):
     (tmp_path / BLOB_ROOT / "notes.txt").write_bytes(b"x")
 
     assert store.list_digests() == (digest,)
+
+
+def test_a_pin_names_one_digest_and_the_first_pin_wins(tmp_path: Path):
+    store = StoryBlobStore(tmp_path)
+    first, second = store.put(b"first"), store.put(b"second")
+    assert store.pinned("run-1") is None
+    assert store.pin("run-1", first) == first
+    assert store.pin("run-1", second) == first
+    assert store.pinned("run-1") == first
+    assert store.pinned("run-2") is None
+    with pytest.raises(BlobMissing):
+        store.pin("run-3", "sha256:" + "0" * 64)
+    assert store.pinned("run-3") is None

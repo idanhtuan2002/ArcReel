@@ -17,7 +17,7 @@ from __future__ import annotations
 
 import hashlib
 import json
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -33,15 +33,28 @@ from lib.db.repositories.gates import GreenlightRepository
 from lib.db.repositories.task_repo import STORY_RUN_TASK_TYPE, TaskRepository
 from lib.episode_ledger import discover_sources
 from lib.source_preview import preview_sources
+from lib.text_backends.ollama import OllamaChatClient
 from r2.host_hardening.paid_routes import PaidRouteUnqualifiedError
 from r2.narrative_lifecycle.errors import NarrativeDecisionAuthorizationError
 from server.story_authoring import book as books
 from server.story_authoring.artifacts import BlobStoreError, StoryBlobStore
 from server.story_authoring.audits import CONTENT_SAFETY_SETTING, DEFAULT_CONTENT_SAFETY, SAFETY_LEVELS, SafetyLevel
 from server.story_authoring.authority import GrantNarrativeShowrunnerAuthority
-from server.story_authoring.cloud import CLOUD_ADAPTERS, OPENAI_ENDPOINT, OPENAI_MAX_INPUT_BOUND
+from server.story_authoring.cloud import (
+    CLOUD_ADAPTERS,
+    OPENAI_ENDPOINT,
+    OPENAI_MAX_INPUT_BOUND,
+    CloudStoryGateway,
+    story_cloud_client,
+)
 from server.story_authoring.commit import CANON_BASE_MOVED, ManuscriptCommitter, load_offered_manifest
-from server.story_authoring.contracts import OLLAMA_CHAT_ENDPOINT, AttemptKind, StoryLimits, StoryModelSelection
+from server.story_authoring.contracts import (
+    OLLAMA_CHAT_ENDPOINT,
+    AttemptKind,
+    StoryLimits,
+    StoryModelSelection,
+    StoryScope,
+)
 from server.story_authoring.driver import (
     CHAPTERS,
     StoryBrief,
@@ -50,7 +63,11 @@ from server.story_authoring.driver import (
     story_bible_input,
     variant_call_bound,
 )
+from server.story_authoring.executor import RouteUnavailable, default_ollama_client, resolve_route_credential
+from server.story_authoring.generation import AttemptSink, AuthoringTextGateway
 from server.story_authoring.handoff import OnConflict, SourceUpload, send_to_video, upload_in_flight
+from server.story_authoring.idea_draw import DRAW_ATTEMPTS, DRAW_MAX_OUTPUT_TOKENS, DrawnProfile, draw_profile
+from server.story_authoring.idea_profile import ProfileSeed
 from server.story_authoring.narrative import StoryIdentity
 from server.story_authoring.pipeline import intent_targets, node_kind
 from server.story_authoring.prompts.prior import prior_calls
@@ -316,6 +333,87 @@ class StoryAuthoringService:
             cloud_profiles=tuple(profiles),
             prior=prior,
         )
+
+    async def draw_cost_bound(self, *, provider_id: str, model_id: str) -> int:
+        """What drawing an idea may cost on a route, in minor units: nothing on a local route."""
+        selection = await self._selection(provider_id, model_id)
+        if selection.endpoint == OLLAMA_CHAT_ENDPOINT:
+            return 0
+        try:
+            prices = (await resolve_cloud_route(self._factory, provider_id, model_id)).profile.prices
+        except (ValueError, PaidRouteUnqualifiedError):
+            raise StoryActionRefused("ROUTE_NOT_QUALIFIED", "cloud story route is unavailable or unqualified") from None
+        return DRAW_ATTEMPTS * prices.minor_units(DEFAULT_LIMITS.max_input_tokens, DRAW_MAX_OUTPUT_TOKENS)
+
+    async def draw_profile(
+        self,
+        *,
+        provider_id: str,
+        model_id: str,
+        max_cost_minor_units: int,
+        scope: StoryScope,
+        draw_key: str,
+        seed: ProfileSeed,
+        avoid: Sequence[str],
+        genre_pack: str | None = None,
+        book_chapters: int | None = None,
+        client_for: Callable[[str, str | None], OllamaChatClient] | None = None,
+    ) -> DrawnProfile:
+        """ADR-0125: draw a run's idea and settings on its writer route, at the project's content safety level."""
+        selection = await self._selection(provider_id, model_id)
+        try:
+            key = await resolve_route_credential(self._factory, selection)
+        except RouteUnavailable:
+            raise StoryActionRefused("MODEL_UNAVAILABLE", "the writer route is unavailable") from None
+        limits = DEFAULT_LIMITS
+        cloud = None
+        if selection.endpoint != OLLAMA_CHAT_ENDPOINT:
+            try:
+                resolved = await resolve_cloud_route(self._factory, provider_id, model_id)
+            except (ValueError, PaidRouteUnqualifiedError):
+                raise StoryActionRefused("ROUTE_NOT_QUALIFIED", "cloud story route is unavailable") from None
+            if resolved.selection != selection or not key:
+                raise StoryActionRefused("ROUTE_CHANGED", "cloud route changed while drawing the idea")
+            limits = StoryLimits.model_validate(
+                {
+                    **DEFAULT_LIMITS.model_dump(),
+                    "currency": "USD",
+                    "max_cost_minor_units": max(1, min(10_000, max_cost_minor_units)),
+                    "cloud_prices": resolved.profile.prices,
+                }
+            )
+            cloud = story_cloud_client(selection, api_key=key)
+
+        async def revalidate() -> None:
+            if (await resolve_cloud_route(self._factory, provider_id, model_id)).selection != selection:
+                raise ValueError("cloud route changed")
+
+        async def gateway_for(sink: AttemptSink) -> AuthoringTextGateway:
+            if cloud is not None:
+                return CloudStoryGateway(
+                    selection=selection, limits=limits, client=cloud, sink=sink, revalidate=revalidate
+                )
+            make = client_for or default_ollama_client
+            return AuthoringTextGateway(
+                selection=selection, limits=limits, client=make(selection.base_url, key), sink=sink
+            )
+
+        try:
+            return await draw_profile(
+                gateway_for=gateway_for,
+                selection=selection,
+                limits=limits,
+                scope=scope,
+                draw_key=draw_key,
+                seed=seed,
+                avoid=avoid,
+                safety=self.content_safety(scope.project_name),
+                genre_pack=genre_pack,
+                book_chapters=book_chapters,
+            )
+        finally:
+            if cloud is not None:
+                await cloud.close()
 
     def content_safety(self, project_name: str) -> SafetyLevel:
         """The project's content safety level (ADR-0121), the lowest (``off``) when unset; ``standard`` when the project

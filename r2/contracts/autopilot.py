@@ -16,10 +16,15 @@ _Text = Annotated[str, StringConstraints(min_length=1, max_length=4000)]
 
 
 class StoryAutopilot(AutomationContract):
-    """A story project writes its book part after part: part 1 from ``idea``, each next part continuing it."""
+    """A story project writes its book part after part: part 1 from ``idea``, each next part continuing it.
 
-    idea: _Text
-    book_chapters: Annotated[int, Field(ge=6, le=120)]
+    Without an idea part 1 draws its own idea and settings (ADR-0125); without a length the drawn one is used. Both
+    are left out of the stored delegation when absent, so earlier delegations keep their digests."""
+
+    idea: _Text | None = Field(default=None, exclude_if=lambda value: value is None)
+    book_chapters: Annotated[int, Field(ge=6, le=120)] | None = Field(
+        default=None, exclude_if=lambda value: value is None
+    )
     #: What a continuation is asked to do; a continuation run needs an instruction.
     direction: _Text = "Continue the book from where the previous part ended, following the book plan."
 

@@ -16,4 +16,12 @@ Decided 2026-11-10 by the main agent under the sponsor's instruction: on autopil
 
 Phases: (0) genre on automatic briefs; (1) profile schema and closed-set validation; (2) `idea_mode` and the drawn profile in BRIEF with replay reuse; (3) duplicate avoidance; (4) optional autopilot parameters; (5) film settings from the story's genre; (6) UI. Each phase is tested on the disposable PostgreSQL; one staged real run precedes workspace-wide use.
 
+Implemented 2026-11-10, as decided with these specifics:
+
+- §1: a brief whose genre names no pack asks the seed to pick one label from the ten packs; aliases match whole words only (`ma` no longer matches `mai`).
+- §2: the profile is content-addressed in the story blob store and named by a *pin* (`story_authoring/pins/<sha256(key)>`, hard-linked into place so the first pin wins and never appears half-written). The draw spends at most two generations on the writer route; BRIEF reserves them (four calls with their counts, and the route's price bound on a cloud route). The brief's idea is the drawn idea with its tone and readers; an automatic run always starts a book of the drawn length. The project shows the profile under `story_profile` in project.json, which no input witness reads.
+- §3: the project's safety level is written into the draw's instructions; the story's chapters are audited at that level as before, so no separate audit call is spent on the idea.
+- §4: duplicates are compared with the ideas of the 20 most recently changed projects (their `story_profile`, else their title); word-overlap threshold 0.5.
+- §6: the batch of films takes its look from the story's drawn genre when there is one, else from the template film.
+
 Risks accepted: no Human reads the idea before it is written; Pause, Cancel and the recorded profile are the brakes. Thresholds for duplicates and the writer route's structured-output reliability are measured on real runs.

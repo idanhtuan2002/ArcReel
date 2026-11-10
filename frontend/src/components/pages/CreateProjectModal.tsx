@@ -206,7 +206,7 @@ export function CreateProjectModal() {
   // ADR-0124: the new project may start on autopilot (a story from its idea; a film following its story).
   const [autopilot, setAutopilotOn] = useState(false);
   const [autoIdea, setAutoIdea] = useState("");
-  const [autoChapters, setAutoChapters] = useState(30);
+  const [autoChapters, setAutoChapters] = useState<number | null>(null);
 
   // Step2 的远端数据 hoist 到此处：前进/后退切 step 时 Step2 unmount/mount 不再触发 HTTP，
   // 只在 modal 挂载与界面语言变化时 fetch。供应商与模型名由后端按 Accept-Language 成文，
@@ -339,7 +339,7 @@ export function CreateProjectModal() {
     // An empty name is filled in: the first words of the autopilot idea, else "Story" and the time.
     const title =
       storyTitle.trim() ||
-      (autopilot && autoStory ? titleFromIdea(autoStory.idea) : "") ||
+      (autopilot && autoStory?.idea ? titleFromIdea(autoStory.idea) : "") ||
       t("dashboard:auto_title_story", { when: nowLabel() });
     setCreating(true);
     try {

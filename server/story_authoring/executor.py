@@ -74,7 +74,7 @@ async def resolve_route_credential(factory: Factory, selection: StoryModelSelect
     return provider.api_key or None
 
 
-def _default_client(base_url: str, api_key: str | None) -> OllamaChatClient:
+def default_ollama_client(base_url: str, api_key: str | None) -> OllamaChatClient:
     return OllamaChatClient(base_url=base_url, api_key=api_key)
 
 
@@ -87,7 +87,7 @@ async def execute_story_run_task(
     task_id: str | None,
     session_factory: Factory = async_session_factory,
     project_dir: Path | None = None,
-    client_for: ClientFactory = _default_client,
+    client_for: ClientFactory = default_ollama_client,
     clock: Callable[[], datetime] = lambda: datetime.now(UTC),
 ) -> dict[str, Any]:
     if task_id is None:

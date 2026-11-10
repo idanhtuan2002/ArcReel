@@ -193,6 +193,7 @@ export default {
   'source_preview_LONG_CHAPTER': "有章节超过 40000 字符，请检查章节标题",
   'source_preview_EMPTY': "文件为空",
   'auto_idea_placeholder': '用一两句话描述故事',
+  'auto_idea_placeholder_optional': '留空则由系统构思',
   'auto_mode_auto': '全自动',
   'auto_mode_semi': '半自动',
   'auto_mode_semi_hint': '在剧本和成片处停下等你审阅。',

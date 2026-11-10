@@ -58,7 +58,7 @@ describe("ProductionRunPanel", () => {
       .spyOn(client, "startProductionRun")
       .mockReturnValue(new Promise<RunSnapshot>((done) => (resolve = done)));
     render(<ProductionRunPanel projectName="alpha" />);
-    fireEvent.change(await screen.findByPlaceholderText("One or two sentences about the story"), {
+    fireEvent.change(await screen.findByPlaceholderText("Leave empty to let the system come up with the idea"), {
       target: { value: "Chuyến đò cuối." },
     });
     const button = screen.getByRole("button", { name: "Start" });
@@ -77,12 +77,24 @@ describe("ProductionRunPanel", () => {
     expect(await screen.findByText("Stage: Story")).toBeInTheDocument();
   });
 
+  it("starts a story without an idea by letting the run draw one", async () => {
+    vi.spyOn(client, "listProductionRuns").mockResolvedValue({ start: OFFER, runs: [] });
+    const startProductionRun = vi.spyOn(client, "startProductionRun").mockResolvedValue(snapshot());
+    render(<ProductionRunPanel projectName="alpha" />);
+    await screen.findByPlaceholderText("Leave empty to let the system come up with the idea");
+    fireEvent.click(screen.getByRole("button", { name: "Start" }));
+
+    const command = startProductionRun.mock.calls[0][1];
+    expect(command).toMatchObject({ idea_mode: "auto" });
+    expect(command).not.toHaveProperty("idea");
+  });
+
   it("starts from the project's own story without an idea", async () => {
     vi.spyOn(client, "listProductionRuns").mockResolvedValue({ start: OFFER, runs: [] });
     const startProductionRun = vi.spyOn(client, "startProductionRun").mockResolvedValue(snapshot());
     render(<ProductionRunPanel projectName="alpha" />);
     fireEvent.click(await screen.findByLabelText("From the story in this project"));
-    expect(screen.queryByPlaceholderText("One or two sentences about the story")).not.toBeInTheDocument();
+    expect(screen.queryByPlaceholderText("Leave empty to let the system come up with the idea")).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Start" }));
 
     expect(startProductionRun).toHaveBeenCalledTimes(1);
@@ -95,7 +107,7 @@ describe("ProductionRunPanel", () => {
     vi.spyOn(client, "listProductionRuns").mockResolvedValue({ start: OFFER, runs: [] });
     const startProductionRun = vi.spyOn(client, "startProductionRun").mockResolvedValue(snapshot());
     render(<ProductionRunPanel projectName="alpha" />);
-    fireEvent.change(await screen.findByPlaceholderText("One or two sentences about the story"), {
+    fireEvent.change(await screen.findByPlaceholderText("Leave empty to let the system come up with the idea"), {
       target: { value: "Chuyến đò cuối." },
     });
     fireEvent.click(screen.getByLabelText("Novel (many chapters, written part by part)"));
@@ -325,7 +337,7 @@ describe("ProductionRunPanel", () => {
     });
     const start = vi.spyOn(client, "startProductionRun").mockResolvedValue(snapshot());
     render(<ProductionRunPanel projectName="alpha" />);
-    fireEvent.change(await screen.findByPlaceholderText("One or two sentences about the story"), {
+    fireEvent.change(await screen.findByPlaceholderText("Leave empty to let the system come up with the idea"), {
       target: { value: "Chuyến đò cuối." },
     });
     fireEvent.change(screen.getByRole("combobox", { name: "Episodes" }), { target: { value: "2" } });
@@ -358,7 +370,7 @@ describe("ProductionRunPanel", () => {
       }),
     );
     render(<ProductionRunPanel projectName="alpha" />);
-    fireEvent.change(await screen.findByPlaceholderText("One or two sentences about the story"), {
+    fireEvent.change(await screen.findByPlaceholderText("Leave empty to let the system come up with the idea"), {
       target: { value: "Chuyến đò cuối." },
     });
     fireEvent.click(screen.getByRole("button", { name: "Start" }));
@@ -527,7 +539,7 @@ describe("ProductionRunPanel", () => {
 
     fireEvent.click(await screen.findByRole("button", { name: "Last ferry" }));
 
-    expect(screen.getByPlaceholderText("One or two sentences about the story")).toHaveValue(
+    expect(screen.getByPlaceholderText("Leave empty to let the system come up with the idea")).toHaveValue(
       "On the last ferry before the bridge opens, an old boatman takes one more passenger across the river.",
     );
   });

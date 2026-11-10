@@ -156,6 +156,23 @@ async def test_story_part_one_then_continuations_then_finished(session_factory):
     assert (state.state, command) == ("finished", None)
 
 
+async def test_a_story_autopilot_without_an_idea_starts_part_one_drawing_its_own(session_factory):
+    from r2.contracts.autopilot import StoryAutopilot
+
+    plain = _delegation()
+    delegation = plain.model_copy(update={"story": StoryAutopilot()})
+    assert "idea" not in delegation.model_dump(mode="json")["story"]
+    assert plain.digest() != delegation.digest()
+    _state, command = await _planner(session_factory, _Service(story=False)).state(delegation)
+    assert command is not None
+    assert (command.idea_mode, command.idea, command.book_chapters, command.end_stage) == (
+        "auto",
+        None,
+        None,
+        "HANDOFF",
+    )
+
+
 @pytest.mark.parametrize("parts", [None, (0, 3)])
 async def test_a_succeeded_part_missing_from_the_book_halts_instead_of_rewriting(session_factory, parts):
     from r2.contracts.autopilot import autopilot_command_id

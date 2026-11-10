@@ -21,6 +21,7 @@ import re
 import unicodedata
 from collections.abc import Iterable, Sequence
 
+from server.story_authoring.genre_packs import genre_menu, pack_for
 from server.story_authoring.prompts.schemas import ChapterPlan, ShortOutline, StoryBibleOut, StorySeed
 
 PLANNING_SYSTEM = (
@@ -34,12 +35,20 @@ def _json(value: object) -> str:
     return json.dumps(value, ensure_ascii=False, indent=2)
 
 
+def _genre_rule(genre: str) -> str:
+    pack = pack_for(genre)
+    if pack is not None:
+        return f"- genre: {pack.label}."
+    return f"- genre: chọn đúng một thể loại hợp nhất với ý tưởng và ghi nguyên văn tên của nó: {genre_menu()}."
+
+
 def seed_prompt(*, idea: str, genre: str) -> str:
     return f"""Hãy dựng phần ý tưởng gốc (seed) cho một truyện ngắn ba chương từ ý tưởng của tác giả.
 
 Yêu cầu:
 - working_title: tên tạm, ngắn, dễ nhớ.
 - premise: 1–2 câu tóm lược truyện.
+{_genre_rule(genre)}
 - tone: giọng điệu chủ đạo; pov: ngôi kể (ví dụ "ngôi thứ ba, bám theo nhân vật chính").
 - central_conflict: xung đột trung tâm cụ thể; ending_direction: hướng kết thúc rõ ràng, khép lại xung đột.
 - characters: 2–5 nhân vật; mỗi người có name (tên Việt), role, relation_to_protagonist (cách gọi trong gia đình

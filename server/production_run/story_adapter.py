@@ -14,19 +14,24 @@ from the story's own charged usage, so story calls are never debited twice.
 
 from __future__ import annotations
 
+import asyncio
 import json
 import math
 from collections.abc import Callable
 from pathlib import Path
 from typing import Literal
 
+from lib.db.repositories.production_runs import ProductionRunRepository
 from lib.db.repositories.task_repo import TaskRepository
 from lib.project_manager import ProjectManager
+from lib.text_backends.ollama import OllamaChatClient
 from r2.contracts.automation import (
     BudgetReservation,
     DispatchIntent,
     OwnerReceipt,
+    RunCommand,
     RunPolicy,
+    RunScope,
     RunSnapshot,
     RunStage,
     StageOutcome,
@@ -52,11 +57,21 @@ from server.services.automation_grants import RunAutomationAuthority
 from server.story_authoring.artifacts import StoryBlobStore
 from server.story_authoring.book import BookSpec
 from server.story_authoring.commit import CANON_BASE_MOVED, CommitRefused, load_offered_manifest
-from server.story_authoring.contracts import StoryLimits
+from server.story_authoring.contracts import StoryLimits, StoryScope
 from server.story_authoring.driver import StoryBrief
 from server.story_authoring.handoff import STORY_SOURCE_LANGUAGE, HandoffRefused, SourceUpload, send_to_video
+from server.story_authoring.idea_draw import DRAW_ATTEMPTS, recent_ideas
+from server.story_authoring.idea_profile import (
+    ProfileRefused,
+    ProjectProfile,
+    profile_bytes,
+    profile_idea,
+    profile_pin,
+    profile_seed,
+    record_profile,
+)
 from server.story_authoring.runtime import RunPhase, RunState, RunStateStore
-from server.story_authoring.service import StoryActionRefused, StoryAuthoringService, brief_idea
+from server.story_authoring.service import SECONDS_PER_CALL, StoryActionRefused, StoryAuthoringService, brief_idea
 
 STORY_GENRE = "truyện ngắn"
 # Share of the run's caps the story may spend; the rest belongs to script, media and Quality.
@@ -109,19 +124,69 @@ class BriefAdapter:
         authority: RunAutomationAuthority,
         stories: StoryAuthoringService,
         projects: ProjectManager,
+        client_for: Callable[[str, str | None], OllamaChatClient] | None = None,
     ) -> None:
         self._sessions, self._authority, self._stories, self._projects = sessions, authority, stories, projects
+        self._client_for = client_for
 
     async def plan(self, *, run: RunSnapshot) -> StepPlan:
-        if route_for(run, "writer") is None:
+        writer = route_for(run, "writer")
+        if writer is None:
             raise OwnerBlocked("MISSING_MODEL_ROLE")
+        async with self._sessions() as session:
+            command = await ProductionRunRepository(session).start_command(
+                RunScope(user_id=run.user_id, project_name=run.project_name, run_id=run.run_id)
+            )
+        if command.idea_mode != "auto":
+            return StepPlan(
+                unit_key="brief",
+                estimated_cost_minor_units=0,
+                estimated_model_calls=0,
+                estimated_tasks=0,
+                estimated_runtime_seconds=10,
+            )
+        # ADR-0125: the drawn idea spends up to DRAW_ATTEMPTS generations, each with its count call.
+        try:
+            cost = await self._stories.draw_cost_bound(provider_id=writer[0], model_id=writer[1])
+        except StoryActionRefused as refused:
+            raise OwnerBlocked(refused.code) from None
         return StepPlan(
             unit_key="brief",
-            estimated_cost_minor_units=0,
-            estimated_model_calls=0,
+            estimated_cost_minor_units=cost,
+            estimated_model_calls=DRAW_ATTEMPTS * 2,
             estimated_tasks=0,
-            estimated_runtime_seconds=10,
+            estimated_runtime_seconds=10 + DRAW_ATTEMPTS * SECONDS_PER_CALL,
         )
+
+    async def _profile(
+        self, intent: DispatchIntent, run: RunSnapshot, command: RunCommand, writer: tuple[str, str]
+    ) -> ProjectProfile:
+        """The run's drawn profile: the one pinned for the run, else a new draw pinned before the brief is drafted."""
+        blobs = _blobs(self._projects, run.project_name)
+        key = profile_pin(run.run_id)
+        pinned = blobs.pinned(key)
+        if pinned is None:
+            avoid = await asyncio.to_thread(recent_ideas, self._projects, exclude=run.project_name)
+            try:
+                drawn = await self._stories.draw_profile(
+                    provider_id=writer[0],
+                    model_id=writer[1],
+                    max_cost_minor_units=run.policy.max_cost_minor_units,
+                    scope=StoryScope(user_id=run.user_id, project_name=run.project_name, actor_id=actor_scope(intent)),
+                    draw_key=command.command_id,
+                    seed=profile_seed(command.command_id),
+                    avoid=avoid,
+                    book_chapters=command.book_chapters,
+                    client_for=self._client_for,
+                )
+            except StoryActionRefused as refused:
+                raise OwnerBlocked(refused.code) from None
+            except ProfileRefused as refused:
+                raise OwnerBlocked(refused.code) from None
+            pinned = blobs.pin(key, blobs.put(profile_bytes(drawn.profile)))
+        profile = ProjectProfile.model_validate_json(blobs.read_exact(pinned))
+        await asyncio.to_thread(record_profile, self._projects, run.project_name, run.run_id, profile)
+        return profile
 
     async def dispatch(self, intent: DispatchIntent) -> OwnerReceipt:
         run = await current_run(self._sessions, intent)
@@ -138,11 +203,17 @@ class BriefAdapter:
             if command.story_source == "variant"
             else None
         )
-        try:
+        genre, book_chapters = STORY_GENRE, command.book_chapters
+        if command.idea_mode == "auto":
+            profile = await self._profile(intent, run, command, writer)
+            idea = profile_idea(profile)
+            genre, book_chapters = profile.pack().label, profile.book_chapters
+        else:
             idea = brief_idea(command.idea, command.variant_profile)
+        try:
             drafted = await self._stories.draft_brief(
                 idea=idea,
-                genre=STORY_GENRE,
+                genre=genre,
                 provider_id=writer[0],
                 model_id=writer[1],
                 max_cost_minor_units=max(1, min(10_000, run.policy.max_cost_minor_units)),
@@ -150,7 +221,7 @@ class BriefAdapter:
                 prior_mode=prior_mode,
                 prior_project=command.source_project,
                 prior_origin=command.variant_profile or "instruction",
-                book=None if command.book_chapters is None else BookSpec(chapters=command.book_chapters),
+                book=None if book_chapters is None else BookSpec(chapters=book_chapters),
                 user_id=run.user_id,
             )
         except StoryActionRefused as refused:

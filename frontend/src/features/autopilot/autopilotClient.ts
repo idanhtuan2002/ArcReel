@@ -3,8 +3,10 @@
 import { API } from "@/api";
 
 export interface StoryAutopilot {
-  idea: string;
-  book_chapters: number;
+  /** ADR-0125: absent when the first part draws its own idea and settings. */
+  idea?: string;
+  /** Absent when the drawn length is used. */
+  book_chapters?: number;
   direction?: string;
 }
 

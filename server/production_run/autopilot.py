@@ -171,11 +171,12 @@ class AutopilotPlanner:
                 # The project holds a story that is not a book: autopilot does not write another one over it.
                 raise AutopilotHalted("STORY_WITHOUT_BOOK")
             base = await self._base(delegation, len(own) + 1, part=1)
+            story = delegation.story
             return RunCommand.model_validate(
                 {
                     **base,
-                    "idea": delegation.story.idea,
-                    "book_chapters": delegation.story.book_chapters,
+                    **({"idea": story.idea} if story.idea is not None else {"idea_mode": "auto"}),
+                    "book_chapters": story.book_chapters,
                     "end_stage": "HANDOFF",
                 }
             )

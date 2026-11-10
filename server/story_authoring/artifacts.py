@@ -18,6 +18,7 @@ from pathlib import Path
 from lib.json_io import atomic_write_bytes
 
 BLOB_ROOT = Path("story_authoring") / "blobs"
+PIN_ROOT = Path("story_authoring") / "pins"
 _DIGEST = re.compile(r"^sha256:([0-9a-f]{64})$")
 
 
@@ -87,6 +88,44 @@ class StoryBlobStore:
                 if re.fullmatch(r"[0-9a-f]{64}", entry.name) and entry.name.startswith(shard.name)
             )
         return tuple(found)
+
+    def pin(self, key: str, digest: str) -> str:
+        """Name ``digest`` by ``key`` once; returns the digest the key names, the first one pinned winning."""
+        self.read_exact(digest)
+        path = self._pin_path(key, create_dirs=True)
+        # A complete temp file hard-linked into place: the pin appears whole or not at all, and never twice.
+        temp = path.with_name(f".{path.name}.{os.getpid()}.{os.urandom(4).hex()}.tmp")
+        atomic_write_bytes(temp, digest.encode("ascii"))
+        try:
+            os.link(temp, path)
+        except FileExistsError:
+            pinned = self.pinned(key)
+            if pinned is None:
+                raise BlobCorrupt(f"pin {key!r} is unreadable") from None
+            return pinned
+        finally:
+            temp.unlink(missing_ok=True)
+        return digest
+
+    def pinned(self, key: str) -> str | None:
+        """The digest ``key`` names, or ``None``; a pin naming a missing or corrupt blob raises."""
+        path = self._pin_path(key, create_dirs=False)
+        if not self._exists_regular(path):
+            return None
+        digest = path.read_text(encoding="ascii").strip()
+        if _DIGEST.match(digest) is None:
+            raise BlobCorrupt(f"pin {key!r} does not name a digest")
+        self.read_exact(digest)
+        return digest
+
+    def _pin_path(self, key: str, *, create_dirs: bool) -> Path:
+        directory = self._project_dir / PIN_ROOT
+        if create_dirs:
+            self._refuse_symlinks(directory)
+            directory.mkdir(parents=True, exist_ok=True)
+        path = directory / hashlib.sha256(key.encode("utf-8")).hexdigest()
+        self._refuse_symlinks(path)
+        return path
 
     def _path(self, digest: str, *, create_dirs: bool) -> Path:
         match = _DIGEST.match(digest)

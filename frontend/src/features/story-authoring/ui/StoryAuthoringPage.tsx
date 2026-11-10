@@ -7,6 +7,7 @@
  */
 import { useProjectsStore } from "@/stores/projects-store";
 import { AutopilotPanel } from "@/features/autopilot/AutopilotPanel";
+import { DrawnProfile } from "@/features/autopilot/DrawnProfile";
 import "./story-authoring.css";
 
 import { useCallback, useEffect, useId, useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
@@ -181,6 +182,9 @@ export default function StoryAuthoringPage({ projectName }: StoryAuthoringPagePr
   const isStoryProject = useProjectsStore(
     (state) => state.currentProjectName === projectName && state.currentProjectData?.project_kind === "story",
   );
+  const drawnProfile = useProjectsStore((state) =>
+    state.currentProjectName === projectName ? (state.currentProjectData?.story_profile ?? null) : null,
+  );
 
   return (
     <div className="flex h-full min-h-0 flex-col overflow-y-auto bg-bg">
@@ -191,8 +195,9 @@ export default function StoryAuthoringPage({ projectName }: StoryAuthoringPagePr
 
       <div className="mx-auto w-full max-w-5xl px-4 py-6">
         {isStoryProject ? (
-          <div className="mb-4">
+          <div className="mb-4 space-y-2">
             <AutopilotPanel projectName={projectName} kind="story" />
+            {drawnProfile ? <DrawnProfile profile={drawnProfile} /> : null}
           </div>
         ) : null}
         {loadError ? (

@@ -147,14 +147,23 @@ def _fold(text: str) -> str:
     return " ".join(unicodedata.normalize("NFC", text).lower().split())
 
 
+def _names(folded: str, alias: str) -> bool:
+    return re.search(rf"(?<!\w){re.escape(alias)}(?!\w)", folded) is not None
+
+
 def pack_for(*genres: str) -> GenrePack | None:
-    """The first pack an alias of which the given genre texts contain, in the order given."""
+    """The first pack an alias of which the given genre texts name as whole words, in the order given."""
     for genre in genres:
         folded = _fold(genre)
         for pack in PACKS:
-            if any(alias in folded for alias in pack.aliases):
+            if any(_names(folded, alias) for alias in pack.aliases):
                 return pack
     return None
+
+
+def genre_menu() -> str:
+    """The pack labels a seed chooses from when its brief names no pack."""
+    return "; ".join(pack.label for pack in PACKS)
 
 
 def planning_block(pack: GenrePack | None) -> str:
@@ -187,4 +196,4 @@ def fatigue_findings(pack: GenrePack | None, scenes: Sequence[tuple[str, str]]) 
     return tuple(findings)
 
 
-__all__ = ["PACKS", "GenrePack", "craft_rules", "fatigue_findings", "pack_for", "planning_block"]
+__all__ = ["PACKS", "GenrePack", "craft_rules", "fatigue_findings", "genre_menu", "pack_for", "planning_block"]

@@ -336,6 +336,8 @@ class RunCommand(AutomationContract):
     )
     #: ADR-0124: ``HANDOFF`` ends a run once its story is committed and handed off (a story project's autopilot).
     end_stage: Literal["HANDOFF", "EXPORT"] = Field(default="EXPORT", exclude_if=lambda value: value == "EXPORT")
+    #: ADR-0125: ``auto`` starts a story with no idea; BRIEF draws the idea and its settings on the writer route.
+    idea_mode: Literal["given", "auto"] = Field(default="given", exclude_if=lambda value: value == "given")
 
     @model_validator(mode="after")
     def command_shape(self) -> Self:
@@ -345,7 +347,9 @@ class RunCommand(AutomationContract):
             variant = self.story_source == "variant"
             if self.story_source == "project" and self.idea is not None:
                 raise ValueError("a run of the project's story takes no idea")
-            if self.story_source in {"idea", "continue"} and self.idea is None:
+            if self.idea_mode == "auto" and (self.story_source != "idea" or self.idea is not None):
+                raise ValueError("a drawn idea starts a new story and replaces the given idea")
+            if self.story_source in {"idea", "continue"} and self.idea is None and self.idea_mode == "given":
                 raise ValueError("start requires an idea")
             if variant and self.idea is None and self.variant_profile is None:
                 raise ValueError("a variant requires an instruction (idea) or a profile")
@@ -366,6 +370,7 @@ class RunCommand(AutomationContract):
             or self.variant_profile is not None
             or self.book_chapters is not None
             or self.end_stage != "EXPORT"
+            or self.idea_mode != "given"
         ):
             raise ValueError("control requires an exact existing run")
         if not self.targets or len(set(self.targets)) != len(self.targets):
