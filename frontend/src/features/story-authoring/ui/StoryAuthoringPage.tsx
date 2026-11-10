@@ -5,6 +5,7 @@
  * asks for a revision or discards it. An approved story is exported or handed to the video flow. The server
  * owns every state and verdict; the page only shows them and sends the Human's decisions.
  */
+import { useProjectsStore } from "@/stores/projects-store";
 import { AutopilotPanel } from "@/features/autopilot/AutopilotPanel";
 import "./story-authoring.css";
 
@@ -176,6 +177,10 @@ export default function StoryAuthoringPage({ projectName }: StoryAuthoringPagePr
   const selected =
     requested && runs?.some((r) => r.run_id === requested) ? requested : (runs?.[0]?.run_id ?? null);
   const showForm = creating || (runs !== null && runs.length === 0);
+  // A film project turns its autopilot on from its overview; only a story project writes its book on autopilot here.
+  const isStoryProject = useProjectsStore(
+    (state) => state.currentProjectName === projectName && state.currentProjectData?.project_kind === "story",
+  );
 
   return (
     <div className="flex h-full min-h-0 flex-col overflow-y-auto bg-bg">
@@ -185,9 +190,11 @@ export default function StoryAuthoringPage({ projectName }: StoryAuthoringPagePr
       </header>
 
       <div className="mx-auto w-full max-w-5xl px-4 py-6">
-        <div className="mb-4">
-          <AutopilotPanel projectName={projectName} kind="story" />
-        </div>
+        {isStoryProject ? (
+          <div className="mb-4">
+            <AutopilotPanel projectName={projectName} kind="story" />
+          </div>
+        ) : null}
         {loadError ? (
           <div role="alert" className="rounded-md border border-hairline-strong p-4 text-sm text-text-2">
             {loadError}

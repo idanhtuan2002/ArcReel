@@ -31,7 +31,7 @@ export function StoryRunTree({ projectName }: { projectName: string }) {
     let timer: number | undefined;
     const tick = () => {
       getAutopilot(projectName, controller.signal)
-        .then((view) => setAutopilotState(view?.status?.state ?? null))
+        .then((view) => setAutopilotState(view?.delegation?.kind === "story" ? (view.status?.state ?? null) : null))
         .catch(() => undefined);
       listRuns(projectName, { signal: controller.signal })
         .then((found) => setRuns(found))
