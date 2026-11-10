@@ -238,3 +238,34 @@ def test_all_verified_current_targets_allow_export_finality(run_data: dict):
     }
     run = RunSnapshot.model_validate({**run.model_dump(mode="python"), "completed_targets": [complete]})
     assert advance(run=run, outcome=outcome_for(run)).status is RunStatus.SUCCEEDED
+
+
+def test_story_only_run_succeeds_at_the_handoff(run_data: dict):
+    from r2.automation.transitions import advance
+    from r2.contracts.automation import RunSnapshot, RunStage, RunStatus
+
+    run = RunSnapshot.model_validate({**run_data, "stage": "HANDOFF", "status": "RUNNING", "end_stage": "HANDOFF"})
+    updated = advance(run=run, outcome=outcome_for(run))
+    assert (updated.status, updated.stage) == (RunStatus.SUCCEEDED, RunStage.HANDOFF)
+    assert "end_stage" in updated.model_dump(mode="json")
+
+
+def test_full_run_passes_the_handoff_and_keeps_its_stored_shape(run_data: dict):
+    from r2.automation.transitions import advance
+    from r2.contracts.automation import RunSnapshot, RunStage, RunStatus
+
+    run = RunSnapshot.model_validate({**run_data, "stage": "HANDOFF", "status": "RUNNING"})
+    updated = advance(run=run, outcome=outcome_for(run))
+    assert (updated.status, updated.stage) == (RunStatus.RUNNING, RunStage.ASSET_ANALYSIS)
+    assert "end_stage" not in updated.model_dump(mode="json")
+
+
+def test_story_only_success_is_only_at_the_handoff(run_data: dict):
+    from pydantic import ValidationError
+
+    from r2.contracts.automation import RunSnapshot
+
+    with pytest.raises(ValidationError):
+        RunSnapshot.model_validate({**run_data, "stage": "STORY", "status": "SUCCEEDED", "end_stage": "HANDOFF"})
+    with pytest.raises(ValidationError):
+        RunSnapshot.model_validate({**run_data, "end_stage": "MEDIA"})

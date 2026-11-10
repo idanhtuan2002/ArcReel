@@ -5,6 +5,7 @@
  * asks for a revision or discards it. An approved story is exported or handed to the video flow. The server
  * owns every state and verdict; the page only shows them and sends the Human's decisions.
  */
+import { AutopilotPanel } from "@/features/autopilot/AutopilotPanel";
 import "./story-authoring.css";
 
 import { useCallback, useEffect, useId, useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
@@ -184,6 +185,9 @@ export default function StoryAuthoringPage({ projectName }: StoryAuthoringPagePr
       </header>
 
       <div className="mx-auto w-full max-w-5xl px-4 py-6">
+        <div className="mb-4">
+          <AutopilotPanel projectName={projectName} kind="story" />
+        </div>
         {loadError ? (
           <div role="alert" className="rounded-md border border-hairline-strong p-4 text-sm text-text-2">
             {loadError}

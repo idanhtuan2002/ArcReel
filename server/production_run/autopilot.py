@@ -1,0 +1,286 @@
+"""ADR-0124: start each enabled project's next run without a click, under its standing autopilot delegation.
+
+A story project writes its book part after part; a film project films its linked story, syncing the story's new
+parts first. A project's autopilot waits while the project has an active run and halts when its own last run did
+not succeed; the Showrunner resolves that run (or turns autopilot off and on again) and the next scan continues.
+The database is the recovery path: a start's command is derived from the delegation and its run count, so a
+scan repeated after a crash replays the same run.
+"""
+
+from __future__ import annotations
+
+import asyncio
+import contextlib
+import logging
+from collections.abc import Awaitable, Callable
+from dataclasses import dataclass
+from typing import Any, Literal, Protocol
+
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
+
+from lib.db.repositories.autopilot import AutopilotRepository
+from lib.db.repositories.production_runs import ProductionRunConflict, ProductionRunRepository
+from lib.project_kinds import linked_story
+from r2.contracts.automation import RunCommand, RunSnapshot, RunStatus
+from r2.contracts.autopilot import AutopilotDelegation, autopilot_command_id
+
+logger = logging.getLogger(__name__)
+
+_EPISODE = "episode:"
+
+
+class StartsDelegatedRuns(Protocol):
+    async def start_delegated(self, *, delegation: AutopilotDelegation, command: RunCommand) -> RunSnapshot: ...
+
+    async def input_digest(self, *, user_id: str, project_name: str) -> str: ...
+
+    async def has_story(self, project_name: str) -> bool: ...
+
+
+@dataclass(frozen=True)
+class BookParts:
+    done: int
+    total: int
+
+
+@dataclass(frozen=True)
+class AutopilotState:
+    """What the project's autopilot does next: ``waiting`` for its active run, ``halted`` on its last run,
+    ``finished`` (nothing left to write or film), or ``ready`` to start."""
+
+    state: Literal["off", "waiting", "halted", "finished", "ready"]
+    run_id: str | None = None
+    reason: str | None = None
+
+
+def _prefix(delegation: AutopilotDelegation) -> str:
+    return autopilot_command_id(delegation, 0).removesuffix("0")
+
+
+def _episode(target: str) -> int | None:
+    if not target.startswith(_EPISODE):
+        return None
+    value = target.removeprefix(_EPISODE)
+    return int(value) if value.isdigit() else None
+
+
+class AutopilotPlanner:
+    """Decides a project's next autopilot command from durable state only."""
+
+    def __init__(
+        self,
+        sessions: async_sessionmaker[AsyncSession],
+        service: StartsDelegatedRuns,
+        *,
+        load_project: Callable[[str], dict[str, Any]],
+        book_parts: Callable[[str, str], Awaitable[BookParts | None]],
+        unplanned_source: Callable[[str], bool],
+        sync_story: Callable[[str, str], Awaitable[list[str]]],
+        max_targets: Callable[[AutopilotDelegation], Awaitable[int]],
+    ) -> None:
+        self._sessions = sessions
+        self._service = service
+        self._load_project = load_project
+        self._book_parts = book_parts
+        self._unplanned_source = unplanned_source
+        self._sync_story = sync_story
+        self._max_targets = max_targets
+
+    async def _runs(self, delegation: AutopilotDelegation) -> tuple[bool, list[RunSnapshot], list[RunSnapshot]]:
+        async with self._sessions() as session:
+            repository = ProductionRunRepository(session)
+            active = await repository.has_active(user_id=delegation.user_id, project_name=delegation.project_name)
+            own = await repository.started_by(
+                user_id=delegation.user_id, project_name=delegation.project_name, command_prefix=_prefix(delegation)
+            )
+            every = await repository.list_for_project(user_id=delegation.user_id, project_name=delegation.project_name)
+        return active, own, every
+
+    async def state(self, delegation: AutopilotDelegation) -> tuple[AutopilotState, RunCommand | None]:
+        if delegation.state != "ENABLED":
+            return AutopilotState("off"), None
+        active, own, every = await self._runs(delegation)
+        if active:
+            running = next((run for run in every if run.status not in _TERMINAL), None)
+            return AutopilotState("waiting", running.run_id if running else None), None
+        if own and own[-1].status is not RunStatus.SUCCEEDED:
+            return AutopilotState("halted", own[-1].run_id, own[-1].reason or own[-1].status.value), None
+        try:
+            command = (
+                await self._story_command(delegation, own)
+                if delegation.kind == "story"
+                else await self._film_command(delegation, own, every)
+            )
+        except AutopilotHalted as halt:
+            return AutopilotState("halted", None, str(halt)), None
+        if command is None:
+            return AutopilotState("finished"), None
+        return AutopilotState("ready"), command
+
+    async def _base(self, delegation: AutopilotDelegation, ordinal: int) -> dict[str, Any]:
+        return {
+            "user_id": delegation.user_id,
+            "project_name": delegation.project_name,
+            "command_id": autopilot_command_id(delegation, ordinal),
+            "action": "START",
+            "expected_version": 0,
+            "expected_input_digest": await self._service.input_digest(
+                user_id=delegation.user_id, project_name=delegation.project_name
+            ),
+            "policy_digest": delegation.policy_digest,
+            "mode": delegation.mode,
+        }
+
+    async def _story_command(self, delegation: AutopilotDelegation, own: list[RunSnapshot]) -> RunCommand | None:
+        assert delegation.story is not None
+        parts = await self._book_parts(delegation.user_id, delegation.project_name)
+        base = await self._base(delegation, len(own) + 1)
+        if parts is None:
+            # A part this delegation wrote that left no book behind is not written again.
+            if own:
+                return None
+            return RunCommand.model_validate(
+                {
+                    **base,
+                    "idea": delegation.story.idea,
+                    "book_chapters": delegation.story.book_chapters,
+                    "end_stage": "HANDOFF",
+                }
+            )
+        if parts.done >= parts.total:
+            return None
+        return RunCommand.model_validate(
+            {**base, "story_source": "continue", "idea": delegation.story.direction, "end_stage": "HANDOFF"}
+        )
+
+    async def _film_command(
+        self, delegation: AutopilotDelegation, own: list[RunSnapshot], every: list[RunSnapshot]
+    ) -> RunCommand | None:
+        assert delegation.film is not None
+        project = await asyncio.to_thread(self._load_project, delegation.project_name)
+        if linked_story(project) is not None:
+            conflicts = await self._sync_story(delegation.user_id, delegation.project_name)
+            if conflicts:
+                raise AutopilotHalted("STORY_SYNC_CONFLICT")
+            project = await asyncio.to_thread(self._load_project, delegation.project_name)
+        if not await self._service.has_story(delegation.project_name):
+            return None
+        filmed = {
+            number
+            for run in every
+            if run.status is RunStatus.SUCCEEDED
+            for output in run.completed_targets
+            if (number := _episode(output.target)) is not None
+        }
+        episodes = project.get("episodes")
+        planned = sorted(
+            {
+                entry["episode"]
+                for entry in (episodes if isinstance(episodes, list) else [])
+                if isinstance(entry, dict) and isinstance(entry.get("episode"), int)
+            }
+        )
+        limit = min(delegation.film.episodes_per_run, await self._max_targets(delegation))
+        pending = [number for number in planned if number not in filmed][:limit]
+        if not pending:
+            if planned and not await asyncio.to_thread(self._unplanned_source, delegation.project_name):
+                return None
+            pending = [max([0, *planned, *filmed]) + 1]
+        base = await self._base(delegation, len(own) + 1)
+        return RunCommand.model_validate(
+            {**base, "story_source": "project", "targets": tuple(f"{_EPISODE}{n}" for n in pending)}
+        )
+
+
+_TERMINAL = {RunStatus.SUCCEEDED, RunStatus.FAILED, RunStatus.FAILED_QUALITY, RunStatus.CANCELLED}
+
+
+class AutopilotHalted(Exception):
+    """The project's autopilot cannot continue until the Showrunner acts."""
+
+
+class AutopilotScheduler:
+    def __init__(
+        self,
+        sessions: async_sessionmaker[AsyncSession],
+        service: StartsDelegatedRuns,
+        planner: AutopilotPlanner,
+        *,
+        interval_seconds: float = 60.0,
+        page_size: int = 64,
+    ) -> None:
+        self._sessions = sessions
+        self._service = service
+        self._planner = planner
+        self._interval_seconds = interval_seconds
+        self._page_size = page_size
+        self._stop_event = asyncio.Event()
+        self._wake_event = asyncio.Event()
+        self._task: asyncio.Task[None] | None = None
+
+    @property
+    def planner(self) -> AutopilotPlanner:
+        return self._planner
+
+    async def step(self, delegation: AutopilotDelegation) -> RunSnapshot | None:
+        """Start the project's next run if it is ready; returns the run started (or replayed)."""
+        state, command = await self._planner.state(delegation)
+        if state.state != "ready" or command is None:
+            return None
+        return await self._service.start_delegated(delegation=delegation, command=command)
+
+    async def scan_once(self) -> int:
+        """Visit every enabled project once; returns how many runs were started."""
+        started = 0
+        after: tuple[str, str] | None = None
+        while True:
+            async with self._sessions() as session:
+                page = await AutopilotRepository(session).enabled(limit=self._page_size, after=after)
+            for delegation in page:
+                try:
+                    if await self.step(delegation) is not None:
+                        started += 1
+                except (ProductionRunConflict, PermissionError) as error:
+                    logger.info("autopilot of %s waits: %s", delegation.project_name, error)
+                except Exception as error:
+                    # A refusal (policy or input moved, preflight blocked) is retried by a later scan.
+                    logger.info("autopilot of %s did not start: %r", delegation.project_name, error)
+            if len(page) < self._page_size:
+                return started
+            after = (page[-1].user_id, page[-1].project_name)
+
+    def wake(self) -> None:
+        self._wake_event.set()
+
+    async def start(self) -> None:
+        if self._task is not None and not self._task.done():
+            return
+        self._stop_event.clear()
+        self._task = asyncio.create_task(self._run_loop(), name="autopilot-scan")
+
+    async def stop(self) -> None:
+        self._stop_event.set()
+        self._wake_event.set()
+        if self._task is not None:
+            await self._task
+            self._task = None
+
+    async def _run_loop(self) -> None:
+        while not self._stop_event.is_set():
+            self._wake_event.clear()
+            try:
+                await self.scan_once()
+            except Exception:
+                logger.exception("autopilot scan failed")
+            with contextlib.suppress(TimeoutError):
+                await asyncio.wait_for(self._wake_event.wait(), timeout=self._interval_seconds)
+
+
+__all__ = [
+    "AutopilotHalted",
+    "AutopilotPlanner",
+    "AutopilotScheduler",
+    "AutopilotState",
+    "BookParts",
+    "StartsDelegatedRuns",
+]

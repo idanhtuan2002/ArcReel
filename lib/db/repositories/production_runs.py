@@ -173,6 +173,7 @@ class ProductionRunRepository:
             targets=command.targets,
             created_at=now,
             stage=first_stage(command),
+            end_stage=RunStage(command.end_stage),
         )
         self.session.add(
             ProductionPolicyModel(
@@ -251,6 +252,35 @@ class ProductionRunRepository:
             )
         ).scalars()
         return [_snapshot(row) for row in rows]
+
+    async def started_by(self, *, user_id: str, project_name: str, command_prefix: str) -> list[RunSnapshot]:
+        """The project's runs whose start command begins with ``command_prefix``, oldest first."""
+        escaped = command_prefix.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+        rows = (
+            await self.session.execute(
+                select(ProductionRunModel)
+                .where(
+                    ProductionRunModel.user_id == user_id,
+                    ProductionRunModel.project_name == project_name,
+                    ProductionRunModel.start_command_id.like(escaped + "%", escape="\\"),
+                )
+                .order_by(ProductionRunModel.created_at, ProductionRunModel.run_id)
+            )
+        ).scalars()
+        return [_snapshot(row) for row in rows]
+
+    async def has_active(self, *, user_id: str, project_name: str) -> bool:
+        return (
+            await self.session.scalar(
+                select(ProductionRunModel.run_id)
+                .where(
+                    ProductionRunModel.user_id == user_id,
+                    ProductionRunModel.project_name == project_name,
+                    ProductionRunModel.status.not_in([s.value for s in _TERMINAL]),
+                )
+                .limit(1)
+            )
+        ) is not None
 
     async def locked(self, scope: RunScope) -> RunSnapshot:
         """The current run under its row lock, for commands applied in the caller's transaction."""

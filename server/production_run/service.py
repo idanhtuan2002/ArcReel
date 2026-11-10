@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime, timedelta
+from typing import Literal
 
 from fastapi import HTTPException
 from pydantic import BaseModel, ConfigDict
@@ -37,6 +38,7 @@ from r2.contracts.automation import (
     RunStage,
     RunStatus,
 )
+from r2.contracts.autopilot import AutopilotDelegation, FilmAutopilot, StoryAutopilot, autopilot_command_id
 from server.auth import get_current_interactive_user
 from server.production_run.ports import InputWitness, PolicyResolver, PreflightCheck
 from server.services.automation_grants import AutomationGrantCustodian
@@ -62,6 +64,27 @@ def covering_later_stages(granted: frozenset[AutomationOperation]) -> frozenset[
     if {AutomationOperation.EPISODE_PLAN, AutomationOperation.SCRIPT_PLAN} <= granted:
         return granted | {AutomationOperation.ADAPTATION}
     return granted
+
+
+#: Checks a story-only run (ADR-0124: it ends at the handoff) does not reach: media routes and their qualification,
+#: the voice, the image judge, the quality profile its film would be judged by, and GPU room.
+_FILM_ONLY_PREFLIGHT = frozenset(
+    {
+        "MEDIA_ROUTE_NOT_QUALIFIED",
+        "DRAMA_ROUTE_NOT_QUALIFIED",
+        "IMAGE_JUDGE_NOT_QUALIFIED",
+        "LAUNCH_PROFILE_NOT_QUALIFIED",
+        "LAUNCH_QUALIFICATION_CHANGED",
+        "MISSING_PUBLISHED_PROFILE",
+        "PROFILE_INTEGRITY_INVALID",
+        "QUALITY_PROFILE_CHANGED",
+        "PROFILE_REQUIRES_HUMAN",
+        "PROFILE_MODEL_ASSESSMENT_INCOMPLETE",
+        "MISSING_VOICE",
+        "RESOURCE_ENVELOPE_UNKNOWN",
+        "INSUFFICIENT_GPU",
+    }
+)
 
 
 class ProductionRunRefused(Exception):
@@ -206,10 +229,15 @@ class ProductionRunService:
                 "AUTOMATIC_PRODUCTION_NOT_ACTIVATED", 503, (self.activation.reason or "NOT_ACTIVATED",)
             )
 
-    async def _require_preflight(self, *, user_id: str, project_name: str, policy: RunPolicy) -> None:
+    async def _require_preflight(
+        self, *, user_id: str, project_name: str, policy: RunPolicy, story_only: bool = False
+    ) -> None:
         report = await self._preflight.check(user_id=user_id, project_name=project_name, policy=policy)
-        if not report.dispatch_allowed:
-            raise ProductionRunRefused("PREFLIGHT_BLOCKED", 409, report.blocking_reasons)
+        reasons = tuple(
+            reason for reason in report.blocking_reasons if not (story_only and reason in _FILM_ONLY_PREFLIGHT)
+        )
+        if reasons:
+            raise ProductionRunRefused("PREFLIGHT_BLOCKED", 409, reasons)
 
     async def _grant_request(
         self,
@@ -219,6 +247,7 @@ class ProductionRunService:
         command_id: str,
         parent_expiry: datetime,
         operations: frozenset[AutomationOperation],
+        ttl: timedelta | None | Literal["default"] = "default",
     ) -> GrantRequest:
         return GrantRequest(
             user_id=run.user_id,
@@ -230,7 +259,9 @@ class ProductionRunService:
             input_digest=run.input_digest,
             policy_digest=policy_digest(run.policy),
             operations=operations,
-            expires_at=min(datetime.now(UTC) + self._grant_ttl, parent_expiry),
+            expires_at=parent_expiry
+            if ttl is None
+            else min(datetime.now(UTC) + (self._grant_ttl if ttl == "default" else ttl), parent_expiry),
         )
 
     async def start(self, *, interactive_token: str | None, command: RunCommand) -> RunSnapshot:
@@ -263,7 +294,12 @@ class ProductionRunService:
             current_input = await self._witness.digest(user_id=command.user_id, project_name=command.project_name)
             if current_input != command.expected_input_digest:
                 raise ProductionRunRefused("INPUT_MOVED")
-            await self._require_preflight(user_id=command.user_id, project_name=command.project_name, policy=policy)
+            await self._require_preflight(
+                user_id=command.user_id,
+                project_name=command.project_name,
+                policy=policy,
+                story_only=command.end_stage == "HANDOFF",
+            )
         else:
             policy = replay.policy
         await self._custodian.activate()
@@ -288,6 +324,116 @@ class ProductionRunService:
                 await self._custodian.issue_locked(session, interactive_token=interactive_token, request=request)
             elif grant.start_command_id != command.command_id:
                 raise ProductionRunRefused("COMMAND_REPLAY_CONFLICT")
+        self._on_change()
+        return run
+
+    async def resolve_policy(self, *, user_id: str, project_name: str, mode: AutomationMode) -> RunPolicy:
+        return await self._policies.resolve(user_id=user_id, project_name=project_name, mode=mode)
+
+    async def input_digest(self, *, user_id: str, project_name: str) -> str:
+        return await self._witness.digest(user_id=user_id, project_name=project_name)
+
+    async def has_story(self, project_name: str) -> bool:
+        return await self._has_story(project_name)
+
+    async def set_autopilot(
+        self,
+        *,
+        interactive_token: str | None,
+        user_id: str,
+        project_name: str,
+        command_id: str,
+        enabled: bool,
+        kind: Literal["story", "film"],
+        mode: AutomationMode,
+        story: StoryAutopilot | None = None,
+        film: FilmAutopilot | None = None,
+    ) -> AutopilotDelegation | None:
+        """ADR-0124: record the Showrunner's decision to turn the project's autopilot on (freezing the policy of
+        ``mode``) or off."""
+        self._require_activated()
+        await self._interactive(interactive_token, user_id)
+        policy = await self.resolve_policy(user_id=user_id, project_name=project_name, mode=mode)
+        await self._custodian.activate()
+        try:
+            async with self._sessions() as session, session.begin():
+                delegation = await self._custodian.set_autopilot_locked(
+                    session,
+                    interactive_token=interactive_token,
+                    user_id=user_id,
+                    project_name=project_name,
+                    command_id=command_id,
+                    enabled=enabled,
+                    kind=kind,
+                    mode=mode,
+                    policy_digest=policy_digest(policy),
+                    story=story,
+                    film=film,
+                )
+        except PermissionError as error:
+            raise ProductionRunRefused(str(error), 403) from None
+        self._on_change()
+        return delegation
+
+    async def start_delegated(self, *, delegation: AutopilotDelegation, command: RunCommand) -> RunSnapshot:
+        """ADR-0124: start (or replay) a run of the autopilot under its locked, enabled delegation, without a session.
+        Everything an interactive start checks is checked, and the policy must be the one frozen at enable."""
+        command = RunCommand.model_validate(command)
+        delegation = AutopilotDelegation.model_validate(delegation)
+        if (
+            command.action != "START"
+            or (command.user_id, command.project_name) != (delegation.user_id, delegation.project_name)
+            or command.mode != delegation.mode
+            or command.source_project is not None
+            or not command.command_id.startswith(autopilot_command_id(delegation, 0).removesuffix("0"))
+        ):
+            raise ProductionRunRefused("INVALID_COMMAND", 422)
+        self._require_activated()
+        async with self._sessions() as session, session.begin():
+            replay = await ProductionRunRepository(session).start_replay(command=command)
+        if replay is None:
+            policy = await self.resolve_policy(
+                user_id=command.user_id, project_name=command.project_name, mode=command.mode
+            )
+            if policy_digest(policy) != command.policy_digest or command.policy_digest != delegation.policy_digest:
+                raise ProductionRunRefused("POLICY_MOVED")
+            if len(set(command.targets)) != len(command.targets) or len(command.targets) > policy.max_target_episodes:
+                raise ProductionRunRefused("TARGETS_OVER_LIMIT", 422, (str(policy.max_target_episodes),))
+            if command.story_source in {"project", "continue"} and not await self._has_story(command.project_name):
+                raise ProductionRunRefused("PROJECT_SOURCE_MISSING", 409)
+            current_input = await self._witness.digest(user_id=command.user_id, project_name=command.project_name)
+            if current_input != command.expected_input_digest:
+                raise ProductionRunRefused("INPUT_MOVED")
+            await self._require_preflight(
+                user_id=command.user_id,
+                project_name=command.project_name,
+                policy=policy,
+                story_only=command.end_stage == "HANDOFF",
+            )
+        else:
+            policy = replay.policy
+        await self._custodian.activate()
+        try:
+            async with self._sessions() as session, session.begin():
+                parent_expiry = await self._custodian.require_delegation_locked(session, delegation=delegation)
+                run = await ProductionRunRepository(session).create(command=command, policy=policy)
+                scope = RunScope(user_id=run.user_id, project_name=run.project_name, run_id=run.run_id)
+                grant = await AutomationGrantRepository(session).head(scope)
+                if grant is None:
+                    # The child grant lives as long as its parent; the delegation, not a session, bounds it.
+                    request = await self._grant_request(
+                        run,
+                        issuer_id=delegation.issuer_id,
+                        command_id=command.command_id,
+                        parent_expiry=parent_expiry,
+                        operations=frozenset(AutomationOperation),
+                        ttl=None,
+                    )
+                    await self._custodian.issue_delegated_locked(session, delegation=delegation, request=request)
+                elif grant.start_command_id != command.command_id:
+                    raise ProductionRunRefused("COMMAND_REPLAY_CONFLICT")
+        except PermissionError as error:
+            raise ProductionRunRefused(str(error), 403) from None
         self._on_change()
         return run
 
@@ -336,7 +482,10 @@ class ProductionRunService:
             ):
                 raise ProductionRunRefused("INPUT_MOVED")
             await self._require_preflight(
-                user_id=command.user_id, project_name=command.project_name, policy=target_policy
+                user_id=command.user_id,
+                project_name=command.project_name,
+                policy=target_policy,
+                story_only=observed.end_stage is RunStage.HANDOFF,
             )
         await self._custodian.activate()
         async with self._sessions() as session, session.begin():

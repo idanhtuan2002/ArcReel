@@ -14,12 +14,16 @@ from fastapi.responses import FileResponse
 from pydantic import BaseModel, ConfigDict, Field
 
 from lib.db import async_session_factory
+from lib.db.repositories.autopilot import AutopilotRepository
 from lib.db.repositories.production_runs import ProductionRunConflict, ProductionRunRepository
 from lib.presentation_renderer import sha256_file
+from lib.project_kinds import project_kind
 from lib.project_manager import get_project_manager
 from r2.automation.identity import policy_digest
 from r2.contracts.automation import AutomationMode, Checkpoint, ReviewCommand, RunCommand, RunSnapshot, RunStatus
+from r2.contracts.autopilot import FilmAutopilot, StoryAutopilot
 from server.auth import CurrentUser, InteractiveUser, oauth2_scheme_optional
+from server.production_run.autopilot import AutopilotScheduler
 from server.production_run.qualification_jobs import QualificationJobs, QualificationRefused
 from server.production_run.report import pending_final, run_progress, run_report, verified_final
 from server.production_run.service import (
@@ -424,3 +428,79 @@ async def download_output(
     ):
         raise HTTPException(status_code=409, detail={"code": "ARCHIVE_CHANGED", "reasons": []})
     return FileResponse(archive, media_type="application/zip", filename=f"{project_name}-episode-{episode}.zip")
+
+
+# Autopilot (ADR-0124) ----------------------------------------------------------------------------------------------
+
+
+def autopilot_scheduler(request: Request) -> AutopilotScheduler | None:
+    return getattr(request.app.state, "autopilot_scheduler", None)
+
+
+Autopilot = Annotated[AutopilotScheduler | None, Depends(autopilot_scheduler)]
+
+
+class AutopilotBody(_Body):
+    enabled: bool
+    mode: AutomationMode = AutomationMode.AUTO
+    story: StoryAutopilot | None = None
+    film: FilmAutopilot | None = None
+
+
+async def _autopilot_view(scheduler: AutopilotScheduler | None, user_id: str, project_name: str) -> dict[str, Any]:
+    async with async_session_factory() as session:
+        delegation = await AutopilotRepository(session).current(user_id, project_name)
+    status: dict[str, Any] = {"state": "off", "run_id": None, "reason": None}
+    if delegation is not None and scheduler is not None:
+        state, _command = await scheduler.planner.state(delegation)
+        status = {"state": state.state, "run_id": state.run_id, "reason": state.reason}
+    elif delegation is not None and delegation.state == "ENABLED":
+        status = {"state": "waiting", "run_id": None, "reason": "RELEASE_GATE_PENDING"}
+    return {
+        "available": scheduler is not None,
+        "delegation": None if delegation is None else delegation.model_dump(mode="json"),
+        "status": status,
+    }
+
+
+@router.get("/projects/{project_name}/autopilot")
+async def get_autopilot(project_name: str, user: CurrentUser, scheduler: Autopilot) -> dict[str, Any]:
+    """The project's autopilot: whether it is on, with what, and what it does next."""
+    return await _autopilot_view(scheduler, user.id, project_name)
+
+
+@router.put("/projects/{project_name}/autopilot")
+async def put_autopilot(
+    project_name: str,
+    body: AutopilotBody,
+    user: InteractiveUser,
+    token: Token,
+    service: Service,
+    scheduler: Autopilot,
+) -> dict[str, Any]:
+    """Turn the project's autopilot on (the Showrunner's current grant; the policy of ``mode`` is frozen) or off."""
+    active = _require(service)
+    try:
+        project = await asyncio.to_thread(get_project_manager().load_project, project_name)
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail={"code": "PROJECT_NOT_FOUND", "reasons": []}) from None
+    kind = project_kind(project)
+    if body.enabled and (kind == "story") != (body.story is not None):
+        raise HTTPException(status_code=422, detail={"code": "AUTOPILOT_PARAMETERS_MISMATCH", "reasons": [kind]})
+    try:
+        await active.set_autopilot(
+            interactive_token=token,
+            user_id=user.id,
+            project_name=project_name,
+            command_id=body.command_id,
+            enabled=body.enabled,
+            kind=kind,
+            mode=body.mode,
+            story=body.story if kind == "story" else None,
+            film=(body.film or FilmAutopilot()) if kind == "film" else None,
+        )
+    except _REFUSALS as error:
+        raise _http(error) from error
+    if scheduler is not None:
+        scheduler.wake()
+    return await _autopilot_view(scheduler, user.id, project_name)

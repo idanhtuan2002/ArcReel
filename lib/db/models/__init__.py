@@ -32,6 +32,7 @@ from lib.db.models.automation_grant import (
     AutomationGrantEventModel,
     AutomationGrantHeadModel,
 )
+from lib.db.models.autopilot import AutopilotDelegationModel
 from lib.db.models.budget_reservation import BudgetReservationModel, BudgetScopeModel
 from lib.db.models.canon import (
     CanonBranchModel,
@@ -185,6 +186,7 @@ __all__ = [
     "AutomationDecisionModel",
     "AutomationGrantEventModel",
     "AutomationGrantHeadModel",
+    "AutopilotDelegationModel",
     "BackupSetMediaRefModel",
     "BackupSetModel",
     "BatchTask",

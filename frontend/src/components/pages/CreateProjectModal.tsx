@@ -1,4 +1,6 @@
 
+import { StoryAutopilotFields, storyAutopilot } from "@/features/autopilot/AutopilotPanel";
+import { setAutopilot } from "@/features/autopilot/autopilotClient";
 import { useState, useEffect, useRef, type CSSProperties } from "react";
 import { ProjectKindPicker } from "./create-project/ProjectKindPicker";
 import type { ProjectKind } from "@/types/project";
@@ -187,6 +189,10 @@ export function CreateProjectModal() {
   const [kind, setKind] = useState<ProjectKind>("film");
   const [storyProject, setStoryProject] = useState("");
   const [storyTitle, setStoryTitle] = useState("");
+  // ADR-0124: the new project may start on autopilot (a story from its idea; a film following its story).
+  const [autopilot, setAutopilotOn] = useState(false);
+  const [autoIdea, setAutoIdea] = useState("");
+  const [autoChapters, setAutoChapters] = useState(30);
 
   // Step2 的远端数据 hoist 到此处：前进/后退切 step 时 Step2 unmount/mount 不再触发 HTTP，
   // 只在 modal 挂载与界面语言变化时 fetch。供应商与模型名由后端按 Accept-Language 成文，
@@ -291,9 +297,32 @@ export function CreateProjectModal() {
     }));
   };
 
+  const autoStory = storyAutopilot(autoIdea, autoChapters, "");
+  const autopilotToggle = (
+    <div className="space-y-2.5 rounded-md border border-hairline px-3 py-2.5">
+      <label className="flex items-start gap-2 text-[13px] text-text">
+        <input
+          type="checkbox"
+          className="mt-0.5"
+          checked={autopilot}
+          onChange={(event) => setAutopilotOn(event.target.checked)}
+        />
+        <span>
+          {t("dashboard:ap_create_label")}
+          <span className="block text-[12px] text-text-3">
+            {t(kind === "story" ? "dashboard:ap_create_story_hint" : "dashboard:ap_create_film_hint")}
+          </span>
+        </span>
+      </label>
+      {autopilot && kind === "story" ? (
+        <StoryAutopilotFields idea={autoIdea} onIdea={setAutoIdea} chapters={autoChapters} onChapters={setAutoChapters} />
+      ) : null}
+    </div>
+  );
+
   const handleCreateStory = async () => {
     const title = storyTitle.trim();
-    if (!title) return;
+    if (!title || (autopilot && !autoStory)) return;
     setCreating(true);
     try {
       const resp = await API.createProject({
@@ -302,6 +331,13 @@ export function CreateProjectModal() {
         content_mode: "narration",
         generation_mode: "storyboard",
       });
+      if (autopilot && autoStory) {
+        try {
+          await setAutopilot(resp.name, { enabled: true, story: autoStory });
+        } catch (err) {
+          useAppStore.getState().pushToast(`${t("dashboard:ap_create_failed")}${errMsg(err)}`, "warning");
+        }
+      }
       setShowCreateModal(false);
       navigate(`/app/projects/${resp.name}/story`);
     } catch (err) {
@@ -381,6 +417,13 @@ export function CreateProjectModal() {
         }
       }
 
+      if (autopilot) {
+        try {
+          await setAutopilot(resp.name, { enabled: true, film: { episodes_per_run: 1 } });
+        } catch (err) {
+          useAppStore.getState().pushToast(`${t("dashboard:ap_create_failed")}${errMsg(err)}`, "warning");
+        }
+      }
       setShowCreateModal(false);
       navigate(`/app/projects/${resp.name}`);
     } catch (err) {
@@ -489,6 +532,7 @@ export function CreateProjectModal() {
               onStoryProject={setStoryProject}
             />
           )}
+          {step === 1 && kind === "film" && <div className="mb-5">{autopilotToggle}</div>}
           {step === 1 && kind === "story" && (
             <form
               className="space-y-4"
@@ -507,13 +551,14 @@ export function CreateProjectModal() {
                 />
               </label>
               <p className="text-[12px] text-text-3">{t("dashboard:new_story_hint")}</p>
+              {autopilotToggle}
               <div className="flex justify-end gap-2">
                 <button type="button" onClick={handleClose} className="rounded-md border border-hairline px-3 py-1.5 text-[13px] text-text-2 hover:text-text">
                   {t("common:cancel")}
                 </button>
                 <button
                   type="submit"
-                  disabled={creating || !storyTitle.trim()}
+                  disabled={creating || !storyTitle.trim() || (autopilot && !autoStory)}
                   className="rounded-md bg-accent px-3 py-1.5 text-[13px] font-medium text-[oklch(0.14_0_0)] disabled:opacity-50"
                 >
                   {t("dashboard:new_story_create")}

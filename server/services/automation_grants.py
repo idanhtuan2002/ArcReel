@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 from datetime import datetime
 from pathlib import Path
+from typing import Literal
 from uuid import NAMESPACE_URL, uuid5
 
 from fastapi import HTTPException
@@ -13,17 +14,21 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from lib.db.models.production_run import ProductionRunModel
 from lib.db.repositories.automation_grants import AutomationGrantRepository
+from lib.db.repositories.autopilot import AutopilotRepository
 from r2.automation.authorization import authorization_subject_digest, automation_principal, grant_request_digest
 from r2.automation.identity import policy_digest
 from r2.contracts.automation import (
     AuthorizationSubject,
     AutomationAuthorizationV1,
     AutomationGrant,
+    AutomationMode,
     GrantRequest,
     RunScope,
     RunSnapshot,
     RunStatus,
 )
+from r2.contracts.autopilot import AutopilotDelegation, FilmAutopilot, StoryAutopilot, autopilot_command_id
+from r2.governance.grant_signature import VerifiedGrantEventV1
 from r2.governance.grant_transition import GrantScopeV1
 from server.auth import get_current_interactive_user
 from server.services.governance_grants import CheckpointedShowrunnerGrantReader
@@ -82,6 +87,56 @@ async def _run_locked(session: AsyncSession, scope: RunScope) -> tuple[Productio
     ):
         raise PermissionError("AUTOMATION_RUN_INTEGRITY_FAILED")
     return row, run
+
+
+async def _issue_first(
+    repository: AutomationGrantRepository,
+    request: GrantRequest,
+    parent: VerifiedGrantEventV1,
+    previous: AutomationGrant | None,
+    run: RunSnapshot,
+    now: datetime,
+) -> AutomationGrant:
+    """The run's first grant under the locked parent, or its identical replay."""
+    digest = grant_request_digest(request)
+    if (
+        parent.body.expires_at is None
+        or not now < request.expires_at <= datetime.fromisoformat(parent.body.expires_at)
+        or (parent.body.sequence, parent.event_digest)
+        != (
+            previous.parent_sequence if previous else parent.body.sequence,
+            previous.parent_event_digest if previous else parent.event_digest,
+        )
+        or (request.input_digest, request.policy_digest) != (run.input_digest, policy_digest(run.policy))
+    ):
+        raise PermissionError("AUTOMATION_DELEGATION_SCOPE_MISMATCH")
+    if previous is not None:
+        if previous.request_digest != digest or previous.state != "ACTIVE" or now >= previous.expires_at:
+            raise PermissionError("AUTOMATION_DELEGATION_REPLAY_CONFLICT")
+        return previous
+    if request.expected_run_version != run.version or run.status is not RunStatus.PENDING:
+        raise PermissionError("AUTOMATION_START_MOVED")
+    grant = AutomationGrant(
+        user_id=run.user_id,
+        project_name=run.project_name,
+        run_id=run.run_id,
+        grant_id=str(uuid5(NAMESPACE_URL, "r2.automation-grant.v1:" + run.run_id)),
+        version=1,
+        state="ACTIVE",
+        principal=automation_principal(run.run_id),
+        issuer_id=request.issuer_id,
+        start_command_id=request.command_id,
+        request_digest=digest,
+        parent_sequence=parent.body.sequence,
+        parent_event_digest=parent.event_digest,
+        policy_digest=request.policy_digest,
+        input_digest=request.input_digest,
+        operations=request.operations,
+        issued_at=now,
+        expires_at=request.expires_at,
+    )
+    await repository.append(grant, previous=None)
+    return grant
 
 
 class RunAutomationAuthority:
@@ -244,46 +299,134 @@ class AutomationGrantCustodian:
         row, run = await _run_locked(session, scope)
         now = await _now(session)
         await self._actor(interactive_token, request.user_id, request.issuer_id)
-        digest = grant_request_digest(request)
+        if row.start_command_id != request.command_id:
+            raise PermissionError("AUTOMATION_DELEGATION_SCOPE_MISMATCH")
+        return await _issue_first(repository, request, parent, previous, run, now)
+
+    async def _delegation_parent_locked(
+        self, session: AsyncSession, delegation: AutopilotDelegation
+    ) -> VerifiedGrantEventV1:
+        if self._reader is None:
+            raise PermissionError("AUTOMATION_GOVERNANCE_NOT_ACTIVATED")
+        await _now(session)
+        parent = await self._reader.require_current_locked(
+            session, scope=GrantScopeV1(delegation.user_id, delegation.project_name, delegation.issuer_id)
+        )
+        current = await AutopilotRepository(session).current(delegation.user_id, delegation.project_name, lock=True)
         if (
-            parent.body.expires_at is None
-            or not now < request.expires_at <= datetime.fromisoformat(parent.body.expires_at)
+            current != delegation
+            or delegation.state != "ENABLED"
             or (parent.body.sequence, parent.event_digest)
-            != (
-                previous.parent_sequence if previous else parent.body.sequence,
-                previous.parent_event_digest if previous else parent.event_digest,
-            )
+            != (delegation.parent_sequence, delegation.parent_event_digest)
+            or parent.body.expires_at is None
+        ):
+            raise PermissionError("AUTOMATION_DELEGATION_NOT_CURRENT")
+        return parent
+
+    async def require_delegation_locked(self, session: AsyncSession, *, delegation: AutopilotDelegation) -> datetime:
+        """Lock the delegation's signed parent, then the delegation; returns the parent's expiry. A start creates its
+        run after this, in the same transaction."""
+        parent = await self._delegation_parent_locked(session, AutopilotDelegation.model_validate(delegation))
+        assert parent.body.expires_at is not None
+        return datetime.fromisoformat(parent.body.expires_at)
+
+    async def issue_delegated_locked(
+        self, session: AsyncSession, *, delegation: AutopilotDelegation, request: GrantRequest
+    ) -> AutomationGrant:
+        """ADR-0124: a run the autopilot scheduler starts under the project's enabled delegation, without a session.
+
+        Lock order: signed parent, delegation, child head, run. The delegation must still be the project's current
+        enabled version, its issuer, policy and parent grant event must still hold, and the run's start command must
+        be one of the delegation's own."""
+        request = GrantRequest.model_validate(request)
+        delegation = AutopilotDelegation.model_validate(delegation)
+        parent = await self._delegation_parent_locked(session, delegation)
+        scope = RunScope(user_id=request.user_id, project_name=request.project_name, run_id=request.run_id)
+        repository = AutomationGrantRepository(session)
+        previous = await repository.head(scope, lock=True)
+        row, run = await _run_locked(session, scope)
+        now = await _now(session)
+        if (
+            (request.user_id, request.project_name, request.issuer_id)
+            != (delegation.user_id, delegation.project_name, delegation.issuer_id)
+            or request.policy_digest != delegation.policy_digest
+            or not request.command_id.startswith(autopilot_command_id(delegation, 0).removesuffix("0"))
             or row.start_command_id != request.command_id
-            or (request.input_digest, request.policy_digest) != (run.input_digest, policy_digest(run.policy))
         ):
             raise PermissionError("AUTOMATION_DELEGATION_SCOPE_MISMATCH")
-        if previous is not None:
-            if previous.request_digest != digest or previous.state != "ACTIVE" or now >= previous.expires_at:
+        return await _issue_first(repository, request, parent, previous, run, now)
+
+    async def set_autopilot_locked(
+        self,
+        session: AsyncSession,
+        *,
+        interactive_token: str | None,
+        user_id: str,
+        project_name: str,
+        command_id: str,
+        enabled: bool,
+        kind: Literal["story", "film"],
+        mode: AutomationMode,
+        policy_digest: str,
+        story: StoryAutopilot | None = None,
+        film: FilmAutopilot | None = None,
+    ) -> AutopilotDelegation | None:
+        """ADR-0124: the interactive Showrunner turns a project's autopilot on (under a current project or workspace
+        grant, whose event the delegation records) or off (always allowed to the project's owner). The same command
+        replays its version; turning off a project that is not on changes nothing."""
+        try:
+            actor = await get_current_interactive_user(interactive_token)
+        except HTTPException:
+            raise PermissionError("AUTOMATION_INTERACTIVE_SHOWRUNNER_REQUIRED") from None
+        if actor.id != user_id:
+            raise PermissionError("AUTOMATION_INTERACTIVE_SHOWRUNNER_REQUIRED")
+        if self._reader is None:
+            raise PermissionError("AUTOMATION_GOVERNANCE_NOT_ACTIVATED")
+        now = await _now(session)
+        parent = (
+            await self._reader.require_current_locked(session, scope=GrantScopeV1(user_id, project_name, actor.sub))
+            if enabled
+            else None
+        )
+        repository = AutopilotRepository(session)
+        previous = await repository.current(user_id, project_name, lock=True)
+        if previous is not None and previous.command_id == command_id:
+            if previous.state != ("ENABLED" if enabled else "DISABLED") or previous.issuer_id != actor.sub:
                 raise PermissionError("AUTOMATION_DELEGATION_REPLAY_CONFLICT")
             return previous
-        if request.expected_run_version != run.version or run.status is not RunStatus.PENDING:
-            raise PermissionError("AUTOMATION_START_MOVED")
-        grant = AutomationGrant(
-            user_id=run.user_id,
-            project_name=run.project_name,
-            run_id=run.run_id,
-            grant_id=str(uuid5(NAMESPACE_URL, "r2.automation-grant.v1:" + run.run_id)),
-            version=1,
-            state="ACTIVE",
-            principal=automation_principal(run.run_id),
-            issuer_id=request.issuer_id,
-            start_command_id=request.command_id,
-            request_digest=digest,
-            parent_sequence=parent.body.sequence,
-            parent_event_digest=parent.event_digest,
-            policy_digest=request.policy_digest,
-            input_digest=request.input_digest,
-            operations=request.operations,
-            issued_at=now,
-            expires_at=request.expires_at,
-        )
-        await repository.append(grant, previous=None)
-        return grant
+        if parent is None:
+            if previous is None or previous.state == "DISABLED":
+                return previous
+            delegation = previous.model_copy(
+                update={
+                    "version": previous.version + 1,
+                    "state": "DISABLED",
+                    "issuer_id": actor.sub,
+                    "command_id": command_id,
+                    "created_at": now,
+                }
+            )
+        else:
+            delegation = AutopilotDelegation(
+                user_id=user_id,
+                project_name=project_name,
+                version=1 if previous is None else previous.version + 1,
+                state="ENABLED",
+                kind=kind,
+                issuer_id=actor.sub,
+                command_id=command_id,
+                parent_sequence=parent.body.sequence,
+                parent_event_digest=parent.event_digest,
+                mode=mode,
+                policy_digest=policy_digest,
+                story=story,
+                film=film,
+                created_at=now,
+            )
+        delegation = AutopilotDelegation.model_validate(delegation.model_dump())
+        await self._actor(interactive_token, user_id, actor.sub)
+        await repository.append(delegation, previous=previous)
+        return delegation
 
     async def require_issuer_locked(
         self, session: AsyncSession, *, interactive_token: str | None, user_id: str, project_name: str

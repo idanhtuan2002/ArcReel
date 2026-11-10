@@ -33,8 +33,10 @@ from r2.contracts.automation import (
     RunPolicy,
     RunStage,
 )
+from r2.contracts.autopilot import AutopilotDelegation
 from r2.contracts.quality import QualityProfileRevision
 from server.production_run.assets_adapter import AssetsAdapter
+from server.production_run.autopilot import AutopilotPlanner, AutopilotScheduler, BookParts
 from server.production_run.configuration import inspect_model_route
 from server.production_run.controller import ProductionController
 from server.production_run.evaluators import QualifiedEvaluator
@@ -337,8 +339,57 @@ __all__ = [
     "build_adapters",
     "compose_production",
     "device_admission_from_env",
+    "wire_autopilot",
     "wire_production",
 ]
+
+
+def wire_autopilot(
+    *,
+    sessions: Sessions,
+    service: ProductionRunService,
+    projects: ProjectManager,
+    grants: CurrentShowrunnerGrantReader | None,
+) -> AutopilotScheduler:
+    """ADR-0124: the scheduler that starts each enabled project's next run under its autopilot delegation."""
+    from lib.workflow_state import WorkflowActionType, WorkflowStateService
+    from server.services.story_sync import sync_linked_story
+    from server.story_authoring.authority import GrantNarrativeShowrunnerAuthority
+
+    stories = StoryAuthoringService(
+        session_factory=sessions,
+        authority=GrantNarrativeShowrunnerAuthority(sessions, grants),
+        project_dir_for=projects.get_project_path,
+    )
+    workflow = WorkflowStateService(projects)
+
+    async def book_parts(user_id: str, project_name: str) -> BookParts | None:
+        progress = await stories.book_progress(project_name, user_id=user_id)
+        return None if progress is None else BookParts(done=progress.parts_done, total=len(progress.spec.parts()))
+
+    def unplanned_source(project_name: str) -> bool:
+        action = workflow.get_status(project_name).next_action.type
+        return action in {WorkflowActionType.PLAN_EPISODES, WorkflowActionType.RESET_EPISODE_PLANNING}
+
+    async def sync_story(user_id: str, project_name: str) -> list[str]:
+        return (await sync_linked_story(projects, project_name, user_id=user_id)).conflicts
+
+    async def max_targets(delegation: AutopilotDelegation) -> int:
+        policy = await service.resolve_policy(
+            user_id=delegation.user_id, project_name=delegation.project_name, mode=delegation.mode
+        )
+        return policy.max_target_episodes
+
+    planner = AutopilotPlanner(
+        sessions,
+        service,
+        load_project=projects.load_project,
+        book_parts=book_parts,
+        unplanned_source=unplanned_source,
+        sync_story=sync_story,
+        max_targets=max_targets,
+    )
+    return AutopilotScheduler(sessions, service, planner)
 
 
 GPU_PROBES_ENV = "ARCREEL_GPU_ADMISSION_PROBES"

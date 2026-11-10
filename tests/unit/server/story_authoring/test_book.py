@@ -295,6 +295,25 @@ def test_a_run_command_carries_a_book_only_from_an_idea_and_drops_it_at_its_defa
         RunCommand.model_validate({**base, "story_source": "continue", "book_chapters": 30})
 
 
+def test_a_story_only_run_command_writes_a_story_and_keeps_the_default_shape():
+    from r2.contracts.automation import RunCommand
+
+    base = {
+        "user_id": "u",
+        "project_name": "p",
+        "command_id": "c",
+        "action": "START",
+        "expected_version": 0,
+        "expected_input_digest": "sha256:" + "0" * 64,
+        "policy_digest": "sha256:" + "0" * 64,
+        "idea": "i",
+    }
+    assert "end_stage" not in RunCommand.model_validate(base).model_dump(mode="json")
+    assert RunCommand.model_validate({**base, "end_stage": "HANDOFF"}).model_dump(mode="json")["end_stage"] == "HANDOFF"
+    with pytest.raises(ValidationError):
+        RunCommand.model_validate({**base, "idea": None, "story_source": "project", "end_stage": "HANDOFF"})
+
+
 def test_a_long_book_chapter_is_planned_with_enough_scenes_for_its_length():
     from server.story_authoring.prompts.schemas import bound_chapter_plan
 

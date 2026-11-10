@@ -271,9 +271,13 @@ class RunSnapshot(RunScope):
     review_approvals: tuple[ReviewApproval, ...] = ()
     reason: ExactIdentity | None = None
     created_at: AwareDatetime
+    #: The last stage; a story-only run (ADR-0124) succeeds at ``HANDOFF`` without film outputs.
+    end_stage: RunStage = Field(default=RunStage.EXPORT, exclude_if=lambda value: value is RunStage.EXPORT)
 
     @model_validator(mode="after")
     def coherent_run(self) -> Self:
+        if self.end_stage not in {RunStage.HANDOFF, RunStage.EXPORT}:
+            raise ValueError("a run ends at the handoff or the export")
         if len(set(self.targets)) != len(self.targets) or len(self.targets) > self.policy.max_target_episodes:
             raise ValueError("duplicate or out-of-scope targets")
         outputs = [output.target for output in self.completed_targets]
@@ -288,7 +292,10 @@ class RunSnapshot(RunScope):
             raise ValueError("final evaluation budget exceeded")
         if self.status is RunStatus.WAITING_REVIEW and self.pending_review is None:
             raise ValueError("review wait requires exact binding")
-        if self.status is RunStatus.SUCCEEDED and (
+        if self.status is RunStatus.SUCCEEDED and self.end_stage is RunStage.HANDOFF:
+            if self.stage is not RunStage.HANDOFF:
+                raise ValueError("a story-only run succeeds at the handoff")
+        elif self.status is RunStatus.SUCCEEDED and (
             not self.targets
             or set(outputs) != set(self.targets)
             or any(
@@ -327,6 +334,8 @@ class RunCommand(AutomationContract):
     book_chapters: Annotated[int, Field(ge=6, le=120)] | None = Field(
         default=None, exclude_if=lambda value: value is None
     )
+    #: ADR-0124: ``HANDOFF`` ends a run once its story is committed and handed off (a story project's autopilot).
+    end_stage: Literal["HANDOFF", "EXPORT"] = Field(default="EXPORT", exclude_if=lambda value: value == "EXPORT")
 
     @model_validator(mode="after")
     def command_shape(self) -> Self:
@@ -346,6 +355,8 @@ class RunCommand(AutomationContract):
                 raise ValueError("a variant is written into another project than its source")
             if self.book_chapters is not None and self.story_source != "idea":
                 raise ValueError("only a run from an idea starts a book")
+            if self.end_stage == "HANDOFF" and self.story_source == "project":
+                raise ValueError("a run that ends at the handoff writes a story")
         elif (
             self.run_id is None
             or self.expected_version < 1
@@ -354,6 +365,7 @@ class RunCommand(AutomationContract):
             or self.source_project is not None
             or self.variant_profile is not None
             or self.book_chapters is not None
+            or self.end_stage != "EXPORT"
         ):
             raise ValueError("control requires an exact existing run")
         if not self.targets or len(set(self.targets)) != len(self.targets):

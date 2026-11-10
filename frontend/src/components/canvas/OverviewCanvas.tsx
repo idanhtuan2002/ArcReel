@@ -1,4 +1,5 @@
 
+import { AutopilotPanel } from "@/features/autopilot/AutopilotPanel";
 import { PipelineBoard } from "./pipeline/PipelineBoard";
 import { ProductionRunPanel } from "@/features/production-run/ui/ProductionRunPanel";
 import { useCallback, useEffect, useId, useRef, useState } from "react";
@@ -328,6 +329,11 @@ export function OverviewCanvas({
         </header>
 
         {!readOnly ? <PipelineBoard projectName={projectName} /> : null}
+        {!readOnly && projectData.project_kind !== "story" ? (
+          <div className="mb-4">
+            <AutopilotPanel projectName={projectName} kind="film" />
+          </div>
+        ) : null}
         {!readOnly ? <ProductionRunPanel key={projectName} projectName={projectName} /> : null}
 
         {showAdInit ? (

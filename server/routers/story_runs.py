@@ -7,7 +7,6 @@ the service, the project's Showrunner grant.
 from __future__ import annotations
 
 import asyncio
-from pathlib import Path
 from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -16,12 +15,12 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from lib.config.resolver import ConfigResolver
 from lib.db import async_session_factory
-from lib.episode_ledger import discover_sources, normalize_source_text
-from lib.project_kinds import linked_story
 from lib.project_manager import get_project_manager
 from r2.narrative_lifecycle.errors import NarrativeDecisionAuthorizationError
 from server.auth import CurrentUser, InteractiveUser
 from server.services import workflow_planner
+from server.services.story_sync import StorySyncRefused
+from server.services.story_sync import sync_linked_story as sync_story_text
 from server.story_authoring.authority import GrantNarrativeShowrunnerAuthority
 from server.story_authoring.book import BookSpec
 from server.story_authoring.commit import CommitRefused
@@ -193,50 +192,18 @@ async def sync_linked_story(project_name: str, user: InteractiveUser) -> dict:
     """ADR-0122: a film project imports the story text of the story project it adapts. Files it does not hold yet
     are added to its sources; files it holds with the same text are skipped; a file it holds with other text is
     never overwritten and is reported, because episodes may already be planned from it."""
-    projects = get_project_manager()
-    try:
-        film = await asyncio.to_thread(projects.load_project, project_name)
-    except FileNotFoundError:
-        raise HTTPException(status_code=404, detail={"code": "PROJECT_NOT_FOUND", "detail": project_name}) from None
-    story = linked_story(film)
-    if story is None:
-        raise HTTPException(status_code=409, detail={"code": "NO_STORY_LINK", "detail": "the project adapts no story"})
     # Writing the film's sources needs what an upload to the film needs (an interactive user); the story was named
     # at the film's creation, which checked that it is a story project.
     try:
-        story_dir = projects.get_project_path(story)
-    except (FileNotFoundError, ValueError):
-        raise HTTPException(status_code=409, detail={"code": "STORY_PROJECT_MISSING", "detail": story}) from None
-    docs = await asyncio.to_thread(discover_sources, story_dir)
-    source_dir = projects.get_project_path(project_name) / "source"
-    scope = ProjectScope(project_name=project_name, projects_root=projects.projects_root)
-    services = Services(
-        projects=projects,
-        workflow_planner=workflow_planner.get_workflow_planner(projects),
-        capabilities=ConfigResolver(async_session_factory),
-    )
-    imported: list[str] = []
-    skipped: list[str] = []
-    conflicts: list[str] = []
-    for doc in docs:
-        # A source is stored as ``<stem>.txt`` whatever its upload suffix; compare against what an upload writes.
-        filename = Path(doc.rel_path).stem + ".txt"
-        target = source_dir / filename
-        if target.exists():
-            held = await asyncio.to_thread(target.read_text, encoding="utf-8")
-            (skipped if normalize_source_text(held) == doc.text else conflicts).append(filename)
-            continue
-        outcome = await upload_source(
-            ToolRequest(UploadSourceRequest(filename=filename, content=doc.text, on_conflict="fail")),
-            scope,
-            CallerContext(user_id=user.id, source="embedded"),
-            services,
-        )
-        if outcome.problem is not None:
-            conflicts.append(filename)
-        else:
-            imported.append(filename)
-    return {"story_project": story, "imported": imported, "skipped": skipped, "conflicts": conflicts}
+        result = await sync_story_text(get_project_manager(), project_name, user_id=user.id)
+    except StorySyncRefused as error:
+        raise HTTPException(status_code=error.status, detail={"code": error.code, "detail": error.detail}) from None
+    return {
+        "story_project": result.story_project,
+        "imported": result.imported,
+        "skipped": result.skipped,
+        "conflicts": result.conflicts,
+    }
 
 
 @router.get("/projects/{project_name}/story-sources/preview")

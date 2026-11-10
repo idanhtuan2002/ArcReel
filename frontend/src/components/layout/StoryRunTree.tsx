@@ -1,7 +1,9 @@
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useLocation, useSearch } from "wouter";
-import { Plus } from "lucide-react";
+import { Bot, Plus } from "lucide-react";
+
+import { getAutopilot, type AutopilotStateName } from "@/features/autopilot/autopilotClient";
 
 import { listRuns, type RunSummary } from "@/features/story-authoring/api/storyClient";
 import { STORY_RUNS_CHANGED } from "@/features/story-authoring/ui/StoryAuthoringPage";
@@ -18,6 +20,7 @@ export function StoryRunTree({ projectName }: { projectName: string }) {
   const [location, navigate] = useLocation();
   const search = useSearch();
   const [runs, setRuns] = useState<RunSummary[] | null>(null);
+  const [autopilot, setAutopilotState] = useState<AutopilotStateName | null>(null);
   const params = new URLSearchParams(search);
   const onStory = location === "/story" || location.startsWith("/story/");
   const creating = onStory && params.get("new") === "1";
@@ -27,6 +30,9 @@ export function StoryRunTree({ projectName }: { projectName: string }) {
     const controller = new AbortController();
     let timer: number | undefined;
     const tick = () => {
+      getAutopilot(projectName, controller.signal)
+        .then((view) => setAutopilotState(view?.status?.state ?? null))
+        .catch(() => undefined);
       listRuns(projectName, { signal: controller.signal })
         .then((found) => setRuns(found))
         .catch(() => undefined)
@@ -62,6 +68,21 @@ export function StoryRunTree({ projectName }: { projectName: string }) {
           {t("story_new")}
         </button>
       </li>
+      {autopilot && autopilot !== "off" ? (
+        <li>
+          <button
+            type="button"
+            onClick={() => navigate("/story")}
+            title={t(`ap_state_${autopilot}`)}
+            className="flex w-full items-center gap-1.5 rounded px-1.5 py-1 text-left text-[12px] text-text-2 focus-ring hover:bg-white/5"
+          >
+            <Bot aria-hidden className={`h-3.5 w-3.5 shrink-0 ${autopilot === "halted" ? "text-warn" : "text-accent"}`} />
+            <span className="min-w-0 flex-1 truncate">
+              {t("ap_title")} · {t(`ap_state_${autopilot}`)}
+            </span>
+          </button>
+        </li>
+      ) : null}
       {runs === null ? null : runs.length === 0 ? (
         <li className="px-1.5 py-1 text-[12px] text-text-4">{t("story_runs_empty")}</li>
       ) : (

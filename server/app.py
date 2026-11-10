@@ -502,11 +502,17 @@ async def lifespan(app: FastAPI):
     # scheduler is started. GPU admission of local provider jobs is configured separately by its probe list.
     from lib.generation_resources import configure_device_admission
     from lib.project_manager import get_project_manager
-    from server.production_run.composition import activation_from_env, device_admission_from_env, wire_production
+    from server.production_run.composition import (
+        activation_from_env,
+        device_admission_from_env,
+        wire_autopilot,
+        wire_production,
+    )
 
     configure_device_admission(device_admission_from_env())
     app.state.production_run_service = None
     app.state.production_scheduler = None
+    app.state.autopilot_scheduler = None
     if activation_from_env().enabled:
         if governance_read_dir is None or governance_attestor_dir is None:
             raise GovernanceStartupUnavailable
@@ -520,6 +526,14 @@ async def lifespan(app: FastAPI):
         app.state.production_run_service = service
         app.state.production_scheduler = scheduler
         await scheduler.start()
+        autopilot = wire_autopilot(
+            sessions=async_session_factory,
+            service=service,
+            projects=get_project_manager(),
+            grants=app.state.governance_grants,
+        )
+        app.state.autopilot_scheduler = autopilot
+        await autopilot.start()
 
     logger.info("启动 ExecutionRecoveryScheduler...")
     execution_recovery_scheduler = ExecutionRecoveryScheduler()
@@ -531,6 +545,9 @@ async def lifespan(app: FastAPI):
         yield
 
     # Shutdown
+    autopilot_scheduler = getattr(app.state, "autopilot_scheduler", None)
+    if autopilot_scheduler:
+        await autopilot_scheduler.stop()
     production_scheduler = getattr(app.state, "production_scheduler", None)
     if production_scheduler:
         # Stopping the scan leaves every logical run durable; leases expire and are reclaimed on restart.

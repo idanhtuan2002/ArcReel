@@ -123,6 +123,8 @@ def advance(*, run: RunSnapshot, outcome: StageOutcome) -> RunSnapshot:
                 status=RunStatus.WAITING_REVIEW,
                 pending_review=PendingReview(checkpoint=checkpoint, binding_digest=binding),
             )
+    if run.stage is run.end_stage is RunStage.HANDOFF:
+        return _updated(run, status=RunStatus.SUCCEEDED, reason=None, pending_review=None)
     if run.stage is RunStage.EXPORT:
         produced = {output.target: output for output in run.completed_targets}
         produced.update({output.target: output for output in outcome.outputs if output.target in run.targets})
