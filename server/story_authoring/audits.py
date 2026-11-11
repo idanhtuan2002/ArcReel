@@ -115,6 +115,16 @@ class AuditDimension(StrEnum):
 
 
 CHAPTER_DIMENSIONS = tuple(AuditDimension)
+#: The issue type prefix by which a merged craft judgment marks a machine-voice issue (ADR-0132).
+VOICE_PREFIX = "giọng máy"
+
+
+def chapter_dimensions(*, merged_voice: bool) -> tuple[AuditDimension, ...]:
+    """The chapter's judgments: with a craft judge, CRAFT also reads machine voice and ANTI_AI is not asked apart."""
+    if not merged_voice:
+        return CHAPTER_DIMENSIONS
+    return tuple(d for d in CHAPTER_DIMENSIONS if d is not AuditDimension.ANTI_AI)
+
 
 _INSTRUCTIONS: dict[AuditDimension, str] = {
     AuditDimension.CONTINUITY: (
@@ -230,20 +240,25 @@ def verified_findings(
     *,
     dimension: AuditDimension | Literal["CRITIC"],
     scenes: Sequence[tuple[str, str]],
+    merged_voice: bool = False,
 ) -> tuple[tuple[Finding, ...], int]:
-    """Findings whose quote occurs verbatim in a scene, placed in that scene; the count of discarded ones."""
+    """Findings whose quote occurs verbatim in a scene, placed in that scene; the count of discarded ones. In a
+    merged craft judgment an issue typed as machine voice is an ``ANTI_AI`` finding."""
     kept: list[Finding] = []
     discarded = 0
-    name = dimension.value if isinstance(dimension, AuditDimension) else dimension
     for issue in issues:
         node = _place(issue.quote, scenes)
         if node is None or degenerate(issue.description):
             discarded += 1
             continue
+        own = dimension
+        if merged_voice and issue.issue_type.strip().lower().startswith(VOICE_PREFIX):
+            own = AuditDimension.ANTI_AI
+        name = own.value if isinstance(own, AuditDimension) else own
         kept.append(
             Finding(
                 code=f"{name}:{issue.issue_type}",
-                severity=_severity(dimension, issue.severity),
+                severity=_severity(own, issue.severity),
                 node_id=node,
                 message=f"{issue.description} Gợi ý: {issue.suggested_fix}",
                 quote=issue.quote,
@@ -334,6 +349,24 @@ def _memo_block(plan: ChapterPlan) -> str:
     )
 
 
+def machine_counts(scenes: Sequence[tuple[str, str]]) -> str:
+    """The deterministic machine-voice counts of each scene, measured on the prose alone, for the judge to read."""
+    lines = [f"- cảnh {node}: {f.message}" for node, text in scenes for f in anti_ai_findings(text, node_id=node)]
+    return "\n".join(lines) or "- không có số đo nào vượt ngưỡng"
+
+
+def merged_craft_instruction(scenes: Sequence[tuple[str, str]]) -> str:
+    """CRAFT and machine voice read in one judgment, with the machine counts (ADR-0132)."""
+    voice = _INSTRUCTIONS[AuditDimension.ANTI_AI].removeprefix("Thẩm định GIỌNG VĂN MÁY. Lỗi: ")
+    return (
+        _INSTRUCTIONS[AuditDimension.CRAFT]
+        + f" Đồng thời thẩm định GIỌNG VĂN MÁY, issue_type bắt đầu bằng '{VOICE_PREFIX}': "
+        + voice
+        + "\n\n[Số đo máy, chỉ tính trên văn bản truyện]\n"
+        + machine_counts(scenes)
+    )
+
+
 def chapter_audit_prompt(
     dimension: AuditDimension,
     *,
@@ -343,8 +376,10 @@ def chapter_audit_prompt(
     facts: str,
     previous_summary: str,
     safety: SafetyLevel = "standard",
+    instruction: str | None = None,
 ) -> str:
-    instruction = safety_instruction(safety) if dimension is AuditDimension.SAFETY else _INSTRUCTIONS[dimension]
+    if instruction is None:
+        instruction = safety_instruction(safety) if dimension is AuditDimension.SAFETY else _INSTRUCTIONS[dimension]
     return f"""{instruction}
 
 Trả về "issues": mỗi lỗi có severity (critical/major/minor), issue_type (tên ngắn của loại lỗi), description,
@@ -410,7 +445,9 @@ async def audit_chapter(
     previous_summary: str,
     max_output_tokens: int = 2048,
     safety: SafetyLevel = "standard",
+    merged_voice: bool = False,
 ) -> AuditResult:
+    """``merged_voice`` makes a CRAFT judgment read machine voice too (ADR-0132)."""
     chapter_text = "\n\n".join(text for _, text in scenes)
     report = await _structured(
         gateway,
@@ -428,11 +465,14 @@ async def audit_chapter(
             facts=facts,
             previous_summary=previous_summary,
             safety=safety,
+            instruction=merged_craft_instruction(scenes) if merged_voice else None,
         ),
         model=AuditReport,
         max_output_tokens=max_output_tokens,
     )
-    findings, discarded = verified_findings(report.issues, dimension=dimension, scenes=scenes)
+    findings, discarded = verified_findings(
+        report.issues, dimension=dimension, scenes=scenes, merged_voice=merged_voice
+    )
     return AuditResult(dimension.value, findings, discarded)
 
 

@@ -12,6 +12,7 @@ from server.story_authoring.checks import (
     count_syllables,
     foreign_script,
     json_leaks,
+    meta_narration,
     notes_leaks,
     strip_json_leaks,
     strip_notes_leaks,
@@ -44,6 +45,7 @@ def test_the_new_checks_fire_only_on_the_scenes_that_drifted():
             [
                 *(["JSON_LEAK"] if json_leaks(text) else []),
                 *(["NOTES_LEAK"] if notes_leaks(text) else []),
+                *(["META_NARRATION"] if meta_narration(text) else []),
                 *(["FOREIGN_SCRIPT"] if foreign_script(text) else []),
                 *(f.code for f in pov_findings(CAST, None, text, node_id=key)),
                 *(
@@ -58,6 +60,7 @@ def test_the_new_checks_fire_only_on_the_scenes_that_drifted():
         "31adf836 1.1": ["FOREIGN_SCRIPT", "NARRATION_EM"],
         "31adf836 1.2": ["JSON_LEAK", "NARRATION_EM"],
         "31adf836 1.3": ["POV_PERSON"],
+        "14eec8e8 2.5": ["META_NARRATION"],
         "3a267760 1.2": ["POV_PERSON"],
         "7d7ff17b 3.1": ["NOTES_LEAK"],
     }

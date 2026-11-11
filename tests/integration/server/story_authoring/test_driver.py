@@ -1090,6 +1090,53 @@ async def test_review_calls_go_to_the_judge_route_and_drafting_stays_with_the_wr
     assert writer.calls["prose"] == 9
 
 
+CRAFT = StoryModelSelection.create(
+    provider_id="custom-1",
+    endpoint="ollama-chat",
+    base_url="http://ollama:1",
+    model_id="gemma3:12b",
+    has_credential=False,
+)
+
+
+async def test_a_craft_judge_reads_craft_and_machine_voice_in_one_call_and_the_writer_judges_the_rest(
+    concurrent_session_factory: Factory, tmp_path
+):
+    store = await _store(concurrent_session_factory)
+    writer, craft = ScriptedModel(), ScriptedModel("gemma3:12b")
+    craft.paragraphs = writer.paragraphs
+
+    def gateway(model: ScriptedModel, selection: StoryModelSelection) -> AuthoringTextGateway:
+        client = OllamaChatClient(base_url=selection.base_url, transport=httpx.MockTransport(model.handler))
+        sink = StoryAttemptSink(
+            store=store,
+            session_factory=concurrent_session_factory,
+            provider_id=selection.provider_id,
+            model_id=selection.model_id,
+        )
+        return AuthoringTextGateway(selection=selection, limits=LIMITS, client=client, sink=sink)
+
+    driver = StoryRunDriver(
+        identity=IDENTITY,
+        brief=BRIEF.model_copy(update={"craft_judge_selection": CRAFT}),
+        store=store,
+        gateway=gateway(writer, SELECTION),
+        craft_gateway=gateway(craft, CRAFT),
+        blobs=StoryBlobStore(tmp_path),
+        clock=lambda: NOW,
+    )
+
+    state = await driver.run()
+
+    assert state.phase is RunPhase.READY_FOR_APPROVAL, state.block_reason
+    # One merged craft judgment per chapter; the writer no longer asks ANTI_AI or CRAFT apart.
+    assert dict(craft.calls) == {"issues": 3}
+    assert writer.calls["issues"] == 12
+    prompts = [p for kind, p in craft.prompts if kind == "issues"]
+    assert all("[Số đo máy, chỉ tính trên văn bản truyện]" in p and "'giọng máy'" in p for p in prompts)
+    assert not any("Thẩm định GIỌNG VĂN MÁY" in p for kind, p in writer.prompts if kind == "issues")
+
+
 def test_a_judge_gateway_must_match_the_brief():
     with pytest.raises(ValueError, match="judge"):
         StoryRunDriver(
@@ -1103,6 +1150,17 @@ def test_a_judge_gateway_must_match_the_brief():
 
 def test_the_judge_route_is_part_of_what_gate_a_greenlights():
     assert BRIEF.model_copy(update={"judge_selection": JUDGE}).digest() != BRIEF.digest()
+    assert BRIEF.model_copy(update={"craft_judge_selection": CRAFT}).digest() != BRIEF.digest()
+    # A brief drafted before the craft judge keeps its digest.
+    assert "craft_judge_selection" not in BRIEF.model_dump(mode="json")
+    with pytest.raises(ValueError, match="craft"):
+        StoryRunDriver(
+            identity=IDENTITY,
+            brief=BRIEF.model_copy(update={"craft_judge_selection": CRAFT}),
+            store=None,
+            gateway=None,
+            blobs=None,
+        )
     assert BRIEF.judge == SELECTION
 
 

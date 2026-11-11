@@ -197,6 +197,12 @@ def brief_idea(idea: str | None, variant_profile: str | None) -> str:
     return "\n\n".join(parts)
 
 
+#: The local model of another family that reads a chapter's craft and machine voice (ADR-0132), on the writer's own
+#: Ollama provider; a project names another with ``story_craft_judge``, or ``off`` for none.
+CRAFT_JUDGE_MODEL = "gemma3:12b"
+CRAFT_JUDGE_SETTING = "story_craft_judge"
+
+
 def run_id_for(gate_a_decision_id: str) -> str:
     return "story-" + hashlib.sha256(gate_a_decision_id.encode("utf-8")).hexdigest()[:24]
 
@@ -248,6 +254,9 @@ class StoryAuthoringService:
         judge = (
             await self._selection(judge_provider_id, judge_model_id) if judge_provider_id and judge_model_id else None
         )
+        craft_judge = None
+        if judge is None and selection.endpoint == OLLAMA_CHAT_ENDPOINT:
+            craft_judge = await self._craft_judge(selection, project_name)
         profiles = []
         for route in (selection, judge):
             if route is not None and route.endpoint != OLLAMA_CHAT_ENDPOINT:
@@ -352,6 +361,7 @@ class StoryAuthoringService:
             story_target_syllables=story_target_syllables,
             selection=selection,
             judge_selection=judge if judge != selection else None,
+            craft_judge_selection=craft_judge,
             limits=limits,
             cloud_profiles=tuple(profiles),
             prior=prior,
@@ -438,6 +448,25 @@ class StoryAuthoringService:
         finally:
             if cloud is not None:
                 await cloud.close()
+
+    async def _craft_judge(self, writer: StoryModelSelection, project_name: str | None) -> StoryModelSelection | None:
+        """The craft judge a local writer's story gets (ADR-0132): the project's ``story_craft_judge`` or
+        :data:`CRAFT_JUDGE_MODEL`, enabled on the writer's provider and other than the writer; none otherwise."""
+        model_id: object = CRAFT_JUDGE_MODEL
+        if project_name is not None:
+            try:
+                project = json.loads((self._project_dir_for(project_name) / "project.json").read_text(encoding="utf-8"))
+            except (OSError, ValueError):
+                project = None
+            if isinstance(project, dict) and CRAFT_JUDGE_SETTING in project:
+                model_id = project[CRAFT_JUDGE_SETTING]
+        if not isinstance(model_id, str) or model_id in {"", "off", writer.model_id}:
+            return None
+        try:
+            route = await self._selection(writer.provider_id, model_id)
+        except StoryActionRefused:
+            return None
+        return route if route.endpoint == OLLAMA_CHAT_ENDPOINT else None
 
     def content_safety(self, project_name: str) -> SafetyLevel:
         """The project's content safety level (ADR-0121), the lowest (``off``) when unset; ``standard`` when the project

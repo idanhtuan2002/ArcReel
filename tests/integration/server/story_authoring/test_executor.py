@@ -153,6 +153,40 @@ async def test_a_judge_route_gets_its_own_gateway_and_reviews_the_run(concurrent
     assert "issues" not in writer.calls
 
 
+async def test_a_craft_judge_route_gets_its_own_gateway_beside_the_writer(
+    concurrent_session_factory: Factory, tmp_path
+):
+    writer_id = await _provider(concurrent_session_factory)
+    craft_id = await _provider(concurrent_session_factory, base_url=JUDGE_URL, model="gemma3:12b")
+    payload = _payload(writer_id)
+    payload["brief"]["craft_judge_selection"] = StoryModelSelection.create(
+        provider_id=craft_id, endpoint="ollama-chat", base_url=JUDGE_URL, model_id="gemma3:12b", has_credential=False
+    ).model_dump(mode="json")
+    task_id = await _task(concurrent_session_factory, payload)
+    writer, craft = ScriptedModel(), ScriptedModel("gemma3:12b")
+    craft.paragraphs = writer.paragraphs
+
+    def client_for(base_url: str, _api_key: str | None) -> OllamaChatClient:
+        model = craft if base_url == JUDGE_URL else writer
+        return OllamaChatClient(base_url=base_url, transport=httpx.MockTransport(model.handler))
+
+    result = await execute_story_run_task(
+        IDENTITY.project_name,
+        IDENTITY.run_id,
+        payload,
+        user_id=IDENTITY.user_id,
+        task_id=task_id,
+        session_factory=concurrent_session_factory,
+        project_dir=tmp_path,
+        client_for=client_for,
+        clock=lambda: NOW,
+    )
+
+    assert result["phase"] == "READY_FOR_APPROVAL"
+    assert dict(craft.calls) == {"issues": 3}
+    assert writer.calls["issues"] == 12
+
+
 async def test_an_unconfigured_judge_route_stops_the_run_before_any_call(concurrent_session_factory: Factory, tmp_path):
     writer_id = await _provider(concurrent_session_factory)
     payload = _payload(writer_id)

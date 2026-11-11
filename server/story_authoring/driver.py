@@ -38,6 +38,7 @@ from server.story_authoring.audits import (
     SafetyLevel,
     anti_ai_findings,
     audit_chapter,
+    chapter_dimensions,
     confirm_finding,
     critic_manuscript,
     unconfirmed,
@@ -243,6 +244,9 @@ class StoryBrief(BaseModel):
     scene_window: tuple[int, int, int] = (600, 1000, 1400)
     selection: StoryModelSelection
     judge_selection: StoryModelSelection | None = None
+    #: A local model of another family that reads a chapter's craft and machine voice in one call (ADR-0132); the
+    #: writer's own judge reads every other dimension. Briefs drafted before it leave it out.
+    craft_judge_selection: StoryModelSelection | None = Field(default=None, exclude_if=lambda value: value is None)
     limits: StoryLimits
     cloud_profiles: tuple[CloudRouteProfile, ...] = Field(default=(), exclude_if=lambda value: not value)
     #: The story this run continues or rewrites; ``idea`` is then the author's direction or variant instruction.
@@ -326,6 +330,7 @@ class StoryRunDriver:
         gateway: AuthoringTextGateway,
         blobs: StoryBlobStore,
         judge_gateway: AuthoringTextGateway | None = None,
+        craft_gateway: AuthoringTextGateway | None = None,
         clock: Callable[[], datetime] = lambda: datetime.now(UTC),
         retry_delays: Sequence[float] = TRANSPORT_RETRY_DELAYS,
         canon_base: ResolvedCanonView | None = None,
@@ -334,6 +339,8 @@ class StoryRunDriver:
         then branches from it."""
         if (brief.judge_selection is None) != (judge_gateway is None):
             raise ValueError("a judge gateway is given exactly when the brief names a judge route")
+        if (brief.craft_judge_selection is None) != (craft_gateway is None):
+            raise ValueError("a craft gateway is given exactly when the brief names a craft judge route")
         if brief.gate_a_decision_id is None:
             raise ValueError("a story run starts only after its Gate A greenlight")
         self._identity = identity
@@ -342,6 +349,7 @@ class StoryRunDriver:
         self._store = store
         self._gateway = gateway
         self._judge_gateway = judge_gateway or gateway
+        self._craft_gateway = craft_gateway
         self._blobs = blobs
         self._clock = clock
         self._retry_delays = tuple(retry_delays)
@@ -410,10 +418,12 @@ class StoryRunDriver:
     # --- node mechanics ----------------------------------------------------------------------------
 
     def _route(self) -> str:
-        writer = self._brief.selection.config_digest
-        if self._brief.judge_selection is None:
-            return writer
-        return writer + "+" + self._brief.judge_selection.config_digest
+        route = self._brief.selection.config_digest
+        if self._brief.judge_selection is not None:
+            route += "+" + self._brief.judge_selection.config_digest
+        if self._brief.craft_judge_selection is not None:
+            route += "+craft:" + self._brief.craft_judge_selection.config_digest
+        return route
 
     async def _ensure(
         self,
@@ -1705,13 +1715,15 @@ class StoryRunDriver:
                         node_id=last.node_id,
                     )
                 )
-        for dimension in CHAPTER_DIMENSIONS:
+        craft_route = self._brief.craft_judge_selection
+        for dimension in chapter_dimensions(merged_voice=craft_route is not None):
+            on_craft = craft_route is not None and dimension is AuditDimension.CRAFT
             result = await self._judge(
                 node,
-                lambda step_id, decoding, dimension=dimension: audit_chapter(
-                    self._judge_gateway,
+                lambda step_id, decoding, dimension=dimension, on_craft=on_craft: audit_chapter(
+                    self._craft_gateway if on_craft and self._craft_gateway else self._judge_gateway,
                     scope=self._scope,
-                    selection=self._brief.judge,
+                    selection=craft_route if on_craft and craft_route else self._brief.judge,
                     step_id=step_id,
                     context_digest=self._brief.digest(),
                     decoding=decoding,
@@ -1722,6 +1734,7 @@ class StoryRunDriver:
                     facts=facts,
                     previous_summary=previous,
                     safety=self._safety(),
+                    merged_voice=on_craft,
                 ),
             )
             findings.extend(result.findings)

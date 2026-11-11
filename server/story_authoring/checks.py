@@ -709,6 +709,8 @@ def strip_notes_leaks(text: str) -> str:
 _META_NARRATION = re.compile(
     r"\b(?:chương|hồi)\s+(?:một|hai|ba|bốn|năm|\d+)\b"
     r"|\bkhép lại chương\b"
+    r"|\bchương (?:này|sau|cuối|tiếp theo|kế tiếp)\b"
+    r"|\b(?:người đọc|độc giả)\b"
     r"|\bxung đột (?:chính|trung tâm)\b"
     r"|\bnhân vật chính\b"
     r"|\bcâu chuyện (?:khép lại|kết thúc|đến đây)\b",
@@ -717,8 +719,8 @@ _META_NARRATION = re.compile(
 
 
 def meta_narration(text: str) -> list[str]:
-    """Sentences in which the narration talks about the story itself: chapter numbers, the central conflict, the
-    protagonist as a role, the story ending."""
+    """Sentences in which the narration talks about the story itself: chapter numbers or "the next/last chapter",
+    the central conflict, the protagonist as a role, the reader, the story ending."""
     return [" ".join(m.group(0).split()) for m in _VI_SENTENCE.finditer(text) if _META_NARRATION.search(m.group(0))]
 
 

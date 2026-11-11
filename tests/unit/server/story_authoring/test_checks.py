@@ -115,6 +115,10 @@ def test_meta_narration_finds_sentences_that_talk_about_the_story_itself():
     ]
     assert meta_narration(_scene(*SENTENCES)) == []
     assert meta_narration("Ông giở cuốn sách cũ, đọc lại chương đầu về làng biển.") == []
+    # A real scene ended on this sentence; a chapter or the reader named in narration is the story talking about itself.
+    assert meta_narration(
+        _scene(SENTENCES[0], "Hình ảnh ấy là dấu hiệu báo trước sự chuyển mình của chương cuối.", "Người đọc sẽ hiểu.")
+    ) == ["Hình ảnh ấy là dấu hiệu báo trước sự chuyển mình của chương cuối.", "Người đọc sẽ hiểu."]
 
 
 def test_dialogue_lines_count_dash_and_quote_openers():

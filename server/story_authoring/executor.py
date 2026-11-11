@@ -104,6 +104,8 @@ async def execute_story_run_task(
     if state.phase is not RunPhase.RUNNING:
         return {"run_id": resource_id, "phase": state.phase.value}
     routes = [brief.selection] if brief.judge_selection is None else [brief.selection, brief.judge_selection]
+    if brief.craft_judge_selection is not None:
+        routes.append(brief.craft_judge_selection)
     try:
         await validate_cloud_brief(session_factory, brief)
         keys = [await resolve_route_credential(session_factory, route) for route in routes]
@@ -148,7 +150,8 @@ async def execute_story_run_task(
         brief=brief,
         store=store,
         gateway=gateways[0],
-        judge_gateway=gateways[1] if len(gateways) > 1 else None,
+        judge_gateway=gateways[1] if brief.judge_selection is not None else None,
+        craft_gateway=gateways[-1] if brief.craft_judge_selection is not None else None,
         blobs=blobs,
         clock=clock,
         canon_base=canon_base,

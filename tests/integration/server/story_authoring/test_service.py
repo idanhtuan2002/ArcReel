@@ -363,6 +363,44 @@ async def test_revise_discard_and_retry_follow_the_lifecycle(
     assert (await store.load()).phase is RunPhase.DISCARDED
 
 
+async def test_a_local_writer_gets_the_craft_judge_its_provider_enables_unless_the_project_turns_it_off(
+    concurrent_session_factory: Factory, grants, projects: ProjectManager
+):
+    import json
+
+    from lib.db.repositories.custom_provider_repo import CustomProviderRepository
+    from server.story_authoring.service import CRAFT_JUDGE_MODEL, CRAFT_JUDGE_SETTING
+
+    service = _service(concurrent_session_factory, grants, projects)
+    lone = await _provider(concurrent_session_factory)
+    async with concurrent_session_factory() as session:
+        provider = await CustomProviderRepository(session).create_provider(
+            "Ollama",
+            "openai",
+            BASE_URL,
+            "",
+            models=[{"model_id": m, "display_name": m, "endpoint": "ollama-chat"} for m in (MODEL, CRAFT_JUDGE_MODEL)],
+        )
+        await session.commit()
+    both = f"custom-{provider.id}"
+    common = {"idea": "Một ý.", "genre": "đời thường", "model_id": MODEL, "project_name": PROJECT}
+
+    judged = await service.draft_brief(**common, provider_id=both)
+    assert judged.craft_judge_selection is not None
+    assert (judged.craft_judge_selection.provider_id, judged.craft_judge_selection.model_id) == (
+        both,
+        CRAFT_JUDGE_MODEL,
+    )
+    assert judged.judge_selection is None
+    # A provider without the model, and a project that turns the judge off, keep the writer judging alone.
+    assert (await service.draft_brief(**common, provider_id=lone)).craft_judge_selection is None
+    path = projects.get_project_path(PROJECT) / "project.json"
+    project = json.loads(path.read_text(encoding="utf-8")) if path.exists() else {}
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps({**project, CRAFT_JUDGE_SETTING: "off"}), encoding="utf-8")
+    assert (await service.draft_brief(**common, provider_id=both)).craft_judge_selection is None
+
+
 async def test_a_brief_names_a_judge_route_only_when_it_differs_from_the_writer(
     concurrent_session_factory: Factory, grants, projects: ProjectManager
 ):

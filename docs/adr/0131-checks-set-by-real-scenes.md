@@ -21,4 +21,4 @@ What the fixtures showed, and what is built from it:
 Measured and not built:
 
 - **F5 weighted scene budgets.** Huohuo writes a chapter one beat per call and truncates each to its budget because the user sets a chapter's length; ArcReel writes a scene per call, the 9B writer already spans 300–1 100 syllables a scene, and no fixture shows a turning scene cut short. Weights would mostly add length findings and repair calls.
-- **F11 merging the anti-AI judge into the craft judge** and **F14 an independent judge route** need model calls on the production GPU (an 8 GB card the 9B writer already overflows); they wait until the GPU is free, then F14 measures the model swap time first.
+- **F11 merging the anti-AI judge into the craft judge** and **F14 an independent judge route**: measured on the production GPU and decided in [ADR-0132](0132-a-craft-judge-of-another-family.md).

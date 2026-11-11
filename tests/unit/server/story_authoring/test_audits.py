@@ -14,7 +14,9 @@ from server.story_authoring.audits import (
     CriticReport,
     anti_ai_findings,
     audit_chapter,
+    chapter_dimensions,
     critic_manuscript,
+    machine_counts,
     pairwise_judge,
     unfaithful_blurbs,
     verified_findings,
@@ -358,3 +360,25 @@ async def test_blurbs_without_claims_need_no_second_reading():
     )
     assert claims == ()
     assert sum(b["options"]["num_predict"] != 1 for b in bodies) == 1
+
+
+def test_a_merged_craft_judgment_files_machine_voice_as_stylistic_anti_ai_and_craft_as_craft():
+    scenes = [("1.1", "Mưa rơi. Lan dường như mệt, dường như buồn. Cô mở cửa.")]
+    issues = [
+        AuditIssue(
+            severity="major", issue_type="giọng máy: cụm sáo", description="d", quote="Mưa rơi.", suggested_fix="f"
+        ),
+        AuditIssue(severity="major", issue_type="mở chương", description="d", quote="Cô mở cửa.", suggested_fix="f"),
+    ]
+
+    merged, _ = verified_findings(issues, dimension=AuditDimension.CRAFT, scenes=scenes, merged_voice=True)
+    apart, _ = verified_findings(issues, dimension=AuditDimension.CRAFT, scenes=scenes)
+
+    assert [(f.code, f.severity) for f in merged] == [
+        ("ANTI_AI:giọng máy: cụm sáo", Severity.STYLISTIC),
+        ("CRAFT:mở chương", Severity.NARRATIVE_CRITICAL),
+    ]
+    assert {f.code.split(":")[0] for f in apart} == {"CRAFT"}
+    assert AuditDimension.ANTI_AI not in chapter_dimensions(merged_voice=True)
+    assert AuditDimension.ANTI_AI in chapter_dimensions(merged_voice=False)
+    assert "cảnh 1.1: 'dường như' used 2 times" in machine_counts(scenes)
