@@ -441,13 +441,30 @@ def set_phase(state: RunState, phase: RunPhase, *, reason: str | None = None) ->
     return state.model_copy(update={"phase": phase, "block_reason": reason, "blocked_findings": ()})
 
 
-def top_up(state: RunState, *, caller_ref: str, limits: StoryLimits) -> RunState:
+ADOPTABLE_PHASES = frozenset(
+    {
+        RunPhase.RUNNING,
+        RunPhase.BLOCKED_BUDGET,
+        RunPhase.BLOCKED_QUALITY,
+        RunPhase.BLOCKED_PROPAGATION,
+        RunPhase.MODEL_UNAVAILABLE,
+    }
+)
+
+
+def top_up(
+    state: RunState,
+    *,
+    caller_ref: str,
+    limits: StoryLimits,
+    phases: frozenset[RunPhase] = frozenset({RunPhase.BLOCKED_BUDGET}),
+) -> RunState:
     """A budget-blocked run goes on under ``limits``, which only grow; recorded with the usage it had, and once per
     ``caller_ref`` (a replayed top-up changes nothing)."""
     if any(t.caller_ref == caller_ref for t in state.top_ups):
         return state
-    if state.phase is not RunPhase.BLOCKED_BUDGET:
-        raise ValueError("only a budget-blocked run is topped up")
+    if state.phase not in phases:
+        raise ValueError(f"a {state.phase.value} run is not topped up here")
     before = state.limits
     grown = (
         "generate_calls_max",

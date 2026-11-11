@@ -20,6 +20,7 @@ from lib.api_errors import ConflictError
 from lib.content_digest import canonical_json_digest
 from lib.db.base import DEFAULT_USER_ID, dt_to_iso, utc_now
 from lib.db.models.api_call import ApiCall
+from lib.db.models.host_hardening import CommandReceiptModel
 from lib.db.models.task import BatchTask, GenerationBatch, Task, WorkerLease
 from lib.db.repositories.base import BaseRepository, rowcount
 from lib.db.repositories.host_hardening import CommandReceiptRepository
@@ -38,6 +39,14 @@ ACTIVE_TASK_STATUSES = ("queued", "running", "cancelling")
 STORY_RUN_TASK_TYPE = "story_authoring_run"
 STORY_RUN_WRITABLE_STATUSES = ("queued", "running", "succeeded", "failed")
 STORY_RUN_REQUEUEABLE_STATUSES = ("succeeded", "failed")
+#: A task set aside while the app is stopped for maintenance; not active, so an offline backup can run.
+PARKED_STATUS = "parked"
+PARKED_FROM_KEY = "_parked_from"
+#: Marks a media task already queued once more after a restart, so a second restart keeps the no-resend rule.
+RESTART_REQUEUE_KEY = "_restart_requeued"
+RUN_RECEIPT_PREFIX = "production-run:"
+#: A story-run task a later run may take over: finished, refused or cancelled, never one still queued or running.
+STORY_RUN_ADOPTABLE_STATUSES = ("succeeded", "failed", "cancelled")
 
 
 class StoryRunStateConflict(RuntimeError):
@@ -1268,6 +1277,109 @@ class TaskRepository(BaseRepository):
         )
         await self.session.commit()
         return rowcount(result)
+
+    async def hand_over_story_run(
+        self,
+        task_id: str,
+        *,
+        user_id: str,
+        project_name: str,
+        actor_scope: str,
+        command_id: str,
+        command_digest: str,
+    ) -> bool:
+        """Give a finished story-run task to a later automatic run (ADR-0129): record that run's command receipt for
+        the task and leave the task finished (a cancelled one becomes failed, so the run state can be written); the
+        caller queues it again once the run state is ready. A replayed hand-over adds nothing. Returns whether the
+        task can be handed over."""
+        now = utc_now()
+        task = (await self.session.execute(select(Task).where(Task.task_id == task_id))).scalar_one_or_none()
+        if task is None or task.task_type != STORY_RUN_TASK_TYPE or task.status not in STORY_RUN_ADOPTABLE_STATUSES:
+            return False
+        existing = await CommandReceiptRepository(self.session).get_exact(
+            user_id=user_id, project_name=project_name, actor_scope=actor_scope, command_id=command_id
+        )
+        if existing is None:
+            envelope = command_receipt_result_envelope(task_id=task_id, result={"status": "queued", "deduped": False})
+            await CommandReceiptRepository(self.session).add(
+                user_id=user_id,
+                project_name=project_name,
+                receipt=CommandReceipt(
+                    actor_scope=actor_scope,
+                    command_id=command_id,
+                    command_digest=command_digest,
+                    task_id=task_id,
+                    result_digest="sha256:" + canonical_json_digest(envelope, allow_nan=False),
+                    created_at=now,
+                ),
+            )
+        if task.status == "cancelled":
+            task.status, task.updated_at = "failed", now
+        await self.session.commit()
+        return True
+
+    async def park_active(self) -> int:
+        """Set every queued, running or cancelling task aside for maintenance while the app is stopped (the offline
+        backup counts none of them as active); each remembers its status, which ``unpark`` gives back."""
+        rows = (await self.session.execute(select(Task).where(Task.status.in_(ACTIVE_TASK_STATUSES)))).scalars().all()
+        now = utc_now()
+        for task in rows:
+            payload = json.loads(task.payload_json or "{}")
+            task.payload_json = json.dumps({**payload, PARKED_FROM_KEY: task.status}, ensure_ascii=False)
+            task.status, task.updated_at = PARKED_STATUS, now
+        await self.session.commit()
+        return len(rows)
+
+    async def unpark(self) -> int:
+        """Give every parked task its status back; a task that was running then goes through restart recovery like
+        any task a stop interrupted."""
+        rows = (await self.session.execute(select(Task).where(Task.status == PARKED_STATUS))).scalars().all()
+        now = utc_now()
+        for task in rows:
+            payload = json.loads(task.payload_json or "{}")
+            status = payload.pop(PARKED_FROM_KEY, "queued")
+            task.payload_json = json.dumps(payload, ensure_ascii=False)
+            task.status = status if status in ACTIVE_TASK_STATUSES else "queued"
+            task.updated_at = now
+        await self.session.commit()
+        return len(rows)
+
+    async def requeue_free_restart_lost(self, task_id: str, *, media_role: str) -> bool:
+        """A running media task an automatic run submitted on a free local route, left by a restart, is queued once
+        more instead of failing: no charge is repeated, and the run goes on without a person. Paid routes, tasks a
+        person queued and a second restart keep the no-resend rule. Returns whether it was queued."""
+        from lib.db.repositories.production_runs import ProductionRunRepository
+
+        task = (await self.session.execute(select(Task).where(Task.task_id == task_id))).scalar_one_or_none()
+        if task is None or task.status != "running":
+            return False
+        payload = json.loads(task.payload_json or "{}")
+        if payload.get(RESTART_REQUEUE_KEY):
+            return False
+        owner = (
+            await self.session.execute(
+                select(CommandReceiptModel.user_id, CommandReceiptModel.project_name, CommandReceiptModel.actor_scope)
+                .where(
+                    CommandReceiptModel.task_id == task_id,
+                    CommandReceiptModel.actor_scope.startswith(RUN_RECEIPT_PREFIX, autoescape=True),
+                )
+                .order_by(CommandReceiptModel.created_at.desc())
+                .limit(1)
+            )
+        ).first()
+        if owner is None:
+            return False
+        run = await ProductionRunRepository(self.session).get(
+            user_id=owner[0], project_name=owner[1], run_id=owner[2].removeprefix(RUN_RECEIPT_PREFIX)
+        )
+        route = None if run is None else next((r for r in run.policy.routes if r.role == media_role), None)
+        if route is None or not route.local or route.paid:
+            return False
+        now = utc_now()
+        task.payload_json = json.dumps({**payload, RESTART_REQUEUE_KEY: True}, ensure_ascii=False)
+        task.status, task.started_at, task.updated_at = "queued", None, now
+        await self.session.commit()
+        return True
 
     async def requeue_story_run(self, task_id: str) -> int:
         """把重启后残留为 running 的 story run 任务放回队列，由执行器先对账再续跑；返回更新行数。"""

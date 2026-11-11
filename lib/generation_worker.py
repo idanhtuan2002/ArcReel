@@ -1208,6 +1208,10 @@ class GenerationWorker:
         阻塞数十分钟。Dispatcher 不调 `_drain_finished_tasks`，完全依赖主循环每 cycle
         清理占用台账；`_stop_event` 触发时 dispatcher 自然退出。
         """
+        # Tasks set aside for maintenance come back first; those that were running are then recovered below.
+        unparked = await self.queue.unpark_tasks()
+        if unparked:
+            logger.warning("恢复维护期间搁置的任务: %d", unparked)
         orphans = await self.queue.list_orphan_tasks_on_start()
         if not orphans:
             return
@@ -1252,6 +1256,12 @@ class GenerationWorker:
 
             # image 任务不持久化 job_id 也无 resume 入口——已提交给供应商的请求无法回收，
             # 主动 requeue 会双重扣费。直接丢弃，等用户决定是否手动重试。
+            # An automatic run's task on a free local route is queued once more: nothing is charged twice.
+            role = {"image": "image", "audio": "audio", "text": "script"}.get(media_type)
+            if role is not None and await self.queue.requeue_free_restart_lost(task_id, media_role=role):
+                logger.warning("孤儿 %s running → 免费本地路由重新入队: %s", media_type, task_id)
+                continue
+
             if media_type == "image":
                 logger.warning("孤儿 image running → [restart_lost]: %s", task_id)
                 rows = await self.queue.mark_task_failed(

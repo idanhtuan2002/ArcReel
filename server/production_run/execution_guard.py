@@ -40,14 +40,17 @@ async def require_run_task_authorized(session: AsyncSession, task: dict[str, Any
     async with session.begin():
         receipts = (
             await session.execute(
-                select(
-                    CommandReceiptModel.user_id, CommandReceiptModel.project_name, CommandReceiptModel.actor_scope
-                ).where(
+                select(CommandReceiptModel.user_id, CommandReceiptModel.project_name, CommandReceiptModel.actor_scope)
+                .where(
                     CommandReceiptModel.task_id == str(task_id),
                     CommandReceiptModel.actor_scope.startswith(RUN_ACTOR_PREFIX, autoescape=True),
                 )
+                .order_by(CommandReceiptModel.created_at.desc())
+                .limit(1)
             )
         ).all()
+        # ADR-0129: a story task handed over to a later run follows that run; the run that submitted it first, now
+        # ended, no longer decides. Only the newest run receipt is checked.
         for user_id, project_name, actor_scope in receipts:
             if _AUTHORITY is None:
                 raise RunTaskRefused("AUTOMATION_GOVERNANCE_NOT_ACTIVATED")

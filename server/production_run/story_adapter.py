@@ -37,10 +37,12 @@ from r2.contracts.automation import (
     RunScope,
     RunSnapshot,
     RunStage,
+    RunStatus,
     StageOutcome,
     UsageReceipt,
 )
 from r2.narrative_lifecycle.errors import NarrativeDecisionAuthorizationError
+from server.production_run.execution_guard import RUN_ACTOR_PREFIX
 from server.production_run.greenlight_authority import greenlight_automatically, greenlight_subject_digest
 from server.production_run.narrative_authority import AutomaticNarrativeAuthority
 from server.production_run.owner_support import (
@@ -74,11 +76,12 @@ from server.story_authoring.idea_profile import (
     record_bytes,
     record_profile,
 )
-from server.story_authoring.runtime import BudgetUsage, RunPhase, RunState, RunStateStore
+from server.story_authoring.runtime import ADOPTABLE_PHASES, BudgetUsage, RunPhase, RunState, RunStateStore
 from server.story_authoring.service import (
     SECONDS_PER_CALL,
     StoryActionRefused,
     StoryAuthoringService,
+    StoryRunRef,
     brief_idea,
     run_id_for,
 )
@@ -142,6 +145,24 @@ def _grown(limits: StoryLimits, *, calls: int, seconds: int) -> StoryLimits:
             "wall_clock_max_seconds": limits.wall_clock_max_seconds + seconds,
         }
     )
+
+
+#: Production runs that can no longer act; only their stories are taken over (ADR-0129).
+_ENDED_RUN = frozenset({RunStatus.CANCELLED, RunStatus.FAILED, RunStatus.FAILED_QUALITY, RunStatus.SUCCEEDED})
+
+
+def adoption_pin(run_id: str) -> str:
+    """The blob-store pin naming the story run a production run took over."""
+    return f"r2.story-adoption.v1:{run_id}"
+
+
+def adopted_story(projects: ProjectManager, project_name: str, run_id: str) -> str | None:
+    blobs = _blobs(projects, project_name)
+    try:
+        pinned = blobs.pinned(adoption_pin(run_id))
+        return None if pinned is None else str(json.loads(blobs.read_exact(pinned))["story_run_id"])
+    except (BlobStoreError, ValueError, KeyError):
+        raise OwnerBlocked("STORY_ADOPTION_UNAVAILABLE") from None
 
 
 def _since_top_up(state: RunState, receipt_ref: str) -> BudgetUsage:
@@ -268,6 +289,68 @@ class BriefAdapter:
             raise OwnerBlocked("STORY_PROFILE_UNAVAILABLE") from None
         return profile
 
+    async def _adoptable(
+        self, run: RunSnapshot, command: RunCommand, idea: str, prior_mode: str | None
+    ) -> StoryRunRef | None:
+        """ADR-0129: the project's unfinished story that writes exactly what this run would write — the same short
+        story, the same first part of the same book, or the book's next part — left by automatic runs that have all
+        ended. A Showrunner's own story run, or one whose run may still act, is never taken over."""
+        if prior_mode == "variant":
+            return None
+        part: int | None = None
+        spec = None
+        if prior_mode == "continuation":
+            progress = await self._stories.book_progress(run.project_name, user_id=run.user_id)
+            if progress is None or progress.parts_done >= len(progress.spec.parts()):
+                return None
+            part, spec = progress.parts_done + 1, progress.spec
+
+        def matches(brief: StoryBrief) -> bool:
+            if brief.prior is not None:
+                return False
+            if part is not None:
+                return brief.book is not None and brief.book.part == part and brief.book.spec == spec
+            if brief.idea != idea:
+                return False
+            if command.book_chapters is None:
+                return brief.book is None
+            return brief.book is not None and brief.book.part == 1 and brief.book.spec.chapters == command.book_chapters
+
+        found = await self._stories.adoptable(user_id=run.user_id, project_name=run.project_name, matches=matches)
+        if found is None:
+            return None
+        ref, _state, owners = found
+        if not owners or any(not o.startswith(RUN_ACTOR_PREFIX) for o in owners):
+            return None
+        async with self._sessions() as session:
+            repository = ProductionRunRepository(session)
+            for owner in owners:
+                earlier = await repository.get(
+                    user_id=run.user_id, project_name=run.project_name, run_id=owner.removeprefix(RUN_ACTOR_PREFIX)
+                )
+                if earlier is None or earlier.run_id == run.run_id or earlier.status not in _ENDED_RUN:
+                    return None
+        return ref
+
+    async def _greenlight_adopted(self, intent: DispatchIntent, run: RunSnapshot, ref: StoryRunRef) -> OwnerReceipt:
+        """Greenlight the unfinished story's own brief under this run's grant and record which story run the STORY
+        stage takes over."""
+        brief = StoryBrief.model_validate(ref.brief.model_dump(mode="json", exclude={"gate_a_decision_id"}))
+        if brief.limits.cloud_prices is not None and run.policy.currency != "USD":
+            raise OwnerBlocked("CURRENCY_MISMATCH")
+        blobs = _blobs(self._projects, run.project_name)
+        digest = blobs.put(brief_bytes(brief))
+        if digest != brief.digest():
+            raise OwnerBlocked("STORY_BRIEF_UNAVAILABLE")
+        blobs.pin(adoption_pin(run.run_id), blobs.put(json.dumps({"story_run_id": ref.run_id}).encode("utf-8")))
+        subject = await current_subject(
+            self._sessions, intent, subject_digest=greenlight_subject_digest(source_digest=digest)
+        )
+        decision = await greenlight_automatically(
+            sessions=self._sessions, authority=self._authority, subject=subject, source_digest=digest
+        )
+        return OwnerReceipt(owner=self.owner, receipt_ref=decision.decision_id, digest=digest)
+
     async def dispatch(self, intent: DispatchIntent) -> OwnerReceipt:
         run = await current_run(self._sessions, intent)
         command = await start_command(self._sessions, intent)
@@ -290,6 +373,9 @@ class BriefAdapter:
             genre, book_chapters = profile.pack().label, profile.book_chapters
         else:
             idea = brief_idea(command.idea, command.variant_profile)
+            adopted = await self._adoptable(run, command, idea, prior_mode)
+            if adopted is not None:
+                return await self._greenlight_adopted(intent, run, adopted)
         story_only = command.end_stage == "HANDOFF"
         sizes = PART_SIZES if story_only and book_chapters is not None else (None,)
         drafted = None
@@ -388,6 +474,19 @@ class StoryAdapter:
 
     async def plan(self, *, run: RunSnapshot) -> StepPlan:
         greenlight, brief = await self._brief(run)
+        adopted = await asyncio.to_thread(adopted_story, self._projects, run.project_name, run.run_id)
+        if adopted is not None:
+            _ref, state = await self._stories.get(user_id=run.user_id, project_name=run.project_name, run_id=adopted)
+            if state.phase in ADOPTABLE_PHASES:
+                calls, seconds = await self._adoption_need(run, state, brief)
+                return StepPlan(
+                    unit_key="story",
+                    input_refs=(greenlight,),
+                    estimated_cost_minor_units=0,
+                    estimated_model_calls=2 * calls,
+                    estimated_tasks=1,
+                    estimated_runtime_seconds=seconds,
+                )
         blocked = await self._blocked_story(run, greenlight)
         if blocked is not None:
             target = await self._top_up_target(run, blocked, brief)
@@ -419,6 +518,10 @@ class StoryAdapter:
         subject = await current_subject(self._sessions, intent, subject_digest=greenlight.digest)
         async with self._sessions() as session, session.begin():
             await self._authority.require_locked(session, subject=subject)
+        adopted = await asyncio.to_thread(adopted_story, self._projects, intent.scope.project_name, intent.scope.run_id)
+        caller = intent.identity.command_id
+        if adopted is not None:
+            return await self._take_over(intent, greenlight, adopted)
         try:
             ref = await self._stories.start_greenlit(
                 user_id=intent.scope.user_id,
@@ -430,7 +533,6 @@ class StoryAdapter:
         except StoryActionRefused as refused:
             raise OwnerBlocked(refused.code) from None
         state = await RunStateStore(self._sessions, task_id=ref.task_id).load()
-        caller = intent.identity.command_id
         done = next((t for t in state.top_ups if t.caller_ref == caller), None)
         if done is None and state.phase is RunPhase.BLOCKED_BUDGET:
             # ADR-0127: this step reserved the difference; the story goes on from where it stopped.
@@ -493,26 +595,88 @@ class StoryAdapter:
             known=state.phase is not RunPhase.RECOVERY_INCONSISTENT,
         )
 
+    async def _take_over(self, intent: DispatchIntent, greenlight: OwnerReceipt, story_run_id: str) -> OwnerReceipt:
+        """ADR-0129: continue the unfinished story this run adopted, from where it stopped; the step settles only
+        what is spent from here."""
+        caller = intent.identity.command_id
+        ref, state = await self._stories.get(
+            user_id=intent.scope.user_id, project_name=intent.scope.project_name, run_id=story_run_id
+        )
+        done = next((t for t in state.top_ups if t.caller_ref == caller), None)
+        if done is None:
+            calls = intent.estimated_model_calls // 2
+            used = state.usage
+            limits = state.limits.model_copy(
+                update={
+                    "generate_calls_max": used.generate_calls + calls,
+                    "count_calls_max": used.count_calls + calls,
+                    "input_tokens_max": used.input_tokens + calls * state.limits.max_input_tokens,
+                    "output_tokens_max": used.output_tokens + calls * state.limits.max_output_tokens,
+                    "wall_clock_max_seconds": used.model_milliseconds // 1000 + intent.estimated_runtime_seconds,
+                }
+            )
+            subject = await current_subject(self._sessions, intent, subject_digest=greenlight.digest)
+            async with self._sessions() as session, session.begin():
+                await self._authority.require_locked(session, subject=subject)
+            try:
+                state = await self._stories.adopt(
+                    user_id=intent.scope.user_id,
+                    project_name=intent.scope.project_name,
+                    run_id=story_run_id,
+                    caller_ref=caller,
+                    actor_scope=actor_scope(intent),
+                    command_id=sub_command(intent, "story"),
+                    limits=limits,
+                )
+            except StoryActionRefused as refused:
+                raise OwnerBlocked(refused.code) from None
+            done = next(t for t in state.top_ups if t.caller_ref == caller)
+        return OwnerReceipt(
+            owner=self.owner,
+            receipt_ref=f"{ref.run_id}#top-up-{done.number}",
+            digest=greenlight.digest,
+            task_id=ref.task_id,
+        )
+
+    async def _adoption_need(self, run: RunSnapshot, state: RunState, brief: StoryBrief) -> tuple[int, int]:
+        """ADR-0129: the generate calls and model seconds this run reserves for the story it takes over: up to the
+        story's structural bound on a free route (its own limits on a paid one), within what the run's caps leave."""
+        cap = state.limits.generate_calls_max
+        if state.limits.cloud_prices is None:
+            cap = max(cap, run_call_bound(state.limits.chapters, book=brief.book, digests=brief.carries_digests))
+        async with self._sessions() as session:
+            _cost, used_calls, _tasks, used_seconds = await ProductionRunRepository(session).usage_totals(
+                RunScope(user_id=run.user_id, project_name=run.project_name, run_id=run.run_id)
+            )
+        room_calls = max(0, run.policy.max_model_calls - used_calls) // 2
+        room_seconds = max(1, run.policy.max_runtime_seconds - used_seconds)
+        calls = max(1, min(cap - state.usage.generate_calls, room_calls))
+        return calls, room_seconds
+
+    async def _story_id(self, run: RunSnapshot, greenlight: OwnerReceipt) -> str:
+        adopted = await asyncio.to_thread(adopted_story, self._projects, run.project_name, run.run_id)
+        return adopted or run_id_for(greenlight.receipt_ref)
+
     async def _blocked_story(self, run: RunSnapshot, greenlight: OwnerReceipt) -> RunState | None:
         """The run's story when an earlier attempt of the stage left it blocked on its budget."""
         try:
             _ref, state = await self._stories.get(
-                user_id=run.user_id, project_name=run.project_name, run_id=run_id_for(greenlight.receipt_ref)
+                user_id=run.user_id, project_name=run.project_name, run_id=await self._story_id(run, greenlight)
             )
         except StoryActionRefused:
             return None
         return state if state.phase is RunPhase.BLOCKED_BUDGET else None
 
-    async def _top_up_target(self, run: RunSnapshot, state: RunState, brief: StoryBrief) -> StoryLimits | None:
+    async def _top_up_target(
+        self, run: RunSnapshot, state: RunState, brief: StoryBrief, *, adopting: bool = False
+    ) -> StoryLimits | None:
         """ADR-0127: a story on a free route whose limits were set below its structural bound goes on up to that
         bound, within what the run's own caps leave, at most TOP_UP_LIMIT times. A paid route never spends more
         than its approved cap without a Showrunner."""
         reworks = sum(r.count for r in run.repair_counts if r.stage is RunStage.STORY)
-        if (
-            state.limits.cloud_prices is not None
-            or len(state.top_ups) >= TOP_UP_LIMIT
-            or reworks >= run.policy.unit_repair_limit
-        ):
+        if state.limits.cloud_prices is not None:
+            return None
+        if not adopting and (len(state.top_ups) >= TOP_UP_LIMIT or reworks >= run.policy.unit_repair_limit):
             return None
         bound = run_call_bound(state.limits.chapters, book=brief.book)
         if state.limits.generate_calls_max >= bound:

@@ -707,6 +707,14 @@ class GenerationQueue:
         async with self._task_repo() as repo:
             return await repo.requeue_story_run(task_id)
 
+    async def unpark_tasks(self) -> int:
+        async with self._task_repo() as repo:
+            return await repo.unpark()
+
+    async def requeue_free_restart_lost(self, task_id: str, *, media_role: str) -> bool:
+        async with self._task_repo() as repo:
+            return await repo.requeue_free_restart_lost(task_id, media_role=media_role)
+
     async def persist_provider_job_id(
         self,
         task_id: str,

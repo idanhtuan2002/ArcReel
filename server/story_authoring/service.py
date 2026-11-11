@@ -27,10 +27,11 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from lib.custom_provider import is_custom_provider, parse_provider_id
+from lib.db.models.host_hardening import CommandReceiptModel
 from lib.db.models.task import Task
 from lib.db.repositories.custom_provider_repo import CustomProviderRepository
 from lib.db.repositories.gates import GreenlightRepository
-from lib.db.repositories.task_repo import STORY_RUN_TASK_TYPE, TaskRepository
+from lib.db.repositories.task_repo import STORY_RUN_ADOPTABLE_STATUSES, STORY_RUN_TASK_TYPE, TaskRepository
 from lib.episode_ledger import discover_sources
 from lib.source_preview import preview_sources
 from lib.text_backends.ollama import OllamaChatClient
@@ -81,6 +82,7 @@ from server.story_authoring.prompts.prior import prior_calls
 from server.story_authoring.prompts.schemas import StorySeed, StyleBibleOut
 from server.story_authoring.routes import max_prices, resolve_cloud_route, story_routes, validate_cloud_brief
 from server.story_authoring.runtime import (
+    ADOPTABLE_PHASES,
     AttemptState,
     HandoffRecord,
     RunPhase,
@@ -795,6 +797,104 @@ class StoryAuthoringService:
             return top_up(current, caller_ref=caller_ref, limits=limits), True
 
         return await self._transition(ref, change, "top up", requeue=True)
+
+    async def adoptable(
+        self, *, user_id: str, project_name: str, matches: Callable[[StoryBrief], bool]
+    ) -> tuple[StoryRunRef, RunState, tuple[str, ...]] | None:
+        """ADR-0129: the project's newest story run when it stopped unfinished and writes what ``matches`` asks for,
+        with the automatic runs that submitted it (their actor scopes); none while it is queued or running."""
+        async with self._factory() as session:
+            task = (
+                await session.execute(
+                    select(Task)
+                    .where(
+                        Task.task_type == STORY_RUN_TASK_TYPE,
+                        Task.project_name == project_name,
+                        Task.user_id == user_id,
+                    )
+                    .order_by(Task.queued_at.desc())
+                    .limit(1)
+                )
+            ).scalar_one_or_none()
+            if task is None or task.status not in STORY_RUN_ADOPTABLE_STATUSES:
+                return None
+            owners = tuple(
+                (
+                    await session.execute(
+                        select(CommandReceiptModel.actor_scope).where(
+                            CommandReceiptModel.task_id == task.task_id,
+                            CommandReceiptModel.user_id == user_id,
+                            CommandReceiptModel.project_name == project_name,
+                        )
+                    )
+                ).scalars()
+            )
+        ref = StoryRunRef(
+            run_id=task.resource_id,
+            task_id=task.task_id,
+            brief=StoryBrief.model_validate(json.loads(task.payload_json or "{}")["brief"]),
+        )
+        state = await RunStateStore(self._factory, task_id=ref.task_id).load()
+        if state.phase not in ADOPTABLE_PHASES or not matches(ref.brief):
+            return None
+        return ref, state, owners
+
+    async def adopt(
+        self,
+        *,
+        user_id: str,
+        project_name: str,
+        run_id: str,
+        caller_ref: str,
+        actor_scope: str,
+        command_id: str,
+        limits: StoryLimits,
+    ) -> RunState:
+        """ADR-0129: a later automatic run takes over an unfinished story run: the story goes on from where it stopped
+        under ``limits`` (never smaller), its usage from here settled by the caller, and its task follows the caller's
+        authority. A replayed adoption changes nothing."""
+        ref, _ = await self.get(user_id=user_id, project_name=project_name, run_id=run_id)
+        store = RunStateStore(self._factory, task_id=ref.task_id)
+        # The receipt first (the task then follows the caller's authority), then the state, then the queue: a worker
+        # never runs the story before its new limits are written.
+        async with self._factory() as session:
+            handed = await TaskRepository(session).hand_over_story_run(
+                ref.task_id,
+                user_id=user_id,
+                project_name=project_name,
+                actor_scope=actor_scope,
+                command_id=command_id,
+                command_digest=ref.brief.digest(),
+            )
+        if not handed:
+            raise StoryActionRefused("ACTION_NOT_ALLOWED", "the story task is still queued or running")
+
+        def change(current: RunState) -> tuple[RunState, bool]:
+            if any(t.caller_ref == caller_ref for t in current.top_ups):
+                return current, True
+            if current.phase not in ADOPTABLE_PHASES:
+                return current, False
+            grown = limits.model_copy(
+                update={
+                    field: max(getattr(limits, field), getattr(current.limits, field))
+                    for field in (
+                        "generate_calls_max",
+                        "count_calls_max",
+                        "input_tokens_max",
+                        "output_tokens_max",
+                        "wall_clock_max_seconds",
+                        "max_cost_minor_units",
+                    )
+                }
+            )
+            return top_up(current, caller_ref=caller_ref, limits=grown, phases=ADOPTABLE_PHASES), True
+
+        state, allowed = await store.apply(change)
+        if not allowed:
+            raise StoryActionRefused("ACTION_NOT_ALLOWED", f"a {state.phase.value} story run is not taken over")
+        async with self._factory() as session:
+            await TaskRepository(session).requeue_finished_story_run(ref.task_id)
+        return state
 
     async def discard(self, *, user_id: str, project_name: str, run_id: str, principal: str) -> RunState:
         return await self._terminal(user_id, project_name, run_id, principal, DISCARDABLE_PHASES, RunPhase.DISCARDED)

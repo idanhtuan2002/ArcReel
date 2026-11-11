@@ -596,3 +596,117 @@ async def test_a_paid_story_or_one_at_its_bound_stays_blocked_for_the_showrunner
         "BLOCKED_BUDGET",
     )
     assert (await store.load()).top_ups == ()
+
+
+async def _cancel(host: Host, run: RunSnapshot) -> None:
+    from lib.db.models.production_run import ProductionRunModel
+
+    async with host.sessions() as session, session.begin():
+        current = await ProductionRunRepository(session).get(
+            user_id=run.user_id, project_name=run.project_name, run_id=run.run_id
+        )
+        assert current is not None
+        ended = RunSnapshot.model_validate(
+            {**current.model_dump(mode="python"), "status": RunStatus.CANCELLED, "reason": "CANCELLED_BY_USER"}
+        )
+        await session.execute(
+            sa.update(ProductionRunModel)
+            .where(ProductionRunModel.run_id == run.run_id)
+            .values(status="CANCELLED", snapshot_json=ended.model_dump_json(), lease_owner=None, lease_until=None)
+        )
+
+
+async def _second_run(host: Host) -> RunSnapshot:
+    witness = ProjectInputWitness(host.sessions, projects=host.projects)
+    async with host.sessions() as session, session.begin():
+        run = await ProductionRunRepository(session).create(
+            command=RunCommand(
+                user_id="default",
+                project_name="project",
+                command_id="start-2",
+                action="START",
+                expected_version=0,
+                expected_input_digest=await witness.digest(user_id="default", project_name="project"),
+                policy_digest=policy_digest(host.run.policy),
+                idea="Một người con về làng bán căn nhà của cha.",
+            ),
+            policy=host.run.policy,
+        )
+    await host.issuer.issue(
+        interactive_token=auth.create_token("actor"),
+        request=GrantRequest(
+            user_id=run.user_id,
+            project_name=run.project_name,
+            run_id=run.run_id,
+            issuer_id="actor",
+            command_id="start-2",
+            expected_run_version=run.version,
+            input_digest=run.input_digest,
+            policy_digest=policy_digest(run.policy),
+            operations=frozenset(AutomationOperation),
+            expires_at=datetime.now(UTC) + timedelta(hours=1),
+        ),
+    )
+    return run
+
+
+async def _tick_run(host: Host, run_id: str) -> RunSnapshot:
+    async with host.sessions() as session, session.begin():
+        claimed = await ProductionRunRepository(session).claim_due(owner_id=OWNER, lease_seconds=120)
+    assert claimed is not None
+    assert claimed.run_id == run_id
+    return await host.controller.tick(run_id=run_id, owner_id=OWNER)
+
+
+async def test_a_new_run_takes_over_the_story_a_cancelled_run_left_unfinished(story_host: Host):
+    from lib.db.models.host_hardening import CommandReceiptModel
+    from server.production_run.execution_guard import configure_run_task_authority, require_run_task_authorized
+    from server.production_run.story_adapter import adopted_story
+
+    host = story_host
+    await _tick(host)
+    await _tick(host)
+    task_id = await _story_task(host)
+    store = RunStateStore(host.sessions, task_id=task_id)
+    first = await store.load()
+    # The first run is cancelled while its story was still writing; the task was refused and ended.
+    async with host.sessions() as session, session.begin():
+        await session.execute(sa.update(Task).where(Task.task_id == task_id).values(status="cancelled"))
+    await _cancel(host, host.run)
+
+    second = await _second_run(host)
+    briefed = await _tick_run(host, second.run_id)
+    assert (briefed.stage, briefed.status) == (RunStage.STORY, RunStatus.RUNNING)
+    assert adopted_story(host.projects, "project", second.run_id) == first.run_id
+    waiting = await _tick_run(host, second.run_id)
+    assert (waiting.stage, waiting.status) == (RunStage.STORY, RunStatus.WAITING_TASK)
+
+    async with host.sessions() as session:
+        tasks = (await session.execute(sa.select(Task).where(Task.task_type == "story_authoring_run"))).scalars().all()
+        owners = (
+            (
+                await session.execute(
+                    sa.select(CommandReceiptModel.actor_scope).where(CommandReceiptModel.task_id == task_id)
+                )
+            )
+            .scalars()
+            .all()
+        )
+    assert [t.task_id for t in tasks] == [task_id]  # no second story run
+    assert tasks[0].status == "queued"
+    assert sorted(owners) == sorted([f"production-run:{host.run.run_id}", f"production-run:{second.run_id}"])
+    state = await store.load()
+    assert state.phase is RunPhase.RUNNING
+    [taken] = state.top_ups
+    assert taken.baseline == first.usage
+
+    configure_run_task_authority(host.authority)
+    try:
+        async with host.sessions() as session:
+            await require_run_task_authorized(session, {"task_id": task_id})
+    finally:
+        configure_run_task_authority(None)
+
+    assert await _execute_story(host) == "READY_FOR_APPROVAL"
+    offered = await _tick_run(host, second.run_id)
+    assert (offered.stage, offered.status) == (RunStage.STORY_COMMIT, RunStatus.RUNNING)
