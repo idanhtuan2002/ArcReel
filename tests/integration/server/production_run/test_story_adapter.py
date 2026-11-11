@@ -555,6 +555,8 @@ async def test_a_story_blocked_below_its_bound_is_topped_up_and_goes_on_from_whe
     assert await _execute_story(host) == "READY_FOR_APPROVAL"
     offered = await _tick(host)
     assert (offered.stage, offered.status) == (RunStage.STORY_COMMIT, RunStatus.RUNNING)
+    committed = await _tick(host)
+    assert (committed.stage, committed.status, committed.reason) == (RunStage.HANDOFF, RunStatus.RUNNING, None)
     async with host.sessions() as session:
         rows = (
             (await session.execute(sa.select(ProductionUsageModel).where(ProductionUsageModel.owner == "story-run")))
@@ -710,3 +712,8 @@ async def test_a_new_run_takes_over_the_story_a_cancelled_run_left_unfinished(st
     assert await _execute_story(host) == "READY_FOR_APPROVAL"
     offered = await _tick_run(host, second.run_id)
     assert (offered.stage, offered.status) == (RunStage.STORY_COMMIT, RunStatus.RUNNING)
+    committed = await _tick_run(host, second.run_id)
+    assert (committed.stage, committed.status, committed.reason) == (RunStage.HANDOFF, RunStatus.RUNNING, None)
+    assert (await store.load()).phase is RunPhase.COMMITTED
+    handed = await _tick_run(host, second.run_id)
+    assert handed.stage is RunStage.ASSET_ANALYSIS

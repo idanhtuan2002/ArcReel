@@ -1209,9 +1209,13 @@ class GenerationWorker:
         清理占用台账；`_stop_event` 触发时 dispatcher 自然退出。
         """
         # Tasks set aside for maintenance come back first; those that were running are then recovered below.
-        unparked = await self.queue.unpark_tasks()
-        if unparked:
-            logger.warning("恢复维护期间搁置的任务: %d", unparked)
+        try:
+            unparked = await self.queue.unpark_tasks()
+        except Exception:
+            logger.exception("恢复搁置任务失败；任务保持 parked，由运维执行 park_tasks unpark")
+        else:
+            if unparked:
+                logger.warning("恢复维护期间搁置的任务: %d", unparked)
         orphans = await self.queue.list_orphan_tasks_on_start()
         if not orphans:
             return

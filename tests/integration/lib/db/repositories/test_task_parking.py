@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from uuid import uuid4
 
 import sqlalchemy as sa
 
@@ -16,11 +17,11 @@ async def _task(session, *, status: str, actor: str | None = None, media: str = 
         project_name="project",
         task_type="image",
         media_type=media,
-        resource_id=f"r-{status}-{actor}",
+        resource_id=f"r-{uuid4().hex}",
         payload={"prompt": "p"},
         user_id="default",
         actor_scope=actor,
-        command_id=None if actor is None else f"cmd-{status}",
+        command_id=None if actor is None else f"cmd-{uuid4().hex}",
         command_digest=None if actor is None else "sha256:" + "d" * 64,
     )
     await session.commit()
@@ -52,7 +53,7 @@ async def test_a_lost_media_task_of_a_free_automatic_run_is_queued_once_and_paid
 
     class Route:
         def __init__(self, role, local, paid):
-            self.role, self.local, self.paid = role, local, paid
+            self.role, self.local, self.paid, self.provider_id = role, local, paid, "custom-1"
 
     class Run:
         def __init__(self, local, paid):
@@ -68,10 +69,16 @@ async def test_a_lost_media_task_of_a_free_automatic_run_is_queued_once_and_paid
         free = await _task(session, status="running", actor="production-run:free")
         paid = await _task(session, status="running", actor="production-run:paid")
         manual = await _task(session, status="running")
+        elsewhere = await _task(session, status="running", actor="production-run:free")
+        await session.execute(sa.update(Task).values(provider_id="custom-1"))
+        await session.execute(sa.update(Task).where(Task.task_id == elsewhere).values(provider_id="gemini"))
+        await session.commit()
         repo = TaskRepository(session)
         assert await repo.requeue_free_restart_lost(free, media_role="image") is True
         assert await repo.requeue_free_restart_lost(paid, media_role="image") is False
         assert await repo.requeue_free_restart_lost(manual, media_role="image") is False
+        # A task that went to another provider than the run's free route is never sent again.
+        assert await repo.requeue_free_restart_lost(elsewhere, media_role="image") is False
         row = (await session.execute(sa.select(Task).where(Task.task_id == free))).scalar_one()
         assert row.status == "queued"
         assert json.loads(row.payload_json)[RESTART_REQUEUE_KEY] is True

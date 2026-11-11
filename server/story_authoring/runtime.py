@@ -458,6 +458,7 @@ def top_up(
     caller_ref: str,
     limits: StoryLimits,
     phases: frozenset[RunPhase] = frozenset({RunPhase.BLOCKED_BUDGET}),
+    grow: bool = True,
 ) -> RunState:
     """A budget-blocked run goes on under ``limits``, which only grow; recorded with the usage it had, and once per
     ``caller_ref`` (a replayed top-up changes nothing)."""
@@ -474,7 +475,7 @@ def top_up(
         "wall_clock_max_seconds",
         "max_cost_minor_units",
     )
-    if any(getattr(limits, f) < getattr(before, f) for f in grown) or limits.model_dump(
+    if (grow and any(getattr(limits, f) < getattr(before, f) for f in grown)) or limits.model_dump(
         exclude=set(grown)
     ) != before.model_dump(exclude=set(grown)):
         raise ValueError("a top-up only raises the run's caps")

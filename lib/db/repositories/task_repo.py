@@ -1351,7 +1351,7 @@ class TaskRepository(BaseRepository):
         from lib.db.repositories.production_runs import ProductionRunRepository
 
         task = (await self.session.execute(select(Task).where(Task.task_id == task_id))).scalar_one_or_none()
-        if task is None or task.status != "running":
+        if task is None or task.status != "running" or task.task_type == STORY_RUN_TASK_TYPE:
             return False
         payload = json.loads(task.payload_json or "{}")
         if payload.get(RESTART_REQUEUE_KEY):
@@ -1373,7 +1373,9 @@ class TaskRepository(BaseRepository):
             user_id=owner[0], project_name=owner[1], run_id=owner[2].removeprefix(RUN_RECEIPT_PREFIX)
         )
         route = None if run is None else next((r for r in run.policy.routes if r.role == media_role), None)
-        if route is None or not route.local or route.paid:
+        # The task's own provider must be the run's free local route for that role: a task that went to another
+        # provider is never sent again.
+        if route is None or not route.local or route.paid or task.provider_id != route.provider_id:
             return False
         now = utc_now()
         task.payload_json = json.dumps({**payload, RESTART_REQUEUE_KEY: True}, ensure_ascii=False)

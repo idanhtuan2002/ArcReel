@@ -45,7 +45,7 @@ async def require_run_task_authorized(session: AsyncSession, task: dict[str, Any
                     CommandReceiptModel.task_id == str(task_id),
                     CommandReceiptModel.actor_scope.startswith(RUN_ACTOR_PREFIX, autoescape=True),
                 )
-                .order_by(CommandReceiptModel.created_at.desc())
+                .order_by(CommandReceiptModel.created_at.desc(), CommandReceiptModel.command_id.desc())
                 .limit(1)
             )
         ).all()

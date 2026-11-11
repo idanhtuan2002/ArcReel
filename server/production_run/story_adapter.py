@@ -165,6 +165,11 @@ def adopted_story(projects: ProjectManager, project_name: str, run_id: str) -> s
         raise OwnerBlocked("STORY_ADOPTION_UNAVAILABLE") from None
 
 
+def story_run_of(receipt: OwnerReceipt) -> str:
+    """The story run a STORY receipt names; a step after a top-up or a take-over adds ``#top-up-n`` to it."""
+    return receipt.receipt_ref.partition("#")[0]
+
+
 def _since_top_up(state: RunState, receipt_ref: str) -> BudgetUsage:
     """What the story spent under the step whose receipt names a top-up: its usage less the usage at that top-up."""
     _run, _sep, tag = receipt_ref.partition("#top-up-")
@@ -320,6 +325,18 @@ class BriefAdapter:
         if found is None:
             return None
         ref, _state, owners = found
+        writer = route_for(run, "writer")
+        brief = ref.brief
+        if (
+            writer is None
+            or (brief.selection.provider_id, brief.selection.model_id) != writer
+            or brief.judge_selection is not None
+            or brief.limits.cloud_prices is not None
+            or brief.content_safety != self._stories.content_safety(run.project_name)
+        ):
+            # Only a story this run could have written itself is taken over: its writer route, a free route (a
+            # paid story never spends past its approved cap without a Showrunner), the project's current safety.
+            return None
         if not owners or any(not o.startswith(RUN_ACTOR_PREFIX) for o in owners):
             return None
         async with self._sessions() as session:
@@ -631,6 +648,11 @@ class StoryAdapter:
             except StoryActionRefused as refused:
                 raise OwnerBlocked(refused.code) from None
             done = next(t for t in state.top_ups if t.caller_ref == caller)
+        else:
+            # A replay after the state was written but before the task was queued again: queue it now.
+            await self._stories.requeue_finished(
+                user_id=intent.scope.user_id, project_name=intent.scope.project_name, run_id=story_run_id
+            )
         return OwnerReceipt(
             owner=self.owner,
             receipt_ref=f"{ref.run_id}#top-up-{done.number}",
@@ -667,16 +689,16 @@ class StoryAdapter:
             return None
         return state if state.phase is RunPhase.BLOCKED_BUDGET else None
 
-    async def _top_up_target(
-        self, run: RunSnapshot, state: RunState, brief: StoryBrief, *, adopting: bool = False
-    ) -> StoryLimits | None:
+    async def _top_up_target(self, run: RunSnapshot, state: RunState, brief: StoryBrief) -> StoryLimits | None:
         """ADR-0127: a story on a free route whose limits were set below its structural bound goes on up to that
         bound, within what the run's own caps leave, at most TOP_UP_LIMIT times. A paid route never spends more
         than its approved cap without a Showrunner."""
         reworks = sum(r.count for r in run.repair_counts if r.stage is RunStage.STORY)
-        if state.limits.cloud_prices is not None:
-            return None
-        if not adopting and (len(state.top_ups) >= TOP_UP_LIMIT or reworks >= run.policy.unit_repair_limit):
+        if (
+            state.limits.cloud_prices is not None
+            or len(state.top_ups) >= TOP_UP_LIMIT
+            or reworks >= run.policy.unit_repair_limit
+        ):
             return None
         bound = run_call_bound(state.limits.chapters, book=brief.book)
         if state.limits.generate_calls_max >= bound:
@@ -754,7 +776,7 @@ class StoryCommitAdapter:
                 raise OwnerBlocked("AUTOMATION_GRANT_NOT_CURRENT") from None
             raise OwnerBlocked("STORY_MANIFEST_BINDING_MISMATCH") from None
         committer = await self._stories.committer(
-            user_id=scope.user_id, project_name=scope.project_name, run_id=story.receipt_ref
+            user_id=scope.user_id, project_name=scope.project_name, run_id=story_run_of(story)
         )
         try:
             await committer.approve_automatically(narrative=narrative, manifest_digest_seen=story.digest)

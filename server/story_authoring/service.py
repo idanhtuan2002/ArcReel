@@ -853,8 +853,11 @@ class StoryAuthoringService:
         """ADR-0129: a later automatic run takes over an unfinished story run: the story goes on from where it stopped
         under ``limits`` (never smaller), its usage from here settled by the caller, and its task follows the caller's
         authority. A replayed adoption changes nothing."""
-        ref, _ = await self.get(user_id=user_id, project_name=project_name, run_id=run_id)
+        ref, before = await self.get(user_id=user_id, project_name=project_name, run_id=run_id)
         store = RunStateStore(self._factory, task_id=ref.task_id)
+        replay = any(t.caller_ref == caller_ref for t in before.top_ups)
+        if not replay and before.phase not in ADOPTABLE_PHASES:
+            raise StoryActionRefused("ACTION_NOT_ALLOWED", f"a {before.phase.value} story run is not taken over")
         # The receipt first (the task then follows the caller's authority), then the state, then the queue: a worker
         # never runs the story before its new limits are written.
         async with self._factory() as session:
@@ -866,7 +869,7 @@ class StoryAuthoringService:
                 command_id=command_id,
                 command_digest=ref.brief.digest(),
             )
-        if not handed:
+        if not handed and not replay:
             raise StoryActionRefused("ACTION_NOT_ALLOWED", "the story task is still queued or running")
 
         def change(current: RunState) -> tuple[RunState, bool]:
@@ -874,20 +877,17 @@ class StoryAuthoringService:
                 return current, True
             if current.phase not in ADOPTABLE_PHASES:
                 return current, False
-            grown = limits.model_copy(
+            # The story's limits become exactly what the caller reserved on top of what it has spent, never more.
+            used = current.usage
+            exact = limits.model_copy(
                 update={
-                    field: max(getattr(limits, field), getattr(current.limits, field))
-                    for field in (
-                        "generate_calls_max",
-                        "count_calls_max",
-                        "input_tokens_max",
-                        "output_tokens_max",
-                        "wall_clock_max_seconds",
-                        "max_cost_minor_units",
-                    )
+                    "generate_calls_max": max(limits.generate_calls_max, used.generate_calls),
+                    "count_calls_max": max(limits.count_calls_max, used.count_calls),
+                    "input_tokens_max": max(limits.input_tokens_max, used.input_tokens),
+                    "output_tokens_max": max(limits.output_tokens_max, used.output_tokens),
                 }
             )
-            return top_up(current, caller_ref=caller_ref, limits=grown, phases=ADOPTABLE_PHASES), True
+            return top_up(current, caller_ref=caller_ref, limits=exact, phases=ADOPTABLE_PHASES, grow=False), True
 
         state, allowed = await store.apply(change)
         if not allowed:
@@ -895,6 +895,13 @@ class StoryAuthoringService:
         async with self._factory() as session:
             await TaskRepository(session).requeue_finished_story_run(ref.task_id)
         return state
+
+    async def requeue_finished(self, *, user_id: str, project_name: str, run_id: str) -> None:
+        """Queue a taken-over story's task again if it finished before it was (idempotent)."""
+        ref, state = await self.get(user_id=user_id, project_name=project_name, run_id=run_id)
+        if state.phase is RunPhase.RUNNING:
+            async with self._factory() as session:
+                await TaskRepository(session).requeue_finished_story_run(ref.task_id)
 
     async def discard(self, *, user_id: str, project_name: str, run_id: str, principal: str) -> RunState:
         return await self._terminal(user_id, project_name, run_id, principal, DISCARDABLE_PHASES, RunPhase.DISCARDED)
