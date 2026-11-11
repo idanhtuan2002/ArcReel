@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from r2.contracts.automation import RunPolicy
-from server.production_run.story_adapter import STORY_ONLY_SHARE, STORY_SHARE, story_limits
+from server.production_run.story_adapter import fits_run, story_limits, whole_story
 from server.story_authoring.contracts import StoryLimits
 
 
@@ -19,18 +19,24 @@ def _policy() -> RunPolicy:
     )
 
 
-def test_a_story_only_run_gets_most_of_the_caps_and_a_film_run_half():
-    drafted = StoryLimits(
-        generate_calls_max=900,
-        count_calls_max=900,
+def _drafted(calls: int) -> StoryLimits:
+    return StoryLimits(
+        generate_calls_max=calls,
+        count_calls_max=calls,
         input_tokens_max=10**9,
         output_tokens_max=10**8,
-        wall_clock_max_seconds=900 * 120,
+        wall_clock_max_seconds=calls * 120,
     )
-    film = story_limits(_policy(), drafted)
-    alone = story_limits(_policy(), drafted, share=STORY_ONLY_SHARE)
+
+
+def test_a_film_run_cuts_its_story_to_half_the_caps():
+    film = story_limits(_policy(), _drafted(900))
     assert (film.generate_calls_max, film.wall_clock_max_seconds) == (375, 32400)
-    assert (alone.generate_calls_max, alone.wall_clock_max_seconds) == (675, 58320)
-    assert STORY_SHARE < STORY_ONLY_SHARE < 1
-    small = drafted.model_copy(update={"generate_calls_max": 300, "wall_clock_max_seconds": 1000})
-    assert story_limits(_policy(), small, share=STORY_ONLY_SHARE).generate_calls_max == 300
+
+
+def test_a_story_only_run_keeps_the_whole_bound_and_takes_its_time_from_the_run():
+    part = _drafted(603)
+    assert fits_run(_policy(), part, spent_calls=4)
+    alone = whole_story(_policy(), part, spent_seconds=250)
+    assert (alone.generate_calls_max, alone.wall_clock_max_seconds) == (603, 64550)
+    assert not fits_run(_policy(), _drafted(749), spent_calls=4)

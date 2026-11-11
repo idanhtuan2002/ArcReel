@@ -698,6 +698,10 @@ class ProductionRunRepository:
         ).one()
         return int(values[0]), int(values[1]), int(values[2]), int(values[3])
 
+    async def usage_totals(self, scope: RunScope) -> tuple[int, int, int, int]:
+        """What the run holds against its caps: settled usage plus open reservations (cost, calls, tasks, seconds)."""
+        return await self._totals(RunScope.model_validate(scope))
+
     async def reserve_budget(self, *, run: RunSnapshot, intent: DispatchIntent) -> BudgetReservation:
         await self._live(run, run.fencing_epoch)
         intent = DispatchIntent.model_validate(intent)

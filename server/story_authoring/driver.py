@@ -43,7 +43,7 @@ from server.story_authoring.audits import (
     unconfirmed,
     unfaithful_blurbs,
 )
-from server.story_authoring.cast_checks import gender_findings
+from server.story_authoring.cast_checks import gender_findings, missing_idea_names, plan_conflicts
 from server.story_authoring.checks import (
     ESCALATED_MARK,
     Finding,
@@ -185,6 +185,7 @@ RETRYABLE = frozenset(
     }
 )
 REPAIRABLE = frozenset({Severity.HARD_INTEGRITY, Severity.HARD_STRUCTURAL, Severity.NARRATIVE_CRITICAL})
+IDEA_ANCHOR = "[Ý tưởng gốc của tác giả — mọi phần phải trung thành: nhân vật, giới tính, ham muốn, xung đột]"
 PLANNING = {"temperature": 0.6, "top_p": 0.9, "top_k": 40, "presence_penalty": 0.0}
 REVIEW = {"temperature": 0.2, "top_p": 0.9, "top_k": 40, "presence_penalty": 0.0}
 DRAFT = {"temperature": 0.7, "top_p": 0.8, "top_k": 20, "presence_penalty": 0.0, "repeat_penalty": 1.1}
@@ -573,7 +574,11 @@ class StoryRunDriver:
         genre = planning_block(self._pack)
         if genre:
             prompt = f"{genre}\n\n{prompt}"
-        return prompt if self._prior_context is None else f"{self._prior_context}\n\n---\n\n{prompt}"
+        if self._prior_context is not None:
+            return f"{self._prior_context}\n\n---\n\n{prompt}"
+        # The author's idea anchors every planning step, not only the seed, so a drifted seed cannot carry the
+        # whole run away from it (donor shenbi a440306: intent anchored, never invented).
+        return f"{IDEA_ANCHOR}\n{self._brief.idea}\n\n---\n\n{prompt}"
 
     def _book_state(self) -> books.BookState | None:
         """The state the previous part committed, for a book part after the first."""
@@ -646,19 +651,24 @@ class StoryRunDriver:
                     f"Đây là hạt giống cho một TIỂU THUYẾT {self._book.spec.chapters} chương: dựng dàn nhân vật và "
                     f"bối cảnh đủ cho truyện dài (tối đa {cast[0]} nhân vật, {cast[1]} địa điểm).\n\n{seed_prompt}"
                 )
-            seed_raw = await self._ensure(
-                "seed",
-                inputs=[brief, *prior_ins],
-                decoding=PLANNING,
-                produce=lambda e: self._json(
-                    "seed",
-                    e,
-                    StoryStepKind.SEED,
-                    planning.PLANNING_SYSTEM,
-                    seed_prompt,
-                    books.bound_seed(*cast),
-                ),
-            )
+
+            async def produce_seed(epoch: int) -> bytes:
+                raw = await self._json(
+                    "seed", epoch, StoryStepKind.SEED, planning.PLANNING_SYSTEM, seed_prompt, books.bound_seed(*cast)
+                )
+                missing = missing_idea_names(idea, StorySeed.model_validate_json(raw))
+                if not missing:
+                    return raw
+                # The seed lost the idea's own characters: drawn once more with them named (ADR-0127).
+                again = (
+                    f"{seed_prompt}\n\nLần trước seed bỏ mất nhân vật của ý tưởng: {', '.join(missing)}. Giữ đúng tên "
+                    "và vai của họ như ý tưởng."
+                )
+                return await self._json(
+                    "seed", epoch, StoryStepKind.SEED, planning.PLANNING_SYSTEM, again, books.bound_seed(*cast)
+                )
+
+            seed_raw = await self._ensure("seed", inputs=[brief, *prior_ins], decoding=PLANNING, produce=produce_seed)
             seed = StorySeed.model_validate_json(seed_raw)
             seed_in = ("seed", content_digest(seed_raw))
             bible_raw = await self._ensure(
@@ -1117,7 +1127,7 @@ class StoryRunDriver:
                 epoch,
                 kind=StoryStepKind.OUTLINE,
                 system=outline_prompts.OUTLINE_SYSTEM,
-                prompt=self._with_prior(outline_prompts.outline_review_prompt(seed, outline)),
+                prompt=self._with_prior(outline_prompts.outline_review_prompt(seed, outline, idea=self._brief.idea)),
                 decoding=REVIEW,
                 model=OutlineReview,
                 judge=True,
@@ -1161,8 +1171,18 @@ class StoryRunDriver:
         if self._book is not None:
             prompt = f"{self._book_note(chapter)}\n\n---\n\n{prompt}"
         node = chapter_plan(chapter)
-        notes = (await self._store.load()).intents.get(node, ())
+        state = await self._store.load()
+        notes = state.intents.get(node, ())
         if notes:
+            # A replan sees the plan that failed as well as every failure, so it changes what failed instead of
+            # drawing a new plan with the same contradiction (donor shenbi 0cdc218).
+            failed = state.node(node).head_revision_id
+            if failed is not None:
+                old = ChapterPlan.model_validate_json(self._blobs.read_exact(state.revisions[failed].digest))
+                prompt += "\n\n[Kế hoạch lần trước — đã thất bại, không lặp lại]\n" + json.dumps(
+                    old.model_dump(include={"chapter_goal", "withheld_cards", "required_changes_by_end", "do_not"}),
+                    ensure_ascii=False,
+                )
             prompt += "\n\n[Yêu cầu sửa kế hoạch]\n" + "\n".join(f"- {n}" for n in notes)
 
         # A book chapter needs enough scenes to reach its length: a scene holds at most 1 000 syllables.
@@ -1212,9 +1232,14 @@ class StoryRunDriver:
                 judge=True,
             )
         )
-        if review.problems:
-            revised, unknown = await generate(planning.chapter_plan_revision_prompt(prompt, plan, review.problems))
-            if not unknown:
+        # Contradictions are caught here, before any scene is drafted on an unsatisfiable plan (donor shenbi
+        # chapter_planning gates); they go into the one revision the review already allows.
+        problems = [*review.problems, *plan_conflicts(plan)]
+        if problems:
+            revised, unknown = await generate(planning.chapter_plan_revision_prompt(prompt, plan, problems))
+            if (not unknown and not plan_conflicts(revised)) or (
+                not unknown and len(plan_conflicts(revised)) < len(plan_conflicts(plan))
+            ):
                 plan = revised
         return plan.model_dump_json().encode("utf-8")
 

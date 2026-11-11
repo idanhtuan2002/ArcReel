@@ -14,7 +14,7 @@ import unicodedata
 from collections.abc import Sequence
 
 from server.story_authoring.checks import Finding, Severity
-from server.story_authoring.prompts.schemas import SeedCharacter
+from server.story_authoring.prompts.schemas import ChapterPlan, SeedCharacter, StorySeed
 
 #: Sentence openings that refer to a woman or to a man; each counts only as a whole word at a sentence start.
 OPENINGS: dict[str, tuple[str, ...]] = {
@@ -76,4 +76,147 @@ def gender_findings(cast: Sequence[SeedCharacter], scenes: Sequence[tuple[str, s
     return tuple(findings)
 
 
-__all__ = ["OPENINGS", "gender_findings"]
+#: Word overlap at or above which a required change restates a ban or a secret.
+CONFLICT_OVERLAP = 0.5
+_STOP = frozenset(
+    [
+        "và",
+        "của",
+        "là",
+        "có",
+        "không",
+        "được",
+        "cho",
+        "với",
+        "một",
+        "những",
+        "các",
+        "trong",
+        "khi",
+        "đã",
+        "sẽ",
+        "đang",
+        "thì",
+        "mà",
+        "này",
+        "đó",
+        "để",
+        "từ",
+        "ra",
+        "vào",
+        "lên",
+        "về",
+        "bị",
+    ]
+)
+
+
+def _content_words(text: str) -> frozenset[str]:
+    words = re.findall(r"\w+", _fold(text).casefold())
+    return frozenset(w for w in words if len(w) > 1 and w not in _STOP)
+
+
+def plan_conflicts(plan: ChapterPlan) -> list[str]:
+    """Required changes that restate a do-not item or a withheld card, named for the plan's revision: such a plan
+    cannot be written without breaking itself (donor shenbi chapter-planning gates)."""
+    problems: list[str] = []
+    for required in plan.required_changes_by_end:
+        need = _content_words(required)
+        for kind, items in (("điều cấm (do_not)", plan.do_not), ("bài giữ kín (withheld_cards)", plan.withheld_cards)):
+            for item in items:
+                other = _content_words(item)
+                if need and other and len(need & other) / len(need | other) >= CONFLICT_OVERLAP:
+                    problems.append(
+                        f"Thay đổi bắt buộc “{required}” trùng với {kind} “{item}”: bỏ hoặc viết lại một trong hai."
+                    )
+    return problems
+
+
+#: Capitalised words of an idea that are not names: sentence openers, pronouns and kinship words.
+_NOT_NAMES = frozenset(
+    [
+        "một",
+        "trong",
+        "từ",
+        "khi",
+        "sau",
+        "nếu",
+        "rồi",
+        "nhưng",
+        "và",
+        "vì",
+        "có",
+        "là",
+        "đây",
+        "đó",
+        "này",
+        "người",
+        "cô",
+        "anh",
+        "ông",
+        "bà",
+        "chị",
+        "em",
+        "hắn",
+        "nàng",
+        "tôi",
+        "ta",
+        "chúng",
+        "họ",
+        "mọi",
+        "cả",
+        "các",
+        "những",
+        "mỗi",
+        "trước",
+        "giữa",
+        "lúc",
+        "ngày",
+        "đêm",
+        "năm",
+        "cuối",
+        "đầu",
+        "bỗng",
+        "tại",
+        "ở",
+        "với",
+        "cho",
+        "đến",
+        "theo",
+        "vợ",
+        "chồng",
+        "con",
+        "cha",
+        "mẹ",
+    ]
+)
+
+
+def idea_names(idea: str) -> list[str]:
+    """The names an idea gives its characters: runs of capitalised words, minus openers and kinship words."""
+    names: list[str] = []
+    run: list[str] = []
+
+    def close() -> None:
+        words = [w for w in run if w.casefold() not in _NOT_NAMES]
+        if words and " ".join(words) not in names:
+            names.append(" ".join(words))
+        run.clear()
+
+    for match in re.finditer(r"\w+|[^\w\s]", _fold(idea)):
+        token = match.group(0)
+        if token[0].isalpha() and token[0].isupper():
+            run.append(token)
+        else:
+            close()
+    close()
+    return names
+
+
+def missing_idea_names(idea: str, seed: StorySeed) -> list[str]:
+    """The idea's names no seed character or place carries (a name may be part of a fuller one: "Minh" in "Lê Minh")."""
+    carried = " | ".join(_fold(entry.name) for entry in (*seed.characters, *seed.locations))
+    return [name for name in idea_names(idea) if not _names_in(carried, name)]
+
+
+__all__ = ["CONFLICT_OVERLAP", "OPENINGS", "gender_findings", "idea_names", "missing_idea_names", "plan_conflicts"]

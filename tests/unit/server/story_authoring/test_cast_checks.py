@@ -85,3 +85,60 @@ def test_a_generated_seed_and_a_volumes_new_characters_state_gender_and_address_
     assert MINH.model_copy(update={"gender": None, "address": None}).locked_line() == (
         "chính là nhân vật chính. họa sĩ nghèo"
     )
+
+
+def test_a_required_change_restating_a_ban_or_a_secret_is_a_plan_conflict():
+    from server.story_authoring.cast_checks import plan_conflicts
+    from server.story_authoring.prompts.schemas import ChapterPlan
+
+    scene = {
+        "summary": "s",
+        "location": "Nhà",
+        "pov": "Minh",
+        "characters": ["Minh"],
+        "beats": ["a", "b"],
+        "emotional_turn": "e",
+        "plot_function": "p",
+        "dialogue_required": False,
+    }
+    plan = ChapterPlan(
+        chapter_goal="g",
+        reader_expectation="r",
+        withheld_cards=["Lan là hồn ma của người vợ đã mất"],
+        required_changes_by_end=["Minh biết Lan là hồn ma của người vợ", "Minh bán bức tranh đầu tiên"],
+        do_not=["Không để Minh bán tranh quá sớm"],
+        scenes=[scene, scene, scene],
+    )
+    problems = plan_conflicts(plan)
+    assert len(problems) == 1
+    assert "hồn ma" in problems[0]
+    assert plan_conflicts(plan.model_copy(update={"withheld_cards": []})) == []
+
+
+def test_the_seed_must_carry_the_ideas_own_names_and_places_count():
+    from server.story_authoring.cast_checks import idea_names, missing_idea_names
+    from server.story_authoring.prompts.schemas import SeedLocation, StorySeed
+
+    idea = "Một cô giáo trẻ tên Lê Thị Hoa về Bản Lác. Cô gặp ông Tư, rồi Hoa đi."
+    assert idea_names(idea) == ["Lê Thị Hoa", "Bản Lác", "Tư", "Hoa"]
+    seed = StorySeed(
+        working_title="t",
+        premise="p",
+        genre="g",
+        tone="t",
+        pov="p",
+        central_conflict="c",
+        ending_direction="e",
+        characters=[LAN.model_copy(update={"name": "Lê Thị Hoa"}), MINH],
+        locations=[SeedLocation(name="Bản Lác", description="d")],
+    )
+    assert missing_idea_names(idea, seed) == ["Tư"]
+    assert idea_names("Minh co so thich dac biet. trong mot lan, Minh dat duoc kha nang giup anh") == ["Minh"]
+
+
+def test_a_name_one_letter_from_a_characters_is_repaired_not_recorded():
+    from server.story_authoring.checks import near_name
+
+    assert near_name("Mạnh", {"Minh", "Lan"}) == "Minh"
+    assert near_name("Huy", {"Minh", "Lan"}) is None
+    assert near_name("Minh", {"Lê Minh"}) is None

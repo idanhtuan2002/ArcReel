@@ -57,7 +57,7 @@ def advance(*, run: RunSnapshot, outcome: StageOutcome) -> RunSnapshot:
         return _blocked(run, status, reason)
     if not outcome.receipts:
         return _blocked(run, RunStatus.BLOCKED_CONFIGURATION, "REQUIRED_EVIDENCE_MISSING")
-    if run.stage in {RunStage.STORY, RunStage.STORY_COMMIT}:
+    if run.stage in {RunStage.STORY, RunStage.STORY_COMMIT} and outcome.kind != "REWORK":
         expected = "READY_FOR_APPROVAL" if run.stage is RunStage.STORY else "COMMITTED"
         if outcome.owner_state != expected:
             return _blocked(

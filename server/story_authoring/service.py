@@ -89,6 +89,7 @@ from server.story_authoring.runtime import (
     new_run_state,
     reopen_unconverged,
     set_phase,
+    top_up,
 )
 from server.story_authoring.variant_profiles import profile_instruction
 
@@ -763,6 +764,22 @@ class StoryAuthoringService:
             return set_phase(reopen_unconverged(current), RunPhase.RUNNING), True
 
         return await self._transition(ref, change, "retry", requeue=True)
+
+    async def top_up(
+        self, *, user_id: str, project_name: str, run_id: str, caller_ref: str, limits: StoryLimits
+    ) -> RunState:
+        """ADR-0127: a budget-blocked run goes on under larger limits from where it stopped; its caller (a production
+        run step that reserved the difference under its own caps and authority) settles what is spent after."""
+        ref, _ = await self.get(user_id=user_id, project_name=project_name, run_id=run_id)
+
+        def change(current: RunState) -> tuple[RunState, bool]:
+            if any(t.caller_ref == caller_ref for t in current.top_ups):
+                return current, True
+            if current.phase is not RunPhase.BLOCKED_BUDGET:
+                return current, False
+            return top_up(current, caller_ref=caller_ref, limits=limits), True
+
+        return await self._transition(ref, change, "top up", requeue=True)
 
     async def discard(self, *, user_id: str, project_name: str, run_id: str, principal: str) -> RunState:
         return await self._terminal(user_id, project_name, run_id, principal, DISCARDABLE_PHASES, RunPhase.DISCARDED)

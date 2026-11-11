@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import os
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
@@ -521,3 +522,77 @@ async def test_a_story_whose_project_main_canon_was_taken_blocks_the_run_with_th
     assert (blocked.stage, blocked.reason) == (RunStage.STORY_COMMIT, "STORY_CANON_BASE_MOVED")
     state = await RunStateStore(host.sessions, task_id=await _story_task(host)).load()
     assert state.phase is RunPhase.COMMIT_BLOCKED
+
+
+async def test_a_story_blocked_below_its_bound_is_topped_up_and_goes_on_from_where_it_stopped(story_host: Host):
+    from server.production_run.story_adapter import TOP_UP_LIMIT
+    from server.story_authoring.driver import run_call_bound
+
+    host = story_host
+    await _tick(host)
+    await _tick(host)
+    task_id = await _story_task(host)
+    store = RunStateStore(host.sessions, task_id=task_id)
+    before = (await store.load()).limits
+    # A film run's story share is cut below the structural bound.
+    assert before.generate_calls_max < run_call_bound(before.chapters)
+    await store.apply(lambda s: (set_phase(s, RunPhase.BLOCKED_BUDGET, reason="cap generate_calls reached"), None))
+    async with host.sessions() as session, session.begin():
+        await session.execute(sa.update(Task).where(Task.task_id == task_id).values(status="succeeded"))
+
+    reworked = await _tick(host)
+    assert (reworked.stage, reworked.status, reworked.generation) == (RunStage.STORY, RunStatus.RUNNING, 2)
+    waiting = await _tick(host)
+    assert (waiting.stage, waiting.status) == (RunStage.STORY, RunStatus.WAITING_TASK)
+    state = await store.load()
+    assert state.phase is RunPhase.RUNNING
+    [top_up] = state.top_ups
+    assert top_up.limits_before == before
+    assert state.limits.generate_calls_max == run_call_bound(before.chapters)
+    assert state.limits.wall_clock_max_seconds > before.wall_clock_max_seconds
+    assert TOP_UP_LIMIT == 2
+
+    assert await _execute_story(host) == "READY_FOR_APPROVAL"
+    offered = await _tick(host)
+    assert (offered.stage, offered.status) == (RunStage.STORY_COMMIT, RunStatus.RUNNING)
+    async with host.sessions() as session:
+        rows = (
+            (await session.execute(sa.select(ProductionUsageModel).where(ProductionUsageModel.owner == "story-run")))
+            .scalars()
+            .all()
+        )
+    assert len(rows) == 2
+    final = await store.load()
+    spent = final.usage.generate_calls + final.usage.count_calls
+    assert sum(int(json.loads(row.usage_json)["model_calls"]) for row in rows) == spent
+
+
+async def test_a_paid_story_or_one_at_its_bound_stays_blocked_for_the_showrunner(story_host: Host):
+    host = story_host
+    await _tick(host)
+    await _tick(host)
+    task_id = await _story_task(host)
+    store = RunStateStore(host.sessions, task_id=task_id)
+    from server.story_authoring.driver import run_call_bound
+
+    await store.apply(
+        lambda s: (
+            set_phase(
+                s.model_copy(
+                    update={
+                        "limits": s.limits.model_copy(update={"generate_calls_max": run_call_bound(s.limits.chapters)})
+                    }
+                ),
+                RunPhase.BLOCKED_BUDGET,
+                reason="cap generate_calls reached",
+            ),
+            None,
+        )
+    )
+    blocked = await _tick(host)
+    assert (blocked.stage, blocked.status, blocked.reason) == (
+        RunStage.STORY,
+        RunStatus.BLOCKED_BUDGET,
+        "BLOCKED_BUDGET",
+    )
+    assert (await store.load()).top_ups == ()

@@ -120,6 +120,8 @@ class PlannedScene(_Out):
 
 
 SCENES_PER_CHAPTER_MAX = 5
+#: Withheld cards and do-not items a generated chapter plan may carry.
+PLAN_LIST_MAX = 2
 
 
 class ChapterPlan(_Out):
@@ -143,6 +145,9 @@ def bound_chapter_plan(
         "BoundChapterPlan",
         __base__=ChapterPlan,
         scenes=(list[scene], Field(min_length=min_scenes, max_length=SCENES_PER_CHAPTER_MAX)),
+        # Fewer secrets and bans leave fewer ways for a small writer to contradict its own plan.
+        withheld_cards=(list[str], Field(max_length=PLAN_LIST_MAX)),
+        do_not=(list[str], Field(max_length=PLAN_LIST_MAX)),
     )
 
 

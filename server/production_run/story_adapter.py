@@ -58,7 +58,7 @@ from server.story_authoring.artifacts import BlobStoreError, StoryBlobStore
 from server.story_authoring.book import BookSpec
 from server.story_authoring.commit import CANON_BASE_MOVED, CommitRefused, load_offered_manifest
 from server.story_authoring.contracts import StoryLimits, StoryScope
-from server.story_authoring.driver import StoryBrief
+from server.story_authoring.driver import StoryBrief, run_call_bound
 from server.story_authoring.handoff import STORY_SOURCE_LANGUAGE, HandoffRefused, SourceUpload, send_to_video
 from server.story_authoring.idea_draw import DRAW_ATTEMPTS, recent_ideas
 from server.story_authoring.idea_profile import (
@@ -71,14 +71,20 @@ from server.story_authoring.idea_profile import (
     record_bytes,
     record_profile,
 )
-from server.story_authoring.runtime import RunPhase, RunState, RunStateStore
-from server.story_authoring.service import SECONDS_PER_CALL, StoryActionRefused, StoryAuthoringService, brief_idea
+from server.story_authoring.runtime import BudgetUsage, RunPhase, RunState, RunStateStore
+from server.story_authoring.service import (
+    SECONDS_PER_CALL,
+    StoryActionRefused,
+    StoryAuthoringService,
+    brief_idea,
+    run_id_for,
+)
 
 STORY_GENRE = "truyện ngắn"
 # Share of the run's caps the story may spend; the rest belongs to script, media and Quality.
 STORY_SHARE = 0.5
-# A run that ends at the handoff makes no film: its story may spend all but what BRIEF's drawn idea reserves.
-STORY_ONLY_SHARE = 0.9
+# Part sizes a story-only run tries, largest first, so the part's whole bound fits the run's caps (ADR-0127).
+PART_SIZES = (5, 4, 3)
 _FINISHED_TASK = frozenset({"succeeded", "failed", "cancelled"})
 
 
@@ -101,6 +107,54 @@ def story_limits(policy: RunPolicy, drafted: StoryLimits, *, share: float = STOR
             drafted.max_cost_minor_units, max(1, math.floor(policy.max_cost_minor_units * share))
         )
     return StoryLimits.model_validate({**values, "cloud_prices": drafted.cloud_prices})
+
+
+def fits_run(policy: RunPolicy, limits: StoryLimits, *, spent_calls: int = 0) -> bool:
+    """Whether a story's whole call bound (and cost cap) fits what the run's caps leave after ``spent_calls``: a
+    story-only run keeps that bound uncut, so its caps stop only a fault, never a story still converging."""
+    if spent_calls + limits.generate_calls_max + limits.count_calls_max > policy.max_model_calls:
+        return False
+    return limits.cloud_prices is None or limits.max_cost_minor_units <= policy.max_cost_minor_units
+
+
+def whole_story(policy: RunPolicy, drafted: StoryLimits, *, spent_seconds: int = 0) -> StoryLimits:
+    """A story-only run's limits: the drafted bound uncut; its model time is the run's own time cap, as the bound's
+    seconds per call are only an estimate of the writer's pace."""
+    seconds = max(1, policy.max_runtime_seconds - spent_seconds)
+    return drafted.model_copy(update={"wall_clock_max_seconds": seconds})
+
+
+#: Times one story is topped up before its budget block waits for a Showrunner (ADR-0127).
+TOP_UP_LIMIT = 2
+
+
+def _grown(limits: StoryLimits, *, calls: int, seconds: int) -> StoryLimits:
+    per_call_in, per_call_out = limits.max_input_tokens, limits.max_output_tokens
+    return limits.model_copy(
+        update={
+            "generate_calls_max": limits.generate_calls_max + calls,
+            "count_calls_max": limits.count_calls_max + calls,
+            "input_tokens_max": limits.input_tokens_max + calls * per_call_in,
+            "output_tokens_max": limits.output_tokens_max + calls * per_call_out,
+            "wall_clock_max_seconds": limits.wall_clock_max_seconds + seconds,
+        }
+    )
+
+
+def _since_top_up(state: RunState, receipt_ref: str) -> BudgetUsage:
+    """What the story spent under the step whose receipt names a top-up: its usage less the usage at that top-up."""
+    _run, _sep, tag = receipt_ref.partition("#top-up-")
+    if not tag:
+        return state.usage
+    base = state.top_ups[int(tag) - 1].baseline
+    used = state.usage
+    return BudgetUsage(
+        count_calls=used.count_calls - base.count_calls,
+        generate_calls=used.generate_calls - base.generate_calls,
+        input_tokens=used.input_tokens - base.input_tokens,
+        output_tokens=used.output_tokens - base.output_tokens,
+        model_milliseconds=used.model_milliseconds - base.model_milliseconds,
+    )
 
 
 def _blobs(projects: ProjectManager, project_name: str) -> StoryBlobStore:
@@ -233,26 +287,44 @@ class BriefAdapter:
             genre, book_chapters = profile.pack().label, profile.book_chapters
         else:
             idea = brief_idea(command.idea, command.variant_profile)
-        try:
-            drafted = await self._stories.draft_brief(
-                idea=idea,
-                genre=genre,
-                provider_id=writer[0],
-                model_id=writer[1],
-                max_cost_minor_units=max(1, min(10_000, run.policy.max_cost_minor_units)),
-                project_name=run.project_name,
-                prior_mode=prior_mode,
-                prior_project=command.source_project,
-                prior_origin=command.variant_profile or "instruction",
-                book=None if book_chapters is None else BookSpec(chapters=book_chapters),
-                user_id=run.user_id,
-            )
-        except StoryActionRefused as refused:
-            raise OwnerBlocked(refused.code) from None
+        story_only = command.end_stage == "HANDOFF"
+        sizes = PART_SIZES if story_only and book_chapters is not None else (None,)
+        drafted = None
+        for size in sizes:
+            book = None
+            if book_chapters is not None:
+                book = BookSpec(chapters=book_chapters, **({} if size is None else {"part_chapters": size}))
+            try:
+                drafted = await self._stories.draft_brief(
+                    idea=idea,
+                    genre=genre,
+                    provider_id=writer[0],
+                    model_id=writer[1],
+                    max_cost_minor_units=max(1, min(10_000, run.policy.max_cost_minor_units)),
+                    project_name=run.project_name,
+                    prior_mode=prior_mode,
+                    prior_project=command.source_project,
+                    prior_origin=command.variant_profile or "instruction",
+                    book=book,
+                    user_id=run.user_id,
+                )
+            except StoryActionRefused as refused:
+                raise OwnerBlocked(refused.code) from None
+            if not story_only or fits_run(run.policy, drafted.limits, spent_calls=DRAW_ATTEMPTS * 2):
+                break
+        assert drafted is not None
         if drafted.limits.cloud_prices is not None and run.policy.currency != "USD":
             raise OwnerBlocked("CURRENCY_MISMATCH")
-        share = STORY_ONLY_SHARE if command.end_stage == "HANDOFF" else STORY_SHARE
-        brief = drafted.model_copy(update={"limits": story_limits(run.policy, drafted.limits, share=share)})
+        if story_only:
+            # ADR-0127: a story-only run keeps its story's whole structural bound; caps that cannot hold even the
+            # smallest part stop the run now instead of hours into it.
+            if not fits_run(run.policy, drafted.limits, spent_calls=DRAW_ATTEMPTS * 2):
+                raise OwnerBlocked("RUN_CAPS_BELOW_STORY_BOUND")
+            brief = drafted.model_copy(
+                update={"limits": whole_story(run.policy, drafted.limits, spent_seconds=10 + DRAW_ATTEMPTS * 120)}
+            )
+        else:
+            brief = drafted.model_copy(update={"limits": story_limits(run.policy, drafted.limits)})
         brief = StoryBrief.model_validate(brief.model_dump(mode="json"))
         digest = _blobs(self._projects, run.project_name).put(brief_bytes(brief))
         if digest != brief.digest():
@@ -307,6 +379,21 @@ class StoryAdapter:
 
     async def plan(self, *, run: RunSnapshot) -> StepPlan:
         greenlight, brief = await self._brief(run)
+        blocked = await self._blocked_story(run, greenlight)
+        if blocked is not None:
+            target = await self._top_up_target(run, blocked, brief)
+            if target is None:
+                raise OwnerBlocked("STORY_BUDGET_EXHAUSTED")
+            before = blocked.limits
+            return StepPlan(
+                unit_key="story",
+                input_refs=(greenlight,),
+                estimated_cost_minor_units=0,
+                estimated_model_calls=(target.generate_calls_max - before.generate_calls_max)
+                + (target.count_calls_max - before.count_calls_max),
+                estimated_tasks=1,
+                estimated_runtime_seconds=target.wall_clock_max_seconds - before.wall_clock_max_seconds,
+            )
         limits = brief.limits
         return StepPlan(
             unit_key="story",
@@ -333,10 +420,44 @@ class StoryAdapter:
             )
         except StoryActionRefused as refused:
             raise OwnerBlocked(refused.code) from None
-        return OwnerReceipt(owner=self.owner, receipt_ref=ref.run_id, digest=greenlight.digest, task_id=ref.task_id)
+        state = await RunStateStore(self._sessions, task_id=ref.task_id).load()
+        caller = intent.identity.command_id
+        done = next((t for t in state.top_ups if t.caller_ref == caller), None)
+        if done is None and state.phase is RunPhase.BLOCKED_BUDGET:
+            # ADR-0127: this step reserved the difference; the story goes on from where it stopped.
+            limits = _grown(
+                state.limits,
+                calls=intent.estimated_model_calls // 2,
+                seconds=intent.estimated_runtime_seconds,
+            )
+            try:
+                state = await self._stories.top_up(
+                    user_id=intent.scope.user_id,
+                    project_name=intent.scope.project_name,
+                    run_id=ref.run_id,
+                    caller_ref=caller,
+                    limits=limits,
+                )
+            except StoryActionRefused as refused:
+                raise OwnerBlocked(refused.code) from None
+            done = next(t for t in state.top_ups if t.caller_ref == caller)
+        receipt_ref = ref.run_id if done is None else f"{ref.run_id}#top-up-{done.number}"
+        return OwnerReceipt(owner=self.owner, receipt_ref=receipt_ref, digest=greenlight.digest, task_id=ref.task_id)
 
     async def inspect(self, *, intent: DispatchIntent, receipt: OwnerReceipt) -> StageOutcome:
         state = await self._state(receipt)
+        if state.phase is RunPhase.BLOCKED_BUDGET:
+            run = await current_run(self._sessions, intent)
+            [greenlight] = intent.input_refs
+            brief = _load_brief(self._projects, intent.scope.project_name, greenlight.digest)
+            if await self._top_up_target(run, state, brief) is not None:
+                # The step settles what the story spent; the story stage runs again and tops the story up.
+                passing = outcome(intent, "PASS", receipts=(receipt,), owner_state=state.phase.value).model_dump(
+                    mode="python"
+                )
+                return StageOutcome.model_validate(
+                    {**passing, "kind": "REWORK", "reason": "STORY_BUDGET_TOP_UP", "repair_stage": RunStage.STORY}
+                )
         if state.phase is RunPhase.RUNNING:
             async with self._sessions() as session:
                 task = await TaskRepository(session).get(str(receipt.task_id))
@@ -351,7 +472,7 @@ class StoryAdapter:
 
     async def usage(self, *, receipt: OwnerReceipt, reservation: BudgetReservation) -> UsageReceipt | None:
         state = await self._state(receipt)
-        used = state.usage
+        used = _since_top_up(state, receipt.receipt_ref)
         prices = state.limits.cloud_prices
         return usage_receipt(
             receipt,
@@ -362,6 +483,41 @@ class StoryAdapter:
             runtime_seconds=math.ceil(used.model_milliseconds / 1000),
             known=state.phase is not RunPhase.RECOVERY_INCONSISTENT,
         )
+
+    async def _blocked_story(self, run: RunSnapshot, greenlight: OwnerReceipt) -> RunState | None:
+        """The run's story when an earlier attempt of the stage left it blocked on its budget."""
+        try:
+            _ref, state = await self._stories.get(
+                user_id=run.user_id, project_name=run.project_name, run_id=run_id_for(greenlight.receipt_ref)
+            )
+        except StoryActionRefused:
+            return None
+        return state if state.phase is RunPhase.BLOCKED_BUDGET else None
+
+    async def _top_up_target(self, run: RunSnapshot, state: RunState, brief: StoryBrief) -> StoryLimits | None:
+        """ADR-0127: a story on a free route whose limits were set below its structural bound goes on up to that
+        bound, within what the run's own caps leave, at most TOP_UP_LIMIT times. A paid route never spends more
+        than its approved cap without a Showrunner."""
+        reworks = sum(r.count for r in run.repair_counts if r.stage is RunStage.STORY)
+        if (
+            state.limits.cloud_prices is not None
+            or len(state.top_ups) >= TOP_UP_LIMIT
+            or reworks >= run.policy.unit_repair_limit
+        ):
+            return None
+        bound = run_call_bound(state.limits.chapters, book=brief.book)
+        if state.limits.generate_calls_max >= bound:
+            return None
+        async with self._sessions() as session:
+            _cost, calls, _tasks, seconds = await ProductionRunRepository(session).usage_totals(
+                RunScope(user_id=run.user_id, project_name=run.project_name, run_id=run.run_id)
+            )
+        room_calls = max(0, run.policy.max_model_calls - calls) // 2
+        room_seconds = max(0, run.policy.max_runtime_seconds - seconds)
+        extra = min(bound - state.limits.generate_calls_max, room_calls)
+        if extra <= 0 or room_seconds <= 0:
+            return None
+        return _grown(state.limits, calls=extra, seconds=room_seconds)
 
     async def _state(self, receipt: OwnerReceipt) -> RunState:
         return await RunStateStore(self._sessions, task_id=str(receipt.task_id)).load()
@@ -524,12 +680,14 @@ class HandoffAdapter:
 
 
 __all__ = [
-    "STORY_ONLY_SHARE",
+    "PART_SIZES",
     "STORY_SHARE",
     "BriefAdapter",
     "HandoffAdapter",
     "StoryAdapter",
     "StoryCommitAdapter",
     "brief_bytes",
+    "fits_run",
     "story_limits",
+    "whole_story",
 ]

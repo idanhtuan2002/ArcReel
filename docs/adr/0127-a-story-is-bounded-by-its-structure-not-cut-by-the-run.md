@@ -1,0 +1,17 @@
+---
+status: accepted
+---
+
+# A story is bounded by its structure, not cut by the run
+
+Decided 2026-11-11 by the main agent with the sponsor (product quality first; "consider what the budget limits are for, and drop them where they can be dropped"). Evidence: the production story of `minh-co-so-thich-dac-bie-55335b61` (local 9B writer, ~93 s per call) stopped `BLOCKED_BUDGET` after chapter 4 of 5 at its 32 400 s cap, 349 of 375 calls: its limits had been cut to half of the run's caps (1500 calls, 64 800 s) although the part's own structural bound is 603 calls. Research: [donor failure modes](../research/2026-11-11-r2-donor-failure-modes.md).
+
+What a budget limit is for: (1) money on a paid route; (2) stopping a fault that loops; (3) not letting one story hold the GPU without end. The story driver already bounds every loop by structure — per-node call caps, a fixed number of review cycles, one replan per chapter — and `run_call_bound` is that structure's worst case. A cap below it stops stories that are still converging, which costs quality and the hours already spent, and buys nothing for (2).
+
+1. **A story-only run keeps its story's whole structural bound.** A run that ends at the handoff (a story project's autopilot) no longer cuts its story to a share of the run's caps. Its model time is the run's own time cap. A book part's size is the largest of 5, 4, 3 chapters whose bound fits the run's call caps; when even 3 does not fit, BRIEF stops the run at once with `RUN_CAPS_BELOW_STORY_BOUND` instead of hours into the part. A run that goes on to film keeps the half share, since script, media and Quality need the rest.
+2. **A story blocked below its bound goes on.** When a story on a free route stops `BLOCKED_BUDGET` while its limits are under its structural bound, the STORY owner settles what it spent and asks for the stage again (`REWORK`, reason `STORY_BUDGET_TOP_UP`); the next STORY step reserves the difference within what the run's caps leave and raises the story's limits up to the bound. The story continues from where it stopped: finished plans, scenes and reviews are kept. A story is topped up at most twice and never past the run's caps or its policy's repair limit; each top-up records the usage at that point, so each step settles only its own spend.
+3. **Money is never topped up automatically.** A paid route keeps its approved cost cap; its budget block waits for a Showrunner.
+4. **Quality is never traded for budget.** A failing chapter plan is always replanned once, as before; no check skips a replan to save calls.
+5. **Fewer ways to waste the budget.** The author's idea anchors every planning step and the outline review; the seed must keep the idea's own names (drawn once more when it drops one); a chapter plan whose required change restates a ban or a withheld card is revised before any scene is drafted; a generated plan carries at most two withheld cards and two bans; a replan sees the plan that failed; a name one letter from a character's is repaired, not recorded.
+
+Not adopted: removing caps outright (a fault would then hold the GPU without end, and paid routes would spend without a ceiling); per-chapter sub-budgets that escalate instead of replanning (they trade quality for budget).

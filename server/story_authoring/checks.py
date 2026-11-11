@@ -687,6 +687,32 @@ def dialogue_lines(text: str) -> int:
     return len(_DIALOGUE_LINE.findall(text))
 
 
+def _bare(text: str) -> str:
+    decomposed = unicodedata.normalize("NFD", text.casefold().replace("đ", "d"))
+    return "".join(ch for ch in decomposed if not unicodedata.combining(ch))
+
+
+def _within_one(a: str, b: str) -> bool:
+    if abs(len(a) - len(b)) > 1:
+        return False
+    if len(a) == len(b):
+        return sum(x != y for x, y in zip(a, b, strict=True)) <= 1
+    short, long = (a, b) if len(a) < len(b) else (b, a)
+    return any(long[:i] + long[i + 1 :] == short for i in range(len(long)))
+
+
+def near_name(name: str, allowed: set[str]) -> str | None:
+    """The allowed one-syllable name ``name`` differs from by tone marks and at most one letter, if any."""
+    if " " in name or len(name) < 3:
+        return None
+    bare = _bare(name)
+    for candidate in sorted(allowed):
+        for syllable in candidate.split():
+            if len(syllable) >= 3 and syllable != name and _within_one(bare, _bare(syllable)):
+                return syllable
+    return None
+
+
 def unknown_names(text: str, allowed: set[str]) -> Counter[str]:
     """Capitalized syllable runs that are not sentence-initial and not made only of allowed name syllables."""
     allowed_syllables = {s.lower() for name in allowed for s in name.split()}
@@ -806,10 +832,19 @@ def check_scene_prose(
     excess = repeated_trigram_excess(text)
     if syllables and excess * 1000 / syllables > 15:
         findings.append(Finding("REPETITION", Severity.STYLISTIC, node_id, f"repeated trigram excess {excess}"))
-    findings.extend(
-        Finding("UNKNOWN_NAME", Severity.STYLISTIC, node_id, f"name not in the story bible ({count}x)", name)
-        for name, count in unknown_names(text, allowed_names).items()
-    )
+    for name, count in unknown_names(text, allowed_names).items():
+        near = near_name(name, allowed_names)
+        if near is not None:
+            # A name one letter from a character's (Minh → Mạnh) is that character misnamed: repaired, not recorded.
+            findings.append(
+                Finding(
+                    "NEAR_NAME", Severity.NARRATIVE_CRITICAL, node_id, f"'{name}' should be '{near}' ({count}x)", name
+                )
+            )
+        else:
+            findings.append(
+                Finding("UNKNOWN_NAME", Severity.STYLISTIC, node_id, f"name not in the story bible ({count}x)", name)
+            )
     if requires_dialogue and dialogue_lines(text) == 0:
         findings.append(Finding("NO_DIALOGUE", Severity.STYLISTIC, node_id, "the scene contract asks for dialogue"))
     return tuple(findings)

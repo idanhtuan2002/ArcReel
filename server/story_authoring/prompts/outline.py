@@ -50,14 +50,15 @@ def deterministic_outline_problems(outline: ShortOutline) -> list[str]:
     return problems
 
 
-def outline_review_prompt(seed: StorySeed, outline: ShortOutline) -> str:
+def outline_review_prompt(seed: StorySeed, outline: ShortOutline, *, idea: str | None = None) -> str:
     return f"""Kiểm tra dàn ý truyện ngắn ba chương theo các điểm sau và trả về passed cùng danh sách problems:
 1. Mạch truyện (story_arc) có rõ không.
 2. Ba hồi có đủ và cân đối không.
 3. Mỗi chương có nhiệm vụ riêng, không có chương chuyển tiếp không.
 4. Bước ngoặt có phân bố hợp lý không.
 5. Kết thúc có trả lời câu hỏi mở đầu và hô ứng với mở đầu không.
-6. Dàn ý có trung thành với seed (tên, tuổi, mốc thời gian, quan hệ) không.
+6. Dàn ý có trung thành với seed (tên, tuổi, giới tính, mốc thời gian, quan hệ) và với ý tưởng gốc của tác giả
+   (nhân vật chính, ham muốn, xung đột) không.
 Mỗi problem phải nêu cụ thể chỗ sai. Nếu không có vấn đề, passed = true và problems rỗng.
 
 Seed:

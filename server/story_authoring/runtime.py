@@ -166,6 +166,17 @@ class HandoffRecord(_Frozen):
     upload_claimed_at: datetime | None = None
 
 
+class BudgetTopUp(_Frozen):
+    """ADR-0127: a budget-blocked run allowed to go on with larger limits; ``baseline`` is the usage it had then,
+    so the caller that granted the top-up settles only what was spent after it."""
+
+    number: int = Field(ge=1)
+    caller_ref: str = Field(min_length=1)
+    baseline: BudgetUsage
+    limits_before: StoryLimits
+    limits_after: StoryLimits
+
+
 class RunState(_Frozen):
     schema_id: str = RUN_STATE_SCHEMA
     state_version: int = Field(ge=1)
@@ -184,6 +195,7 @@ class RunState(_Frozen):
     handoff: HandoffRecord | None = None
     blocked_findings: tuple[Mapping[str, str], ...] = ()
     retries: int = Field(default=0, ge=0)
+    top_ups: tuple[BudgetTopUp, ...] = ()
 
     def attempt(self, attempt_id: str) -> AttemptRecord:
         for record in self.attempts:
@@ -427,6 +439,37 @@ def add_intent(state: RunState, *, node_ids: tuple[str, ...], note: str) -> RunS
 def set_phase(state: RunState, phase: RunPhase, *, reason: str | None = None) -> RunState:
     """Change the phase; a new phase replaces the block reason and clears the blocking findings."""
     return state.model_copy(update={"phase": phase, "block_reason": reason, "blocked_findings": ()})
+
+
+def top_up(state: RunState, *, caller_ref: str, limits: StoryLimits) -> RunState:
+    """A budget-blocked run goes on under ``limits``, which only grow; recorded with the usage it had, and once per
+    ``caller_ref`` (a replayed top-up changes nothing)."""
+    if any(t.caller_ref == caller_ref for t in state.top_ups):
+        return state
+    if state.phase is not RunPhase.BLOCKED_BUDGET:
+        raise ValueError("only a budget-blocked run is topped up")
+    before = state.limits
+    grown = (
+        "generate_calls_max",
+        "count_calls_max",
+        "input_tokens_max",
+        "output_tokens_max",
+        "wall_clock_max_seconds",
+        "max_cost_minor_units",
+    )
+    if any(getattr(limits, f) < getattr(before, f) for f in grown) or limits.model_dump(
+        exclude=set(grown)
+    ) != before.model_dump(exclude=set(grown)):
+        raise ValueError("a top-up only raises the run's caps")
+    record = BudgetTopUp(
+        number=len(state.top_ups) + 1,
+        caller_ref=caller_ref,
+        baseline=state.usage,
+        limits_before=before,
+        limits_after=limits,
+    )
+    reopened = reopen_unconverged(state.model_copy(update={"limits": limits, "top_ups": (*state.top_ups, record)}))
+    return set_phase(reopened, RunPhase.RUNNING)
 
 
 def reopen_unconverged(state: RunState) -> RunState:
