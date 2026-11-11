@@ -48,7 +48,9 @@ from server.story_authoring.cast_checks import (
     fix_near_names,
     gender_findings,
     missing_idea_names,
+    name_pov,
     plan_conflicts,
+    pov_findings,
     seed_problems,
 )
 from server.story_authoring.checks import (
@@ -59,6 +61,7 @@ from server.story_authoring.checks import (
     check_scene_prose,
     count_syllables,
     escalate_or_block,
+    foreign_script,
 )
 from server.story_authoring.commit import ManuscriptCommitManifest, SceneEntry, load_offered_manifest, offer_manifest
 from server.story_authoring.contracts import (
@@ -1460,6 +1463,7 @@ class StoryRunDriver:
                 target,
                 earlier,
                 cast=story.seed.characters,
+                pov=planned.pov,
             )
             return json.dumps(
                 {**binding, "prose": prose, "findings": [_finding_dict(f) for f in findings]}, ensure_ascii=False
@@ -1485,6 +1489,7 @@ class StoryRunDriver:
         earlier: Sequence[str],
         *,
         cast: Sequence[SeedCharacter] = (),
+        pov: str | None = None,
     ) -> tuple[str, tuple[Finding, ...]]:
         bounds = drafting.paragraph_bounds(target)
         try:
@@ -1529,14 +1534,18 @@ class StoryRunDriver:
         while True:
             # Certain fixes first, with no model call: a misspelt character name, a narration sentence opening with
             # the wrong gender (ADR-0127; donor huohuo deterministic continuity fixes).
-            prose = fix_gender_openings(cast, fix_near_names(prose, allowed))
-            findings = check_scene_prose(
-                prose,
-                node_id=node,
-                window=self._window,
-                allowed_names=allowed,
-                requires_dialogue=dialogue,
-                earlier=earlier,
+            # The point-of-view character named where the narration only calls them by their address.
+            prose = name_pov(cast, pov, fix_gender_openings(cast, fix_near_names(prose, allowed)))
+            findings = (
+                *check_scene_prose(
+                    prose,
+                    node_id=node,
+                    window=self._window,
+                    allowed_names=allowed,
+                    requires_dialogue=dialogue,
+                    earlier=earlier,
+                ),
+                *pov_findings(cast, pov, prose, node_id=node),
             )
             if best is None or _weight(findings) <= _weight(best[1]):
                 best = (prose, findings)
@@ -1641,6 +1650,24 @@ class StoryRunDriver:
         findings: list[Finding] = [f for n, h in heads.items() for f in anti_ai_findings(h["prose"], node_id=n)]
         findings.extend(fatigue_findings(self._pack, [(n, h["prose"]) for n, h in heads.items()]))
         findings.extend(gender_findings(story.seed.characters, scenes))
+        # Scenes accepted before these checks existed are held to them here: a letter of another script, a point-of-
+        # view character never named, narration calling someone "em".
+        for ref in refs:
+            prose = heads[ref.node_id]["prose"]
+            alien = foreign_script(prose, [c.name for c in story.seed.characters])
+            if alien:
+                index = alien[0][0]
+                findings.append(
+                    Finding(
+                        "FOREIGN_SCRIPT",
+                        Severity.HARD_INTEGRITY,
+                        ref.node_id,
+                        "chữ của ngôn ngữ khác trong lời văn; viết lại bằng tiếng Việt",
+                        prose[max(0, index - 20) : index + 20],
+                    )
+                )
+            pov = plan.scenes[ref.scene - 1].pov if ref.scene <= len(plan.scenes) else None
+            findings.extend(pov_findings(story.seed.characters, pov, prose, node_id=ref.node_id))
         for dimension in CHAPTER_DIMENSIONS:
             result = await self._judge(
                 node,

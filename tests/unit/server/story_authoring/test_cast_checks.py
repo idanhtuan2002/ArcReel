@@ -230,3 +230,43 @@ def test_inline_speech_counts_as_dialogue_and_a_broken_character_is_an_integrity
     found = check_scene_prose("Minh đứng d�y rồi đi.", node_id="s", window=window, allowed_names={"Minh"})
     assert "REPLACEMENT_CHAR" in {f.code for f in found}
     assert "phủ định" in PATCH_SYSTEM
+
+
+def test_a_letter_of_another_script_is_an_integrity_finding():
+    from server.story_authoring.checks import SceneLengthWindow, check_scene_prose, foreign_script
+
+    window = SceneLengthWindow(minimum=1, maximum=10_000, hard_maximum=20_000)
+    text = "Minh bước trên sàn nhà gỗ скрипит dưới chân."
+    found = {f.code: f for f in check_scene_prose(text, node_id="s", window=window, allowed_names={"Minh"})}
+    assert found["FOREIGN_SCRIPT"].severity is Severity.HARD_INTEGRITY
+    assert "скрипит" in found["FOREIGN_SCRIPT"].quote
+    assert foreign_script("Đêm ấy Minh nghĩ về đứa con gái của mình.") == []
+    # A character whose bible name is written in another script keeps it.
+    assert foreign_script("Minh gặp Иван ở ga.", ["Иван"]) == []
+    assert foreign_script("Minh gặp Иван ở ga.") != []
+
+
+def test_a_scene_that_never_names_its_point_of_view_character_is_named_or_found():
+    from server.story_authoring.cast_checks import name_pov, pov_findings
+
+    unnamed = "Anh đập mạnh vào mặt bàn. Căn hộ tối om.\n\n'Anh đến rồi sao?' Lan hỏi. Anh gật đầu."
+    assert {f.code for f in pov_findings([MINH, LAN], "Minh", unnamed, node_id="s")} == {"UNNAMED_POV"}
+    named = name_pov([MINH, LAN], "Minh", unnamed)
+    assert named.startswith("Minh đập mạnh vào mặt bàn.")
+    assert named.count("Minh") == 1
+    assert "'Anh đến rồi sao?'" in named
+    assert pov_findings([MINH, LAN], "Minh", named, node_id="s") == ()
+    # Without an address the right word is not certain: the model repairs it.
+    plain = MINH.model_copy(update={"address": None})
+    assert name_pov([plain], "Minh", unnamed) == unnamed
+
+
+def test_narration_that_calls_someone_em_is_found_but_dialogue_and_an_em_address_are_not():
+    from server.story_authoring.cast_checks import pov_findings
+
+    drifted = "Minh dừng lại trước quán. Em bước vào, tim đập mạnh.\n\n'Em đã đợi lâu rồi,' Lan nói."
+    found = pov_findings([MINH, LAN], "Minh", drifted, node_id="s")
+    assert [(f.code, f.quote) for f in found] == [("NARRATION_EM", "Em bước vào, tim đập mạnh.")]
+    assert pov_findings([MINH, LAN], "Minh", "Minh cười. 'Em đã đợi lâu rồi,' Lan nói.", node_id="s") == ()
+    young = LAN.model_copy(update={"address": "em"})
+    assert pov_findings([MINH, young], "Minh", drifted, node_id="s") == ()

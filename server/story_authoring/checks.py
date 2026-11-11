@@ -25,7 +25,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from enum import StrEnum
 
-from server.story_authoring.script_guard import find_cjk
+from server.story_authoring.script_guard import find_cjk, is_cjk
 
 
 class Severity(StrEnum):
@@ -198,6 +198,20 @@ LOANWORDS = frozenset(
         "wifi",
     }
 )
+
+
+def foreign_script(text: str, names: Sequence[str] = ()) -> list[tuple[int, str]]:
+    """Letters of a script other than Latin (Vietnamese) and CJK (``find_cjk`` reports those): a Cyrillic, Thai or
+    Arabic word a local model slips into the prose. A character's own name, written as the story bible writes it,
+    is not one."""
+    for name in names:
+        if name:
+            text = text.replace(name, " " * len(name))
+    return [
+        (index, char)
+        for index, char in enumerate(text)
+        if char.isalpha() and not is_cjk(char) and not unicodedata.name(char, "").startswith("LATIN")
+    ]
 
 
 def foreign_words(text: str) -> list[str]:
@@ -768,6 +782,18 @@ def check_scene_prose(
         )
         for h in find_cjk(text)[:1]
     ]
+    alien = foreign_script(text, sorted(allowed_names, key=len, reverse=True))
+    if alien:
+        index = alien[0][0]
+        findings.append(
+            Finding(
+                "FOREIGN_SCRIPT",
+                Severity.HARD_INTEGRITY,
+                node_id,
+                "chữ của ngôn ngữ khác trong lời văn; viết lại bằng tiếng Việt",
+                text[max(0, index - 20) : index + 20],
+            )
+        )
     if "\ufffd" in text:
         # A broken character from the transport (donor huohuo novel-replacement-char).
         index = text.index("\ufffd")

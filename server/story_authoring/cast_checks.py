@@ -21,7 +21,7 @@ OPENINGS: dict[str, tuple[str, ...]] = {
     "nữ": ("cô gái", "cô ấy", "cô", "nàng", "chị ấy", "người phụ nữ", "người đàn bà", "thiếu nữ", "bà ấy"),
     "nam": ("chàng trai", "anh ấy", "anh ta", "anh", "chàng", "gã", "hắn", "người đàn ông", "ông ấy"),
 }
-_QUOTED = re.compile(r"[“\"«][^”\"»]*[”\"»]")
+_QUOTED = re.compile(r"[“\"«][^”\"»]*[”\"»]|[‘'][^’'\n]*[’']")
 _SENTENCE = re.compile(r"[^.!?…]+[.!?…]*")
 
 
@@ -74,6 +74,72 @@ def gender_findings(cast: Sequence[SeedCharacter], scenes: Sequence[tuple[str, s
                     )
                     break
     return tuple(findings)
+
+
+def _character(cast: Sequence[SeedCharacter], name: str | None) -> SeedCharacter | None:
+    return next((c for c in cast if name is not None and _fold(c.name) == _fold(name)), None)
+
+
+def pov_findings(cast: Sequence[SeedCharacter], pov: str | None, text: str, *, node_id: str) -> tuple[Finding, ...]:
+    """A scene that never names its point-of-view character, and narration that calls someone “em” when the
+    narration calls no character so: a reader cannot tell who acts, and the voice slips into another person."""
+    findings: list[Finding] = []
+    character = _character(cast, pov)
+    folded = _fold(text)
+    if character is not None and not _names_in(folded, _fold(character.name)):
+        findings.append(
+            Finding(
+                "UNNAMED_POV",
+                Severity.NARRATIVE_CRITICAL,
+                node_id,
+                f"cảnh không gọi tên {character.name} (nhân vật điểm nhìn) lần nào; gọi tên ở câu đầu nhân vật xuất hiện",
+                folded.strip()[:80],
+            )
+        )
+    if cast and not any((c.address or "").casefold() == "em" for c in cast):
+        for paragraph in folded.split("\n\n"):
+            hit = next(
+                (
+                    s.strip()
+                    for s in _SENTENCE.findall(_narration(paragraph))
+                    if re.match(r"em(?!\w)", s.strip().casefold())
+                ),
+                None,
+            )
+            if hit is not None:
+                findings.append(
+                    Finding(
+                        "NARRATION_EM",
+                        Severity.NARRATIVE_CRITICAL,
+                        node_id,
+                        "lời kể gọi một nhân vật là “em” trong khi lời kể không gọi ai như vậy; dùng tên hoặc cách gọi đã định",
+                        hit,
+                    )
+                )
+                break
+    return tuple(findings)
+
+
+def name_pov(cast: Sequence[SeedCharacter], pov: str | None, text: str) -> str:
+    """The text with the first narration sentence opening with the point-of-view character's own address opened
+    with their name instead, when the scene never names them (the one place the right word is certain)."""
+    character = _character(cast, pov)
+    if character is None or not character.address or _names_in(_fold(text), _fold(character.name)):
+        return text
+    text = _fold(text)
+    address = _fold(character.address).casefold()
+    paragraphs = text.split("\n\n")
+    for i, paragraph in enumerate(paragraphs):
+        for match in _SENTENCE.finditer(paragraph):
+            sentence = match.group(0)
+            body = sentence.lstrip()
+            start, end = match.end() - len(body), match.end()
+            if body[:1] in "“\"«‘'-–—":
+                continue
+            if re.match(rf"{re.escape(address)}(?!\w)(?! ấy)", body.casefold()):
+                paragraphs[i] = paragraph[:start] + character.name + body[len(address) :] + paragraph[end:]
+                return "\n\n".join(paragraphs)
+    return text
 
 
 #: Openings that describe rather than name a person, and the same description of the other gender.
@@ -319,6 +385,8 @@ __all__ = [
     "gender_findings",
     "idea_names",
     "missing_idea_names",
+    "name_pov",
     "plan_conflicts",
+    "pov_findings",
     "seed_problems",
 ]
