@@ -22,7 +22,14 @@ import unicodedata
 from collections.abc import Iterable, Sequence
 
 from server.story_authoring.genre_packs import genre_menu, pack_for
-from server.story_authoring.prompts.schemas import PLAN_LIST_MAX, ChapterPlan, ShortOutline, StoryBibleOut, StorySeed
+from server.story_authoring.prompts.schemas import (
+    PLAN_LIST_MAX,
+    ChapterPlan,
+    OutlineChapter,
+    ShortOutline,
+    StoryBibleOut,
+    StorySeed,
+)
 
 PLANNING_SYSTEM = (
     "Bạn là mô-đun lập kế hoạch cho một truyện ngắn tiếng Việt gồm đúng ba chương. "
@@ -91,6 +98,20 @@ Story Bible:
 {_json(bible.model_dump())}"""
 
 
+def _drama(chapter: OutlineChapter) -> str:
+    """The outline chapter's obstacle, choice and closing question, when it states them."""
+    lines = [
+        f"{label}: {value}"
+        for label, value in (
+            ("Trở ngại", chapter.obstacle),
+            ("Lựa chọn của nhân vật chính", chapter.choice),
+            ("Câu hỏi người đọc mang sang chương sau", chapter.ending_question),
+        )
+        if value
+    ]
+    return "".join("\n" + line for line in lines)
+
+
 def chapter_plan_prompt(
     *,
     chapter_number: int,
@@ -132,6 +153,9 @@ Phần ghi chú chương:
 - required_changes_by_end: 1–3 thay đổi cụ thể (thông tin, quan hệ, vật chất, quyền lực) bắt buộc xảy ra trước khi
   chương kết thúc.
 - do_not: những điều chương này phải tránh.
+- closing_hook: MỘT câu văn hoàn chỉnh sẽ là câu cuối của chương: một câu hỏi chưa có lời đáp, một bí mật chưa nói
+  ra, hoặc một nguy cơ sắp tới, chỉ đích danh người hay vật; viết câu văn, không tóm tắt. Chương cuối truyện: câu
+  khép lại bằng hình ảnh cuối.
 
 Mỗi cảnh: summary, location, pov, characters, beats (2–4 nhịp hành động/lời thoại cụ thể), emotional_turn,
 plot_function, dialogue_required.
@@ -149,7 +173,7 @@ Quy tắc:
 
 Nhiệm vụ của chương {display} theo dàn ý: {chapter.core_task}
 Mạch truyện được đẩy: {chapter.threads_advanced}
-Bước ngoặt: {chapter.turning_point}
+Bước ngoặt: {chapter.turning_point}{_drama(chapter)}
 
 Dàn ý toàn truyện{"" if is_final else " (phần kết được giữ kín cho chương cuối)"}:
 {_json(outline.model_dump(exclude=set() if is_final else {"ending", "final_image", "resolution"}))}

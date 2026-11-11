@@ -91,6 +91,11 @@ class OutlineChapter(_Out):
     core_task: str = Field(min_length=1)
     threads_advanced: str = Field(min_length=1)
     turning_point: str = Field(min_length=1)
+    #: What stands in the protagonist's way, the choice they make, the question the reader carries to the next
+    #: chapter (donor huohuo drama fields). A generated short outline states them; stored outlines carry none.
+    obstacle: str | None = Field(default=None, min_length=1)
+    choice: str | None = Field(default=None, min_length=1)
+    ending_question: str | None = Field(default=None, min_length=1)
 
 
 class ShortOutline(_Out):
@@ -104,11 +109,20 @@ class ShortOutline(_Out):
     final_image: str = Field(min_length=1)
 
 
+_DramaChapter = create_model(
+    "DramaOutlineChapter",
+    __base__=OutlineChapter,
+    obstacle=(str, Field(min_length=1)),
+    choice=(str, Field(min_length=1)),
+    ending_question=(str, Field(min_length=1)),
+)
+
+
 def bound_short_outline() -> type[ShortOutline]:
     return create_model(
         "BoundShortOutline",
         __base__=ShortOutline,
-        chapters=(list[OutlineChapter], Field(min_length=3, max_length=3)),
+        chapters=(list[_DramaChapter], Field(min_length=3, max_length=3)),
     )
 
 
@@ -129,6 +143,7 @@ class PlannedScene(_Out):
 
 
 SCENES_PER_CHAPTER_MAX = 5
+CLOSING_HOOK_MAX = 200
 #: Withheld cards and do-not items a generated chapter plan may carry.
 PLAN_LIST_MAX = 2
 
@@ -140,6 +155,9 @@ class ChapterPlan(_Out):
     required_changes_by_end: list[str] = Field(min_length=1, max_length=3)
     do_not: list[str] = Field(max_length=4)
     scenes: list[PlannedScene] = Field(min_length=3, max_length=SCENES_PER_CHAPTER_MAX)
+    #: The sentence the chapter ends on, declared by the planner and written by the last scene (donor shenbi
+    #: closing-hook beat). A generated plan states it; stored plans carry none.
+    closing_hook: str | None = Field(default=None, min_length=1, max_length=CLOSING_HOOK_MAX)
 
 
 def bound_chapter_plan(
@@ -157,6 +175,7 @@ def bound_chapter_plan(
         # Fewer secrets and bans leave fewer ways for a small writer to contradict its own plan.
         withheld_cards=(list[str], Field(max_length=PLAN_LIST_MAX)),
         do_not=(list[str], Field(max_length=PLAN_LIST_MAX)),
+        closing_hook=(str, Field(min_length=10, max_length=CLOSING_HOOK_MAX)),
     )
 
 

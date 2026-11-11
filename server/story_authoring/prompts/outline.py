@@ -27,6 +27,9 @@ Quy tắc cứng:
 - Cấu trúc ba hồi: opening (dựng nhân vật, tình huống, câu hỏi), confrontation (đẩy xung đột lên, bước ngoặt),
   resolution (đối mặt, lắng đọng, khép lại).
 - Mỗi chương có đúng một nhiệm vụ cốt lõi (core_task) và phải đẩy ít nhất một mạch truyện; không có chương chuyển tiếp.
+- obstacle: điều cụ thể cản nhân vật chính trong chương; choice: quyết định nhân vật chính tự đưa ra (vì sao, được
+  gì, đúng tính cách ra sao); ending_question: câu hỏi cụ thể người đọc mang sang chương sau (chương 3: câu hỏi mở
+  đầu truyện đã được trả lời thế nào).
 - Chương 3 phải giải quyết xung đột trung tâm; ending mô tả kết thúc cụ thể, trả lời câu hỏi đặt ra ở mở đầu.
 - final_image: hình ảnh cuối cùng khép truyện, gợi lại hình ảnh mở đầu.
 - story_arc: một câu tóm cả hành trình.

@@ -662,6 +662,50 @@ def meta_leaks(text: str) -> list[str]:
     return [lines[i].strip() for i in sorted(starts) if i < len(lines)]
 
 
+#: A paragraph that opens with a JSON key ("{ "paragraph_2": "...") or closes a JSON string: the model wrote its
+#: answer's structure into the prose.
+_JSON_HEAD = re.compile(r'^[ \t]*[\[{]?[ \t]*"[A-Za-z_][A-Za-z0-9_]*"[ \t]*:[ \t]*"?', re.MULTILINE)
+_JSON_TAIL = re.compile(r'"[ \t]*,?[ \t]*[\]}]?[ \t]*$|^[ \t]*[\]}][ \t]*$', re.MULTILINE)
+
+
+def json_leaks(text: str) -> list[str]:
+    """Lines that open with a JSON key."""
+    return [m.group(0).strip() + text[m.end() : m.end() + 30] for m in _JSON_HEAD.finditer(text)]
+
+
+def strip_json_leaks(text: str) -> str:
+    """The text without the JSON keys, quotes and brackets around its paragraphs; the prose inside is kept."""
+    out: list[str] = []
+    for paragraph in text.split("\n\n"):
+        if _JSON_HEAD.search(paragraph):
+            paragraph = _JSON_HEAD.sub("", paragraph)
+            paragraph = _JSON_TAIL.sub("", paragraph)
+        stripped = paragraph.strip()
+        if stripped:
+            out.append(stripped)
+    return "\n\n".join(out)
+
+
+#: One "name: description" item of a notes list ("minh: cô gái 22 tuổi; lan: vợ của ...").
+_NOTE_ITEM = re.compile(r"^[^\W\d_][^:;.!?\n“”\"]{0,30}:\s")
+NOTE_ITEMS_MIN = 3
+
+
+def notes_leaks(text: str) -> list[str]:
+    """Paragraphs that are a list of "name: description" items separated by semicolons: the model's notes on its
+    cast or places written into the prose."""
+    return [
+        paragraph.strip()
+        for paragraph in text.split("\n\n")
+        if sum(1 for item in paragraph.split(";") if _NOTE_ITEM.match(item.strip())) >= NOTE_ITEMS_MIN
+    ]
+
+
+def strip_notes_leaks(text: str) -> str:
+    leaked = set(notes_leaks(text))
+    return "\n\n".join(p for p in text.split("\n\n") if p.strip() not in leaked)
+
+
 _META_NARRATION = re.compile(
     r"\b(?:chương|hồi)\s+(?:một|hai|ba|bốn|năm|\d+)\b"
     r"|\bkhép lại chương\b"
@@ -841,6 +885,14 @@ def check_scene_prose(
                 f"{syllables} syllables outside {window.minimum}-{window.maximum}",
             )
         )
+    findings.extend(
+        Finding("NOTES_LEAK", Severity.HARD_STRUCTURAL, node_id, "a list of notes on the cast in prose", leak[:120])
+        for leak in notes_leaks(text)[:1]
+    )
+    findings.extend(
+        Finding("JSON_LEAK", Severity.HARD_STRUCTURAL, node_id, "JSON keys or brackets in prose", leak)
+        for leak in json_leaks(text)[:1]
+    )
     findings.extend(
         Finding("META_LEAK", Severity.HARD_STRUCTURAL, node_id, "heading, label or note in prose", leak)
         for leak in meta_leaks(text)[:3]

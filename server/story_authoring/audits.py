@@ -326,6 +326,7 @@ def _memo_block(plan: ChapterPlan) -> str:
             "withheld_cards": plan.withheld_cards,
             "required_changes_by_end": plan.required_changes_by_end,
             "do_not": plan.do_not,
+            **({"closing_hook": plan.closing_hook} if plan.closing_hook else {}),
             "scenes": [{"summary": s.summary, "beats": s.beats} for s in plan.scenes],
         },
         ensure_ascii=False,

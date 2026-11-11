@@ -270,3 +270,96 @@ def test_narration_that_calls_someone_em_is_found_but_dialogue_and_an_em_address
     assert pov_findings([MINH, LAN], "Minh", "Minh cười. 'Em đã đợi lâu rồi,' Lan nói.", node_id="s") == ()
     young = LAN.model_copy(update={"address": "em"})
     assert pov_findings([MINH, young], "Minh", drifted, node_id="s") == ()
+
+
+def test_a_plan_declares_its_closing_hook_and_the_last_scene_is_held_to_it():
+    from server.story_authoring.craft_checks import closing_hook_findings
+    from server.story_authoring.prompts.schemas import ChapterPlan, bound_chapter_plan, bound_short_outline
+
+    scene = {
+        "summary": "s",
+        "location": "Nhà",
+        "pov": "Minh",
+        "characters": ["Minh"],
+        "beats": ["a", "b"],
+        "emotional_turn": "e",
+        "plot_function": "p",
+        "dialogue_required": False,
+    }
+    stored = {
+        "chapter_goal": "g",
+        "reader_expectation": "r",
+        "withheld_cards": [],
+        "required_changes_by_end": ["c"],
+        "do_not": [],
+        "scenes": [scene] * 3,
+    }
+    assert ChapterPlan.model_validate(stored).closing_hook is None
+    bound = bound_chapter_plan(["Minh"], ["Nhà"])
+    with pytest.raises(ValidationError):
+        bound.model_validate(stored)
+    hook = "Ai đã để lá thư dưới cửa nhà Minh đêm ấy?"
+    assert bound.model_validate({**stored, "closing_hook": hook}).closing_hook == hook
+    outline_chapter = {"core_task": "t", "threads_advanced": "m", "turning_point": "b"}
+    outline = {
+        "story_arc": "a",
+        "opening": "o",
+        "confrontation": "c",
+        "resolution": "r",
+        "chapters": [outline_chapter] * 3,
+        "ending": "e",
+        "final_image": "f",
+    }
+    with pytest.raises(ValidationError):
+        bound_short_outline().model_validate(outline)
+    drama = {**outline_chapter, "obstacle": "o", "choice": "c", "ending_question": "q"}
+    assert bound_short_outline().model_validate({**outline, "chapters": [drama] * 3}).chapters[0].choice == "c"
+
+    ending = "Minh đóng cửa.\n\nAnh nhìn lá thư. Ai đã để lá thư dưới cửa nhà Minh đêm ấy?"
+    assert closing_hook_findings(hook, ending, node_id="s") == ()
+    reworded = "Minh đóng cửa.\n\nAi đã để lá thư dưới cửa nhà anh đêm ấy?"
+    assert closing_hook_findings(hook, reworded, node_id="s") == ()
+    [missed] = closing_hook_findings(hook, "Minh đóng cửa.\n\nAnh ngủ một giấc dài.", node_id="s")
+    assert (missed.code, missed.severity, missed.quote) == ("CLOSING_HOOK", Severity.STYLISTIC, "Anh ngủ một giấc dài.")
+
+
+def test_the_closing_hook_and_drama_fields_reach_the_prompts():
+    from server.story_authoring.prompts.drafting import scene_repair_context
+    from server.story_authoring.prompts.planning import _drama
+    from server.story_authoring.prompts.schemas import ChapterPlan, OutlineChapter
+
+    chapter = OutlineChapter(
+        core_task="t",
+        threads_advanced="m",
+        turning_point="b",
+        obstacle="ông chủ nợ",
+        choice="bán nhà",
+        ending_question="ai gửi thư?",
+    )
+    assert _drama(chapter) == (
+        "\nTrở ngại: ông chủ nợ\nLựa chọn của nhân vật chính: bán nhà\nCâu hỏi người đọc mang sang chương sau: ai gửi thư?"
+    )
+    assert _drama(OutlineChapter(core_task="t", threads_advanced="m", turning_point="b")) == ""
+    scene = {
+        "summary": "s",
+        "location": "Nhà",
+        "pov": "Minh",
+        "characters": ["Minh"],
+        "beats": ["a", "b"],
+        "emotional_turn": "e",
+        "plot_function": "p",
+        "dialogue_required": False,
+    }
+    plan = ChapterPlan.model_validate(
+        {
+            "chapter_goal": "g",
+            "reader_expectation": "r",
+            "withheld_cards": [],
+            "required_changes_by_end": ["c"],
+            "do_not": [],
+            "scenes": [scene] * 3,
+            "closing_hook": "Ai đã để lá thư dưới cửa?",
+        }
+    )
+    context = scene_repair_context("facts", plan=plan, scene=plan.scenes[2], is_last=True, voice="", kept=[])
+    assert "Câu cuối cùng của cảnh là: “Ai đã để lá thư dưới cửa?”" in context

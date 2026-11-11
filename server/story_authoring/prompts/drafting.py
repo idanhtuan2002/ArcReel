@@ -205,6 +205,10 @@ def scene_draft_prompt(
                 "Dừng ở một câu hỏi chưa có lời đáp hoặc một nguy cơ sắp tới, cụ thể, khiến người đọc muốn đọc chương "
                 "sau; không kết bằng cảm xúc lắng xuống, không tổng kết, không suy ngẫm."
             )
+        if plan.closing_hook:
+            duties.append(
+                f"Câu cuối cùng của cảnh là: “{plan.closing_hook}” (có thể đổi vài chữ cho liền mạch, không đổi ý)."
+            )
     if is_final_scene:
         duties.append("Đây là cảnh cuối của truyện: khép lại xung đột trung tâm một cách trọn vẹn, không bỏ lửng.")
     if plan.withheld_cards:
@@ -262,6 +266,8 @@ def scene_repair_context(
         duties.append("Tránh: " + "; ".join(plan.do_not))
     if is_last:
         duties.append("Trước khi hết cảnh phải xảy ra: " + "; ".join(plan.required_changes_by_end))
+        if plan.closing_hook:
+            duties.append(f"Câu cuối cùng của cảnh là: “{plan.closing_hook}”")
     if duties:
         parts.append("[Ràng buộc của chương]\n" + "\n".join(f"- {d}" for d in duties))
     if voice:

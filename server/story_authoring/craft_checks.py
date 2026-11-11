@@ -157,3 +157,29 @@ def drift_findings(reference: str, text: str, *, node: str) -> tuple[Finding, ..
 
 
 __all__ = ["drift_findings", "long_span_findings", "opening_findings", "voice_stats"]
+
+
+#: Share of the declared closing hook's content words the chapter's last two paragraphs must carry (donor shenbi
+#: verbatim closing-hook match, loosened for a small writer that rewords).
+CLOSING_HOOK_OVERLAP = 0.5
+
+
+def closing_hook_findings(hook: str | None, last_scene: str, *, node_id: str) -> tuple[Finding, ...]:
+    """A chapter whose last scene does not end on the closing hook its plan declared: recorded, never repaired, until
+    real chapters set the threshold."""
+    if not hook:
+        return ()
+    tail = "\n\n".join(_paragraphs(last_scene)[-2:])
+    wanted = set(_words(hook))
+    if not wanted or len(wanted & set(_words(tail))) / len(wanted) >= CLOSING_HOOK_OVERLAP:
+        return ()
+    last = re.split(r"(?<=[.!?…])\s+", tail.strip())[-1] if tail.strip() else ""
+    return (
+        Finding(
+            "CLOSING_HOOK",
+            Severity.STYLISTIC,
+            node_id,
+            f"chương không kết bằng câu móc đã định: “{hook}”",
+            last,
+        ),
+    )

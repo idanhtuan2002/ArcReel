@@ -120,6 +120,45 @@ def pov_findings(cast: Sequence[SeedCharacter], pov: str | None, text: str, *, n
     return tuple(findings)
 
 
+#: Narration "tôi" a third-person scene may carry (a remembered phrase, an unquoted thought) before it counts as a
+#: slip into the first person; the committed real stories carry at most one, the drifted scenes 16 and 24.
+THIRD_PERSON_TOI_MAX = 2
+_TOI = re.compile(r"(?<!\w)tôi(?!\w)", re.IGNORECASE)
+
+
+def pov_person_findings(pov: str | None, text: str, *, node_id: str, syllables: int) -> tuple[Finding, ...]:
+    """A scene narrated in another person than the story's point of view (donor shenbi POV invariant, counted on
+    narration with dialogue removed)."""
+    if not pov:
+        return ()
+    folded = _fold(text)
+    narration = "\n".join(_narration(p) for p in folded.split("\n\n"))
+    hits = list(_TOI.finditer(narration))
+    first_person = "thứ nhất" in pov.casefold()
+    if not first_person and len(hits) > THIRD_PERSON_TOI_MAX:
+        quote = next((s.strip() for s in _SENTENCE.findall(narration) if _TOI.search(s)), "")
+        return (
+            Finding(
+                "POV_PERSON",
+                Severity.NARRATIVE_CRITICAL,
+                node_id,
+                f"truyện kể ở {pov} nhưng lời kể cảnh này xưng “tôi” {len(hits)} lần; kể lại ở {pov}",
+                quote,
+            ),
+        )
+    if first_person and not hits and syllables >= 600:
+        return (
+            Finding(
+                "POV_PERSON",
+                Severity.NARRATIVE_CRITICAL,
+                node_id,
+                f"truyện kể ở {pov} nhưng lời kể cảnh này không xưng “tôi” lần nào; kể lại ở {pov}",
+                folded.strip()[:80],
+            ),
+        )
+    return ()
+
+
 def name_pov(cast: Sequence[SeedCharacter], pov: str | None, text: str) -> str:
     """The text with the first narration sentence opening with the point-of-view character's own address opened
     with their name instead, when the scene never names them (the one place the right word is certain)."""
@@ -388,5 +427,6 @@ __all__ = [
     "name_pov",
     "plan_conflicts",
     "pov_findings",
+    "pov_person_findings",
     "seed_problems",
 ]

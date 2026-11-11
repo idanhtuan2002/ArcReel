@@ -33,8 +33,10 @@ from server.story_authoring.checks import (
     count_syllables,
     ends_cleanly,
     strip_copied_sentences,
+    strip_json_leaks,
     strip_markup,
     strip_meta_narration,
+    strip_notes_leaks,
     strip_replayed_sentences,
     trim_unterminated_tail,
 )
@@ -265,6 +267,16 @@ def deterministic_fixes(
         if trimmed != text and ends_cleanly(trimmed):
             text = trimmed
             notes.append("removed an unfinished last sentence")
+    if "NOTES_LEAK" in codes:
+        stripped = strip_notes_leaks(text)
+        if stripped != text:
+            text = stripped
+            notes.append("removed a paragraph of notes on the cast")
+    if "JSON_LEAK" in codes:
+        stripped = strip_json_leaks(text)
+        if stripped != text:
+            text = stripped
+            notes.append("removed JSON keys and brackets around paragraphs")
     if "MARKUP" in codes:
         text = strip_markup(text)
         notes.append("removed markdown emphasis")

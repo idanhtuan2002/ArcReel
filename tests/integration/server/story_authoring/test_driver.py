@@ -208,9 +208,30 @@ STRUCTURED: dict[str, Any] = {
         "confrontation": "Lan phản đối.",
         "resolution": "Minh giữ nhà.",
         "chapters": [
-            {"core_task": "trở về", "threads_advanced": "nợ", "turning_point": "cuốn sổ"},
-            {"core_task": "giằng co", "threads_advanced": "nợ", "turning_point": "người mua"},
-            {"core_task": "quyết định", "threads_advanced": "nợ", "turning_point": "trả nợ"},
+            {
+                "core_task": "trở về",
+                "threads_advanced": "nợ",
+                "turning_point": "cuốn sổ",
+                "obstacle": "Lan",
+                "choice": "ở lại",
+                "ending_question": "ai ghi nợ?",
+            },
+            {
+                "core_task": "giằng co",
+                "threads_advanced": "nợ",
+                "turning_point": "người mua",
+                "obstacle": "Lan",
+                "choice": "ở lại",
+                "ending_question": "ai ghi nợ?",
+            },
+            {
+                "core_task": "quyết định",
+                "threads_advanced": "nợ",
+                "turning_point": "trả nợ",
+                "obstacle": "Lan",
+                "choice": "ở lại",
+                "ending_question": "ai ghi nợ?",
+            },
         ],
         "ending": "Minh ở lại.",
         "final_image": "ngọn đèn",
@@ -223,6 +244,7 @@ STRUCTURED: dict[str, Any] = {
         "required_changes_by_end": ["Minh thấy cuốn sổ"],
         "do_not": [],
         "scenes": [_scene(1), _scene(2), _scene(3)],
+        "closing_hook": "Ai đã ghi món nợ ấy vào cuốn sổ?",
     },
 }
 

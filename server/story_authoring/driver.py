@@ -51,6 +51,7 @@ from server.story_authoring.cast_checks import (
     name_pov,
     plan_conflicts,
     pov_findings,
+    pov_person_findings,
     seed_problems,
 )
 from server.story_authoring.checks import (
@@ -62,6 +63,8 @@ from server.story_authoring.checks import (
     count_syllables,
     escalate_or_block,
     foreign_script,
+    json_leaks,
+    notes_leaks,
 )
 from server.story_authoring.commit import ManuscriptCommitManifest, SceneEntry, load_offered_manifest, offer_manifest
 from server.story_authoring.contracts import (
@@ -76,7 +79,12 @@ from server.story_authoring.contracts import (
     StoryStepKind,
     StoryStepRequest,
 )
-from server.story_authoring.craft_checks import drift_findings, long_span_findings, opening_findings
+from server.story_authoring.craft_checks import (
+    closing_hook_findings,
+    drift_findings,
+    long_span_findings,
+    opening_findings,
+)
 from server.story_authoring.generation import AuthoringTextGateway, StoryStepError
 from server.story_authoring.genre_packs import GenrePack, craft_rules, fatigue_findings, pack_for, planning_block
 from server.story_authoring.layout import natural_paragraphs
@@ -202,6 +210,7 @@ RETRYABLE = frozenset(
         StoryFailureCode.OUTCOME_UNKNOWN,
     }
 )
+_CUT_AT_REVIEW = frozenset({"JSON_LEAK", "NOTES_LEAK"})
 REPAIRABLE = frozenset({Severity.HARD_INTEGRITY, Severity.HARD_STRUCTURAL, Severity.NARRATIVE_CRITICAL})
 IDEA_ANCHOR = "[Ý tưởng gốc của tác giả — mọi phần phải trung thành: nhân vật, giới tính, ham muốn, xung đột]"
 PLANNING = {"temperature": 0.6, "top_p": 0.9, "top_k": 40, "presence_penalty": 0.0}
@@ -1464,6 +1473,7 @@ class StoryRunDriver:
                 earlier,
                 cast=story.seed.characters,
                 pov=planned.pov,
+                person=story.seed.pov,
             )
             return json.dumps(
                 {**binding, "prose": prose, "findings": [_finding_dict(f) for f in findings]}, ensure_ascii=False
@@ -1490,6 +1500,7 @@ class StoryRunDriver:
         *,
         cast: Sequence[SeedCharacter] = (),
         pov: str | None = None,
+        person: str | None = None,
     ) -> tuple[str, tuple[Finding, ...]]:
         bounds = drafting.paragraph_bounds(target)
         try:
@@ -1546,6 +1557,7 @@ class StoryRunDriver:
                     earlier=earlier,
                 ),
                 *pov_findings(cast, pov, prose, node_id=node),
+                *pov_person_findings(person, prose, node_id=node, syllables=count_syllables(prose)),
             )
             if best is None or _weight(findings) <= _weight(best[1]):
                 best = (prose, findings)
@@ -1666,8 +1678,21 @@ class StoryRunDriver:
                         prose[max(0, index - 20) : index + 20],
                     )
                 )
+            for code, leaks in (("JSON_LEAK", json_leaks(prose)), ("NOTES_LEAK", notes_leaks(prose))):
+                if leaks:
+                    findings.append(
+                        Finding(code, Severity.HARD_STRUCTURAL, ref.node_id, "notes or JSON in prose", leaks[0][:120])
+                    )
             pov = plan.scenes[ref.scene - 1].pov if ref.scene <= len(plan.scenes) else None
             findings.extend(pov_findings(story.seed.characters, pov, prose, node_id=ref.node_id))
+            findings.extend(
+                pov_person_findings(story.seed.pov, prose, node_id=ref.node_id, syllables=count_syllables(prose))
+            )
+        if refs:
+            last = max(refs, key=lambda r: r.scene)
+            findings.extend(
+                closing_hook_findings(plan.closing_hook, heads[last.node_id]["prose"], node_id=last.node_id)
+            )
         for dimension in CHAPTER_DIMENSIONS:
             result = await self._judge(
                 node,
@@ -1737,9 +1762,14 @@ class StoryRunDriver:
                     voice=drafting.voice_block(story.seed, story.style, story.bible),
                     kept=kept,
                 )
+                # Leaked notes and JSON are cut with no model call; what is left goes to the model.
+                cut, _notes = deterministic_fixes(
+                    scene_head["prose"], [f for f in scene_findings if f.code in _CUT_AT_REVIEW]
+                )
+                rest = [f for f in scene_findings if f.code not in _CUT_AT_REVIEW]
                 try:
-                    repaired = await self._repair_once(
-                        scene_node, scene_epoch, scene_head["prose"], scene_findings, context, []
+                    repaired = (
+                        cut if not rest else await self._repair_once(scene_node, scene_epoch, cut, rest, context, [])
                     )
                 except Blocked:
                     continue
