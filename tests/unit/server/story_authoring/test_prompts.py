@@ -205,10 +205,11 @@ def _pack():
     return asyncio.run(build())
 
 
-def test_the_context_renders_decoded_facts_beats_and_style():
+def test_the_context_renders_decoded_facts_and_style_and_leaves_the_beats_to_the_scene_prompt():
     text = render_context(_pack(), {"char-minh": "Minh", "char-lan": "Lan", "loc-nha-cu": "Căn nhà cũ"})
     assert "- Lan: Em gái Minh, ở lại làng chăm mẹ." in text
-    assert "- mở cửa" in text
+    # The pack sorts its beats; the scene prompt shows them in plan order, so the context does not repeat them.
+    assert "[Nhịp bắt buộc]" not in text
     assert "- Ngôi thứ ba, giọng trầm." in text
     assert "\\u" not in text
 
@@ -280,3 +281,87 @@ def test_paragraph_length_bounds_keep_every_scene_inside_its_window():
         count, _ = paragraph_bounds(target)
         assert count * paragraph_min_chars(target) / 4.5 >= 0.4 * 600
         assert count * paragraph_max_chars(target) / 4.5 <= 1400
+
+
+def test_the_writer_and_every_repair_see_the_storys_voice_and_kept_fixes():
+    from server.story_authoring.prompts.drafting import VOICE_MAX_CHARS, scene_repair_context, voice_block
+    from server.story_authoring.prompts.schemas import (
+        ChapterPlan,
+        PlannedScene,
+        SeedCharacter,
+        SeedLocation,
+        StoryBibleOut,
+        StorySeed,
+        StyleBibleOut,
+    )
+
+    seed = StorySeed(
+        working_title="t",
+        premise="p",
+        genre="g",
+        tone="trầm, day dứt",
+        pov="ngôi thứ ba, bám Minh",
+        central_conflict="c",
+        ending_direction="e",
+        characters=[
+            SeedCharacter(name="Minh", role="r", relation_to_protagonist="x", description="d", goal="g"),
+            SeedCharacter(name="Lan", role="r", relation_to_protagonist="x", description="d", goal="g"),
+        ],
+        locations=[SeedLocation(name="Nhà", description="d")],
+    )
+    style = StyleBibleOut(
+        narration_style="kể chậm",
+        sentence_rhythm="câu ngắn xen dài",
+        emotional_texture="nén",
+        dialogue_style="ít lời",
+        forbidden_style=["sáo rỗng"],
+        style_rules=["a", "b", "c"],
+    )
+    bible = StoryBibleOut(
+        logline="l",
+        core_promise="c",
+        world_rules=["w"],
+        major_conflicts=["m"],
+        forbidden_contradictions=["Lan không biết chữ"],
+    )
+    voice = voice_block(seed, style, bible)
+    for part in (
+        "ngôi thứ ba, bám Minh",
+        "trầm, day dứt",
+        "kể chậm",
+        "câu ngắn xen dài",
+        "ít lời",
+        "sáo rỗng",
+        "Lan không biết chữ",
+    ):
+        assert voice.count(part) == 1
+    assert len(voice) <= VOICE_MAX_CHARS
+    long = style.model_copy(update={"narration_style": "x" * 1000, "dialogue_style": "y" * 1000})
+    assert len(voice_block(seed, long, bible)) <= VOICE_MAX_CHARS
+
+    scene = PlannedScene(
+        summary="Minh mở cửa",
+        location="Nhà",
+        pov="Minh",
+        characters=["Minh"],
+        beats=["mở cửa", "thấy sổ"],
+        emotional_turn="sợ",
+        plot_function="p",
+        dialogue_required=False,
+    )
+    plan = ChapterPlan(
+        chapter_goal="g",
+        reader_expectation="r",
+        withheld_cards=["bí mật"],
+        required_changes_by_end=["thấy sổ"],
+        do_not=["không khóc"],
+        scenes=[scene, scene, scene],
+    )
+    context = scene_repair_context(
+        "- Minh: x", plan=plan, scene=scene, is_last=True, voice=voice, kept=["CAST_GENDER: “Cô biết”"]
+    )
+    assert "mở cửa; thấy sổ" in context
+    assert "Giữ kín, chưa hé lộ: bí mật" in context
+    assert "Trước khi hết cảnh phải xảy ra: thấy sổ" in context
+    assert voice in context
+    assert "giữ nguyên, không làm hỏng lại" in context

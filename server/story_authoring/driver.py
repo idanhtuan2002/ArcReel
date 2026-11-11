@@ -49,6 +49,7 @@ from server.story_authoring.cast_checks import (
     gender_findings,
     missing_idea_names,
     plan_conflicts,
+    seed_problems,
 )
 from server.story_authoring.checks import (
     ESCALATED_MARK,
@@ -75,6 +76,7 @@ from server.story_authoring.contracts import (
 from server.story_authoring.craft_checks import drift_findings, long_span_findings, opening_findings
 from server.story_authoring.generation import AuthoringTextGateway, StoryStepError
 from server.story_authoring.genre_packs import GenrePack, craft_rules, fatigue_findings, pack_for, planning_block
+from server.story_authoring.layout import natural_paragraphs
 from server.story_authoring.narrative import (
     ChapterOutlineInput,
     ProvisionalAcceptance,
@@ -180,6 +182,10 @@ VARIANT_NOTE = AUTO_NOTE + (
     "dàn ý phiên bản khác đã bỏ hoặc làm trái các diễn biến của truyện gốc mà yêu cầu không cho đổi; giữ lại đúng "
     "thứ tự các diễn biến: "
 )
+ENDING_REPLAN_NOTE = AUTO_NOTE + (
+    "kết truyện vẫn chưa khép lại sau khi viết lại cảnh cuối; lập lại kế hoạch chương cuối để các cảnh dẫn tới và "
+    "trình bày trọn kết thúc sau: "
+)
 ENDING_NOTE = AUTO_NOTE + (
     "biên tập viên thấy cảnh này chưa khép lại xung đột trung tâm. Viết lại để kết thúc giải quyết trọn vẹn xung đột, "
     "trả lời câu hỏi mở đầu và dừng ở hình ảnh cuối đã định trong dàn ý."
@@ -231,6 +237,9 @@ class StoryBrief(BaseModel):
     content_safety: SafetyLevel = Field(default="standard", exclude_if=lambda value: value == "standard")
     #: The part of a book this run writes (ADR-0116); none for a three-chapter story.
     book: books.BookPart | None = Field(default=None, exclude_if=lambda value: value is None)
+    #: A short story digests each chapter and carries what happened into the next (stage-by-stage F3). Briefs drafted
+    #: before it leave it out, so their runs keep their exact inputs on resume.
+    carries_digests: bool = Field(default=False, exclude_if=lambda value: not value)
 
     @property
     def chapters(self) -> int:
@@ -330,6 +339,7 @@ class StoryRunDriver:
         self._pack: GenrePack | None = None
         self._book = brief.book
         self._chapters = brief.chapters
+        self._digesting = brief.book is not None or brief.carries_digests
         self._plan: books.BookPlan | None = None
         self._memory = books.BookMemory()
         self._book_ins: list[tuple[str, str]] = []
@@ -349,7 +359,7 @@ class StoryRunDriver:
         try:
             # Every automatic replan restarts the pass; each chapter replans at most PLAN_REPLANS times, so the
             # passes they take are bounded and come on top of those that converge Human revisions.
-            for _ in range(CONVERGE_PASSES + self._chapters * PLAN_REPLANS):
+            for _ in range(CONVERGE_PASSES + self._chapters * PLAN_REPLANS + 1):
                 intents = human_intents(await self._store.load())
                 try:
                     story = await self._converge()
@@ -667,14 +677,18 @@ class StoryRunDriver:
                 raw = await self._json(
                     "seed", epoch, StoryStepKind.SEED, planning.PLANNING_SYSTEM, seed_prompt, books.bound_seed(*cast)
                 )
-                missing = missing_idea_names(idea, StorySeed.model_validate_json(raw))
-                if not missing:
+                drawn = StorySeed.model_validate_json(raw)
+                missing = missing_idea_names(idea, drawn)
+                problems = seed_problems(drawn)
+                if not missing and not problems:
                     return raw
-                # The seed lost the idea's own characters: drawn once more with them named (ADR-0127).
-                again = (
-                    f"{seed_prompt}\n\nLần trước seed bỏ mất nhân vật của ý tưởng: {', '.join(missing)}. Giữ đúng tên "
-                    "và vai của họ như ý tưởng."
-                )
+                # One more draw names everything the first lacked: the idea's own characters (ADR-0127) and the
+                # seed's foundation problems (donor shenbi validates the seed before the pipeline starts).
+                lacks = []
+                if missing:
+                    lacks.append(f"bỏ mất nhân vật của ý tưởng: {', '.join(missing)} (giữ đúng tên và vai như ý tưởng)")
+                lacks.extend(problems)
+                again = f"{seed_prompt}\n\nLần trước seed chưa đạt: " + "; ".join(lacks) + "."
                 return await self._json(
                     "seed", epoch, StoryStepKind.SEED, planning.PLANNING_SYSTEM, again, books.bound_seed(*cast)
                 )
@@ -948,8 +962,7 @@ class StoryRunDriver:
         return "\n\n".join([json.loads(await self._head(r.node_id))["prose"] for r in refs])
 
     async def _chapter_digest(self, chapter: int, refs: Sequence[SceneRef]) -> tuple[str, str]:
-        """The memory of an accepted chapter: extracted from its text, names attested."""
-        assert self._plan is not None
+        """The memory of an accepted chapter: extracted from its text, names attested. A short story has no hooks."""
         number = self._first() + chapter - 1
         text = await self._chapter_text(refs)
         known = [(h.hook_id, h.text) for h in self._memory.hooks if h.status != "resolved" and h.planted <= number]
@@ -1091,7 +1104,9 @@ class StoryRunDriver:
         refs = scene_refs(story.outline_input)
         text = await self._chapter_text(refs)
         packaged = Packaging.model_validate(json.loads(await self._head("packaging"))["packaging"])
-        title = self._title or packaged.titles[0].title
+        title = self._title or packaging_prompts.best_title(
+            packaged, [c.name for c in story.seed.characters], story.seed.working_title
+        )
         state = books.BookState(
             spec=self._book.spec,
             parts_done=self._book.part,
@@ -1298,10 +1313,10 @@ class StoryRunDriver:
                 if cycle == REVIEW_CYCLES or not await self._review_chapter(story, c, chapter_refs, final=False):
                     break
             await self._review_chapter(story, c, chapter_refs, final=True)
-            if self._book is not None:
+            if self._digesting and (self._book is not None or c < self._chapters):
                 await self._chapter_digest(c, chapter_refs)
-                if c == self._chapters and self._ends_story():
-                    await self._close_open_hooks(chapter_refs[-1].node_id)
+            if self._book is not None and c == self._chapters and self._ends_story():
+                await self._close_open_hooks(chapter_refs[-1].node_id)
 
     async def _acceptances(
         self, refs: Sequence[SceneRef], upto: int, version: str, proposal: Any
@@ -1345,6 +1360,15 @@ class StoryRunDriver:
             acceptances[i] for i in recent_indices(refs, ref.global_index, chapter_window=self._book is not None)
         ]
         memory = ""
+        if self._book is None and self._digesting and ref.chapter > 1:
+            digests = await self._digests(ref.chapter)
+            inputs = [
+                *inputs,
+                *((f"chapter_digest[{c}]", content_digest(d.model_dump_json().encode())) for c, d in digests),
+            ]
+            memory = books.short_memory_block(
+                digests, names=story.plans[ref.chapter - 1].scenes[ref.scene - 1].characters
+            )
         if self._book is not None:
             digests = await self._digests(ref.chapter)
             inputs = [
@@ -1380,7 +1404,7 @@ class StoryRunDriver:
         )
         binding = {"context_pack_id": pack.context_pack_id, "context_content_hash": pack.content_hash}
         if self._book is None:
-            context = drafting.render_context(pack, story.names)
+            context = drafting.render_context(pack, story.names, memory=memory)
         else:
             context = drafting.render_context(pack, story.names, openings=max(0, ref.scene - 2), memory=memory)
         chapter = story.plans[ref.chapter - 1]
@@ -1410,6 +1434,9 @@ class StoryRunDriver:
                 target_syllables=target,
                 revision_note=note,
                 genre_rules=craft_rules(self._pack),
+                voice=drafting.voice_block(story.seed, story.style, story.bible),
+                chapter_first=ref.scene == 1,
+                story_first=ref.scene == 1 and ref.chapter == 1 and self._first() == 1 and self._brief.prior is None,
             )
             prior = self._brief.prior
             if (
@@ -1523,7 +1550,11 @@ class StoryRunDriver:
                         epoch,
                         kind=StoryStepKind.SCENE_DRAFT,
                         system=drafting.DRAFT_SYSTEM,
-                        prompt=prompt + REGENERATE_NOTE,
+                        # Measured numbers make a retry actionable (donor shenbi 5b517c3: a generic retry message
+                        # failed three attempts in a row).
+                        prompt=prompt
+                        + REGENERATE_NOTE
+                        + f" Bản trước có {count_syllables(prose)} chữ; cần khoảng {target} chữ, đúng {bounds[0]} đoạn.",
                         decoding=DRAFT,
                         paragraphs=bounds,
                         paragraph_chars=drafting.paragraph_min_chars(target),
@@ -1602,7 +1633,11 @@ class StoryRunDriver:
         scenes = [(n, h["prose"]) for n, h in heads.items()]
         plan = story.plans[chapter - 1]
         facts = "\n".join(f"- {c.name}: {c.locked_line()}" for c in story.seed.characters)
-        previous = " ".join(p.chapter_goal for p in story.plans[: chapter - 1])
+        if self._digesting and chapter > 1:
+            # The continuity judge reads what earlier chapters actually wrote, not what their plans meant to.
+            previous = " ".join(d.summary for _c, d in await self._digests(chapter))
+        else:
+            previous = " ".join(p.chapter_goal for p in story.plans[: chapter - 1])
         findings: list[Finding] = [f for n, h in heads.items() for f in anti_ai_findings(h["prose"], node_id=n)]
         findings.extend(fatigue_findings(self._pack, [(n, h["prose"]) for n, h in heads.items()]))
         findings.extend(gender_findings(story.seed.characters, scenes))
@@ -1665,15 +1700,45 @@ class StoryRunDriver:
                 state = await self._store.load()
                 scene_epoch = state.node(scene_node).generation_epoch
                 scene_head = heads[scene_node]
+                ref = next(r for r in refs if r.node_id == scene_node)
+                kept = [str(k) for k in scene_head.get("fixed", [])]
+                context = drafting.scene_repair_context(
+                    facts,
+                    plan=plan,
+                    scene=plan.scenes[ref.scene - 1],
+                    is_last=ref.scene == len(plan.scenes),
+                    voice=drafting.voice_block(story.seed, story.style, story.bible),
+                    kept=kept,
+                )
                 try:
                     repaired = await self._repair_once(
-                        scene_node, scene_epoch, scene_head["prose"], scene_findings, facts, []
+                        scene_node, scene_epoch, scene_head["prose"], scene_findings, context, []
                     )
                 except Blocked:
                     continue
-                if repaired != scene_head["prose"] and self._no_worse(story, scene_head["prose"], repaired):
+                if (
+                    repaired != scene_head["prose"]
+                    and self._no_worse(story, scene_head["prose"], repaired)
+                    and not _restores(scene_head, repaired)
+                ):
+                    fixed = [*kept, *(f"{f.code}: “{f.quote[:80]}”" for f in scene_findings if f.quote)]
+                    # Only passages this repair actually removed are guarded against coming back.
+                    fixed_quotes = [
+                        f.quote
+                        for f in scene_findings
+                        if f.quote and f.quote in scene_head["prose"] and f.quote not in repaired
+                    ]
                     await self._replace_head(
-                        scene_node, json.dumps({**scene_head, "prose": repaired}, ensure_ascii=False).encode("utf-8")
+                        scene_node,
+                        json.dumps(
+                            {
+                                **scene_head,
+                                "prose": repaired,
+                                "fixed": fixed,
+                                "fixed_quotes": [*scene_head.get("fixed_quotes", []), *fixed_quotes],
+                            },
+                            ensure_ascii=False,
+                        ).encode("utf-8"),
                     )
                     changed = True
             if changed:
@@ -1685,7 +1750,11 @@ class StoryRunDriver:
         if final and blocking and all(f.code.startswith(contract) for f in blocking):
             plan_node = chapter_plan(chapter)
             state = await self._store.load()
-            replanned = sum(1 for n in state.intents.get(plan_node, ()) if n.startswith(AUTO_NOTE))
+            replanned = sum(
+                1
+                for n in state.intents.get(plan_node, ())
+                if n.startswith(AUTO_NOTE) and not n.startswith(ENDING_REPLAN_NOTE)
+            )
             if replanned < PLAN_REPLANS:
                 # Each replan sees the failed plan and every earlier failure (donor shenbi accumulates failure
                 # families so a retry converges); after PLAN_REPLANS the finding goes to the Showrunner.
@@ -1820,6 +1889,14 @@ class StoryRunDriver:
                 if ending_note not in state.intents.get(final_scene, ()):
                     await self._store.apply(lambda s: (add_intent(s, node_ids=(final_scene,), note=ending_note), None))
                     raise _Restart(final_scene)
+                # The rewrite of the final scene did not close the story: its last chapter is planned once more
+                # toward the outline's ending (no donor publishes an unresolved ending automatically).
+                last_plan = chapter_plan(refs[-1].chapter)
+                if not any(n.startswith(ENDING_REPLAN_NOTE) for n in state.intents.get(last_plan, ())):
+                    quote = next((f.quote for f in blocking if f.quote), "")
+                    note = ENDING_REPLAN_NOTE + f"{story.outline.ending} (cảnh cuối hiện kết ở: “{quote}”)"
+                    await self._store.apply(lambda s: (add_intent(s, node_ids=(last_plan,), note=note), None))
+                    raise _Restart(last_plan)
             findings, blocking = escalate_or_block(findings)
             if blocking:
                 raise Blocked(
@@ -1887,7 +1964,11 @@ class StoryRunDriver:
                     )
                 )
                 attempts.append((packaging, set(packaging_prompts.unverified_selling_points(packaging, manuscript))))
-                if len(packaging.selling_points) - len(attempts[-1][1]) >= MIN_VERIFIED_SELLING_POINTS:
+                titled = any(
+                    not packaging_prompts.title_problems(t.title, [c.name for c in story.seed.characters])
+                    for t in packaging.titles
+                )
+                if titled and len(packaging.selling_points) - len(attempts[-1][1]) >= MIN_VERIFIED_SELLING_POINTS:
                     break
             packaging, unverified = min(attempts, key=lambda a: len(a[1]))
             verified_points = [p for p in packaging.selling_points if p.point not in unverified]
@@ -2016,7 +2097,9 @@ class StoryRunDriver:
             for r in record
             if r["severity"] in (Severity.NARRATIVE_CRITICAL.value, Severity.LOCAL_MODEL_LIMIT.value)
         )
-        title = packaging.titles[0].title
+        title = packaging_prompts.best_title(
+            packaging, [c.name for c in story.seed.characters], story.seed.working_title
+        )
         if self._book is not None:
             title = f"{self._title or title} — Phần {self._book.part}"
         export = render_markdown(
@@ -2079,6 +2162,11 @@ def drop_auto_intents(state: RunState, node_ids: Sequence[str]) -> RunState:
     return state.model_copy(update={"intents": intents})
 
 
+def _restores(scene_head: dict[str, Any], repaired: str) -> bool:
+    """Whether a repair brings back a passage an earlier round of review repair removed."""
+    return any(len(q) >= 12 and q in repaired for q in scene_head.get("fixed_quotes", []))
+
+
 def step_prefix(state: RunState, node: str) -> str:
     """Attempts of a node in one round share its call cap. A round ends with a Human revision or retry; for a
     scene or chapter review it also ends when its chapter plan is replanned, since the contract is new; for a chapter
@@ -2102,7 +2190,11 @@ def step_prefix(state: RunState, node: str) -> str:
 
 
 def run_call_bound(
-    chapters: int = CHAPTERS, scenes_per_chapter: int = SCENES_PER_CHAPTER_MAX, *, book: books.BookPart | None = None
+    chapters: int = CHAPTERS,
+    scenes_per_chapter: int = SCENES_PER_CHAPTER_MAX,
+    *,
+    book: books.BookPart | None = None,
+    digests: bool = False,
 ) -> int:
     """Generate calls of a run whose every chapter review fails until repair is spent: each chapter replanned
     PLAN_REPLANS times (regenerating its plan and every later one), every scene drafted and repaired in each review
@@ -2114,9 +2206,14 @@ def run_call_bound(
     plans = sum(1 + PLAN_REPLANS * c for c in range(1, chapters + 1)) * PLAN_CALLS
     scenes = chapters * scenes_per_chapter * (1 + REVIEW_CYCLES) * contracts
     reviews = chapters * contracts * (1 + REVIEW_CYCLES) * review
+    # The final scene rewritten for its ending, then, if the ending still does not close, the last chapter replanned
+    # once: its plan, its scenes in every review cycle and its reviews.
     ending = 1 + (1 + REVIEW_CYCLES) * review
+    ending += PLAN_CALLS + scenes_per_chapter * (1 + REVIEW_CYCLES) + (1 + REVIEW_CYCLES) * review
     late = 2 * NODE_CAPS["manuscript_review"] + NODE_CAPS["packaging"] + 1
     memory = 0
+    if book is None and digests:
+        memory = (chapters - 1) * NODE_CAPS["chapter_digest"]
     if book is not None:
         # ADR-0116: a digest per chapter and the part summary; part 1 also writes the book plan.
         memory = chapters * NODE_CAPS["chapter_digest"] + NODE_CAPS["part_summary"]
@@ -2247,11 +2344,12 @@ def story_length_findings(chapters: Sequence[Sequence[str]]) -> tuple[Finding, .
 
 
 def render_markdown(*, title: str, blurb: str, chapters: Sequence[Sequence[str]], first_chapter: int = 1) -> str:
-    """The exported manuscript: deterministic from the approved scene texts and the first title and blurb; a book
-    part numbers its chapters across the book."""
+    """The exported manuscript: deterministic from the approved scene texts and the chosen title and blurb, each scene
+    laid out in natural paragraphs (its words unchanged); a book part numbers its chapters across the book."""
     parts = [f"# {title}", "", f"> {blurb}", ""]
     for number, scenes in enumerate(chapters, start=first_chapter):
-        parts.extend([f"## Chương {number}", "", "\n\n* * *\n\n".join(scenes), ""])
+        laid = [natural_paragraphs(scene) for scene in scenes]
+        parts.extend([f"## Chương {number}", "", "\n\n* * *\n\n".join(laid), ""])
     return "\n".join(parts).rstrip() + "\n"
 
 

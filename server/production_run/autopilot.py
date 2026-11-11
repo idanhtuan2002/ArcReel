@@ -24,6 +24,7 @@ from lib.db.repositories.production_runs import ProductionRunRepository
 from lib.project_kinds import linked_story
 from r2.contracts.automation import RunCommand, RunSnapshot, RunStatus
 from r2.contracts.autopilot import AutopilotDelegation, autopilot_command_id, autopilot_command_prefix
+from server.story_authoring.idea_profile import PROFILE_SETTING
 
 logger = logging.getLogger(__name__)
 
@@ -175,14 +176,18 @@ class AutopilotPlanner:
                 raise AutopilotHalted("STORY_WITHOUT_BOOK")
             base = await self._base(delegation, len(own) + 1, part=1)
             story = delegation.story
-            return RunCommand.model_validate(
-                {
-                    **base,
-                    **({"idea": story.idea} if story.idea is not None else {"idea_mode": "auto"}),
-                    "book_chapters": story.book_chapters,
-                    "end_stage": "HANDOFF",
-                }
-            )
+            idea: dict[str, object] = {"idea": story.idea} if story.idea is not None else {"idea_mode": "auto"}
+            chapters = story.book_chapters
+            if story.idea is None:
+                # An idea drawn for this project earlier (an autopilot turned off and on again before part 1 was
+                # committed) is written again rather than replaced by a new one.
+                project = await asyncio.to_thread(self._load_project, delegation.project_name)
+                drawn = project.get(PROFILE_SETTING)
+                if isinstance(drawn, dict) and isinstance(drawn.get("idea"), str) and drawn["idea"].strip():
+                    idea = {"idea": _drawn_idea(drawn)}
+                    if chapters is None and isinstance(drawn.get("book_chapters"), int):
+                        chapters = drawn["book_chapters"]
+            return RunCommand.model_validate({**base, **idea, "book_chapters": chapters, "end_stage": "HANDOFF"})
         if parts.done >= parts.total:
             return None
         base = await self._base(delegation, len(own) + 1, part=parts.done + 1)
@@ -239,6 +244,15 @@ _STOPPED = {
     RunStatus.BLOCKED_UNKNOWN,
     RunStatus.BLOCKED_INPUT_CHANGED,
 }
+
+
+def _drawn_idea(drawn: dict[str, Any]) -> str:
+    """The brief idea of a profile drawn earlier, with its tone and readers as the drawn run wrote them."""
+    text = str(drawn["idea"]).strip()
+    tone, audience = drawn.get("tone"), drawn.get("audience")
+    if isinstance(tone, str) and isinstance(audience, str):
+        text += f"\n\nGiọng điệu: {tone}. Độc giả: {audience}."
+    return text[:4000]
 
 
 class AutopilotHalted(Exception):

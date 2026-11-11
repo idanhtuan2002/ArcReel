@@ -22,7 +22,7 @@ import unicodedata
 from collections.abc import Iterable, Sequence
 
 from server.story_authoring.genre_packs import genre_menu, pack_for
-from server.story_authoring.prompts.schemas import ChapterPlan, ShortOutline, StoryBibleOut, StorySeed
+from server.story_authoring.prompts.schemas import PLAN_LIST_MAX, ChapterPlan, ShortOutline, StoryBibleOut, StorySeed
 
 PLANNING_SYSTEM = (
     "Bạn là mô-đun lập kế hoạch cho một truyện ngắn tiếng Việt gồm đúng ba chương. "
@@ -55,7 +55,9 @@ Yêu cầu:
   hoặc quan hệ, ghi "chính là nhân vật chính" cho nhân vật chính), description, goal, gender ("nam" hoặc "nữ") và
   address: từ lời kể dùng để gọi nhân vật ngoài tên ("anh", "chị", "cô", "ông", "bà", "cậu", "em"...), hợp giới
   tính và tuổi. Giới tính theo đúng ý tưởng: ý tưởng gọi nhân vật là "anh", "ông", "chồng"... thì là nam; "chị",
-  "cô", "bà", "vợ"... thì là nữ; ý tưởng không nói thì tự chọn rồi giữ nguyên suốt truyện.
+  "cô", "bà", "vợ"... thì là nữ; ý tưởng không nói thì tự chọn rồi giữ nguyên suốt truyện. voice: cách nhân vật
+  nói (câu ngắn hay dài, từ hay dùng, cách xưng hô), tối đa 20 chữ, mỗi người một giọng khác nhau; flaw: một tật
+  xấu hoặc điểm yếu thật, ảnh hưởng tới quyết định của họ, tối đa 20 chữ.
 - locations: 1–4 địa điểm có name và description.
 - Bám sát ý tưởng của tác giả: giữ nguyên tên, tuổi, mốc thời gian và chi tiết họ đã nêu.
 
@@ -140,7 +142,7 @@ Quy tắc:
 - Nhân vật không được biết điều họ chưa thể biết.
 - required_changes_by_end, withheld_cards và do_not không được mâu thuẫn nhau: điều bắt buộc xảy ra không được
   nằm trong danh sách cấm hay bài giữ kín, và lời thoại hay hành động bắt buộc không được để lộ bài giữ kín.
-- withheld_cards và do_not tối đa 3 mục mỗi loại, ngắn gọn; chapter_goal và summary của cảnh không được kể ra nội
+- withheld_cards và do_not tối đa {PLAN_LIST_MAX} mục mỗi loại (có thể để trống), ngắn gọn; chapter_goal và summary của cảnh không được kể ra nội
   dung của bài giữ kín.
 - location chỉ được chọn trong: {", ".join(location_names)}.
 - pov và characters chỉ được chọn trong: {", ".join(character_names)}.{ending}

@@ -57,6 +57,7 @@ from server.story_authoring.contracts import (
 )
 from server.story_authoring.driver import (
     CHAPTERS,
+    NODE_CAPS,
     StoryBrief,
     StoryPrior,
     run_call_bound,
@@ -325,8 +326,21 @@ class StoryAuthoringService:
                     "wall_clock_max_seconds": limits.wall_clock_max_seconds + extra_calls * SECONDS_PER_CALL,
                 }
             )
+        carries_digests = part is None and prior is None
         if part is not None:
             limits = book_limits(limits, part)
+        elif carries_digests:
+            # Stage-by-stage F3: a short story digests its chapters before the last.
+            extra = (CHAPTERS - 1) * NODE_CAPS["chapter_digest"]
+            limits = limits.model_copy(
+                update={
+                    "generate_calls_max": limits.generate_calls_max + extra,
+                    "count_calls_max": limits.count_calls_max + extra,
+                    "input_tokens_max": limits.input_tokens_max + extra * limits.max_input_tokens,
+                    "output_tokens_max": limits.output_tokens_max + extra * limits.max_output_tokens,
+                    "wall_clock_max_seconds": limits.wall_clock_max_seconds + extra * SECONDS_PER_CALL,
+                }
+            )
         safety = self.content_safety(project_name) if project_name is not None else DEFAULT_CONTENT_SAFETY
         return StoryBrief(
             content_safety=safety,
@@ -339,6 +353,7 @@ class StoryAuthoringService:
             limits=limits,
             cloud_profiles=tuple(profiles),
             prior=prior,
+            carries_digests=carries_digests,
         )
 
     async def draw_cost_bound(self, *, provider_id: str, model_id: str) -> int:

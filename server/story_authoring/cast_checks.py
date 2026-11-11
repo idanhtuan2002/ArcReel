@@ -144,6 +144,30 @@ def fix_near_names(text: str, allowed: set[str]) -> str:
     return text
 
 
+PROTAGONIST_MARK = "chính là nhân vật chính"
+
+
+def seed_problems(seed: StorySeed) -> list[str]:
+    """What a seed lacks as a foundation, every problem at once (donor shenbi 19f192e seed structural validation,
+    foundation review): one protagonist, a conflict and an ending of their own rather than the premise restated,
+    and characters who do not all speak alike."""
+    problems: list[str] = []
+    leads = [c.name for c in seed.characters if PROTAGONIST_MARK in _fold(c.relation_to_protagonist).casefold()]
+    if len(leads) != 1:
+        problems.append(f"đúng một nhân vật ghi relation_to_protagonist là “{PROTAGONIST_MARK}”")
+    premise = _content_words(seed.premise)
+    for field, text in (("central_conflict", seed.central_conflict), ("ending_direction", seed.ending_direction)):
+        own = _content_words(text)
+        if premise and own and len(premise & own) / len(premise | own) >= 0.8:
+            problems.append(f"{field} phải cụ thể hơn, không chép lại premise")
+    voices = [(c.name, _content_words(c.voice)) for c in seed.characters if c.voice]
+    for i, (name, words) in enumerate(voices):
+        for other, other_words in voices[i + 1 :]:
+            if words and other_words and len(words & other_words) / len(words | other_words) >= 0.6:
+                problems.append(f"giọng nói của {name} và {other} phải khác nhau")
+    return problems
+
+
 #: Word overlap at or above which a required change restates a ban or a secret.
 CONFLICT_OVERLAP = 0.5
 _STOP = frozenset(
@@ -296,4 +320,5 @@ __all__ = [
     "idea_names",
     "missing_idea_names",
     "plan_conflicts",
+    "seed_problems",
 ]

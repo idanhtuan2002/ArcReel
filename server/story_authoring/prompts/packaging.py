@@ -11,6 +11,8 @@ finding while the export leads with an unflagged blurb.
 
 from __future__ import annotations
 
+from collections.abc import Sequence
+
 from server.story_authoring.prompts.schemas import Packaging
 
 PACKAGING_SYSTEM = (
@@ -41,3 +43,44 @@ def unverified_selling_points(packaging: Packaging, manuscript: str) -> list[str
     """Selling points whose evidence quote does not occur verbatim in the manuscript."""
     normalized = " ".join(manuscript.split())
     return [p.point for p in packaging.selling_points if " ".join(p.evidence_quote.split()) not in normalized]
+
+
+#: Words that make a hollow title when a title holds nothing else (donor huohuo bans abstract, selling-point-free
+#: titles).
+HOLLOW_TITLE_WORDS = frozenset(
+    {"thời gian", "năm tháng", "kỷ niệm", "giấc mơ", "bến bờ", "vô đề", "tâm tư", "ký ức", "cuộc đời", "định mệnh"}
+)
+
+
+def title_problems(title: str, cast_names: Sequence[str]) -> list[str]:
+    """Why a title breaks the packaging prompt's own rules: 2–8 Vietnamese syllables, no repeated syllable, not only a
+    character's name, not only hollow words."""
+    from server.story_authoring.checks import count_syllables, is_vietnamese_syllable
+
+    problems: list[str] = []
+    words = title.split()
+    names = {w.casefold() for name in cast_names for w in name.split()}
+    if not 2 <= count_syllables(title) <= 8:
+        problems.append("tên phải dài 2–8 tiếng")
+    tokens = [w.strip(".,:;!?—–-“”\"'()").casefold() for w in words]
+    tokens = [t for t in tokens if t]
+    if any(not is_vietnamese_syllable(t) and t not in names for t in tokens):
+        problems.append("tên chỉ dùng chữ tiếng Việt")
+    if len(set(tokens)) != len(tokens):
+        problems.append("tên không lặp chữ")
+    if tokens and all(t in names for t in tokens):
+        problems.append("tên không chỉ là tên nhân vật")
+    rest = " ".join(t for t in tokens if t not in names)
+    if rest and all(phrase in HOLLOW_TITLE_WORDS for phrase in _phrases(rest)):
+        problems.append("tên phải gợi ra câu chuyện, không chỉ là từ trừu tượng")
+    return problems
+
+
+def _phrases(text: str) -> list[str]:
+    words = text.split()
+    return [" ".join(words[i : i + 2]) for i in range(0, len(words), 2)]
+
+
+def best_title(packaging: Packaging, cast_names: Sequence[str], fallback: str) -> str:
+    """The first offered title that keeps the rules, else the seed's working title."""
+    return next((t.title for t in packaging.titles if not title_problems(t.title, cast_names)), fallback)

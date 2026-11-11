@@ -683,8 +683,15 @@ def trim_unterminated_tail(text: str) -> str:
     return match.group(1).rstrip() if match else text
 
 
+_INLINE_QUOTE = re.compile(r"“[^”]{2,}”")
+
+
 def dialogue_lines(text: str) -> int:
-    return len(_DIALOGUE_LINE.findall(text))
+    """Dialogue in the scene: lines that open with a dash or a quote, and quoted speech inside a narration block."""
+    inline = sum(
+        1 for m in _INLINE_QUOTE.finditer(text) if text[text.rfind("\n", 0, m.start()) + 1 : m.start()].strip()
+    )
+    return len(_DIALOGUE_LINE.findall(text)) + inline
 
 
 def _bare(text: str) -> str:
@@ -761,6 +768,18 @@ def check_scene_prose(
         )
         for h in find_cjk(text)[:1]
     ]
+    if "\ufffd" in text:
+        # A broken character from the transport (donor huohuo novel-replacement-char).
+        index = text.index("\ufffd")
+        findings.append(
+            Finding(
+                "REPLACEMENT_CHAR",
+                Severity.HARD_INTEGRITY,
+                node_id,
+                "broken character (U+FFFD) in prose",
+                text[max(0, index - 20) : index + 20],
+            )
+        )
     if not ends_cleanly(text):
         findings.append(
             Finding(

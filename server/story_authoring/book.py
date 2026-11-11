@@ -170,6 +170,8 @@ _GeneratedCharacter = create_model(
     __base__=SeedCharacter,
     gender=(Literal["nam", "nữ"], ...),
     address=(str, Field(min_length=1, max_length=16)),
+    voice=(str, Field(min_length=1, max_length=120)),
+    flaw=(str, Field(min_length=1, max_length=120)),
 )
 
 
@@ -529,6 +531,21 @@ def memory_block(
     return "\n".join(lines) if len(lines) > 1 else ""
 
 
+def short_memory_block(digests: Sequence[tuple[int, ChapterDigest]], *, names: Sequence[str] = ()) -> str:
+    """What a short story's earlier chapters wrote, for the next chapter's scenes (stage-by-stage F3)."""
+    if not digests:
+        return ""
+    lines = ["[Đã xảy ra ở các chương trước — viết tiếp cho khớp]"]
+    lines.extend(f"- Chương {c}: {d.summary}" for c, d in digests)
+    last = digests[-1][1]
+    lines.append(f"Thời gian, nơi chốn khi chương {digests[-1][0]} kết thúc: {last.time_place}")
+    states = [ch for ch in last.characters if not names or ch.name in names]
+    if states:
+        lines.append("Trạng thái nhân vật:")
+        lines.extend(f"- {ch.name}: {ch.state}" for ch in states)
+    return "\n".join(lines)
+
+
 class BookState(_Frozen):
     """What a part commits for the next one: the plan, the cast, the bibles and the memory after the part."""
 
@@ -572,4 +589,5 @@ __all__ = [
     "part_outline",
     "plan_problems",
     "settle_plan",
+    "short_memory_block",
 ]

@@ -74,8 +74,8 @@ def test_a_generated_seed_and_a_volumes_new_characters_state_gender_and_address_
     with pytest.raises(ValidationError):
         seed.model_validate({**base, "characters": [character, {**character, "name": "Lan"}]})
     gendered = [
-        {**character, "gender": "nam", "address": "anh"},
-        {**character, "name": "Lan", "gender": "nữ", "address": "cô"},
+        {**character, "gender": "nam", "address": "anh", "voice": "nói ngắn", "flaw": "nóng nảy"},
+        {**character, "name": "Lan", "gender": "nữ", "address": "cô", "voice": "nói nhỏ", "flaw": "cả nể"},
     ]
     assert seed.model_validate({**base, "characters": gendered}).characters[0].gender == "nam"
     schema = bound_book_outline(2).model_json_schema()
@@ -164,3 +164,69 @@ def test_certain_cast_errors_are_fixed_without_a_model_call():
     assert fix_near_names("Minh đi. Lúc ấy Mạnh quay lại, rồi Mạnh cười.", {"Minh", "Lan"}) == (
         "Minh đi. Lúc ấy Minh quay lại, rồi Minh cười."
     )
+
+
+def test_a_seed_without_one_protagonist_a_conflict_of_its_own_or_distinct_voices_is_drawn_again():
+    from server.story_authoring.cast_checks import seed_problems
+    from server.story_authoring.prompts.schemas import SeedLocation, StorySeed
+
+    lead = MINH.model_copy(update={"voice": "nói ngắn, ít cảm thán"})
+    sister = LAN.model_copy(update={"voice": "nói nhỏ, hay hỏi lại"})
+    seed = StorySeed(
+        working_title="t",
+        premise="Minh về làng bán căn nhà của cha",
+        genre="g",
+        tone="t",
+        pov="p",
+        central_conflict="Lan muốn giữ nhà để thờ cha, Minh cần tiền trả nợ",
+        ending_direction="Minh giữ nhà và tự trả nợ",
+        characters=[lead, sister],
+        locations=[SeedLocation(name="Nhà", description="d")],
+    )
+    assert seed_problems(seed) == []
+    restated = seed.model_copy(update={"central_conflict": "Minh về làng bán căn nhà của cha"})
+    assert seed_problems(restated) == ["central_conflict phải cụ thể hơn, không chép lại premise"]
+    same = seed.model_copy(update={"characters": [lead, sister.model_copy(update={"voice": "nói ngắn, ít cảm thán"})]})
+    assert seed_problems(same) == ["giọng nói của Minh và Lan phải khác nhau"]
+    two = seed.model_copy(
+        update={"characters": [lead, sister.model_copy(update={"relation_to_protagonist": "chính là nhân vật chính"})]}
+    )
+    assert len(seed_problems(two)) == 1
+
+
+def test_a_title_must_keep_the_packaging_rules():
+    from server.story_authoring.prompts.packaging import best_title, title_problems
+    from server.story_authoring.prompts.schemas import Packaging
+
+    assert title_problems("Căn nhà cũ", ["Minh"]) == []
+    assert title_problems("Học sinh thứ mười ba", ["Minh"]) == []
+    assert title_problems("Minh", ["Minh"])
+    assert title_problems("Ký ức", ["Minh"])
+    assert title_problems("Bóng Bóng Đêm", ["Minh"])
+    assert title_problems("The Ghost", ["Minh"])
+    point = {"point": "p", "evidence_quote": "q"}
+    packaging = Packaging.model_validate(
+        {
+            "titles": [
+                {"title": "Ký ức", "kind": "k"},
+                {"title": "Căn nhà cũ", "kind": "k"},
+                {"title": "Minh", "kind": "k"},
+            ],
+            "blurbs": ["b1", "b2"],
+            "selling_points": [point, point, point],
+            "tags": ["a", "b", "c", "d", "e"],
+        }
+    )
+    assert best_title(packaging, ["Minh"], "Tên tạm") == "Căn nhà cũ"
+
+
+def test_inline_speech_counts_as_dialogue_and_a_broken_character_is_an_integrity_finding():
+    from server.story_authoring.checks import SceneLengthWindow, check_scene_prose, dialogue_lines
+    from server.story_authoring.repair import PATCH_SYSTEM
+
+    assert dialogue_lines("Minh đứng dậy. “Đi thôi,” anh nói rồi mở cửa.") == 1
+    assert dialogue_lines("Minh đứng dậy rồi mở cửa.") == 0
+    window = SceneLengthWindow(minimum=1, maximum=10_000, hard_maximum=20_000)
+    found = check_scene_prose("Minh đứng d�y rồi đi.", node_id="s", window=window, allowed_names={"Minh"})
+    assert "REPLACEMENT_CHAR" in {f.code for f in found}
+    assert "phủ định" in PATCH_SYSTEM

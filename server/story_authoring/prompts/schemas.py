@@ -30,6 +30,10 @@ class SeedCharacter(_Out):
     gender: Literal["nam", "nữ"] | None = None
     #: The word the narration calls the character by besides the name ("anh", "cô", "bà", "ông", "cậu"...).
     address: str | None = Field(default=None, min_length=1, max_length=16)
+    #: How the character speaks, and a real flaw that shapes their decisions (donor shenbi: a speech fingerprint
+    #: for every major character). Seeds stored before these carry neither.
+    voice: str | None = Field(default=None, min_length=1, max_length=120)
+    flaw: str | None = Field(default=None, min_length=1, max_length=120)
 
     def locked_line(self) -> str:
         """What the narration may never change about the character: who they are to the protagonist, their gender
@@ -40,7 +44,12 @@ class SeedCharacter(_Out):
             if self.address:
                 identity += f", lời kể gọi là “{self.address}”"
             identity += ". "
-        return f"{self.relation_to_protagonist}. {identity}{self.description}"
+        line = f"{self.relation_to_protagonist}. {identity}{self.description}"
+        if self.voice:
+            line += f" Cách nói: {self.voice}."
+        if self.flaw:
+            line += f" Điểm yếu: {self.flaw}."
+        return line
 
 
 class SeedLocation(_Out):

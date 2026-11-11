@@ -67,6 +67,14 @@ PRIOR_TEXT = (
     "Hai anh em tìm thấy cuốn sổ nợ trong hòm áo cũ. Trang cuối ghi tên một người lạ.\n\n"
     "Đêm đó, có tiếng gõ cửa. Minh mở cửa và không thấy ai, chỉ có một phong thư."
 )
+CHAPTER_DIGEST = {
+    "summary": "Minh về căn nhà cũ và thấy cuốn sổ nợ của cha.",
+    "events": ["Minh về làng."],
+    "characters": [{"name": "Minh", "state": "cầm cuốn sổ"}],
+    "hooks": [],
+    "new_threads": [],
+    "time_place": "chiều tối, căn nhà cũ",
+}
 PRIOR_SUMMARY = {
     "events": ["Minh về làng.", "Hai anh em tìm thấy sổ nợ.", "Có người để lại phong thư."],
     "characters": [{"name": "Minh", "state": "đang cầm phong thư"}, {"name": "Lan", "state": "lo lắng"}],
@@ -157,11 +165,13 @@ STRUCTURED: dict[str, Any] = {
             {
                 "name": "Minh",
                 "role": "chính",
-                "relation_to_protagonist": "nhân vật chính",
+                "relation_to_protagonist": "chính là nhân vật chính",
                 "description": "con trai cả",
                 "goal": "bán nhà",
                 "gender": "nam",
                 "address": "anh",
+                "voice": "nói ngắn, ít cảm thán",
+                "flaw": "ngại đối mặt chuyện cũ",
             },
             {
                 "name": "Lan",
@@ -171,6 +181,8 @@ STRUCTURED: dict[str, Any] = {
                 "goal": "giữ nhà",
                 "gender": "nữ",
                 "address": "cô",
+                "voice": "nói nhỏ, hay hỏi lại",
+                "flaw": "giữ mọi chuyện trong lòng",
             },
         ],
         "locations": [{"name": "Căn nhà cũ", "description": "nhà ba gian"}],
@@ -285,6 +297,8 @@ class ScriptedModel:
             return {"rewrites": []}
         if kind == "contradicted":
             return {"missing": [], "contradicted": [], "notes": []}
+        if kind == "time_place":
+            return CHAPTER_DIGEST
         if kind == "events":
             return PRIOR_SUMMARY
         if kind == "title_hint":
@@ -302,6 +316,7 @@ class ScriptedModel:
                 k
                 for k in (
                     *STRUCTURED,
+                    "time_place",
                     "events",
                     "title_hint",
                     "confirmed",
@@ -365,13 +380,15 @@ async def _store(factory: Factory, limits: StoryLimits = LIMITS) -> RunStateStor
     return store
 
 
-def _driver(factory: Factory, store: RunStateStore, model: ScriptedModel, blobs: StoryBlobStore) -> StoryRunDriver:
+def _driver(
+    factory: Factory, store: RunStateStore, model: ScriptedModel, blobs: StoryBlobStore, brief: StoryBrief = BRIEF
+) -> StoryRunDriver:
     client = OllamaChatClient(base_url="http://ollama:1", transport=httpx.MockTransport(model.handler))
     sink = StoryAttemptSink(store=store, session_factory=factory, provider_id="custom-ollama", model_id=MODEL)
     gateway = AuthoringTextGateway(selection=SELECTION, limits=LIMITS, client=client, sink=sink)
     return StoryRunDriver(
         identity=IDENTITY,
-        brief=BRIEF,
+        brief=brief,
         store=store,
         gateway=gateway,
         blobs=blobs,
@@ -408,10 +425,34 @@ async def test_a_clean_run_converges_and_offers_one_manifest(concurrent_session_
         "## Chương 2",
         "## Chương 3",
     ]
-    assert all(s.revision.normalized_content in export for s in manifest.scenes)
+    flat = " ".join(export.split())
+    assert all(" ".join(s.revision.normalized_content.split()) in flat for s in manifest.scenes)
     assert model.calls["prose"] == 9
     assert model.calls["issues"] == 18
     assert (model.calls["ending_resolves_conflict"], model.calls["titles"]) == (1, 1)
+
+
+async def test_a_short_story_carries_what_each_chapter_wrote_into_the_next(
+    concurrent_session_factory: Factory, tmp_path
+):
+    store = await _store(concurrent_session_factory)
+    model = ScriptedModel()
+    brief = BRIEF.model_copy(update={"carries_digests": True})
+
+    state = await _driver(concurrent_session_factory, store, model, StoryBlobStore(tmp_path), brief).run()
+
+    assert state.phase is RunPhase.READY_FOR_APPROVAL, state.block_reason
+    assert model.calls["time_place"] == 2  # chapters 1 and 2; the last chapter has no next one
+    later = [prompt for kind, prompt in model.prompts if kind == "prose" and "[Đã xảy ra ở các chương trước" in prompt]
+    assert len(later) == 6
+    assert all(CHAPTER_DIGEST["summary"] in prompt for prompt in later)
+    assert "chiều tối, căn nhà cũ" in later[0]
+    continuity = [p for kind, p in model.prompts if kind == "issues" and "[Chương 2 cần thẩm định]" in p]
+    assert any(CHAPTER_DIGEST["summary"] in p for p in continuity)
+    again = ScriptedModel()
+    await _rerun(store)
+    await _driver(concurrent_session_factory, store, again, StoryBlobStore(tmp_path), brief).run()
+    assert sum(again.calls.values()) == 0
 
 
 async def test_a_second_run_of_a_converged_story_calls_no_model(concurrent_session_factory: Factory, tmp_path):
@@ -595,7 +636,9 @@ async def test_an_ending_that_stays_unresolved_reaches_the_human_after_the_rewri
     state = await _driver(concurrent_session_factory, store, model, blobs).run()
 
     assert state.phase is RunPhase.READY_FOR_APPROVAL, state.block_reason
-    assert (model.calls["prose"], model.calls["ending_resolves_conflict"]) == (10, 2)
+    # The final scene is rewritten once, then the last chapter is replanned once toward the outline's ending (here
+    # the scripted plan comes back the same, so its scenes stand) and the ending is judged a third time.
+    assert (model.calls["prose"], model.calls["ending_resolves_conflict"]) == (10, 3)
     flagged = [f for f in _exceptions(blobs, state) if f["code"] == "NO_ENDING"]
     assert [f["severity"] for f in flagged] == ["NARRATIVE_CRITICAL"]
     assert flagged[0]["message"].startswith("[hết lượt sửa tự động] ")

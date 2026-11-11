@@ -42,7 +42,7 @@ Trả về:
 - volumes: đúng {len(volumes)} quyển theo thứ tự; mỗi quyển có title, objective (mục tiêu của quyển), 3–5 key_results
   (kết quả cụ thể phải đạt trong quyển), turning_point (bước ngoặt cuối quyển, đẩy sang quyển sau), new_characters
   và new_locations (tối đa 3 mỗi loại, chỉ khi quyển cần người hay nơi mới; không lặp tên đã có; nhân vật mới có
-  gender và address như trong seed).
+  gender, address, voice và flaw như trong seed).
 Quy tắc: mỗi quyển leo thang so với quyển trước; xung đột trung tâm chỉ được giải ở quyển cuối; không có quyển
 chuyển tiếp; giữ đúng tên, tuổi, giới tính, cách gọi và quan hệ của seed.
 

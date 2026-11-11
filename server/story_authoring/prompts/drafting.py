@@ -23,7 +23,7 @@ from collections.abc import Mapping, Sequence
 
 from r2.contracts import NarrativeContextPack
 from r2.contracts.narrative_context import ContextChannel, NarrativeContextSegment
-from server.story_authoring.prompts.schemas import ChapterPlan, PlannedScene
+from server.story_authoring.prompts.schemas import ChapterPlan, PlannedScene, StoryBibleOut, StorySeed, StyleBibleOut
 
 DRAFT_SYSTEM = (
     "Bạn là người viết văn xuôi tiếng Việt cho một truyện ngắn. Bạn chỉ được dựa vào phần Bối cảnh được cung cấp, "
@@ -95,10 +95,12 @@ def render_context(
             style.append(f"- {segment.content}")
         elif segment.channel is ContextChannel.RECENT_ACCEPTED:
             earlier.append(segment.content)
+    # The pack's beats are sorted for the contract; the scene prompt shows them in plan order, so they are not
+    # repeated here out of order.
+    del beats
     parts = [
         "[Sự thật đã khóa]\n" + ("\n".join(facts) or "(không có)"),
         "[Mục đích cảnh]\n" + ("\n".join(intent) or "(không có)"),
-        "[Nhịp bắt buộc]\n" + ("\n".join(beats) or "(không có)"),
         "[Quy tắc văn phong]\n" + ("\n".join(style) or "(không có)"),
     ]
     if earlier:
@@ -143,6 +145,30 @@ def paragraph_max_chars(target_syllables: int) -> int:
     return min(PARAGRAPH_MAX_CHARS, int(HARD_MAXIMUM_SYLLABLES * CHARS_PER_SYLLABLE / count))
 
 
+VOICE_MAX_CHARS = 700
+
+
+def voice_block(seed: StorySeed, style: StyleBibleOut, bible: StoryBibleOut) -> str:
+    """The story's voice, given to the writer of every scene and to every repair (donors: shenbi injects the style
+    profile into each drafting package, huohuo puts its prose guide in every writer call)."""
+    lines = [
+        "[Giọng truyện — giữ suốt cảnh]",
+        f"- Ngôi kể: {_opening(seed.pov, 140)}. Không đổi ngôi kể; kể ngôi thứ ba thì lời kể không xưng “tôi”.",
+        f"- Giọng điệu: {_opening(seed.tone, 140)}",
+        f"- Lối kể: {_opening(style.narration_style, 140)}",
+        f"- Nhịp câu: {_opening(style.sentence_rhythm, 140)}",
+        f"- Cảm xúc: {_opening(style.emotional_texture, 140)}",
+        f"- Lời thoại: {_opening(style.dialogue_style, 140)}",
+    ]
+    if style.forbidden_style:
+        lines.append(f"- Tránh lối viết: {_opening('; '.join(style.forbidden_style[:4]), 160)}")
+    contradictions = [f"- {_opening(c, 120)}" for c in bible.forbidden_contradictions[:4]]
+    if contradictions:
+        lines += ["[Không được mâu thuẫn]", *contradictions]
+    block = "\n".join(lines)
+    return block if len(block) <= VOICE_MAX_CHARS else block[:VOICE_MAX_CHARS].rsplit("\n", 1)[0]
+
+
 def scene_draft_prompt(
     *,
     context: str,
@@ -155,13 +181,30 @@ def scene_draft_prompt(
     target_syllables: int,
     revision_note: str | None = None,
     genre_rules: Sequence[str] = (),
+    voice: str = "",
+    chapter_first: bool = False,
+    story_first: bool = False,
 ) -> str:
     duties: list[str] = []
+    # Position duties (donor huohuo chapter beat rules): open on pressure, join the seam, stop on a hook.
+    if story_first:
+        duties.append(
+            "Đoạn đầu tiên mở bằng một lời thoại hoặc một hành động va chạm; tả cảnh tối đa một câu; không mở bằng "
+            "giới thiệu hoàn cảnh hay hồi tưởng."
+        )
+    elif chapter_first:
+        duties.append(
+            "Câu đầu nối ngay sau điều vừa xảy ra cuối chương trước (nói rõ thời gian đã trôi nếu có), không kể lại; "
+            "câu thứ hai vào xung đột hoặc lời thoại."
+        )
     if is_last_scene_of_chapter:
         changes = "; ".join(plan.required_changes_by_end)
         duties.append(f"Cảnh này kết thúc chương {chapter_number}: trước khi hết cảnh phải xảy ra: {changes}.")
         if not is_final_scene:
-            duties.append("Kết cảnh bằng một móc nối cụ thể khiến người đọc muốn đọc chương sau.")
+            duties.append(
+                "Dừng ở một câu hỏi chưa có lời đáp hoặc một nguy cơ sắp tới, cụ thể, khiến người đọc muốn đọc chương "
+                "sau; không kết bằng cảm xúc lắng xuống, không tổng kết, không suy ngẫm."
+            )
     if is_final_scene:
         duties.append("Đây là cảnh cuối của truyện: khép lại xung đột trung tâm một cách trọn vẹn, không bỏ lửng.")
     if plan.withheld_cards:
@@ -183,6 +226,8 @@ def scene_draft_prompt(
   thúc trọn câu.
 {chr(10).join("- " + duty for duty in duties)}
 {note}
+{voice}
+
 [Quy tắc cứng]
 {chr(10).join("- " + rule for rule in HARD_RULES)}
 
@@ -197,3 +242,30 @@ def target_syllables_for(scenes: Sequence[PlannedScene], *, story_target: int = 
     """Even split of the story target across the chapter's scenes, clamped to the scene window."""
     per_chapter = story_target // chapters
     return max(600, min(1000, per_chapter // max(1, len(scenes))))
+
+
+def scene_repair_context(
+    facts: str, *, plan: ChapterPlan, scene: PlannedScene, is_last: bool, voice: str, kept: Sequence[str] = ()
+) -> str:
+    """What a review-driven repair of one scene must keep: the locked facts, the scene's own contract in plan order,
+    the chapter's secrets and bans, the story's voice, and the fixes earlier rounds made (donor shenbi 0cdc218: an
+    anti-regression list keeps a retry from undoing what an earlier round fixed)."""
+    parts = [
+        "[Sự thật đã khóa]\n" + facts,
+        "[Cảnh này]\n"
+        + f"- Diễn biến: {scene.summary}\n- Nhịp: {'; '.join(scene.beats)}\n- Chuyển biến cảm xúc: {scene.emotional_turn}",
+    ]
+    duties = []
+    if plan.withheld_cards:
+        duties.append("Giữ kín, chưa hé lộ: " + "; ".join(plan.withheld_cards))
+    if plan.do_not:
+        duties.append("Tránh: " + "; ".join(plan.do_not))
+    if is_last:
+        duties.append("Trước khi hết cảnh phải xảy ra: " + "; ".join(plan.required_changes_by_end))
+    if duties:
+        parts.append("[Ràng buộc của chương]\n" + "\n".join(f"- {d}" for d in duties))
+    if voice:
+        parts.append(voice)
+    if kept:
+        parts.append("[Đã sửa ở vòng trước — giữ nguyên, không làm hỏng lại]\n" + "\n".join(f"- {k}" for k in kept))
+    return "\n\n".join(parts)

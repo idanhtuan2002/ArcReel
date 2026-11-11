@@ -208,6 +208,7 @@ Trả về JSON đúng schema:
 Quy tắc:
 - "before" phải chép nguyên văn từ phần [Văn bản cần sửa], kể cả dấu câu.
 - Mỗi bản sửa chỉ sửa một chỗ; độ dài "after" chênh không quá 30% so với "before"; giữ nguyên xuống dòng và đoạn văn.
+- Không đổi sự thật của câu: ai làm, khi nào, trong điều kiện nào, phạm vi, phủ định, lời của ai; điều nhân vật chỉ đoán không được thành điều họ biết chắc.
 - Lỗi về tình tiết, địa điểm, hành động nhân vật: lấy sự thật đã khóa trong bối cảnh làm chuẩn và sửa trọn đoạn liên quan, không được chỉ đổi một từ mà để lại mâu thuẫn.
 - Nếu cần sửa nhiều chỗ mới nhất quán, trả về 2–4 bản sửa; nếu không định vị được thì trả "patches" rỗng.
 - Chỉ viết tiếng Việt; không thêm nhân vật, sự kiện hay tên riêng mới."""

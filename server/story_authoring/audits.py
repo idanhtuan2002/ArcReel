@@ -135,7 +135,8 @@ _INSTRUCTIONS: dict[AuditDimension, str] = {
     AuditDimension.CHARACTER: (
         "Thẩm định NHÂN VẬT VÀ ĐỘNG CƠ. Lỗi: hành động hoặc lời nói trái tính cách đã xây dựng; giọng nói hoặc cách xưng "
         "hô đổi đột ngột; nhân vật phụ bị làm ngốc đi để đẩy cốt truyện; hành động không có lý do mà người đọc suy ra "
-        "được từ mong muốn, nỗi sợ hay niềm tin của nhân vật; chuỗi hành động - hậu quả - phản ứng bị đứt."
+        "được từ mong muốn, nỗi sợ hay niềm tin của nhân vật; chuỗi hành động - hậu quả - phản ứng bị đứt; người ngoài gia đình gọi nhân vật bằng từ xưng hô chỉ người trong "
+        "nhà mới dùng."
     ),
     AuditDimension.CRAFT: (
         "Thẩm định KỸ THUẬT VÀ SỨC KÉO (ADR-0117). Lỗi: đoạn mở chương không kéo người đọc vào ngay (mở bằng tả cảnh hay "

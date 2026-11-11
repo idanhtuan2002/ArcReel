@@ -1,15 +1,18 @@
 """Owner adapters from a run's idea to a committed manuscript handed to the video flow.
 
-- ``BRIEF``: draft the brief from the run's idea and frozen writer route, store its exact bytes and
-  greenlight that digest at Gate A under the run's automation grant.
+- ``BRIEF``: draft the brief from the run's idea (drawn on the writer route when the run has none, ADR-0125) and
+  frozen writer route, store its exact bytes and greenlight that digest at Gate A under the run's automation grant.
 - ``STORY``: start the greenlit story run; it passes only when the story owner offers a manifest
-  (``READY_FOR_APPROVAL``). A succeeded queue task never stands in for the story phase.
-- ``STORY_COMMIT``: approve the offered manifest through ``AutomaticNarrativeAuthority``. A manifest with offered
-  exceptions or open findings is never approved automatically.
+  (``READY_FOR_APPROVAL``). A succeeded queue task never stands in for the story phase. A free-route story blocked on
+  its budget below its structural bound is topped up and goes on (ADR-0127).
+- ``STORY_COMMIT``: approve the offered manifest through ``AutomaticNarrativeAuthority``. Open findings and offered
+  exceptions are accepted as is only when the manifest's exact quality record names each with a non-hard severity
+  (never a hard finding, never a safety finding above stylistic).
 - ``HANDOFF``: hand the committed manuscript to the project's sources once.
 
-The story keeps its own limits; they are cut from the run's caps, and the parent run settles the story step once
-from the story's own charged usage, so story calls are never debited twice.
+A story-only run keeps its story's whole structural bound; a run that goes on to film cuts the story to half of the
+run's caps. The parent run settles each story step from the story's own charged usage (after a top-up, only what was
+spent since), so story calls are never debited twice.
 """
 
 from __future__ import annotations

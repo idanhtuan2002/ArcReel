@@ -51,7 +51,7 @@ class _Service:
         return self._story
 
 
-def _planner(sessions, service, *, parts=None, episodes=(), unplanned=False, conflicts=(), link="story-a"):
+def _planner(sessions, service, *, parts=None, episodes=(), unplanned=False, conflicts=(), link="story-a", extra=None):
     from server.production_run.autopilot import AutopilotPlanner
 
     async def book_parts(user_id, project_name):
@@ -64,6 +64,7 @@ def _planner(sessions, service, *, parts=None, episodes=(), unplanned=False, con
         return 4
 
     project = {"project_kind": "film", "story_project": link, "episodes": [{"episode": n} for n in episodes]}
+    project.update(extra or {})
     return AutopilotPlanner(
         sessions,
         service,
@@ -173,6 +174,27 @@ async def test_a_story_autopilot_without_an_idea_starts_part_one_drawing_its_own
         None,
         "HANDOFF",
     )
+
+
+async def test_an_autopilot_turned_on_again_writes_the_idea_drawn_earlier(session_factory):
+    from r2.contracts.autopilot import StoryAutopilot
+
+    delegation = _delegation().model_copy(update={"story": StoryAutopilot()})
+    drawn = {
+        "idea": "Một lái đò già chở người khách cuối cùng.",
+        "tone": "hồi hộp",
+        "audience": "phổ thông",
+        "book_chapters": 18,
+    }
+    _state, command = await _planner(session_factory, _Service(story=False), extra={"story_profile": drawn}).state(
+        delegation
+    )
+    assert command is not None
+    assert command.idea_mode == "given"
+    assert command.idea is not None
+    assert command.idea.startswith(drawn["idea"])
+    assert "Giọng điệu: hồi hộp" in command.idea
+    assert command.book_chapters == 18
 
 
 @pytest.mark.parametrize("parts", [None, (0, 3)])
