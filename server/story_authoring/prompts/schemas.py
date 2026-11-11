@@ -34,6 +34,8 @@ class SeedCharacter(_Out):
     #: for every major character). Seeds stored before these carry neither.
     voice: str | None = Field(default=None, min_length=1, max_length=120)
     flaw: str | None = Field(default=None, min_length=1, max_length=120)
+    #: Age in years when the story opens (donor huohuo stable cast facts). Seeds stored before it carry none.
+    age: int | None = Field(default=None, ge=0, le=120)
 
     def locked_line(self) -> str:
         """What the narration may never change about the character: who they are to the protagonist, their gender
@@ -41,6 +43,8 @@ class SeedCharacter(_Out):
         identity = ""
         if self.gender is not None:
             identity = f"giới tính {self.gender}"
+            if self.age is not None:
+                identity += f", {self.age} tuổi"
             if self.address:
                 identity += f", lời kể gọi là “{self.address}”"
             identity += ". "

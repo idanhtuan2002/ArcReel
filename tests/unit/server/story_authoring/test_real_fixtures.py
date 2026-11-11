@@ -3,6 +3,7 @@ exactly on the scenes that carry its failure and on no scene of a committed stor
 
 from __future__ import annotations
 
+import itertools
 import json
 from pathlib import Path
 
@@ -78,3 +79,50 @@ def test_a_paragraph_of_notes_on_the_cast_is_removed():
     assert notes_leaks(clean) == []
     assert "minh: cô gái" not in clean
     assert clean.count("\n\n") == leaked.count("\n\n") - 1
+
+
+def _seams() -> list[tuple[str, dict, dict]]:
+    seams = []
+    for path in sorted(FIXTURES.glob("*.json")):
+        story = json.loads(path.read_text(encoding="utf-8"))
+        chapters = story["chapters"]
+        seams.extend(
+            (f"{story['run_id'][6:14]} {a['chapter']}", a, b)
+            for a, b in itertools.pairwise(chapters)
+            if a["scenes"] and a.get("beats") and b.get("beats")
+        )
+    return seams
+
+
+def test_no_real_chapter_writes_the_next_ones_beats_and_one_that_does_is_found():
+    from server.story_authoring.craft_checks import next_chapter_leak_findings
+
+    seams = _seams()
+    assert len(seams) == 10
+    for key, chapter, following in seams:
+        text = "\n\n".join(chapter["scenes"])
+        assert next_chapter_leak_findings(text, chapter["beats"], following["beats"], node_id=key) == (), key
+    overshoots = [(key, a, b) for key, a, b in seams if len(b["scenes"]) >= 3]
+    assert len(overshoots) == 7
+    for key, chapter, following in overshoots:
+        # The chapter goes on into two of the next chapter's scenes.
+        text = "\n\n".join(chapter["scenes"] + following["scenes"][:2])
+        [leak] = next_chapter_leak_findings(text, chapter["beats"], following["beats"], node_id=key)
+        assert leak.code == "NEXT_CHAPTER_LEAK"
+        assert leak.quote in text
+
+
+def test_an_age_is_checked_only_where_the_text_states_it_for_certain():
+    from server.story_authoring.cast_checks import age_findings
+
+    lan = SeedCharacter(
+        name="Lan", role="r", relation_to_protagonist="r", description="d", goal="g", gender="nữ", address="cô", age=24
+    )
+    assert age_findings([lan], list(_scenes().items())) == ()
+    wrong = [("s", "Lan, hai mươi tám tuổi, đứng trước cửa."), ("t", "Lan năm nay 25 tuổi.")]
+    [found] = age_findings([lan], wrong)
+    assert (found.code, found.node_id, found.quote) == ("CAST_AGE", "s", "Lan, hai mươi tám tuổi")
+    # A memory or a relative's age beside the name is not read as hers; in a book years pass.
+    assert age_findings([lan], [("s", "Lan nhớ năm mười tuổi, em trai Lan 9 tuổi.")]) == ()
+    assert age_findings([lan], [("s", "Lan năm nay 30 tuổi.")], years_pass=True) == ()
+    assert "24 tuổi" in lan.locked_line()

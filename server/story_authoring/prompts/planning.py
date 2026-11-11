@@ -64,7 +64,8 @@ Yêu cầu:
   tính và tuổi. Giới tính theo đúng ý tưởng: ý tưởng gọi nhân vật là "anh", "ông", "chồng"... thì là nam; "chị",
   "cô", "bà", "vợ"... thì là nữ; ý tưởng không nói thì tự chọn rồi giữ nguyên suốt truyện. voice: cách nhân vật
   nói (câu ngắn hay dài, từ hay dùng, cách xưng hô), tối đa 20 chữ, mỗi người một giọng khác nhau; flaw: một tật
-  xấu hoặc điểm yếu thật, ảnh hưởng tới quyết định của họ, tối đa 20 chữ.
+  xấu hoặc điểm yếu thật, ảnh hưởng tới quyết định của họ, tối đa 20 chữ. age: số tuổi khi truyện mở đầu (số
+  nguyên, đúng tuổi ý tưởng nêu nếu có), giữ nguyên suốt truyện.
 - locations: 1–4 địa điểm có name và description.
 - Bám sát ý tưởng của tác giả: giữ nguyên tên, tuổi, mốc thời gian và chi tiết họ đã nêu.
 

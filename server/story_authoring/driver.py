@@ -44,6 +44,7 @@ from server.story_authoring.audits import (
     unfaithful_blurbs,
 )
 from server.story_authoring.cast_checks import (
+    age_findings,
     fix_gender_openings,
     fix_near_names,
     gender_findings,
@@ -83,6 +84,7 @@ from server.story_authoring.craft_checks import (
     closing_hook_findings,
     drift_findings,
     long_span_findings,
+    next_chapter_leak_findings,
     opening_findings,
 )
 from server.story_authoring.generation import AuthoringTextGateway, StoryStepError
@@ -1662,6 +1664,7 @@ class StoryRunDriver:
         findings: list[Finding] = [f for n, h in heads.items() for f in anti_ai_findings(h["prose"], node_id=n)]
         findings.extend(fatigue_findings(self._pack, [(n, h["prose"]) for n, h in heads.items()]))
         findings.extend(gender_findings(story.seed.characters, scenes))
+        findings.extend(age_findings(story.seed.characters, scenes, years_pass=self._book is not None))
         # Scenes accepted before these checks existed are held to them here: a letter of another script, a point-of-
         # view character never named, narration calling someone "em".
         for ref in refs:
@@ -1693,6 +1696,15 @@ class StoryRunDriver:
             findings.extend(
                 closing_hook_findings(plan.closing_hook, heads[last.node_id]["prose"], node_id=last.node_id)
             )
+            if chapter < len(story.plans):
+                findings.extend(
+                    next_chapter_leak_findings(
+                        "\n\n".join(heads[r.node_id]["prose"] for r in sorted(refs, key=lambda r: r.scene)),
+                        [b for s in plan.scenes for b in s.beats],
+                        [b for s in story.plans[chapter].scenes for b in s.beats],
+                        node_id=last.node_id,
+                    )
+                )
         for dimension in CHAPTER_DIMENSIONS:
             result = await self._judge(
                 node,

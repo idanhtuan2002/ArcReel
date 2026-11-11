@@ -419,6 +419,7 @@ def missing_idea_names(idea: str, seed: StorySeed) -> list[str]:
 __all__ = [
     "CONFLICT_OVERLAP",
     "OPENINGS",
+    "age_findings",
     "fix_gender_openings",
     "fix_near_names",
     "gender_findings",
@@ -430,3 +431,66 @@ __all__ = [
     "pov_person_findings",
     "seed_problems",
 ]
+
+
+_UNITS = {
+    "một": 1,
+    "mốt": 1,
+    "hai": 2,
+    "ba": 3,
+    "bốn": 4,
+    "tư": 4,
+    "năm": 5,
+    "lăm": 5,
+    "sáu": 6,
+    "bảy": 7,
+    "tám": 8,
+    "chín": 9,
+}
+_NUMBER = r"\d{1,3}|(?:(?:một|hai|ba|bốn|năm|sáu|bảy|tám|chín) mươi|mười)(?: (?:mốt|một|hai|ba|bốn|tư|lăm|năm|sáu|bảy|tám|chín))?|một|hai|ba|bốn|năm|sáu|bảy|tám|chín"
+
+
+def _age_value(token: str) -> int | None:
+    token = token.strip().casefold()
+    if token.isdigit():
+        return int(token)
+    words = token.split()
+    if words[0] == "mười":
+        return 10 + (_UNITS.get(words[1], 0) if len(words) > 1 else 0)
+    if len(words) >= 2 and words[1] == "mươi":
+        return _UNITS[words[0]] * 10 + (_UNITS.get(words[2], 0) if len(words) > 2 else 0)
+    return _UNITS.get(words[0])
+
+
+def age_findings(
+    cast: Sequence[SeedCharacter], scenes: Sequence[tuple[str, str]], *, years_pass: bool = False
+) -> tuple[Finding, ...]:
+    """A character's age stated in the two forms that name it for certain ("Lan, 24 tuổi", "Lan năm nay 24 tuổi")
+    against the age the cast fixed, one year either way (donor huohuo hard-checks only certain forms; an age near a
+    name is often a sibling's, a memory's or a span of years). In a book, where years pass, only a younger age."""
+    findings: list[Finding] = []
+    for character in cast:
+        if character.age is None:
+            continue
+        name = re.escape(_fold(character.name))
+        pattern = re.compile(rf"(?<!\w){name}(?:\s*,\s*|\s+năm nay\s+)({_NUMBER})\s+tuổi", re.IGNORECASE)
+        for node, text in scenes:
+            match = pattern.search(_fold(text))
+            if match is None:
+                continue
+            stated = _age_value(match.group(1))
+            if stated is None:
+                continue
+            wrong = stated < character.age - 1 if years_pass else abs(stated - character.age) > 1
+            if wrong:
+                findings.append(
+                    Finding(
+                        "CAST_AGE",
+                        Severity.NARRATIVE_CRITICAL,
+                        node,
+                        f"{character.name} {character.age} tuổi theo hồ sơ nhân vật nhưng văn bản ghi {stated} tuổi",
+                        match.group(0),
+                    )
+                )
+                break
+    return tuple(findings)

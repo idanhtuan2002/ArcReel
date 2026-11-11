@@ -172,6 +172,7 @@ _GeneratedCharacter = create_model(
     address=(str, Field(min_length=1, max_length=16)),
     voice=(str, Field(min_length=1, max_length=120)),
     flaw=(str, Field(min_length=1, max_length=120)),
+    age=(int, Field(ge=1, le=110)),
 )
 
 

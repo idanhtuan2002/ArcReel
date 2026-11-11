@@ -74,8 +74,8 @@ def test_a_generated_seed_and_a_volumes_new_characters_state_gender_and_address_
     with pytest.raises(ValidationError):
         seed.model_validate({**base, "characters": [character, {**character, "name": "Lan"}]})
     gendered = [
-        {**character, "gender": "nam", "address": "anh", "voice": "nói ngắn", "flaw": "nóng nảy"},
-        {**character, "name": "Lan", "gender": "nữ", "address": "cô", "voice": "nói nhỏ", "flaw": "cả nể"},
+        {**character, "gender": "nam", "address": "anh", "voice": "nói ngắn", "flaw": "nóng nảy", "age": 30},
+        {**character, "name": "Lan", "gender": "nữ", "address": "cô", "voice": "nói nhỏ", "flaw": "cả nể", "age": 27},
     ]
     assert seed.model_validate({**base, "characters": gendered}).characters[0].gender == "nam"
     schema = bound_book_outline(2).model_json_schema()

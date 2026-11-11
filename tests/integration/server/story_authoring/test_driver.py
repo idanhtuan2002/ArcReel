@@ -172,6 +172,7 @@ STRUCTURED: dict[str, Any] = {
                 "address": "anh",
                 "voice": "nói ngắn, ít cảm thán",
                 "flaw": "ngại đối mặt chuyện cũ",
+                "age": 34,
             },
             {
                 "name": "Lan",
@@ -183,6 +184,7 @@ STRUCTURED: dict[str, Any] = {
                 "address": "cô",
                 "voice": "nói nhỏ, hay hỏi lại",
                 "flaw": "giữ mọi chuyện trong lòng",
+                "age": 29,
             },
         ],
         "locations": [{"name": "Căn nhà cũ", "description": "nhà ba gian"}],

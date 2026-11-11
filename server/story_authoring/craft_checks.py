@@ -8,6 +8,7 @@ Donor surfaces: shenbi ``review-long-span`` (n-gram reuse against earlier chapte
 
 from __future__ import annotations
 
+import itertools
 import re
 import statistics
 from collections import Counter
@@ -181,5 +182,97 @@ def closing_hook_findings(hook: str | None, last_scene: str, *, node_id: str) ->
             node_id,
             f"chương không kết bằng câu móc đã định: “{hook}”",
             last,
+        ),
+    )
+
+
+# --- next-chapter leak (donor huohuo next_chapter_beat_leak) -----------------------------------------
+
+#: Words a beat shares with any prose; a beat bigram made only of them says nothing about the beat.
+_LEAK_STOP = frozenset(
+    [
+        "và",
+        "của",
+        "là",
+        "có",
+        "những",
+        "một",
+        "các",
+        "được",
+        "cho",
+        "với",
+        "trong",
+        "khi",
+        "đã",
+        "đang",
+        "sẽ",
+        "không",
+        "này",
+        "đó",
+        "ấy",
+        "thì",
+        "mà",
+        "rồi",
+        "lại",
+        "cũng",
+        "như",
+        "để",
+        "từ",
+        "ra",
+        "vào",
+        "lên",
+        "xuống",
+        "anh",
+        "cô",
+        "em",
+        "ông",
+        "bà",
+        "nó",
+        "họ",
+        "mình",
+        "tôi",
+        "người",
+        "việc",
+    ]
+)
+#: Share of a beat's content bigrams the prose must carry for the beat to count as written; on the real-scene
+#: fixtures a chapter carries 50-100 % of its own beats and 0-25 % of the next chapter's at this share.
+BEAT_WRITTEN_SHARE = 0.5
+
+
+def _bigrams(text: str) -> set[tuple[str, str]]:
+    words = _words(text)
+    return {(a, b) for a, b in itertools.pairwise(words) if a not in _LEAK_STOP and b not in _LEAK_STOP}
+
+
+def beat_written(prose_bigrams: set[tuple[str, str]], beat: str) -> bool:
+    wanted = _bigrams(beat)
+    return bool(wanted) and len(wanted & prose_bigrams) / len(wanted) >= BEAT_WRITTEN_SHARE
+
+
+def next_chapter_leak_findings(
+    chapter_text: str, beats: Sequence[str], next_beats: Sequence[str], *, node_id: str
+) -> tuple[Finding, ...]:
+    """A chapter that writes the next chapter's beats (donor huohuo: at least max(2, 45 %) of them). Huohuo also
+    excuses a chapter that wrote its own beats; with a beat counted at half its content bigrams a real chapter
+    carries at most 25 % of the next one's, so a chapter that wrote both is reported too."""
+    if len(next_beats) < 2 or not beats:
+        return ()
+    prose = _bigrams(chapter_text)
+    own = sum(beat_written(prose, b) for b in beats)
+    leaked = [b for b in next_beats if beat_written(prose, b)]
+    if len(leaked) < max(2, -(-len(next_beats) * 45 // 100)):
+        return ()
+    wanted = _bigrams(leaked[0])
+    sentences = re.split(r"(?<=[.!?…])\s+", chapter_text.strip())
+    quote = max(sentences, key=lambda s: len(_bigrams(s) & wanted)) if sentences else ""
+    return (
+        Finding(
+            "NEXT_CHAPTER_LEAK",
+            Severity.NARRATIVE_CRITICAL,
+            node_id,
+            f"chương đã viết trước {len(leaked)}/{len(next_beats)} nhịp của chương sau (như “{leaked[0]}”) "
+            f"trong khi mới viết {own}/{len(beats)} nhịp của mình; bỏ phần thuộc chương sau, viết đủ nhịp của chương này",
+            quote,
         ),
     )
