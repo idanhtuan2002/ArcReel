@@ -3035,7 +3035,7 @@ export default {
   "ap_state_halted": "Đã dừng, cần bạn xử lý",
   "ap_state_finished": "Đã xong, không còn gì để làm",
   "ap_reason": "lý do: {{reason}}",
-  "ap_open_run": "Mở lần chạy",
+  "ap_resume": "Tiếp tục",
   "ap_unavailable": "Máy chủ chưa bật sản xuất tự động",
   "ap_turn_on": "Bật tự động",
   "ap_turn_off": "Tắt tự động",

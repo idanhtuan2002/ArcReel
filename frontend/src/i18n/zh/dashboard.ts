@@ -3036,7 +3036,7 @@ export default {
   "ap_state_halted": "已停止，需要你处理",
   "ap_state_finished": "已完成，没有待做的内容",
   "ap_reason": "原因：{{reason}}",
-  "ap_open_run": "打开运行",
+  "ap_resume": "继续",
   "ap_unavailable": "此服务器未开启自动制作",
   "ap_turn_on": "开启",
   "ap_turn_off": "关闭",

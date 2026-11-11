@@ -3037,7 +3037,7 @@ export default {
   "ap_state_halted": "Stopped, needs you",
   "ap_state_finished": "Done, nothing left to make",
   "ap_reason": "reason: {{reason}}",
-  "ap_open_run": "Open run",
+  "ap_resume": "Resume",
   "ap_unavailable": "Automatic production is off on this server",
   "ap_turn_on": "Turn on",
   "ap_turn_off": "Turn off",

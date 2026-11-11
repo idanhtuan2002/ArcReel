@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useId, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Link } from "wouter";
 import { Bot } from "lucide-react";
 
 import { useAppStore } from "@/stores/app-store";
+import { controlProductionRun, getProductionRun, newCommandId } from "@/features/production-run/api/productionRunClient";
 import { useAutopilotErrorText } from "./useAutopilotErrorText";
 import {
   getAutopilot,
@@ -163,9 +163,29 @@ export function AutopilotPanel({ projectName, kind }: { projectName: string; kin
     }
   };
 
+  // A run that stopped for the Showrunner resumes here: a story project's page shows no run panel.
+  const resume = async (runId: string) => {
+    setBusy(true);
+    try {
+      const run = await getProductionRun(projectName, runId);
+      await controlProductionRun(projectName, runId, "resume", {
+        command_id: newCommandId(),
+        expected_version: run.version,
+        expected_input_digest: run.input_digest,
+        policy_digest: run.policy_digest,
+      });
+      await load();
+    } catch (error) {
+      useAppStore.getState().pushToast(`${t("ap_failed")}${errorText(error)}`, "error");
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const story = storyAutopilot(idea, chapters, direction);
   const episodesValid = Number.isInteger(episodes) && episodes >= 1 && episodes <= 12;
   const state = view?.status.state ?? "off";
+  const haltedRun = state === "halted" ? (view?.status.run_id ?? null) : null;
 
   return (
     <section aria-labelledby={`${episodesId}-title`} className="rounded-md border border-hairline px-3 py-2">
@@ -182,13 +202,15 @@ export function AutopilotPanel({ projectName, kind }: { projectName: string; kin
             ) : null}
           </span>
         ) : null}
-        {view?.status.run_id && (state === "halted" || state === "waiting") ? (
-          <Link
-            href={`/app/projects/${encodeURIComponent(projectName)}`}
-            className="text-[12px] text-text-3 underline-offset-2 hover:text-text hover:underline"
+        {haltedRun ? (
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => void resume(haltedRun)}
+            className="rounded-md border border-accent/40 px-2.5 py-1 text-[12.5px] text-text hover:border-accent disabled:opacity-50"
           >
-            {t("ap_open_run")}
-          </Link>
+            {t("ap_resume")}
+          </button>
         ) : null}
         <span className="ml-auto flex items-center gap-2">
           {view && !view.available ? <span className="text-[12px] text-text-3">{t("ap_unavailable")}</span> : null}
