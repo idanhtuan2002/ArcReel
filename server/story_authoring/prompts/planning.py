@@ -52,7 +52,10 @@ Yêu cầu:
 - tone: giọng điệu chủ đạo; pov: ngôi kể (ví dụ "ngôi thứ ba, bám theo nhân vật chính").
 - central_conflict: xung đột trung tâm cụ thể; ending_direction: hướng kết thúc rõ ràng, khép lại xung đột.
 - characters: 2–5 nhân vật; mỗi người có name (tên Việt), role, relation_to_protagonist (cách gọi trong gia đình
-  hoặc quan hệ, ghi "chính là nhân vật chính" cho nhân vật chính), description, goal.
+  hoặc quan hệ, ghi "chính là nhân vật chính" cho nhân vật chính), description, goal, gender ("nam" hoặc "nữ") và
+  address: từ lời kể dùng để gọi nhân vật ngoài tên ("anh", "chị", "cô", "ông", "bà", "cậu", "em"...), hợp giới
+  tính và tuổi. Giới tính theo đúng ý tưởng: ý tưởng gọi nhân vật là "anh", "ông", "chồng"... thì là nam; "chị",
+  "cô", "bà", "vợ"... thì là nữ; ý tưởng không nói thì tự chọn rồi giữ nguyên suốt truyện.
 - locations: 1–4 địa điểm có name và description.
 - Bám sát ý tưởng của tác giả: giữ nguyên tên, tuổi, mốc thời gian và chi tiết họ đã nêu.
 

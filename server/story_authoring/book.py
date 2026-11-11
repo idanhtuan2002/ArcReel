@@ -165,21 +165,38 @@ def _enum(name: str, values: Sequence[str]) -> Any:
     return StrEnum(name, {f"v{i}": value for i, value in enumerate(values)})
 
 
+_GeneratedCharacter = create_model(
+    "GeneratedSeedCharacter",
+    __base__=SeedCharacter,
+    gender=(Literal["nam", "nữ"], ...),
+    address=(str, Field(min_length=1, max_length=16)),
+)
+
+
 def bound_seed(characters: int, locations: int) -> type[StorySeed]:
-    """The seed a run generates: a short story keeps two to five characters and one to four places."""
+    """The seed a run generates: a short story keeps two to five characters and one to four places, each character
+    with a gender and the word the narration calls them by."""
     return create_model(
         "BoundStorySeed",
         __base__=StorySeed,
-        characters=(list[SeedCharacter], Field(min_length=2, max_length=characters)),
+        characters=(list[_GeneratedCharacter], Field(min_length=2, max_length=characters)),
         locations=(list[SeedLocation], Field(min_length=1, max_length=locations)),
     )
 
 
+_GeneratedVolume = create_model(
+    "GeneratedVolumeEntry",
+    __base__=VolumeEntry,
+    new_characters=(list[_GeneratedCharacter], Field(max_length=3)),
+)
+
+
 def bound_book_outline(volumes: int) -> type[BookOutline]:
+    """A book outline of exactly ``volumes`` volumes; a volume's new characters carry their gender and address."""
     return create_model(
         "BoundBookOutline",
         __base__=BookOutline,
-        volumes=(list[VolumeEntry], Field(min_length=volumes, max_length=volumes)),
+        volumes=(list[_GeneratedVolume], Field(min_length=volumes, max_length=volumes)),
     )
 
 

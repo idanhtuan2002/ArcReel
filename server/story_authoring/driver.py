@@ -43,6 +43,7 @@ from server.story_authoring.audits import (
     unconfirmed,
     unfaithful_blurbs,
 )
+from server.story_authoring.cast_checks import gender_findings
 from server.story_authoring.checks import (
     ESCALATED_MARK,
     Finding,
@@ -1551,10 +1552,11 @@ class StoryRunDriver:
         state, _ = await self._store.apply(lambda s: (require(s, node_id=node, fingerprint=fp), None))
         scenes = [(n, h["prose"]) for n, h in heads.items()]
         plan = story.plans[chapter - 1]
-        facts = "\n".join(f"- {c.name}: {c.relation_to_protagonist}. {c.description}" for c in story.seed.characters)
+        facts = "\n".join(f"- {c.name}: {c.locked_line()}" for c in story.seed.characters)
         previous = " ".join(p.chapter_goal for p in story.plans[: chapter - 1])
         findings: list[Finding] = [f for n, h in heads.items() for f in anti_ai_findings(h["prose"], node_id=n)]
         findings.extend(fatigue_findings(self._pack, [(n, h["prose"]) for n, h in heads.items()]))
+        findings.extend(gender_findings(story.seed.characters, scenes))
         for dimension in CHAPTER_DIMENSIONS:
             result = await self._judge(
                 node,
@@ -2101,10 +2103,7 @@ def story_bible_input(seed: StorySeed, style: StyleBibleOut) -> StoryBibleInput:
         title=seed.working_title,
         premise=seed.premise,
         characters=tuple(
-            StoryEntityInput(
-                key=names[c.name], name=c.name, description=f"{c.relation_to_protagonist}. {c.description}"
-            )
-            for c in seed.characters
+            StoryEntityInput(key=names[c.name], name=c.name, description=c.locked_line()) for c in seed.characters
         ),
         locations=tuple(
             StoryEntityInput(key=locations[loc.name], name=loc.name, description=loc.description)

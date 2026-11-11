@@ -11,6 +11,7 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from enum import StrEnum
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, create_model
 
@@ -25,6 +26,21 @@ class SeedCharacter(_Out):
     relation_to_protagonist: str = Field(min_length=1)
     description: str = Field(min_length=1)
     goal: str = Field(min_length=1)
+    #: A generated seed always states both (``book.bound_seed``); seeds stored before they existed carry neither.
+    gender: Literal["nam", "nữ"] | None = None
+    #: The word the narration calls the character by besides the name ("anh", "cô", "bà", "ông", "cậu"...).
+    address: str | None = Field(default=None, min_length=1, max_length=16)
+
+    def locked_line(self) -> str:
+        """What the narration may never change about the character: who they are to the protagonist, their gender
+        and the word the narration calls them by, then the description."""
+        identity = ""
+        if self.gender is not None:
+            identity = f"giới tính {self.gender}"
+            if self.address:
+                identity += f", lời kể gọi là “{self.address}”"
+            identity += ". "
+        return f"{self.relation_to_protagonist}. {identity}{self.description}"
 
 
 class SeedLocation(_Out):

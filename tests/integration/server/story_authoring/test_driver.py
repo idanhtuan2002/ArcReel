@@ -153,6 +153,8 @@ STRUCTURED: dict[str, Any] = {
                 "relation_to_protagonist": "nhân vật chính",
                 "description": "con trai cả",
                 "goal": "bán nhà",
+                "gender": "nam",
+                "address": "anh",
             },
             {
                 "name": "Lan",
@@ -160,6 +162,8 @@ STRUCTURED: dict[str, Any] = {
                 "relation_to_protagonist": "em gái Minh",
                 "description": "ở lại làng",
                 "goal": "giữ nhà",
+                "gender": "nữ",
+                "address": "cô",
             },
         ],
         "locations": [{"name": "Căn nhà cũ", "description": "nhà ba gian"}],
