@@ -228,15 +228,17 @@ async def test_a_preview_does_not_sync_the_story(session_factory):
     assert synced == ["project"]
 
 
-@pytest.mark.parametrize("status", ["FAILED_QUALITY", "CANCELLED", "BLOCKED_BUDGET"])
-async def test_a_project_halts_on_its_own_unsucceeded_run_and_waits_on_an_active_one(session_factory, status):
+@pytest.mark.parametrize("status", ["FAILED_QUALITY", "CANCELLED", "BLOCKED_BUDGET", "PAUSED", "WAITING_TASK"])
+async def test_a_project_halts_on_an_unsucceeded_or_stopped_run_and_waits_on_a_moving_one(session_factory, status):
     from r2.contracts.autopilot import autopilot_command_id
 
     delegation = _delegation()
     run = await _run(session_factory, autopilot_command_id(delegation, 1, part=1), status=status)
     state, command = await _planner(session_factory, _Service()).state(delegation)
-    expected = "waiting" if status == "BLOCKED_BUDGET" else "halted"
+    expected = "waiting" if status == "WAITING_TASK" else "halted"
     assert (state.state, state.run_id, command) == (expected, run.run_id, None)
+    if expected == "halted":
+        assert state.reason == status
 
 
 async def test_another_delegations_failed_run_does_not_halt(session_factory):

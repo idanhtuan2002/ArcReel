@@ -77,6 +77,8 @@ from server.story_authoring.service import SECONDS_PER_CALL, StoryActionRefused,
 STORY_GENRE = "truyện ngắn"
 # Share of the run's caps the story may spend; the rest belongs to script, media and Quality.
 STORY_SHARE = 0.5
+# A run that ends at the handoff makes no film: its story may spend all but what BRIEF's drawn idea reserves.
+STORY_ONLY_SHARE = 0.9
 _FINISHED_TASK = frozenset({"succeeded", "failed", "cancelled"})
 
 
@@ -86,17 +88,17 @@ def brief_bytes(brief: StoryBrief) -> bytes:
     return json.dumps(content, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
 
 
-def story_limits(policy: RunPolicy, drafted: StoryLimits) -> StoryLimits:
+def story_limits(policy: RunPolicy, drafted: StoryLimits, *, share: float = STORY_SHARE) -> StoryLimits:
     """The drafted story limits, cut to the story's share of the run caps; never larger than drafted."""
-    calls = max(1, math.floor(policy.max_model_calls * STORY_SHARE) // 2)
-    seconds = max(1, math.floor(policy.max_runtime_seconds * STORY_SHARE))
+    calls = max(1, math.floor(policy.max_model_calls * share) // 2)
+    seconds = max(1, math.floor(policy.max_runtime_seconds * share))
     values = drafted.model_dump()
     values["generate_calls_max"] = min(drafted.generate_calls_max, calls)
     values["count_calls_max"] = min(drafted.count_calls_max, calls)
     values["wall_clock_max_seconds"] = min(drafted.wall_clock_max_seconds, seconds)
     if drafted.cloud_prices is not None:
         values["max_cost_minor_units"] = min(
-            drafted.max_cost_minor_units, max(1, math.floor(policy.max_cost_minor_units * STORY_SHARE))
+            drafted.max_cost_minor_units, max(1, math.floor(policy.max_cost_minor_units * share))
         )
     return StoryLimits.model_validate({**values, "cloud_prices": drafted.cloud_prices})
 
@@ -249,7 +251,8 @@ class BriefAdapter:
             raise OwnerBlocked(refused.code) from None
         if drafted.limits.cloud_prices is not None and run.policy.currency != "USD":
             raise OwnerBlocked("CURRENCY_MISMATCH")
-        brief = drafted.model_copy(update={"limits": story_limits(run.policy, drafted.limits)})
+        share = STORY_ONLY_SHARE if command.end_stage == "HANDOFF" else STORY_SHARE
+        brief = drafted.model_copy(update={"limits": story_limits(run.policy, drafted.limits, share=share)})
         brief = StoryBrief.model_validate(brief.model_dump(mode="json"))
         digest = _blobs(self._projects, run.project_name).put(brief_bytes(brief))
         if digest != brief.digest():
@@ -521,6 +524,7 @@ class HandoffAdapter:
 
 
 __all__ = [
+    "STORY_ONLY_SHARE",
     "STORY_SHARE",
     "BriefAdapter",
     "HandoffAdapter",

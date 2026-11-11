@@ -117,6 +117,9 @@ class AutopilotPlanner:
         active, own, every = await self._runs(delegation)
         if active:
             running = next((run for run in every if run.status not in _TERMINAL), None)
+            if running is not None and running.status in _STOPPED:
+                # A blocked or paused run waits for the Showrunner, not for time: the autopilot is halted on it.
+                return AutopilotState("halted", running.run_id, running.reason or running.status.value), None
             return AutopilotState("waiting", running.run_id if running else None), None
         if own and own[-1][1].status is not RunStatus.SUCCEEDED:
             last = own[-1][1]
@@ -227,6 +230,15 @@ class AutopilotPlanner:
 
 
 _TERMINAL = {RunStatus.SUCCEEDED, RunStatus.FAILED, RunStatus.FAILED_QUALITY, RunStatus.CANCELLED}
+#: Unfinished runs that only a Showrunner's action moves on.
+_STOPPED = {
+    RunStatus.PAUSED,
+    RunStatus.BLOCKED_CONFIGURATION,
+    RunStatus.BLOCKED_RESOURCE,
+    RunStatus.BLOCKED_BUDGET,
+    RunStatus.BLOCKED_UNKNOWN,
+    RunStatus.BLOCKED_INPUT_CHANGED,
+}
 
 
 class AutopilotHalted(Exception):
