@@ -25,6 +25,7 @@ from r2.contracts.automation import (
     ModelRoute,
     RunCommand,
     RunPolicy,
+    RunScope,
     RunSnapshot,
     RunStage,
     RunStatus,
@@ -353,6 +354,53 @@ async def test_a_story_task_that_stopped_while_running_is_an_unknown_outcome(sto
         RunStatus.BLOCKED_UNKNOWN,
         "OUTCOME_UNKNOWN",
     )
+
+
+async def test_a_story_task_refused_before_the_run_authority_was_installed_is_queued_again(story_host: Host):
+    host = story_host
+    await _tick(host)
+    await _tick(host)
+    task_id = await _story_task(host)
+    async with host.sessions() as session, session.begin():
+        await session.execute(
+            sa.update(Task)
+            .where(Task.task_id == task_id)
+            .values(status="failed", error_message="AUTOMATION_GOVERNANCE_NOT_ACTIVATED")
+        )
+    # A release before this check blocked the run; the Showrunner's Resume reads the step again.
+    async with host.sessions() as session, session.begin():
+        repository = ProductionRunRepository(session)
+        live = await repository.locked(RunScope(user_id="default", project_name="project", run_id=host.run.run_id))
+        await repository.apply_command(
+            expected=live,
+            updated=live.model_copy(
+                update={
+                    "status": RunStatus.BLOCKED_UNKNOWN,
+                    "reason": "OUTCOME_UNKNOWN",
+                    "version": live.version + 1,
+                    "fencing_epoch": live.fencing_epoch + 1,
+                }
+            ),
+        )
+        live = await repository.locked(RunScope(user_id="default", project_name="project", run_id=host.run.run_id))
+        await repository.apply_command(
+            expected=live,
+            updated=live.model_copy(
+                update={
+                    "status": RunStatus.RUNNING,
+                    "reason": None,
+                    "version": live.version + 1,
+                    "fencing_epoch": live.fencing_epoch + 1,
+                }
+            ),
+        )
+
+    waiting = await _tick(host)
+
+    assert (waiting.stage, waiting.status) == (RunStage.STORY, RunStatus.WAITING_TASK)
+    async with host.sessions() as session:
+        row = (await session.execute(sa.select(Task).where(Task.task_id == task_id))).scalar_one()
+    assert (row.status, row.error_message) == ("queued", None)
 
 
 async def test_story_start_replays_to_the_same_story_run(story_host: Host):

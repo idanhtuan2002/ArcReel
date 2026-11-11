@@ -90,6 +90,56 @@ class TestAppModule:
         assert not worker.stopped
 
     @pytest.mark.asyncio
+    async def test_activated_lifespan_installs_the_run_authority_before_the_worker_starts(self, monkeypatch, tmp_path):
+        """The worker runs a story task a restart left running at once; the execution guard refuses it until the run
+        authority is installed, so automatic production is wired first and its schedulers start after the worker."""
+        from server.production_run import composition
+
+        order: list[str] = []
+
+        class Worker(_FakeWorker):
+            async def start(self):
+                order.append("worker")
+                await super().start()
+
+        class Scheduler:
+            def __init__(self, name):
+                self.name = name
+
+            async def start(self):
+                order.append(f"start {self.name}")
+
+            async def stop(self):
+                pass
+
+        async def wire_production(**_kwargs):
+            order.append("wire production")
+            return object(), Scheduler("production")
+
+        def wire_autopilot(**_kwargs):
+            return Scheduler("autopilot")
+
+        async def verified(*_args, **_kwargs):
+            return object()
+
+        monkeypatch.setenv("ARCREEL_GOVERNANCE_READ_DIR", str(tmp_path / "read"))
+        monkeypatch.setenv("ARCREEL_GOVERNANCE_ATTESTOR_DIR", str(tmp_path / "attestor"))
+        monkeypatch.setattr(app_module, "verify_governance_activated_startup", verified)
+        monkeypatch.setattr(composition, "activation_from_env", lambda: SimpleNamespace(enabled=True))
+        monkeypatch.setattr(composition, "wire_production", wire_production)
+        monkeypatch.setattr(composition, "wire_autopilot", wire_autopilot)
+        worker = Worker()
+        monkeypatch.setattr(app_module, "create_generation_worker", lambda: worker)
+        monkeypatch.setattr(app_module, "ensure_auth_password", lambda: "test")
+        monkeypatch.setattr(assistant_router.assistant_service, "startup", _noop_async)
+        monkeypatch.setattr(assistant_router.assistant_service, "shutdown", _noop_async)
+
+        app = app_module.app
+        app.state = SimpleNamespace()
+        async with app_module.lifespan(app):
+            assert order == ["wire production", "worker", "start production", "start autopilot"]
+
+    @pytest.mark.asyncio
     async def test_lifespan_clears_callback_after_worker_stop(self, monkeypatch):
         """lifespan 应先 worker.stop()（drain inflight + callback 仍可用），
         再清掉 set_worker_cancel_callback(None)。

@@ -476,27 +476,8 @@ async def lifespan(app: FastAPI):
     await assistant.assistant_service.startup(in_docker=is_docker, sandbox_enabled=sandbox_enabled)
     assistant.assistant_service.session_manager.start_patrol()
 
-    logger.info("启动 GenerationWorker...")
-    worker = create_generation_worker()
-    app.state.generation_worker = worker
-    # 注入 in-process cancel 回调必须在 worker.start() 之前，
-    # 否则有窗口期 callback 为 None、cancel running 信号丢失（违反 ADR 0006 秒级响应）。
-    from lib.generation_queue import get_generation_queue
-
-    get_generation_queue().set_worker_cancel_callback(worker.request_cancel)
-    await worker.start()
-    logger.info("GenerationWorker 已启动")
-
-    logger.info("启动 ProjectEventService...")
-    project_event_service = ProjectEventService(PROJECT_ROOT, projects_root=app_data_dir())
-    app.state.project_event_service = project_event_service
-    await project_event_service.start()
-    logger.info("ProjectEventService 已启动")
-
-    # No start()/shutdown() lifecycle: purely reactive to subscribe()/notify(), no
-    # background task to manage.
-    app.state.execution_event_stream_service = DurableEventStreamService()
-
+    # Automatic production is wired before the worker starts: the worker requeues a story run a restart left running
+    # and runs it at once, and the execution guard refuses a run's task until the run authority is installed.
     # Automatic production is wired only at its release gate (ARCREEL_AUTOMATIC_PRODUCTION=1 on a governance-activated
     # host); otherwise run reads still work, commands answer AUTOMATIC_PRODUCTION_NOT_ACTIVATED and no production
     # scheduler is started. GPU admission of local provider jobs is configured separately by its probe list.
@@ -525,7 +506,6 @@ async def lifespan(app: FastAPI):
         )
         app.state.production_run_service = service
         app.state.production_scheduler = scheduler
-        await scheduler.start()
         autopilot = wire_autopilot(
             sessions=async_session_factory,
             service=service,
@@ -533,7 +513,31 @@ async def lifespan(app: FastAPI):
             grants=app.state.governance_grants,
         )
         app.state.autopilot_scheduler = autopilot
-        await autopilot.start()
+
+    logger.info("启动 GenerationWorker...")
+    worker = create_generation_worker()
+    app.state.generation_worker = worker
+    # 注入 in-process cancel 回调必须在 worker.start() 之前，
+    # 否则有窗口期 callback 为 None、cancel running 信号丢失（违反 ADR 0006 秒级响应）。
+    from lib.generation_queue import get_generation_queue
+
+    get_generation_queue().set_worker_cancel_callback(worker.request_cancel)
+    await worker.start()
+    logger.info("GenerationWorker 已启动")
+    if app.state.production_scheduler is not None:
+        await app.state.production_scheduler.start()
+    if app.state.autopilot_scheduler is not None:
+        await app.state.autopilot_scheduler.start()
+
+    logger.info("启动 ProjectEventService...")
+    project_event_service = ProjectEventService(PROJECT_ROOT, projects_root=app_data_dir())
+    app.state.project_event_service = project_event_service
+    await project_event_service.start()
+    logger.info("ProjectEventService 已启动")
+
+    # No start()/shutdown() lifecycle: purely reactive to subscribe()/notify(), no
+    # background task to manage.
+    app.state.execution_event_stream_service = DurableEventStreamService()
 
     logger.info("启动 ExecutionRecoveryScheduler...")
     execution_recovery_scheduler = ExecutionRecoveryScheduler()

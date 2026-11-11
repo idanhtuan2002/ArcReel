@@ -92,6 +92,7 @@ STORY_SHARE = 0.5
 # Part sizes a story-only run tries, largest first, so the part's whole bound fits the run's caps (ADR-0127).
 PART_SIZES = (5, 4, 3)
 _FINISHED_TASK = frozenset({"succeeded", "failed", "cancelled"})
+_NOT_ACTIVATED = "AUTOMATION_GOVERNANCE_NOT_ACTIVATED"
 
 
 def brief_bytes(brief: StoryBrief) -> bytes:
@@ -589,6 +590,16 @@ class StoryAdapter:
         if state.phase is RunPhase.RUNNING:
             async with self._sessions() as session:
                 task = await TaskRepository(session).get(str(receipt.task_id))
+            if (
+                task is not None
+                and task.get("status") == "failed"
+                and _NOT_ACTIVATED in (task.get("error_message") or "")
+            ):
+                # The worker took the task up before the run authority was installed (a restart); the guard refused
+                # it before any model call, so the story continues from its checkpoint.
+                async with self._sessions() as session:
+                    await TaskRepository(session).requeue_finished_story_run(str(receipt.task_id))
+                return outcome(intent, "WAIT", owner_state=state.phase.value)
             if task is not None and task.get("status") in _FINISHED_TASK:
                 return outcome(intent, "BLOCK", reason="OUTCOME_UNKNOWN", owner_state=state.phase.value)
             return outcome(intent, "WAIT", owner_state=state.phase.value)
