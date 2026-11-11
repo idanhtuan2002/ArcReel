@@ -15,7 +15,7 @@ import re
 import stat
 from pathlib import Path
 
-from lib.json_io import atomic_write_bytes
+from lib.json_io import atomic_write_bytes, fsync_directory
 
 BLOB_ROOT = Path("story_authoring") / "blobs"
 PIN_ROOT = Path("story_authoring") / "pins"
@@ -98,6 +98,7 @@ class StoryBlobStore:
         atomic_write_bytes(temp, digest.encode("ascii"))
         try:
             os.link(temp, path)
+            fsync_directory(path.parent)
         except FileExistsError:
             pinned = self.pinned(key)
             if pinned is None:

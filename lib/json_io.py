@@ -63,10 +63,25 @@ def atomic_write_json(path: Path, data: Any) -> None:
             json.dump(data, tmp, ensure_ascii=False, indent=2)
         os.replace(tmp_path, path)
         tmp_path = None
+        fsync_directory(path.parent)
     finally:
         if tmp_path is not None:
             with suppress(OSError):
                 tmp_path.unlink()
+
+
+def fsync_directory(directory: Path) -> None:
+    """Make a rename or link in ``directory`` survive power loss; a platform without directory fsync skips it."""
+    try:
+        fd = os.open(directory, os.O_RDONLY)
+    except OSError:
+        return
+    try:
+        os.fsync(fd)
+    except OSError:
+        pass
+    finally:
+        os.close(fd)
 
 
 def atomic_write_bytes(path: Path, data: bytes) -> None:

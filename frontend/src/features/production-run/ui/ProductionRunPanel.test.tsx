@@ -51,6 +51,22 @@ afterEach(() => {
 });
 
 describe("ProductionRunPanel", () => {
+  it("asks once more before cancelling a run and keeps it when asked to", async () => {
+    vi.spyOn(client, "listProductionRuns").mockResolvedValue({ start: OFFER, runs: [snapshot()] });
+    const control = vi.spyOn(client, "controlProductionRun").mockResolvedValue(snapshot({ status: "CANCELLED" }));
+    render(<ProductionRunPanel projectName="alpha" />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "Cancel this run…" }));
+    expect(screen.getByRole("alert")).toHaveTextContent("Cancel ends this run for good");
+    fireEvent.click(screen.getByRole("button", { name: "Keep it" }));
+    expect(control).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole("button", { name: "Cancel this run…" }));
+    fireEvent.click(screen.getByRole("button", { name: "Yes, cancel the run" }));
+    await waitFor(() => expect(control).toHaveBeenCalledTimes(1));
+    expect(control.mock.calls[0][2]).toBe("cancel");
+  });
+
   it("defaultsToAutoAndStartsOnce", async () => {
     vi.spyOn(client, "listProductionRuns").mockResolvedValue({ start: OFFER, runs: [] });
     let resolve: (value: RunSnapshot) => void = () => {};
@@ -289,7 +305,7 @@ describe("ProductionRunPanel", () => {
 
     expect(await screen.findByRole("button", { name: "Download episode 1" })).toBeInTheDocument();
     expect(screen.getByText("Passed quality review")).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Cancel" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Cancel this run…" })).not.toBeInTheDocument();
   });
 
   it("marks an exported final the reviewers rejected as not passed", async () => {

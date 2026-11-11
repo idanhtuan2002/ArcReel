@@ -132,6 +132,8 @@ export function ProductionRunPanel({ projectName }: Props) {
   const [setupVersion, setSetupVersion] = useState(0);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Cancel ends a run for good: it asks once more, away from Pause and Resume.
+  const [confirmCancel, setConfirmCancel] = useState(false);
   // The parent keys this panel by project, so a mounted panel serves one project; responses that land after it
   // unmounts (the user switched project) are dropped.
   const mounted = useRef(true);
@@ -630,18 +632,52 @@ export function ProductionRunPanel({ projectName }: Props) {
                 {run.policy.mode === "auto" ? t("auto_switch_to_semi") : t("auto_switch_to_auto")}
               </button>
             )}
-            {active && (
-              <button
-                type="button"
-                className={BUTTON_CLS}
-                style={BUTTON_STYLE}
-                disabled={busy}
-                onClick={() => control("cancel")}
-              >
-                {t("auto_cancel")}
-              </button>
-            )}
           </div>
+          {active && (
+            <div
+              className="flex flex-wrap items-center gap-2 border-t pt-2 text-[12px]"
+              style={{ borderColor: "var(--color-hairline-soft)" }}
+            >
+              {confirmCancel ? (
+                <>
+                  <span role="alert" style={{ color: "var(--color-warn)" }}>
+                    {t("auto_cancel_warning")}
+                  </span>
+                  <button
+                    type="button"
+                    className={BUTTON_CLS}
+                    style={{ ...BUTTON_STYLE, color: "var(--color-warn)", borderColor: "var(--color-warn)" }}
+                    disabled={busy}
+                    onClick={() => {
+                      setConfirmCancel(false);
+                      control("cancel");
+                    }}
+                  >
+                    {t("auto_cancel_confirm")}
+                  </button>
+                  <button
+                    type="button"
+                    className={BUTTON_CLS}
+                    style={BUTTON_STYLE}
+                    disabled={busy}
+                    onClick={() => setConfirmCancel(false)}
+                  >
+                    {t("auto_cancel_keep")}
+                  </button>
+                </>
+              ) : (
+                <button
+                  type="button"
+                  className="focus-ring ml-auto rounded px-1.5 py-0.5 underline-offset-2 hover:underline"
+                  style={{ color: "var(--color-text-3)" }}
+                  disabled={busy}
+                  onClick={() => setConfirmCancel(true)}
+                >
+                  {t("auto_cancel")}
+                </button>
+              )}
+            </div>
+          )}
           <RunReportDetails projectName={projectName} runId={run.run_id} version={run.version} />
           {run.status === "SUCCEEDED" && (
             <ul className="m-0 list-none space-y-1 p-0">
