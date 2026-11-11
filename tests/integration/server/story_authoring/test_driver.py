@@ -21,7 +21,14 @@ from server.story_authoring.artifacts import StoryBlobStore
 from server.story_authoring.checks import count_syllables
 from server.story_authoring.commit import load_offered_manifest
 from server.story_authoring.contracts import StoryLimits, StoryModelSelection
-from server.story_authoring.driver import CONFIRM_MAX, REVIEW_CYCLES, StoryBrief, StoryRunDriver, run_call_bound
+from server.story_authoring.driver import (
+    CONFIRM_MAX,
+    PLAN_REPLANS,
+    REVIEW_CYCLES,
+    StoryBrief,
+    StoryRunDriver,
+    run_call_bound,
+)
 from server.story_authoring.generation import AuthoringTextGateway
 from server.story_authoring.pipeline import scene_draft
 from server.story_authoring.runtime import (
@@ -795,7 +802,7 @@ async def test_a_withheld_card_that_stays_revealed_is_patched_replanned_then_off
     assert state.phase is RunPhase.READY_FOR_APPROVAL, state.block_reason
     assert model.calls["patches"] >= 1
     assert not any(n.startswith("scene_draft[") for n in state.intents)
-    assert len(state.intents["chapter_plan[1]"]) == 1
+    assert len(state.intents["chapter_plan[1]"]) == PLAN_REPLANS
     exceptions = _exceptions(blobs, state)
     assert {f["code"] for f in exceptions} == {"MEMO_COMPLIANCE:withheld_card_revealed"}
     assert all(f["message"].startswith("[hết lượt sửa tự động] ") and f["quote"] for f in exceptions)
@@ -883,6 +890,7 @@ async def test_a_contract_that_stays_unmet_replans_the_chapter_once(concurrent_s
     assert state.phase is RunPhase.READY_FOR_APPROVAL, state.block_reason
     assert len(replanned) == 1
     assert "mục bắt buộc phạm mục cấm" in replanned[0]
+    # The replanned chapter passes, so no further replan is asked for.
     assert len(state.intents["chapter_plan[1]"]) == 1
     assert not any(n.startswith("scene_draft[1,") for n in state.intents)
     assert any(a.step_id.startswith("scene_draft[1,1]@r0.0.1#") for a in state.attempts)
@@ -891,7 +899,12 @@ async def test_a_contract_that_stays_unmet_replans_the_chapter_once(concurrent_s
 async def test_a_required_change_that_stays_missing_reaches_the_human_after_the_replan(
     concurrent_session_factory: Factory, tmp_path
 ):
-    store = await _store(concurrent_session_factory)
+    # Every replan of the chapter fails too: the run needs the structural bound that counts them.
+    bound = run_call_bound()
+    store = await _store(
+        concurrent_session_factory,
+        LIMITS.model_copy(update={"generate_calls_max": bound, "count_calls_max": bound}),
+    )
     model = ScriptedModel()
     blobs = StoryBlobStore(tmp_path)
 
@@ -913,7 +926,7 @@ async def test_a_required_change_that_stays_missing_reaches_the_human_after_the_
     state = await _driver(concurrent_session_factory, store, model, blobs).run()
 
     assert state.phase is RunPhase.READY_FOR_APPROVAL, state.block_reason
-    assert len(state.intents["chapter_plan[1]"]) == 1
+    assert len(state.intents["chapter_plan[1]"]) == PLAN_REPLANS
     assert {f["code"] for f in _exceptions(blobs, state)} == {"MEMO_COMPLIANCE:required_change_missing"}
 
 
@@ -1200,9 +1213,10 @@ async def test_a_story_whose_every_review_fails_reaches_the_human_inside_the_def
     state = await _driver(concurrent_session_factory, store, model, blobs).run()
 
     assert state.phase is RunPhase.READY_FOR_APPROVAL, state.block_reason
-    assert all(len(state.intents[f"chapter_plan[{c}]"]) == 1 for c in (1, 2, 3))
+    assert all(len(state.intents[f"chapter_plan[{c}]"]) == PLAN_REPLANS for c in (1, 2, 3))
     plan_3 = {a.step_id.rsplit("#", 1)[0] for a in state.attempts if a.step_id.startswith("chapter_plan[3]")}
-    assert len(plan_3) == 4
+    # Its first round, then one for each replan of chapters 1 to 3 (each regenerates every later plan).
+    assert len(plan_3) == 1 + 3 * PLAN_REPLANS
     assert {f["code"] for f in _exceptions(blobs, state)} == {"MEMO_COMPLIANCE:required_change_missing"}
     assert state.usage.generate_calls <= run_call_bound(scenes_per_chapter=3)
     reviews = {a.step_id.rsplit("#", 1)[0] for a in state.attempts if a.step_id.startswith("chapter_review[")}

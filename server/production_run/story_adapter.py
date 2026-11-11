@@ -316,12 +316,18 @@ class BriefAdapter:
         if drafted.limits.cloud_prices is not None and run.policy.currency != "USD":
             raise OwnerBlocked("CURRENCY_MISMATCH")
         if story_only:
-            # ADR-0127: a story-only run keeps its story's whole structural bound; caps that cannot hold even the
-            # smallest part stop the run now instead of hours into it.
-            if not fits_run(run.policy, drafted.limits, spent_calls=DRAW_ATTEMPTS * 2):
-                raise OwnerBlocked("RUN_CAPS_BELOW_STORY_BOUND")
+            # ADR-0127: a story-only run keeps its story's whole structural bound. A new book whose smallest part
+            # does not fit stops now instead of hours into it; a story whose size is already fixed (a later part of
+            # a book, a short story) takes all the run's calls, and a top-up continues it if it needs more.
+            spent = DRAW_ATTEMPTS * 2
+            limits = drafted.limits
+            if not fits_run(run.policy, limits, spent_calls=spent):
+                if book_chapters is not None:
+                    raise OwnerBlocked("RUN_CAPS_BELOW_STORY_BOUND")
+                calls = max(1, (run.policy.max_model_calls - spent) // 2)
+                limits = limits.model_copy(update={"generate_calls_max": calls, "count_calls_max": calls})
             brief = drafted.model_copy(
-                update={"limits": whole_story(run.policy, drafted.limits, spent_seconds=10 + DRAW_ATTEMPTS * 120)}
+                update={"limits": whole_story(run.policy, limits, spent_seconds=10 + DRAW_ATTEMPTS * 120)}
             )
         else:
             brief = drafted.model_copy(update={"limits": story_limits(run.policy, drafted.limits)})

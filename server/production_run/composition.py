@@ -71,6 +71,8 @@ from server.story_authoring.service import StoryAuthoringService
 type Sessions = async_sessionmaker[AsyncSession]
 ACTIVATION_ENV = "ARCREEL_AUTOMATIC_PRODUCTION"
 #: Ceiling on the episodes one automatic run may produce, whatever a project's settings ask for.
+#: ADR-0127: a 5-chapter book part with three replans per chapter fits whole (2 290 calls with its counts).
+DEFAULT_MAX_MODEL_CALLS = 2400
 MAX_TARGET_EPISODES = 12
 
 
@@ -143,7 +145,7 @@ class ProjectPolicyResolver:
                 "routes": routes,
                 "currency": settings.get("currency", "USD"),
                 "max_cost_minor_units": int(settings.get("max_cost_minor_units", 500)),
-                "max_model_calls": int(settings.get("max_model_calls", 1500)),
+                "max_model_calls": int(settings.get("max_model_calls", DEFAULT_MAX_MODEL_CALLS)),
                 "max_tasks": int(settings.get("max_tasks", 600)),
                 "max_runtime_seconds": int(settings.get("max_runtime_seconds", 64800)),
                 "max_target_episodes": min(int(settings.get("max_target_episodes", 1)), MAX_TARGET_EPISODES),

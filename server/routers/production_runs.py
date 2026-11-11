@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import asyncio
 from typing import Annotated, Any, Literal
+from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import FileResponse
@@ -210,7 +211,7 @@ async def get_settings(project_name: str, user: CurrentUser, service: Service) -
 
 @router.put("/projects/{project_name}/automation/settings")
 async def put_settings(
-    project_name: str, body: SettingsUpdate, user: InteractiveUser, token: Token, service: Service
+    project_name: str, body: SettingsUpdate, user: InteractiveUser, token: Token, service: Service, scheduler: Autopilot
 ) -> dict[str, Any]:
     """Replace the project's model per role and run limits; a later Start freezes them into its policy."""
     active = _require(service)
@@ -220,9 +221,31 @@ async def put_settings(
         raise _http(error) from error
     sessions = active.sessions
     try:
-        return await save_settings(sessions, get_project_manager(), project_name, body, user_id=user.id)
+        saved = await save_settings(sessions, get_project_manager(), project_name, body, user_id=user.id)
     except SettingsRefused as refused:
         raise HTTPException(status_code=422, detail={"code": str(refused), "reasons": []}) from None
+    # ADR-0127: an autopilot on the project freezes the policy it was turned on with; the same Showrunner's change of
+    # settings turns it on again with the new policy and the same parameters, so it does not stop on POLICY_MOVED.
+    async with sessions() as session:
+        delegation = await AutopilotRepository(session).current(user.id, project_name)
+    if delegation is not None and delegation.state == "ENABLED":
+        try:
+            await active.set_autopilot(
+                interactive_token=token,
+                user_id=user.id,
+                project_name=project_name,
+                command_id=f"settings:{uuid4().hex}",
+                enabled=True,
+                kind=delegation.kind,
+                mode=delegation.mode,
+                story=delegation.story,
+                film=delegation.film,
+            )
+        except _REFUSALS as error:
+            raise _http(error) from error
+        if scheduler is not None:
+            scheduler.wake()
+    return saved
 
 
 @router.post("/projects/{project_name}/production-runs")

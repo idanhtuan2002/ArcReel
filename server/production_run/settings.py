@@ -27,7 +27,7 @@ from lib.db.models.quality import QualityProfileHeadModel
 from lib.db.repositories.custom_provider_repo import CustomProviderRepository
 from lib.db.repositories.quality import QualityProfileRepository
 from lib.project_manager import ProjectManager
-from server.production_run.composition import MAX_TARGET_EPISODES
+from server.production_run.composition import DEFAULT_MAX_MODEL_CALLS, MAX_TARGET_EPISODES
 
 Role = Literal["writer", "script", "reviewer_a", "reviewer_b", "image", "video", "audio"]
 ROLE_MEDIA: dict[str, str] = {
@@ -65,7 +65,7 @@ class SettingsUpdate(BaseModel):
     routes: list[RouteChoice] = Field(min_length=len(ROLE_MEDIA), max_length=len(ROLE_MEDIA))
     currency: Annotated[str, StringConstraints(pattern=r"^[A-Z][A-Z0-9_]{1,31}$")] = "USD"
     max_cost_minor_units: Annotated[int, Field(ge=0, le=1_000_000)] = 500
-    max_model_calls: Annotated[int, Field(ge=1, le=5000)] = 1500
+    max_model_calls: Annotated[int, Field(ge=1, le=5000)] = DEFAULT_MAX_MODEL_CALLS
     max_runtime_seconds: Annotated[int, Field(ge=600, le=172_800)] = 64_800
     max_target_episodes: Annotated[int, Field(ge=1, le=MAX_TARGET_EPISODES)] = 1
     #: A published quality profile of the project; its current revision's digest is pinned. ``None`` keeps the

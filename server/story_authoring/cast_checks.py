@@ -76,6 +76,74 @@ def gender_findings(cast: Sequence[SeedCharacter], scenes: Sequence[tuple[str, s
     return tuple(findings)
 
 
+#: Openings that describe rather than name a person, and the same description of the other gender.
+_COUNTERPART = {
+    "cô gái": "chàng trai",
+    "thiếu nữ": "chàng trai",
+    "người phụ nữ": "người đàn ông",
+    "người đàn bà": "người đàn ông",
+    "chàng trai": "cô gái",
+    "người đàn ông": "người phụ nữ",
+}
+
+
+def _opening_word(sentence: str, gender: str) -> str | None:
+    head = sentence.lstrip().casefold()
+    for word in OPENINGS[gender]:
+        if re.match(rf"{re.escape(word)}(?!\w)", head):
+            return word
+    return None
+
+
+def fix_gender_openings(cast: Sequence[SeedCharacter], text: str) -> str:
+    """The text with each narration sentence that opens with a word of the wrong gender, in a paragraph naming one
+    character only, opened with that character's own address, or with the same description of the right gender
+    ("Cô gái trẻ" → "Chàng trai trẻ"). Dialogue and
+    paragraphs naming several characters are left to the model repair (donor huohuo applies deterministic local
+    fixes only where the right word is certain)."""
+    by_name = {_fold(c.name): c for c in cast if c.gender is not None}
+    paragraphs = _fold(text).split("\n\n")
+    fixed: list[str] = []
+    for paragraph in paragraphs:
+        present = [c for name, c in by_name.items() if _names_in(_narration(paragraph), name)]
+        if len(present) != 1:
+            fixed.append(paragraph)
+            continue
+        character = present[0]
+        other = "nữ" if character.gender == "nam" else "nam"
+        out: list[str] = []
+        for sentence in _SENTENCE.findall(paragraph):
+            body = sentence.lstrip()
+            lead = sentence[: len(sentence) - len(body)]
+            word = None if body[:1] in '“"«-–—' else _opening_word(body, other)
+            if word is None:
+                out.append(sentence)
+                continue
+            if word in _COUNTERPART:
+                counterpart = _COUNTERPART[word]
+                replacement = counterpart[:1].upper() + counterpart[1:]
+            elif not character.address:
+                replacement = character.name
+            else:
+                replacement = character.address[:1].upper() + character.address[1:]
+                if word.endswith(" ấy"):
+                    replacement += " ấy"
+            out.append(lead + replacement + body[len(word) :])
+        fixed.append("".join(out))
+    return "\n\n".join(fixed)
+
+
+def fix_near_names(text: str, allowed: set[str]) -> str:
+    """The text with each name one letter from a character's replaced by that character's name."""
+    from server.story_authoring.checks import near_name, unknown_names
+
+    for name in unknown_names(text, allowed):
+        right = near_name(name, allowed)
+        if right is not None:
+            text = re.sub(rf"(?<!\w){re.escape(name)}(?!\w)", right, text)
+    return text
+
+
 #: Word overlap at or above which a required change restates a ban or a secret.
 CONFLICT_OVERLAP = 0.5
 _STOP = frozenset(
@@ -219,4 +287,13 @@ def missing_idea_names(idea: str, seed: StorySeed) -> list[str]:
     return [name for name in idea_names(idea) if not _names_in(carried, name)]
 
 
-__all__ = ["CONFLICT_OVERLAP", "OPENINGS", "gender_findings", "idea_names", "missing_idea_names", "plan_conflicts"]
+__all__ = [
+    "CONFLICT_OVERLAP",
+    "OPENINGS",
+    "fix_gender_openings",
+    "fix_near_names",
+    "gender_findings",
+    "idea_names",
+    "missing_idea_names",
+    "plan_conflicts",
+]

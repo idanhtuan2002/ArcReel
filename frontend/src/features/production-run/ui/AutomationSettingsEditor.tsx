@@ -31,7 +31,7 @@ function draftOf(loaded: AutomationSettings): Draft {
     routes,
     currency: settings.currency ?? "USD",
     max_cost_minor_units: settings.max_cost_minor_units ?? 500,
-    max_model_calls: settings.max_model_calls ?? 1500,
+    max_model_calls: settings.max_model_calls ?? 2400,
     max_runtime_hours: Math.round((settings.max_runtime_seconds ?? 64800) / 3600),
     max_target_episodes: settings.max_target_episodes ?? 1,
   };

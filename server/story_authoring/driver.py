@@ -43,7 +43,13 @@ from server.story_authoring.audits import (
     unconfirmed,
     unfaithful_blurbs,
 )
-from server.story_authoring.cast_checks import gender_findings, missing_idea_names, plan_conflicts
+from server.story_authoring.cast_checks import (
+    fix_gender_openings,
+    fix_near_names,
+    gender_findings,
+    missing_idea_names,
+    plan_conflicts,
+)
 from server.story_authoring.checks import (
     ESCALATED_MARK,
     Finding,
@@ -105,6 +111,7 @@ from server.story_authoring.prompts.schemas import (
     ChapterPlan,
     OutlineReview,
     Packaging,
+    SeedCharacter,
     ShortOutline,
     StoryBibleOut,
     StorySeed,
@@ -146,6 +153,8 @@ CONVERGE_PASSES = 6
 JUDGE_ATTEMPTS = 3
 CONFIRM_MAX = 3
 PLAN_CALLS = 4
+#: Automatic replans of one chapter plan before its unmet contract goes to the Showrunner (ADR-0127).
+PLAN_REPLANS = 3
 MIN_VERIFIED_SELLING_POINTS = 3
 STORY_HARD_RANGE = (6000, 12500)
 STORY_TARGET_RANGE = (7000, 11000)
@@ -338,7 +347,9 @@ class StoryRunDriver:
         if state.phase is not RunPhase.RUNNING:
             return state
         try:
-            for _ in range(CONVERGE_PASSES):
+            # Every automatic replan restarts the pass; each chapter replans at most PLAN_REPLANS times, so the
+            # passes they take are bounded and come on top of those that converge Human revisions.
+            for _ in range(CONVERGE_PASSES + self._chapters * PLAN_REPLANS):
                 intents = human_intents(await self._store.load())
                 try:
                     story = await self._converge()
@@ -1413,7 +1424,15 @@ class StoryRunDriver:
                     f"{self._prior_tail}\n>>>\n\n{prompt}"
                 )
             prose, findings = await self._draft_until_clean(
-                ref.node_id, epoch, prompt, context, allowed, planned.dialogue_required, target, earlier
+                ref.node_id,
+                epoch,
+                prompt,
+                context,
+                allowed,
+                planned.dialogue_required,
+                target,
+                earlier,
+                cast=story.seed.characters,
             )
             return json.dumps(
                 {**binding, "prose": prose, "findings": [_finding_dict(f) for f in findings]}, ensure_ascii=False
@@ -1437,6 +1456,8 @@ class StoryRunDriver:
         dialogue: bool,
         target: int,
         earlier: Sequence[str],
+        *,
+        cast: Sequence[SeedCharacter] = (),
     ) -> tuple[str, tuple[Finding, ...]]:
         bounds = drafting.paragraph_bounds(target)
         try:
@@ -1479,6 +1500,9 @@ class StoryRunDriver:
         history: list[str] = []
         best: tuple[str, tuple[Finding, ...]] | None = None
         while True:
+            # Certain fixes first, with no model call: a misspelt character name, a narration sentence opening with
+            # the wrong gender (ADR-0127; donor huohuo deterministic continuity fixes).
+            prose = fix_gender_openings(cast, fix_near_names(prose, allowed))
             findings = check_scene_prose(
                 prose,
                 node_id=node,
@@ -1661,7 +1685,10 @@ class StoryRunDriver:
         if final and blocking and all(f.code.startswith(contract) for f in blocking):
             plan_node = chapter_plan(chapter)
             state = await self._store.load()
-            if not state.intents.get(plan_node):
+            replanned = sum(1 for n in state.intents.get(plan_node, ()) if n.startswith(AUTO_NOTE))
+            if replanned < PLAN_REPLANS:
+                # Each replan sees the failed plan and every earlier failure (donor shenbi accumulates failure
+                # families so a retry converges); after PLAN_REPLANS the finding goes to the Showrunner.
                 note = AUTO_NOTE + PLAN_REPAIR_NOTE + "; ".join(f"{f.message} (trích: “{f.quote}”)" for f in blocking)
                 scene_nodes = tuple(ref.node_id for ref in refs)
                 await self._store.apply(
@@ -2077,14 +2104,14 @@ def step_prefix(state: RunState, node: str) -> str:
 def run_call_bound(
     chapters: int = CHAPTERS, scenes_per_chapter: int = SCENES_PER_CHAPTER_MAX, *, book: books.BookPart | None = None
 ) -> int:
-    """Generate calls of a run whose every chapter review fails until repair is spent: each chapter replanned once
-    (regenerating its plan and every later one), every scene drafted and repaired in each review cycle of both
-    contracts, each review with all its audits and second readings, and the final scene rewritten for its ending.
+    """Generate calls of a run whose every chapter review fails until repair is spent: each chapter replanned
+    PLAN_REPLANS times (regenerating its plan and every later one), every scene drafted and repaired in each review
+    cycle of every contract, each review with all its audits and second readings, and the final scene rewritten for its ending.
     Output retries come out of the margin left by nodes that need fewer calls."""
-    contracts = 2
+    contracts = 1 + PLAN_REPLANS
     review = len(CHAPTER_DIMENSIONS) + CONFIRM_MAX
     planning = 3 + 3  # seed and bibles; outline, its review and revision
-    plans = sum(1 + c for c in range(1, chapters + 1)) * PLAN_CALLS
+    plans = sum(1 + PLAN_REPLANS * c for c in range(1, chapters + 1)) * PLAN_CALLS
     scenes = chapters * scenes_per_chapter * (1 + REVIEW_CYCLES) * contracts
     reviews = chapters * contracts * (1 + REVIEW_CYCLES) * review
     ending = 1 + (1 + REVIEW_CYCLES) * review

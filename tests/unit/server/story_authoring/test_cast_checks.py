@@ -142,3 +142,25 @@ def test_a_name_one_letter_from_a_characters_is_repaired_not_recorded():
     assert near_name("Mạnh", {"Minh", "Lan"}) == "Minh"
     assert near_name("Huy", {"Minh", "Lan"}) is None
     assert near_name("Minh", {"Lê Minh"}) is None
+
+
+def test_certain_cast_errors_are_fixed_without_a_model_call():
+    from server.story_authoring.cast_checks import fix_gender_openings, fix_near_names
+
+    text = (
+        "Minh quay lưng lại cửa sổ. Cô biết rằng đây là khởi đầu.\n\n"
+        "Minh bước ra. Cô gái trẻ không quay đầu. Cô ấy đi.\n\n"
+        "Minh nhìn Lan. Cô cúi đầu.\n\n"
+        "Minh nói: “Cô đi đi.”"
+    )
+    fixed = fix_gender_openings([MINH, LAN], text)
+    assert fixed == (
+        "Minh quay lưng lại cửa sổ. Anh biết rằng đây là khởi đầu.\n\n"
+        "Minh bước ra. Chàng trai trẻ không quay đầu. Anh ấy đi.\n\n"
+        "Minh nhìn Lan. Cô cúi đầu.\n\n"
+        "Minh nói: “Cô đi đi.”"
+    )
+    assert gender_findings([MINH, LAN], [("s", fixed)]) == ()
+    assert fix_near_names("Minh đi. Lúc ấy Mạnh quay lại, rồi Mạnh cười.", {"Minh", "Lan"}) == (
+        "Minh đi. Lúc ấy Minh quay lại, rồi Minh cười."
+    )
