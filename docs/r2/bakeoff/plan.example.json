@@ -1,0 +1,16 @@
+{
+  "aspect_ratio": "9:16",
+  "shots": [
+    {"id": "dialogue-closeup", "prompt": "Close-up, a young Vietnamese woman speaks softly to someone off frame on her left, slight head turn, natural blinking, warm evening light, handheld camera.", "start_image": "frames/dialogue-closeup.png", "duration": 5},
+    {"id": "action-medium", "prompt": "Medium shot, an old fisherman hauls a wet net onto the boat with both hands, water drips, the boat rocks, camera tracks slowly left.", "start_image": "frames/action-medium.png", "duration": 5},
+    {"id": "wide-establishing", "prompt": "Wide establishing shot of a Mekong river village at dawn, mist on the water, a small boat glides from right to left, slow push in.", "start_image": "frames/wide-establishing.png", "duration": 5}
+  ],
+  "engines": [
+    {"provider": "gemini-aistudio", "model": "veo-3.1-lite-generate-preview", "resolution": "720p"},
+    {"provider": "gemini-aistudio", "model": "veo-3.1-fast-generate-preview", "resolution": "720p"},
+    {"provider": "ark", "model": "doubao-seedance-2-0-mini-260615", "resolution": "720p"},
+    {"provider": "kling", "model": "kling-v3", "resolution": "720p"},
+    {"provider": "minimax", "model": "MiniMax-Hailuo-2.3-Fast"},
+    {"provider": "vidu", "model": "viduq3-turbo", "resolution": "720p"}
+  ]
+}
