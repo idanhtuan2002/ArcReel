@@ -33,7 +33,7 @@ from server.production_run.evaluators import (
     prompt_digest,
     review_method,
 )
-from server.production_run.final_checks import picture_findings, subtitle_findings
+from server.production_run.final_checks import picture_findings, sound_findings, subtitle_findings, timing_findings
 from server.production_run.vision_chat import AccessFor, model_access
 
 DEFAULT_BASE_URL = "https://generativelanguage.googleapis.com"
@@ -79,6 +79,8 @@ class GeminiReviewer:
                 return ModelAssessment.model_validate({**base, "outcome": "FAILED"})
             checks = subtitle_findings(subtitles, evidence.narration_text, unit_key=evidence.unit_key)
             checks += await asyncio.to_thread(picture_findings, evidence.final_path, unit_key=evidence.unit_key)
+            checks += timing_findings(subtitles, unit_key=evidence.unit_key)
+            checks += await asyncio.to_thread(sound_findings, evidence.final_path, unit_key=evidence.unit_key)
             base_url, api_key = await self._credentials_for(route.provider_id)
             body = {
                 "contents": [

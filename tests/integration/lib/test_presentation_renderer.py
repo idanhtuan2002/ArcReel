@@ -132,3 +132,36 @@ def test_a_duration_outside_the_contract_is_refused(clips, tmp_path: Path):
         render_presentations(
             episode=RenderInput(episode=1, units=(_unit(clips),)), output_dir=tmp_path / "out", contract=contract
         )
+
+
+def test_the_final_is_mastered_to_the_contract_loudness(clips, tmp_path: Path):
+    quiet = _media(
+        tmp_path / "quiet.wav",
+        "-f",
+        "lavfi",
+        "-i",
+        "sine=frequency=300:sample_rate=24000",
+        "-af",
+        "volume=-30dB",
+        seconds=2,
+    )
+    unit = _unit({**clips, "voice": quiet})
+    episode = RenderInput(episode=1, units=(unit, unit, unit))
+
+    receipt = render_presentations(episode=episode, output_dir=tmp_path / "out", contract=CONTRACT)
+
+    loudness = json.loads(receipt.manifest_path.read_text(encoding="utf-8"))["loudness"]
+    assert loudness["input_lufs"] < -35
+    assert abs(loudness["output_lufs"] - CONTRACT.loudness_lufs) <= 1.0
+    assert loudness["output_true_peak_db"] <= CONTRACT.true_peak_db + 0.5
+    assert abs(receipt.duration_seconds - 9.0) <= 0.12
+
+
+def test_a_contract_without_a_loudness_target_keeps_the_mix(clips, tmp_path: Path):
+    contract = RenderContract(width=576, height=1024, fps=24, min_seconds=1, max_seconds=60, loudness_lufs=None)
+
+    receipt = render_presentations(
+        episode=RenderInput(episode=1, units=(_unit(clips),)), output_dir=tmp_path / "out", contract=contract
+    )
+
+    assert json.loads(receipt.manifest_path.read_text(encoding="utf-8"))["loudness"] is None

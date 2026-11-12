@@ -4,8 +4,10 @@ Input is a snapshot of already-selected media: each unit names its video file an
 file placed inside that window, and the unit's subtitle cues. Nothing is chosen again from file names. Each unit is
 encoded to the output contract (H.264/AAC, exact size and frame rate) with structured FFmpeg argv, the units are
 concatenated, and the final is decoded in full and probed: streams, size, frame rate, duration against the sum of
-the units, and audible audio where narration was placed. Source files are hashed before and after and must not
-change. Everything is written in a staging directory and moved into place only after verification; a failed or
+the units, and audible audio where narration was placed. Before verification the concatenated audio is mastered to
+the contract's loudness: a measuring pass, then a linear ``loudnorm`` pass with the measured values and a true-peak
+ceiling, picture copied untouched; the before/after loudness is recorded in the manifest. Source files are hashed
+before and after and must not change. Everything is written in a staging directory and moved into place only after verification; a failed or
 cancelled render leaves no final behind.
 """
 
@@ -27,6 +29,8 @@ MICROSECONDS = 1_000_000
 DURATION_TOLERANCE_SECONDS = 0.12
 SILENCE_DB = -60.0
 AUDIO_RATE = 48_000
+#: Below this integrated loudness the final is treated as silent and is not mastered.
+MASTER_FLOOR_LUFS = -70.0
 
 
 class RenderRefused(ValueError):
@@ -68,6 +72,10 @@ class RenderContract:
     max_seconds: float
     requires_narration: bool = True
     requires_subtitles: bool = True
+    #: Integrated loudness target of the final (EBU R128 / ITU-R BS.1770); ``None`` leaves the mix as made.
+    loudness_lufs: float | None = -14.0
+    true_peak_db: float = -1.0
+    loudness_range: float = 20.0
 
 
 @dataclass(frozen=True)
@@ -240,6 +248,103 @@ def _mean_volume(path: Path, ffmpeg: str, start_us: int, duration_us: int) -> fl
     return -math.inf if value == "-inf" else float(value)
 
 
+def measure_loudness(
+    path: Path, *, ffmpeg: str = "ffmpeg", target: tuple[float, float, float] = (-14.0, -1.0, 20.0)
+) -> dict[str, str]:
+    """``loudnorm`` measurement of ``path``'s audio: integrated LUFS, true peak, range and threshold (strings as
+    ffmpeg prints them, ``-inf`` for silence)."""
+    integrated, peak, lra = target
+    completed = subprocess.run(
+        [
+            ffmpeg,
+            "-nostdin",
+            "-hide_banner",
+            "-i",
+            str(path),
+            "-vn",
+            "-af",
+            f"loudnorm=I={integrated}:TP={peak}:LRA={lra}:print_format=json",
+            "-f",
+            "null",
+            "-",
+        ],
+        capture_output=True,
+        text=True,
+        timeout=600,
+        check=False,
+    )
+    start = completed.stderr.rfind("{")
+    if completed.returncode != 0 or start < 0:
+        raise RenderRefused("AUDIO_PROBE_FAILED", "loudness measurement")
+    try:
+        values = json.loads(completed.stderr[start : completed.stderr.rfind("}") + 1])
+    except ValueError as error:
+        raise RenderRefused("AUDIO_PROBE_FAILED", "loudness measurement") from error
+    return {key: str(values[key]) for key in ("input_i", "input_tp", "input_lra", "input_thresh", "target_offset")}
+
+
+def _lufs(value: str) -> float:
+    return -math.inf if value.strip().lower() in {"-inf", "inf", "nan"} else float(value)
+
+
+def _master(final: Path, mastered: Path, contract: RenderContract, *, ffmpeg: str) -> dict[str, float | bool] | None:
+    """Master ``final``'s audio into ``mastered`` (picture copied); ``None`` when the contract asks for no mastering
+    or the audio is silent."""
+    if contract.loudness_lufs is None:
+        return None
+    target = (contract.loudness_lufs, contract.true_peak_db, contract.loudness_range)
+    before = measure_loudness(final, ffmpeg=ffmpeg, target=target)
+    if _lufs(before["input_i"]) <= MASTER_FLOOR_LUFS:
+        return None
+    integrated, peak, lra = target
+    audio = (
+        f"loudnorm=I={integrated}:TP={peak}:LRA={lra}:linear=true:"
+        f"measured_I={before['input_i']}:measured_TP={before['input_tp']}:measured_LRA={before['input_lra']}:"
+        f"measured_thresh={before['input_thresh']}:offset={before['target_offset']},aresample={AUDIO_RATE}"
+    )
+    _run(
+        [
+            ffmpeg,
+            "-nostdin",
+            "-hide_banner",
+            "-loglevel",
+            "error",
+            "-y",
+            "-i",
+            str(final),
+            "-map",
+            "0:v:0",
+            "-map",
+            "0:a:0",
+            "-c:v",
+            "copy",
+            "-af",
+            audio,
+            "-c:a",
+            "aac",
+            "-b:a",
+            "160k",
+            "-ar",
+            str(AUDIO_RATE),
+            "-ac",
+            "2",
+            "-movflags",
+            "+faststart",
+            str(mastered),
+        ],
+        timeout=900,
+    )
+    after = measure_loudness(mastered, ffmpeg=ffmpeg, target=target)
+    return {
+        "target_lufs": integrated,
+        "true_peak_ceiling_db": peak,
+        "input_lufs": _lufs(before["input_i"]),
+        "input_true_peak_db": _lufs(before["input_tp"]),
+        "output_lufs": _lufs(after["input_i"]),
+        "output_true_peak_db": _lufs(after["input_tp"]),
+    }
+
+
 def _verify(final: Path, episode: RenderInput, contract: RenderContract, *, ffmpeg: str, ffprobe: str) -> float:
     _run(
         [ffmpeg, "-nostdin", "-hide_banner", "-v", "error", "-xerror", "-i", str(final), "-f", "null", "-"], timeout=900
@@ -343,6 +448,10 @@ def render_presentations(
             ],
             timeout=600,
         )
+        mastered = staging / f"mastered_{episode.episode}.mp4"
+        loudness = _master(final, mastered, contract, ffmpeg=ffmpeg)
+        if loudness is not None:
+            os.replace(mastered, final)
         duration = _verify(final, episode, contract, ffmpeg=ffmpeg, ffprobe=ffprobe)
         if _sources(episode) != before:
             raise RenderRefused("SOURCE_MEDIA_CHANGED")
@@ -355,6 +464,7 @@ def render_presentations(
             "tool_version": version,
             "duration_seconds": duration,
             "final_sha256": sha256_file(final),
+            "loudness": loudness,
             "subtitle_sha256": sha256_file(subtitle),
             "units": [
                 {
@@ -409,6 +519,7 @@ __all__ = [
     "RenderReceipt",
     "RenderRefused",
     "RenderUnit",
+    "measure_loudness",
     "render_presentations",
     "sha256_file",
 ]

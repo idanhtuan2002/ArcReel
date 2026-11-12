@@ -35,7 +35,7 @@ from r2.automation.identity import digest_value
 from r2.automation.profiles import route_digest
 from r2.contracts.automation import ModelRoute, RunStage
 from r2.contracts.common import ensure_json_value
-from server.production_run.final_checks import picture_findings, subtitle_findings
+from server.production_run.final_checks import picture_findings, sound_findings, subtitle_findings, timing_findings
 from server.production_run.vision_chat import AccessFor, ollama_access, vision_chat
 
 FRAME_COUNT = 8
@@ -447,6 +447,8 @@ class FrameReviewer:
             pairs = [await asyncio.to_thread(orientation_pair, frame) for frame in frames]
             checks = subtitle_findings(subtitles, evidence.narration_text, unit_key=evidence.unit_key)
             checks += await asyncio.to_thread(picture_findings, evidence.final_path, unit_key=evidence.unit_key)
+            checks += timing_findings(subtitles, unit_key=evidence.unit_key)
+            checks += await asyncio.to_thread(sound_findings, evidence.final_path, unit_key=evidence.unit_key)
             cues = "\n".join(
                 f"Khung {index + 1} ({seconds:.1f}s): «{cue_at(subtitles, seconds) or '—'}»"
                 for index, seconds in enumerate(frame_times(duration, len(frames)))
