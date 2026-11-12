@@ -23,3 +23,7 @@ Not run: full suite (policy), frontend (untouched), heavy Remotion/M6 render tes
 3. Offline adapter verification for the 1–2 winning engines; sponsor approves status; route canary.
 4. ADR-0134 step 3: MEDIA regenerates drift storyboards once with `prompt_fix` as a task payload addendum (worker builds the prompt from the script item in `server/services/generation_tasks.py:1616`; addendum must be recorded in provenance), `continuity.json` evidence.
 5. Real motion profile (cloud i2v) + OpenMontage slideshow-risk / no-silent-downgrade gate; music bed with ducking once a music source exists; drama via Kling elements + lip-sync.
+
+## Sponsor decisions (2026-11-13)
+- **Adapter status change approved** ("duyệt chuyển trạng thái"): the agent may set `OFFLINE_VERIFIED` on the adapter profiles of the bake-off winners once their ADR-0091 F1 offline evidence file is complete (same form as the spatial precedent). The route canary remains a separate operator step.
+- **Gemini free tier allowed for trial content** ("cho phép đưa nội dung thử nghiệm lên gói miễn phí của Gemini"), accepting that free-tier inputs may be used by Google.
