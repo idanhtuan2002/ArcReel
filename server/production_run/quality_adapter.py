@@ -244,6 +244,7 @@ class QualityAdapter:
                 narration_text=self._narration(run.project_name, episode),
                 subject_digest=master.digest,
                 segments=final_segments(final, episode),
+                target_seconds=run.policy.target_duration_seconds,
             )
         return targets
 

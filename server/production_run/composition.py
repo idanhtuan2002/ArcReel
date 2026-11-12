@@ -23,6 +23,7 @@ from lib.db.models.quality import QualityProfileHeadModel
 from lib.db.repositories.launch_qualifications import LaunchQualificationRepository
 from lib.db.repositories.quality import QualityProfileRepository
 from lib.db.repositories.reviewer_qualifications import ReviewerQualificationRepository
+from lib.episode_target_duration import project_episode_target_duration
 from lib.generation_resources import device_admission_configured
 from lib.project_manager import ProjectManager
 from r2.automation.profiles import resolve_launch_profile, route_digest
@@ -150,7 +151,7 @@ class ProjectPolicyResolver:
                 "max_runtime_seconds": int(settings.get("max_runtime_seconds", 64800)),
                 "max_target_episodes": min(int(settings.get("max_target_episodes", 1)), MAX_TARGET_EPISODES),
                 "route_digests": tuple(route_digest(route) for route in routes) or ("sha256:" + "0" * 64,),
-                "target_duration_seconds": launch.target_duration_seconds,
+                "target_duration_seconds": project_episode_target_duration(self._projects.load_project(project_name)),
                 "width": launch.width,
                 "height": launch.height,
                 "fps": launch.fps,

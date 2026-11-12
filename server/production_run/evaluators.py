@@ -35,7 +35,13 @@ from r2.automation.identity import digest_value
 from r2.automation.profiles import route_digest
 from r2.contracts.automation import ModelRoute, RunStage
 from r2.contracts.common import ensure_json_value
-from server.production_run.final_checks import picture_findings, sound_findings, subtitle_findings, timing_findings
+from server.production_run.final_checks import (
+    length_findings,
+    picture_findings,
+    sound_findings,
+    subtitle_findings,
+    timing_findings,
+)
 from server.production_run.vision_chat import AccessFor, ollama_access, vision_chat
 
 FRAME_COUNT = 8
@@ -322,6 +328,8 @@ class FinalEvidence:
     subject_digest: str
     #: The final's segments in play order as (unit id, end second), from the render manifest; empty when unknown.
     segments: tuple[tuple[str, float], ...] = ()
+    #: The run's episode target in seconds (``RunPolicy.target_duration_seconds``); ``None`` when the project has none.
+    target_seconds: float | None = None
 
 
 class QualifiedEvaluator(Protocol):
@@ -449,6 +457,7 @@ class FrameReviewer:
             checks += await asyncio.to_thread(picture_findings, evidence.final_path, unit_key=evidence.unit_key)
             checks += timing_findings(subtitles, unit_key=evidence.unit_key)
             checks += await asyncio.to_thread(sound_findings, evidence.final_path, unit_key=evidence.unit_key)
+            checks += length_findings(duration, evidence.target_seconds, unit_key=evidence.unit_key)
             cues = "\n".join(
                 f"Khung {index + 1} ({seconds:.1f}s): «{cue_at(subtitles, seconds) or '—'}»"
                 for index, seconds in enumerate(frame_times(duration, len(frames)))

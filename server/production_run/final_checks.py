@@ -4,7 +4,8 @@ Subtitles must say the narration (normalized text similarity), be Vietnamese, ca
 placeholder text. The picture must not be black for long and, in most frames, must fill at least half of the frame. Each failure is a CRITICAL
 finding with the stage that repairs it; the checks read only the final, its subtitle sidecar and the narration.
 
-Delivery checks (loudness against the render contract, dead air, subtitle reading speed and event duration) are MINOR
+Delivery checks (loudness against the render contract, dead air, subtitle reading speed and event duration, the final's
+length against the run's episode target) are MINOR
 findings: they are recorded and shown with every review but never send the run back, so reviewer qualification is
 unchanged.
 """
@@ -37,6 +38,8 @@ DEAD_AIR_DB = -50
 MAX_CHARACTERS_PER_SECOND = 20.0
 MIN_CUE_SECONDS = 5 / 6
 MAX_CUE_SECONDS = 7.0
+#: The share a final may miss the run's episode target by, as the adaptation's length check allows.
+TARGET_LENGTH_TOLERANCE = 0.2
 
 _CUE = re.compile(r"(\d+):(\d+):(\d+)[,.](\d+)\s*-->\s*(\d+):(\d+):(\d+)[,.](\d+)")
 _SILENCE = re.compile(r"silence_duration:\s*([0-9.]+)")
@@ -261,4 +264,26 @@ def sound_findings(final: Path, *, unit_key: str, ffmpeg: str = "ffmpeg") -> lis
     return found
 
 
-__all__ = ["picture_findings", "sound_findings", "subtitle_findings", "subtitle_text", "timing_findings"]
+def length_findings(seconds: float, target: float | None, *, unit_key: str) -> list[AssessmentFinding]:
+    """A MINOR finding for a final more than 20% shorter or longer than the run's episode target; none without one."""
+    if not target or abs(seconds - target) <= TARGET_LENGTH_TOLERANCE * target:
+        return []
+    return [
+        AssessmentFinding(
+            code="CHECK_LENGTH_OFF_TARGET",
+            severity="MINOR",
+            unit_key=unit_key,
+            repair_stage=RunStage.SCRIPT_PLAN,
+            detail=f"{seconds:.1f}s against a target of {target:.0f}s",
+        )
+    ]
+
+
+__all__ = [
+    "length_findings",
+    "picture_findings",
+    "sound_findings",
+    "subtitle_findings",
+    "subtitle_text",
+    "timing_findings",
+]

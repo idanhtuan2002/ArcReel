@@ -3,7 +3,9 @@
 A story is finished when its book has every part handed off, or, without a book, when it has story text. A story
 that a film already adapts is skipped, so running the batch again resumes where it stopped. Each new film copies
 its production settings from a template film project the Showrunner names, adapts the story (its text is synced
-in) and has its autopilot turned on by the same interactive Showrunner.
+in; its episodes are screen adaptations unless the template asks for ``verbatim``, and its narration is planned at the
+measured speaking rate of the launch profile's voice) and has its autopilot turned on by the same interactive
+Showrunner.
 """
 
 from __future__ import annotations
@@ -14,10 +16,13 @@ from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from typing import Any
 
+from lib.episode_adaptation import SETTING as ADAPTATION_SETTING
 from lib.episode_ledger import discover_sources
 from lib.project_kinds import KIND_FIELD, STORY_LINK_FIELD, linked_story, project_kind
 from lib.project_manager import ProjectManager
+from lib.speech_rate import SPEECH_RATE_FIELD
 from lib.style_templates import resolve_template_prompt
+from r2.automation.profiles import resolve_launch_profile
 from server.story_authoring.film_looks import film_look
 from server.story_authoring.idea_profile import PROFILE_SETTING
 
@@ -28,6 +33,7 @@ TEMPLATE_FIELDS = (
     "model_settings",
     "automation",
     "speech_rate_units_per_second",
+    "episode_adaptation",
     "video_backend",
     "video_provider_i2v",
     "video_provider_r2v",
@@ -123,6 +129,10 @@ def _create_film(projects: ProjectManager, story_name: str, story: dict[str, Any
     extras = {key: copy.deepcopy(template[key]) for key in TEMPLATE_FIELDS if template.get(key) is not None}
     extras.pop(KIND_FIELD, None)
     extras[STORY_LINK_FIELD] = story_name
+    # A film is adapted from its story, never read from it (ADR-0114), unless the template says otherwise.
+    extras.setdefault(ADAPTATION_SETTING, "screen")
+    if SPEECH_RATE_FIELD not in extras and (rate := _voice_rate(template)) is not None:
+        extras[SPEECH_RATE_FIELD] = rate
     profile = story.get(PROFILE_SETTING)
     look = film_look(profile.get("genre_pack") if isinstance(profile, dict) else None)
     if look is not None:
@@ -144,6 +154,24 @@ def _create_film(projects: ProjectManager, story_name: str, story: dict[str, Any
         extras=extras,
     )
     return name
+
+
+def _voice_rate(template: dict[str, Any]) -> float | None:
+    """The measured speaking rate of the launch profile's voice when the template narrates with that voice, so the
+    film's planned length is the length its narration will have; ``None`` for any other voice."""
+    settings = template.get("automation")
+    if not isinstance(settings, dict):
+        return None
+    try:
+        launch = resolve_launch_profile(str(settings.get("launch_profile_id", "fiction_narration_vi_v1")))
+    except ValueError:
+        return None
+    voices = {
+        (route.get("provider_id"), route.get("model_id"))
+        for route in settings.get("routes") or []
+        if isinstance(route, dict) and route.get("role") == "audio"
+    }
+    return launch.speech_rate_units_per_second if voices == {tuple(launch.audio_route)} else None
 
 
 def adopt_automation_settings(projects: ProjectManager, project_name: str) -> str | None:

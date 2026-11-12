@@ -6,7 +6,13 @@ from pathlib import Path
 
 import pytest
 
-from server.production_run.final_checks import picture_findings, sound_findings, subtitle_findings, timing_findings
+from server.production_run.final_checks import (
+    length_findings,
+    picture_findings,
+    sound_findings,
+    subtitle_findings,
+    timing_findings,
+)
 
 NARRATION = "Ông lão lặng lẽ thả lưới giữa dòng sông. Bỗng chiếc hộp gỗ mắc vào lưới."
 SRT = (
@@ -157,3 +163,18 @@ def test_quiet_finals_and_dead_air_are_minor(tmp_path: Path, audio: str, expecte
 
     assert {f.code for f in found} == expected
     assert {f.severity for f in found} <= {"MINOR"}
+
+
+@pytest.mark.parametrize(
+    ("seconds", "target", "codes"),
+    [(45.0, 45, []), (36.5, 45, []), (26.1, 45, ["CHECK_LENGTH_OFF_TARGET"]), (110.0, 90, ["CHECK_LENGTH_OFF_TARGET"])],
+)
+def test_a_final_far_from_the_episode_target_is_minor(seconds: float, target: int, codes: list[str]) -> None:
+    found = length_findings(seconds, target, unit_key="episode:1")
+
+    assert [finding.code for finding in found] == codes
+    assert all(finding.severity == "MINOR" for finding in found)
+
+
+def test_no_target_means_no_length_finding() -> None:
+    assert length_findings(26.1, None, unit_key="episode:1") == []

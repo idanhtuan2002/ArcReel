@@ -126,3 +126,39 @@ async def test_a_film_of_a_story_with_a_drawn_genre_takes_that_genres_look(tmp_p
     assert (films["given"]["style_template_id"], films["given"]["episode_target_duration"]) == ("anim_ghibli", 300)
     assert all(film_look(pack) is not None for pack in LOOKS)
     assert film_look("cyberpunk") is None
+
+
+@pytest.mark.parametrize(
+    ("voice", "own_rate", "rate"),
+    [
+        (("custom-2", "vieneu-tts-v3-turbo"), None, 3.75),
+        (("cloud-tts", "some-voice"), None, None),
+        (("custom-2", "vieneu-tts-v3-turbo"), 3.1, 3.1),
+    ],
+)
+async def test_a_film_speaks_at_its_voices_measured_rate(tmp_path, voice, own_rate, rate):
+    pm = ProjectManager(tmp_path)
+    automation = {"routes": [{"role": "audio", "provider_id": voice[0], "model_id": voice[1]}]}
+    extras: dict = {"automation": automation}
+    if own_rate is not None:
+        extras["speech_rate_units_per_second"] = own_rate
+    _project(pm, "tpl", extras=extras, created="2026-01-01T00:00:00")
+    _project(pm, "story", extras={"project_kind": "story"}, created="2026-02-01T00:00:00", text="Hết.")
+
+    result, _ = await _run(pm)
+
+    assert pm.load_project(result.created[0]["film"]).get("speech_rate_units_per_second") == rate
+
+
+@pytest.mark.parametrize(("template_mode", "mode"), [(None, "screen"), ("verbatim", "verbatim")])
+async def test_a_film_adapts_its_story_unless_the_template_reads_it(tmp_path, template_mode, mode):
+    pm = ProjectManager(tmp_path)
+    extras: dict = {"automation": {"routes": []}}
+    if template_mode is not None:
+        extras["episode_adaptation"] = template_mode
+    _project(pm, "tpl", extras=extras, created="2026-01-01T00:00:00")
+    _project(pm, "story", extras={"project_kind": "story"}, created="2026-02-01T00:00:00", text="Hết.")
+
+    result, _ = await _run(pm)
+
+    assert pm.load_project(result.created[0]["film"])["episode_adaptation"] == mode

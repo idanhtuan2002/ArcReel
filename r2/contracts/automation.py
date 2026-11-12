@@ -126,7 +126,9 @@ class RunPolicy(AutomationContract):
     unit_repair_limit: Annotated[StrictInt, Field(ge=0, le=2)] = 2
     final_evaluation_limit: Annotated[StrictInt, Field(ge=1, le=3)] = 3
     route_digests: tuple[Digest, ...] = Field(min_length=1)
-    target_duration_seconds: Annotated[StrictInt, Field(ge=30, le=60)] = 45
+    #: The project's episode target in seconds when the run started (``episode_target_duration``, within the product
+    #: episode interval); ``None`` when the project sets none. QUALITY compares each final's length with it.
+    target_duration_seconds: Annotated[StrictInt, Field(ge=10, le=600)] | None = None
     width: PositiveInt = 576
     height: PositiveInt = 1024
     fps: PositiveInt = 24

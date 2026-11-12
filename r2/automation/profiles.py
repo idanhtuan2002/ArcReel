@@ -3,7 +3,9 @@
 import hashlib
 import json
 from pathlib import Path
-from typing import Literal
+from typing import Annotated, Literal
+
+from pydantic import Field
 
 from r2.automation.identity import digest_value
 from r2.contracts.automation import (
@@ -41,6 +43,9 @@ class LaunchProfile(AutomationContract):
     video_codec: Literal["h264"]
     audio_codec: Literal["aac"]
     target_duration_seconds: PositiveInt
+    #: The audio route's measured speaking rate in reading units (Vietnamese words) per second, given to the films the
+    #: autopilot makes on this profile so their planned length is spoken at the voice's real pace.
+    speech_rate_units_per_second: Annotated[float, Field(gt=0, le=20)] | None = None
     image_route: tuple[ExactIdentity, ExactIdentity]
     video_route: tuple[ExactIdentity, ExactIdentity]
     audio_route: tuple[ExactIdentity, ExactIdentity]

@@ -78,3 +78,21 @@ async def test_the_episode_limit_comes_from_the_project_and_is_capped(monkeypatc
     policy = await resolver.resolve(user_id="u", project_name="p", mode=AutomationMode.AUTO)
 
     assert policy.max_target_episodes == frozen
+
+
+@pytest.mark.parametrize(("target", "frozen"), [(None, None), (90, 90), (5, None)])
+async def test_the_episode_target_comes_from_the_project(monkeypatch, target, frozen):
+    settings = {"profile_id": "auto-review", "profile_digest": "sha256:" + "a" * 64}
+    project: dict = {"content_mode": "narration", "automation": settings}
+    if target is not None:
+        project["episode_target_duration"] = target
+    resolver = composition.ProjectPolicyResolver(None, projects=Projects(project), resolver=None)
+
+    async def no_routes(project_name: str) -> tuple:
+        return ()
+
+    monkeypatch.setattr(resolver, "routes", no_routes)
+
+    policy = await resolver.resolve(user_id="u", project_name="p", mode=AutomationMode.AUTO)
+
+    assert policy.target_duration_seconds == frozen
