@@ -480,3 +480,43 @@ async def test_semi_checkpoint_waits_for_review_without_dispatch(concurrent_sess
     submitted = owner.provider_submit_count
     assert await host.scan_once() == 0
     assert owner.provider_submit_count == submitted
+
+
+async def test_a_crash_after_settling_resumes_on_the_settled_usage_even_when_usage_grew(
+    concurrent_session_factory, monkeypatch
+):
+    sessions = concurrent_session_factory
+    run = await make_run(sessions)
+
+    class GrowingUsage(FakeOwner):
+        """Usage measured later counts work that finished after the first settlement (a late model call)."""
+
+        def __init__(self) -> None:
+            super().__init__()
+            self.calls = 0
+
+        async def usage(self, *, receipt, reservation):
+            measured = await super().usage(receipt=receipt, reservation=reservation)
+            self.calls += 1
+            return measured.model_copy(update={"model_calls": self.calls}) if measured else None
+
+    owner, host = harness(sessions, GrowingUsage())
+    transition = ProductionRunRepository.transition
+    crashed: list[bool] = []
+
+    async def crash_once(self, **kwargs):
+        if not crashed:
+            crashed.append(True)
+            raise SimulatedCrash("between settlement and transition")
+        return await transition(self, **kwargs)
+
+    monkeypatch.setattr(ProductionRunRepository, "transition", crash_once)
+    await host.scan_once()
+    assert crashed == [True]
+    assert (await current(sessions, run)).stage is RunStage.BRIEF
+
+    await expire_leases(sessions)
+    await host.scan_once()
+
+    assert (await current(sessions, run)).stage is RunStage.STORY
+    assert owner.calls == 1

@@ -806,6 +806,26 @@ class ProductionRunRepository:
         await self.session.flush()
         return reservation
 
+    async def settled_usage(self, reservation: BudgetReservation) -> UsageReceipt | None:
+        """The usage this reservation was settled with, if it was; a resumed step settles on it again."""
+        reservation = BudgetReservation.model_validate(reservation)
+        row = (
+            await self.session.execute(
+                select(ProductionUsageModel).where(
+                    ProductionUsageModel.user_id == reservation.scope.user_id,
+                    ProductionUsageModel.project_name == reservation.scope.project_name,
+                    ProductionUsageModel.run_id == reservation.scope.run_id,
+                    ProductionUsageModel.reservation_id == reservation.reservation_id,
+                )
+            )
+        ).scalar_one_or_none()
+        if row is None:
+            return None
+        usage = UsageReceipt.model_validate_json(row.usage_json)
+        if row.usage_digest != _wire_digest("r2.production-usage-reference.v1", usage.model_dump(mode="json")):
+            raise ProductionRunConflict("RUN_STATE_INTEGRITY_FAILED")
+        return usage
+
     async def settle_budget(self, *, reservation: BudgetReservation, usage: UsageReceipt) -> None:
         reservation, usage = BudgetReservation.model_validate(reservation), UsageReceipt.model_validate(usage)
         await self._now()

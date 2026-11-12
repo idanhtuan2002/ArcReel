@@ -162,8 +162,12 @@ class ProductionController:
         reservation: BudgetReservation,
         outcome: StageOutcome,
     ) -> StageOutcome:
-        """Settle only from the owner's usage receipt; a finished command without one cannot advance."""
-        usage = await adapter.usage(receipt=receipt, reservation=reservation)
+        """Settle only from the owner's usage receipt; a finished command without one cannot advance. A step resumed
+        after its settlement was committed keeps that settlement: usage measured again may count work that finished
+        later, and settling twice differently is a replay conflict."""
+        async with self._sessions() as session:
+            settled = await ProductionRunRepository(session).settled_usage(reservation)
+        usage = settled or await adapter.usage(receipt=receipt, reservation=reservation)
         if usage is None:
             return self._blocked_outcome(outcome, "USAGE_UNKNOWN")
         usage = UsageReceipt.model_validate(usage)
