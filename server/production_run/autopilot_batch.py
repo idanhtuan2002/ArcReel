@@ -54,7 +54,7 @@ class BatchRefused(Exception):
 
 @dataclass
 class BatchResult:
-    created: list[dict[str, str]] = field(default_factory=list)
+    created: list[dict[str, Any]] = field(default_factory=list)
     skipped: list[dict[str, str]] = field(default_factory=list)
 
 
@@ -72,8 +72,11 @@ async def films_for_finished_stories(
     book_parts: Callable[[str], Awaitable[tuple[int, int] | None]],
     sync_story: Callable[[str], Awaitable[list[str]]],
     enable_autopilot: Callable[[str, str], Awaitable[None]],
+    qualify_launch: Callable[[str], Awaitable[list[str]]] | None = None,
 ) -> BatchResult:
-    """``enable_autopilot(film, story)`` turns the new film's autopilot on as the interactive Showrunner."""
+    """``enable_autopilot(film, story)`` turns the new film's autopilot on as the interactive Showrunner;
+    ``qualify_launch(film)`` records the film's launch qualification first and returns the reasons it could not
+    (ADR-0136), listed with the film as ``launch_reasons``."""
     try:
         template = await asyncio.to_thread(projects.load_project, template_project)
     except FileNotFoundError:
@@ -110,12 +113,13 @@ async def films_for_finished_stories(
         if conflicts:
             result.skipped.append({"story": name, "film": film, "reason": "STORY_SYNC_CONFLICT"})
             continue
+        launch_reasons = await qualify_launch(film) if qualify_launch is not None else []
         try:
             await enable_autopilot(film, name)
         except Exception as error:
             result.skipped.append({"story": name, "film": film, "reason": f"AUTOPILOT_NOT_ENABLED:{error}"})
             continue
-        result.created.append({"story": name, "film": film})
+        result.created.append({"story": name, "film": film, "launch_reasons": launch_reasons})
     return result
 
 

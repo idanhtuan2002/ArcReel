@@ -53,7 +53,8 @@ export function setAutopilot(projectName: string, change: AutopilotChange): Prom
 }
 
 export interface FilmsBatchResult {
-  created: { story: string; film: string }[];
+  /** Preflight reasons the film could not be launch-qualified with (ADR-0136); empty when it was. */
+  created: { story: string; film: string; launch_reasons: string[] }[];
   skipped: { story: string; film?: string; reason: string }[];
 }
 

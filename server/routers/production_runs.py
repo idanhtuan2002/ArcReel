@@ -579,6 +579,13 @@ async def films_for_finished_stories_route(
             film=FilmAutopilot(),
         )
 
+    async def qualify_launch(film: str) -> list[str]:
+        try:
+            recorded = await _qualifications(service).record_launch(user_id=user.id, project_name=film)
+        except QualificationRefused as refused:
+            return [str(refused)]
+        return list(recorded["reasons"])
+
     try:
         result = await films_for_finished_stories(
             get_project_manager(),
@@ -587,6 +594,7 @@ async def films_for_finished_stories_route(
             book_parts=book_parts,
             sync_story=sync_story,
             enable_autopilot=enable,
+            qualify_launch=qualify_launch,
         )
     except BatchRefused as refused:
         raise HTTPException(status_code=422, detail={"code": refused.code, "reasons": []}) from None

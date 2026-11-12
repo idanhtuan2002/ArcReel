@@ -162,3 +162,37 @@ async def test_a_film_adapts_its_story_unless_the_template_reads_it(tmp_path, te
     result, _ = await _run(pm)
 
     assert pm.load_project(result.created[0]["film"])["episode_adaptation"] == mode
+
+
+async def test_each_new_film_is_launch_qualified_before_its_autopilot_starts(tmp_path):
+    pm = ProjectManager(tmp_path)
+    _project(pm, "tpl", extras={"automation": {"routes": []}}, created="2026-01-01T00:00:00")
+    _project(pm, "story", extras={"project_kind": "story"}, created="2026-02-01T00:00:00", text="Hết.")
+    order: list[str] = []
+
+    async def qualify(film: str) -> list[str]:
+        order.append(f"qualify:{film}")
+        return ["DISK_SPACE_LOW"]
+
+    async def enable(film: str, story: str) -> None:
+        order.append(f"enable:{film}")
+
+    async def no_parts(story: str):
+        return None
+
+    async def synced(film: str):
+        return []
+
+    result = await films_for_finished_stories(
+        pm,
+        template_project="tpl",
+        limit=5,
+        book_parts=no_parts,
+        sync_story=synced,
+        enable_autopilot=enable,
+        qualify_launch=qualify,
+    )
+
+    film = result.created[0]["film"]
+    assert order == [f"qualify:{film}", f"enable:{film}"]
+    assert result.created[0]["launch_reasons"] == ["DISK_SPACE_LOW"]
