@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 import { getDrafts, type StoryDrafts } from "../api/storyClient";
 
 const POLL_MS = 15_000;
+const NO_RUNS: readonly string[] = [];
 
 /** "scene_draft[2,3]" → the chapter and scene being written, numbered across a book from ``first``. */
 function workingLabel(node: string, first: number, t: (key: string, values?: Record<string, unknown>) => string): string {
@@ -21,10 +22,35 @@ function workingLabel(node: string, first: number, t: (key: string, values?: Rec
  * scenes drafted, whether the chapter's review sealed it, and what is being generated now. A scene being generated
  * has no text until its call returns; drafts of an unsealed chapter may still be repaired.
  */
-export function DraftReader({ projectName, runId, live }: { projectName: string; runId: string; live: boolean }) {
+export function DraftReader({
+  projectName,
+  runId,
+  live,
+  earlierRunIds = NO_RUNS,
+}: {
+  projectName: string;
+  runId: string;
+  live: boolean;
+  /** Committed runs of the book's earlier parts, oldest first: their chapters are listed before this run's. */
+  earlierRunIds?: readonly string[];
+}) {
   const { t } = useTranslation("dashboard");
   const [drafts, setDrafts] = useState<StoryDrafts | null>(null);
+  const [earlier, setEarlier] = useState<StoryDrafts["chapters"]>([]);
   const [open, setOpen] = useState<number | null>(null);
+  const earlierKey = earlierRunIds.join(",");
+
+  useEffect(() => {
+    // Earlier parts are committed and no longer change, so they are read once.
+    const controller = new AbortController();
+    const ids = earlierKey ? earlierKey.split(",") : [];
+    Promise.all(ids.map((id) => getDrafts(projectName, id, { signal: controller.signal })))
+      .then((found) => {
+        if (!controller.signal.aborted) setEarlier(found.flatMap((part) => (Array.isArray(part?.chapters) ? part.chapters : [])));
+      })
+      .catch(() => undefined);
+    return () => controller.abort();
+  }, [projectName, earlierKey]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -46,12 +72,12 @@ export function DraftReader({ projectName, runId, live }: { projectName: string;
     };
   }, [projectName, runId, live]);
 
-  if (!drafts || drafts.chapters.length === 0) {
+  if (!drafts || drafts.chapters.length + earlier.length === 0) {
     return drafts && live ? (
       <section className="sa-panel rounded-md border border-hairline p-4 text-xs text-text-3">{t("story_drafts_none")}</section>
     ) : null;
   }
-  const first = drafts.chapters[0]?.chapter ?? 1;
+  const first = drafts.chapters[0]?.chapter ?? (earlier.at(-1)?.chapter ?? 0) + 1;
   const offset = first - 1;
   return (
     <section aria-labelledby="sa-drafts-title" className="sa-panel rounded-md border border-hairline p-4">
@@ -64,7 +90,7 @@ export function DraftReader({ projectName, runId, live }: { projectName: string;
         </p>
       ) : null}
       <ol className="mt-3 space-y-2">
-        {drafts.chapters.map((chapter) => {
+        {[...earlier, ...drafts.chapters].map((chapter) => {
           const expanded = open === chapter.chapter;
           return (
             <li key={chapter.chapter} className="rounded-md border border-hairline-soft">

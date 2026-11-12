@@ -28,6 +28,7 @@ import { useDemoWorkbench } from "@/onboarding/use-demo-workbench";
 import { isDemoProject } from "@/onboarding/demo-project";
 import { normalizeRoute } from "@/utils/generation-mode";
 import { EpisodeCard } from "./EpisodeCard";
+import { SourceFileTree } from "./SourceFileTree";
 import { StoryRunTree } from "./StoryRunTree";
 
 interface AssetSidebarProps {
@@ -70,7 +71,8 @@ export function AssetSidebar({ className }: AssetSidebarProps) {
   const isAd = currentProjectData?.content_mode === "ad";
 
   const sourceFilesVersion = useAppStore((s) => s.sourceFilesVersion);
-  const [sourceCount, setSourceCount] = useState<number>(0);
+  const [sourceNames, setSourceNames] = useState<string[] | null>(null);
+  const sourceCount = sourceNames?.length ?? 0;
 
   // 演示项目没有服务端侧数据，源文件计数跳过（导航与分集列表照常渲染）
   const demoMode = useDemoWorkbench();
@@ -86,7 +88,7 @@ export function AssetSidebar({ className }: AssetSidebarProps) {
     let cancelled = false;
     API.listFiles(currentProjectName)
       .then((res) => {
-        if (!cancelled) setSourceCount(res.files?.source?.length ?? 0);
+        if (!cancelled) setSourceNames((res.files?.source ?? []).map((file) => file.name));
       })
       .catch(() => {
         // 失败时保留上一份成功值，避免把网络/权限错误伪装成 0
@@ -303,6 +305,14 @@ export function AssetSidebar({ className }: AssetSidebarProps) {
               <div key={item.key}>
                 {button}
                 <StoryRunTree projectName={currentProjectName} />
+              </div>
+            );
+          }
+          if (item.key === "source" && !collapsed && currentProjectName && isNavActive(item)) {
+            return (
+              <div key={item.key}>
+                {button}
+                <SourceFileTree files={sourceNames} />
               </div>
             );
           }

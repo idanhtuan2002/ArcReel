@@ -694,6 +694,8 @@ class StoryAuthoringService:
                     "idea": brief.idea,
                     "genre": brief.genre,
                     "started_at": queued_at.isoformat(),
+                    # The book part a run writes (None outside a book), so a reader can put a book's parts in order.
+                    "book_part": brief.book.part if brief.book is not None else None,
                 }
             )
         return runs

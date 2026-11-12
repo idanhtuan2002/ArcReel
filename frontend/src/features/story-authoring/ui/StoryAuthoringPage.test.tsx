@@ -485,6 +485,54 @@ describe("other phases", () => {
     expect(screen.getByText("Minh đẩy cổng.")).toBeInTheDocument();
   });
 
+  it("lists a book's earlier committed parts before the chapters of the part being written", async () => {
+    current = run({ phase: "RUNNING", offered: null });
+    runs = [
+      { ...summary("RUNNING"), book_part: 2 },
+      { ...summary("COMMITTED"), run_id: "story-0", book_part: 1 },
+    ];
+    routes["GET /story-0/drafts"] = () =>
+      json({
+        run_id: "story-0",
+        phase: "COMMITTED",
+        title: "Cuốn sổ",
+        chapters: [{ chapter: 1, goal: "Minh về làng", planned: 1, reviewed: true, scenes: [{ scene: 1, text: "Minh đẩy cổng." }] }],
+        working: [],
+      });
+    routes["GET /story-1/drafts"] = () =>
+      json({
+        run_id: "story-1",
+        phase: "RUNNING",
+        title: "Cuốn sổ",
+        chapters: [{ chapter: 2, goal: "Gặp chủ nợ", planned: 2, reviewed: false, scenes: [] }],
+        working: ["scene_draft[1,1]"],
+      });
+    render(<StoryAuthoringPage projectName="demo" />);
+
+    expect(await screen.findByRole("button", { name: /Chapter 1/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Chapter 2/ })).toBeInTheDocument();
+    expect(screen.getByText("Writing chapter 2, scene 1…")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /Chapter 1/ }));
+    expect(screen.getByText("Minh đẩy cổng.")).toBeInTheDocument();
+  });
+
+  it("keeps the chapters of a committed story readable", async () => {
+    current = run({ phase: "COMMITTED" });
+    runs = [summary("COMMITTED")];
+    routes["GET /story-1/drafts"] = () =>
+      json({
+        run_id: "story-1",
+        phase: "COMMITTED",
+        title: "Cuốn sổ",
+        chapters: [{ chapter: 1, goal: "Minh về làng", planned: 1, reviewed: true, scenes: [{ scene: 1, text: "Minh đẩy cổng." }] }],
+        working: [],
+      });
+    render(<StoryAuthoringPage projectName="demo" />);
+
+    fireEvent.click(await screen.findByRole("button", { name: /Chapter 1/ }));
+    expect(screen.getByText("Minh đẩy cổng.")).toBeInTheDocument();
+  });
+
   it("queues a translation of a story handed to video", async () => {
     current = run({
       phase: "COMMITTED",

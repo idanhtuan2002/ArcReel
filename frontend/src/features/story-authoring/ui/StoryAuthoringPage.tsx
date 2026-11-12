@@ -222,7 +222,13 @@ export default function StoryAuthoringPage({ projectName }: StoryAuthoringPagePr
             }}
           />
         ) : selected ? (
-          <RunView key={selected} projectName={projectName} runId={selected} onChanged={reload} />
+          <RunView
+            key={selected}
+            projectName={projectName}
+            runId={selected}
+            earlierRunIds={earlierPartRuns(runs, selected)}
+            onChanged={reload}
+          />
         ) : null}
       </div>
     </div>
@@ -634,7 +640,32 @@ function stageOf(run: StoryRun): Stage {
   return "writing";
 }
 
-function RunView({ projectName, runId, onChanged }: { projectName: string; runId: string; onChanged: () => void }) {
+/**
+ * The committed runs of a book's earlier parts, oldest part first, for the run ``runId`` writing a later part; a part
+ * written more than once counts its newest committed run. Empty outside a book or for its first part.
+ */
+export function earlierPartRuns(runs: readonly RunSummary[], runId: string): string[] {
+  const part = runs.find((r) => r.run_id === runId)?.book_part ?? null;
+  if (part === null || part <= 1) return [];
+  const ids: string[] = [];
+  for (let earlier = 1; earlier < part; earlier += 1) {
+    const found = runs.find((r) => r.book_part === earlier && r.phase === "COMMITTED");
+    if (found) ids.push(found.run_id);
+  }
+  return ids;
+}
+
+function RunView({
+  projectName,
+  runId,
+  earlierRunIds,
+  onChanged,
+}: {
+  projectName: string;
+  runId: string;
+  earlierRunIds: readonly string[];
+  onChanged: () => void;
+}) {
   const { t } = useTranslation("dashboard");
   const [run, setRun] = useState<StoryRun | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -731,8 +762,14 @@ function RunView({ projectName, runId, onChanged }: { projectName: string; runId
         {WORKING_PHASES.has(run.phase) ? <RunningNote /> : null}
         <UsageLine run={run} />
       </header>
-      {run.offered === null || run.offered === undefined ? (
-        <DraftReader projectName={projectName} runId={run.run_id} live={WORKING_PHASES.has(run.phase)} />
+      {/* A committed run keeps its chapters readable here; a run waiting for review shows its offered text below. */}
+      {run.offered === null || run.offered === undefined || run.phase === "COMMITTED" ? (
+        <DraftReader
+          projectName={projectName}
+          runId={run.run_id}
+          live={WORKING_PHASES.has(run.phase)}
+          earlierRunIds={earlierRunIds}
+        />
       ) : null}
       <PhasePanel projectName={projectName} run={run} onChanged={changed} />
     </article>

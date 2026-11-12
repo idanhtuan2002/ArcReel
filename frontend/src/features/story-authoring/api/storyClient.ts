@@ -129,6 +129,8 @@ export interface RunSummary {
   idea: string;
   genre: string;
   started_at: string;
+  /** The book part the run writes; null outside a book. */
+  book_part?: number | null;
 }
 
 export interface DraftBriefRequest {

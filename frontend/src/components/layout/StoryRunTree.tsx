@@ -111,7 +111,10 @@ export function StoryRunTree({ projectName }: { projectName: string }) {
                           : "bg-text-4"
                   }`}
                 />
-                <span className="min-w-0 flex-1 truncate">{run.idea}</span>
+                <span className="min-w-0 flex-1 truncate">
+                  {run.book_part ? `${t("story_tree_part", { part: run.book_part })} · ` : null}
+                  {run.idea}
+                </span>
                 <span className="sr-only">{t(`story_phase_${run.phase}`)}</span>
               </button>
             </li>

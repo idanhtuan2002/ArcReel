@@ -108,6 +108,8 @@ async def test_a_continuation_of_a_book_project_writes_its_next_part_until_the_b
     )
     second_path = await _run_and_hand_off(service, concurrent_session_factory, projects, ref, "cmd-00000002")
     assert second_path > first_path  # the second part sorts after the first among the project's sources
+    listed = await service.list_runs(user_id=USER, project_name=PROJECT)
+    assert [run["book_part"] for run in listed] == [2, 1]  # newest first, each with the part it wrote
 
     async with concurrent_session_factory() as session:
         branches = (

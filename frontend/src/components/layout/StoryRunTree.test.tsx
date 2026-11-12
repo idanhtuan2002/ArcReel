@@ -22,7 +22,10 @@ const run = (run_id: string, idea: string, phase: storyClient.RunSummary["phase"
 
 describe("StoryRunTree", () => {
   it("lists the stories, marks the one the URL names and opens the new-story form", async () => {
-    const list = vi.spyOn(storyClient, "listRuns").mockResolvedValue([run("a", "Bến đò"), run("b", "Chợ đêm", "COMMITTED")]);
+    const list = vi.spyOn(storyClient, "listRuns").mockResolvedValue([
+      { ...run("a", "Bến đò"), book_part: 2 },
+      run("b", "Chợ đêm", "COMMITTED"),
+    ]);
     const location = memoryLocation({ path: "/story", searchPath: "run=b", record: true });
     render(
       <Router hook={location.hook} searchHook={location.searchHook}>
@@ -32,6 +35,7 @@ describe("StoryRunTree", () => {
 
     expect(await screen.findByRole("button", { name: /Chợ đêm/ })).toHaveAttribute("aria-current", "page");
     expect(screen.getByRole("button", { name: /Bến đò/ })).not.toHaveAttribute("aria-current");
+    expect(screen.getByRole("button", { name: /Bến đò/ })).toHaveTextContent("Part 2 · Bến đò");
 
     fireEvent.click(screen.getByRole("button", { name: "New story" }));
     expect(location.history?.at(-1)).toBe("/story?new=1");
