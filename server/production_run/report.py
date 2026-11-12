@@ -1,4 +1,5 @@
-"""What an automatic run decided on its own, for the run panel: reviewer verdicts and accepted story exceptions.
+"""What an automatic run decided on its own, for the run panel: reviewer verdicts, accepted story exceptions, and what
+each stage cost (money in the policy's currency's minor units, model calls, tasks, seconds of work).
 
 Read-only. Reviews are the ones QUALITY stored beside each target's final for the run's current generation; story
 exceptions are the findings of the offered manuscript's quality record that the automatic commit accepted as they
@@ -258,7 +259,7 @@ async def run_report(
         projects.get_project_path(run.project_name)
     except FileNotFoundError:
         # The project folder is gone; there is nothing stored to read.
-        return {"run_id": run.run_id, "quality": [], "story_exceptions": [], "previews": []}
+        return {"run_id": run.run_id, "quality": [], "story_exceptions": [], "previews": [], "stages": []}
     previews: list[dict[str, Any]] = list(_previews(projects, run))
     pending = [
         target
@@ -266,11 +267,14 @@ async def run_report(
         if await pending_final(sessions, projects, run, int(target.split(":")[1])) is not None
     ]
     previews.extend({"target": target, "pending": True} for target in pending)
+    async with sessions() as session:
+        stages = await ProductionRunRepository(session).stage_usage(run)
     return {
         "run_id": run.run_id,
         "quality": _reviews(projects, run),
         "previews": previews,
         "story_exceptions": await _story_exceptions(sessions, projects, run),
+        "stages": [{**stage, "currency": run.policy.currency} for stage in stages],
     }
 
 

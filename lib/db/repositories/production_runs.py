@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta
-from typing import cast
+from typing import Any, cast
 from uuid import NAMESPACE_URL, uuid5
 
 from sqlalchemy import func, or_, select, text
@@ -697,6 +697,44 @@ class ProductionRunRepository:
             )
         ).one()
         return int(values[0]), int(values[1]), int(values[2]), int(values[3])
+
+    async def stage_usage(self, scope: RunScope) -> list[dict[str, Any]]:
+        """Per stage, in run order: what its steps hold (settled usage, or the reservation while a step is open)."""
+        rows = (
+            await self.session.execute(
+                select(
+                    ProductionStepModel.stage,
+                    func.count(ProductionBudgetModel.reservation_id),
+                    func.sum(ProductionBudgetModel.held_cost),
+                    func.sum(ProductionBudgetModel.held_calls),
+                    func.sum(ProductionBudgetModel.held_tasks),
+                    func.sum(ProductionBudgetModel.held_runtime),
+                    func.count(ProductionBudgetModel.reservation_id).filter(ProductionBudgetModel.state != "SETTLED"),
+                )
+                .join(ProductionStepModel, ProductionStepModel.command_id == ProductionBudgetModel.command_id)
+                .where(
+                    ProductionBudgetModel.user_id == scope.user_id,
+                    ProductionBudgetModel.project_name == scope.project_name,
+                    ProductionBudgetModel.run_id == scope.run_id,
+                )
+                .group_by(ProductionStepModel.stage)
+            )
+        ).all()
+        order = {stage.value: index for index, stage in enumerate(RunStage)}
+        return [
+            {
+                "stage": stage,
+                "steps": int(steps),
+                "cost_minor_units": int(cost or 0),
+                "model_calls": int(calls or 0),
+                "tasks": int(tasks or 0),
+                "runtime_seconds": int(runtime or 0),
+                "open_steps": int(open_steps),
+            }
+            for stage, steps, cost, calls, tasks, runtime, open_steps in sorted(
+                rows, key=lambda row: order.get(row[0], len(order))
+            )
+        ]
 
     async def usage_totals(self, scope: RunScope) -> tuple[int, int, int, int]:
         """What the run holds against its caps: settled usage plus open reservations (cost, calls, tasks, seconds)."""

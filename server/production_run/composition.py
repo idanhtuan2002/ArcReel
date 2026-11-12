@@ -36,6 +36,7 @@ from r2.contracts.automation import (
 )
 from r2.contracts.autopilot import AutopilotDelegation
 from r2.contracts.quality import QualityProfileRevision
+from server.production_run.alerts import alerts_from_env
 from server.production_run.assets_adapter import AssetsAdapter
 from server.production_run.autopilot import AutopilotPlanner, AutopilotScheduler, BookParts
 from server.production_run.configuration import inspect_model_route
@@ -400,7 +401,7 @@ def wire_autopilot(
         max_targets=max_targets,
         story_busy=story_busy,
     )
-    return AutopilotScheduler(sessions, service, planner)
+    return AutopilotScheduler(sessions, service, planner, alerts=alerts_from_env())
 
 
 #: Story-run phases after which a run no longer holds the project's story (ADR-0124 §3).

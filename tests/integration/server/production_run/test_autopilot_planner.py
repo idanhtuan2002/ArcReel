@@ -315,3 +315,24 @@ async def test_scheduler_starts_ready_projects_only(session_factory):
     scheduler = AutopilotScheduler(session_factory, service, _planner(session_factory, service), page_size=1)
     assert await scheduler.scan_once() == 1
     assert [command.project_name for command in service.started] == ["project"]
+
+
+async def test_a_halted_autopilot_alerts_once_across_scans(session_factory):
+    from lib.db.repositories.autopilot import AutopilotRepository
+    from server.production_run.autopilot import AutopilotScheduler
+
+    sent: list[tuple[str, str | None]] = []
+
+    class _Alerts:
+        async def send(self, *, project_name, event, run_id, reason) -> None:
+            sent.append((event, reason))
+
+    delegation = _delegation("film")
+    async with session_factory() as session, session.begin():
+        await AutopilotRepository(session).append(delegation, previous=None)
+    service = _Service()
+    planner = _planner(session_factory, service, conflicts=("part-2.txt",))
+    scheduler = AutopilotScheduler(session_factory, service, planner, alerts=_Alerts())
+    for _ in range(3):
+        await scheduler.scan_once()
+    assert sent == [("halted", "STORY_SYNC_CONFLICT")]

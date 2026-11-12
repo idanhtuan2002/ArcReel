@@ -194,7 +194,13 @@ async def test_a_runs_report_is_empty_before_quality_and_story_and_unknown_runs_
     missing = await host.http.get(f"{BASE}/no-such-run/report", headers=host.headers)
 
     assert report.status_code == 200, report.text
-    assert report.json() == {"run_id": started["run_id"], "quality": [], "story_exceptions": [], "previews": []}
+    assert report.json() == {
+        "run_id": started["run_id"],
+        "quality": [],
+        "story_exceptions": [],
+        "previews": [],
+        "stages": [],
+    }
     assert missing.status_code == 404
     progress = await host.http.get(f"{BASE}/{started['run_id']}/progress", headers=host.headers)
     body = progress.json()

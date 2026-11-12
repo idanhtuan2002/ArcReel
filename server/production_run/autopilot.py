@@ -24,6 +24,7 @@ from lib.db.repositories.production_runs import ProductionRunRepository
 from lib.project_kinds import linked_story
 from r2.contracts.automation import RunCommand, RunSnapshot, RunStatus
 from r2.contracts.autopilot import AutopilotDelegation, autopilot_command_id, autopilot_command_prefix
+from server.production_run.alerts import AlertGate, Alerts
 from server.story_authoring.idea_profile import PROFILE_SETTING
 
 logger = logging.getLogger(__name__)
@@ -274,6 +275,7 @@ class AutopilotScheduler:
         *,
         interval_seconds: float = 60.0,
         page_size: int = 64,
+        alerts: Alerts | None = None,
     ) -> None:
         self._sessions = sessions
         self._service = service
@@ -285,6 +287,7 @@ class AutopilotScheduler:
         self._task: asyncio.Task[None] | None = None
         #: Why each project's last start was refused (policy or input moved, preflight blocked), until one starts.
         self._refusals: dict[tuple[str, str], str] = {}
+        self._alerts = AlertGate(alerts)
 
     @property
     def planner(self) -> AutopilotPlanner:
@@ -296,6 +299,15 @@ class AutopilotScheduler:
     async def step(self, delegation: AutopilotDelegation) -> RunSnapshot | None:
         """Start the project's next run if it is ready; returns the run started (or replayed)."""
         state, command = await self._planner.state(delegation)
+        if state.state != "ready":
+            # A ready project keeps its last alert: a start refused again on the next scan is not a new state.
+            await self._alerts.observe(
+                user_id=delegation.user_id,
+                project_name=delegation.project_name,
+                event="halted" if state.state == "halted" else "finished" if state.state == "finished" else None,
+                run_id=state.run_id,
+                reason=state.reason,
+            )
         if state.state != "ready" or command is None:
             return None
         return await self._service.start_delegated(delegation=delegation, command=command)
@@ -316,6 +328,12 @@ class AutopilotScheduler:
                 except Exception as error:
                     # Retried by a later scan; the project's autopilot shows why until a start succeeds.
                     self._refusals[key] = _refusal_text(error)
+                    await self._alerts.observe(
+                        user_id=delegation.user_id,
+                        project_name=delegation.project_name,
+                        event="refused",
+                        reason=self._refusals[key],
+                    )
                     logger.info("autopilot of %s did not start: %r", delegation.project_name, error)
             if len(page) < self._page_size:
                 return started

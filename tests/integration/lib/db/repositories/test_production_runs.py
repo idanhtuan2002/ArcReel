@@ -414,3 +414,40 @@ async def test_lease_expiring_during_row_lock_wait_cannot_stage_intent(concurren
         )
     with pytest.raises(StaleProductionRunError):
         await task
+
+
+async def test_stage_usage_sums_each_stages_settled_and_open_steps(concurrent_session_factory):
+    from lib.db.repositories.production_runs import ProductionRunRepository
+    from r2.contracts.automation import UsageReceipt
+
+    factory = concurrent_session_factory
+    await create_run(factory)
+    run = await claim(factory)
+    first, second = intent_for(run, "first"), intent_for(run, "second")
+    async with factory() as session, session.begin():
+        repo = ProductionRunRepository(session)
+        await repo.stage_intent(run=run, intent=first)
+        await repo.stage_intent(run=run, intent=second)
+        reservation = await repo.reserve_budget(run=run, intent=first)
+        await repo.settle_budget(
+            reservation=reservation,
+            usage=UsageReceipt(
+                owner="story",
+                receipt_ref="usage-1",
+                digest="sha256:" + "d" * 64,
+                reservation_id=reservation.reservation_id,
+                currency="USD",
+                cost_minor_units=30,
+                model_calls=1,
+                tasks=1,
+                runtime_seconds=10,
+                outcome="KNOWN",
+            ),
+        )
+        await repo.reserve_budget(run=run, intent=second)
+        stages = await repo.stage_usage(run)
+
+    assert len(stages) == 1
+    assert stages[0]["stage"] == first.identity.stage.value
+    assert (stages[0]["steps"], stages[0]["open_steps"]) == (2, 1)
+    assert (stages[0]["cost_minor_units"], stages[0]["runtime_seconds"]) == (90, 40)
