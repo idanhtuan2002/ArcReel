@@ -53,22 +53,25 @@ TEXT_FALLBACK_ROLE = "script"
 
 
 def project_text_fallbacks(project_name: str | None) -> tuple[tuple[str, str], ...]:
-    """The project's text fallback models in order, from its automation settings; none without a project."""
+    """The project's text fallback models in order, from its automation settings, as far as the current run's rules
+    allow (``fallback_rules``); none without a project."""
     if not project_name:
         return ()
     from lib.project_manager import get_project_manager
+    from lib.text_backends.fallback_rules import allowed_fallback
 
     try:
         project = get_project_manager().load_project(project_name)
     except (FileNotFoundError, ValueError, OSError):
         return ()
     settings = project.get("automation")
-    routes = settings.get("fallbacks") if isinstance(settings, dict) else None
+    raw = settings.get("fallbacks") if isinstance(settings, dict) else None
     return tuple(
         (str(route["provider_id"]), str(route["model_id"]))
-        for route in routes or []
+        for route in raw or []
         if isinstance(route, dict)
         and route.get("role") == TEXT_FALLBACK_ROLE
         and route.get("provider_id")
         and route.get("model_id")
+        and allowed_fallback(route)
     )

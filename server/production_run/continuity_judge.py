@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import io
 import json
+import math
 from dataclasses import dataclass, field
 from typing import Any, Literal
 
@@ -247,8 +248,8 @@ def parse_verdict(answer: str) -> Verdict:
     if not isinstance(data, dict):
         raise ValueError("verdict is not an object")
     raw_score = data.get("score")
-    if isinstance(raw_score, bool) or not isinstance(raw_score, int | float):
-        raise ValueError("score is not a number")
+    if isinstance(raw_score, bool) or not isinstance(raw_score, int | float) or not math.isfinite(raw_score):
+        raise ValueError("score is not a finite number")
     issues = tuple(
         Issue(str(item["category"]), str(item["severity"]), str(item.get("message", "")).strip())
         for item in data.get("issues") or []

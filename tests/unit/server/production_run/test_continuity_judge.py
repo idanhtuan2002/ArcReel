@@ -90,7 +90,9 @@ def test_a_character_who_is_not_the_person_of_their_sheet_is_an_identity_drift()
     )
 
 
-@pytest.mark.parametrize("answer", ["no json", '{"issues": []}', '{"score": true, "issues": []}', "[1]"])
+@pytest.mark.parametrize(
+    "answer", ["no json", '{"issues": []}', '{"score": true, "issues": []}', "[1]", '{"score": Infinity, "issues": []}']
+)
 def test_an_unusable_answer_is_refused(answer: str) -> None:
     with pytest.raises(ValueError, match=r"JSON|score|object"):
         parse_verdict(answer)

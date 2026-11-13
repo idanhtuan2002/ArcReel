@@ -19,3 +19,12 @@ Not covered, and why:
 - Image, video and audio: the launch profile pins them, and every cloud media adapter is `UNQUALIFIED` in production (FILM handoff finding 1), so a media fallback would need launch-profile alternatives and qualified adapters first.
 - An open run keeps its primary models (a run is the unit a policy is approved for). A new default applies from the next run; the autopilot re-pins on save and starts it, and ADR-0138 lets that run take a stopped story over on the new default.
 - Text tasks read the project's settings, not the run, so a live fallback is not re-checked against a run's local-only flag there; a Showrunner who saves a cloud fallback has made the settings non-local.
+
+## Amended after the independent review (2026-11-13, `R2_FILM_QUALITY_REVIEW_2026-11-13.md`)
+
+- **An open run's text tasks are held to the run** (H2, M6). The worker resolves the run a task follows (the execution guard already does) and sets its rules for the task (`lib/text_backends/fallback_rules.py`): the run's frozen script model is the one script work uses (a new default applies from the next run and never stops an open one; text stages no longer compare the project's model with the frozen one), and fallbacks are passed over when cloud under a local-only policy, cloud without a ceiling, or one of the run's reviewers. The story's writer order applies the same rules. Settings refuse a fallback that is one of the reviewers (`FALLBACK_IS_REVIEWER`).
+- **Money** (H1). A priced story spends at most what the run has left: a fallback step and a take-over step reserve the run's remaining money and cap the story at it; a priced writer that does not fit is passed over.
+- **Repairs** (M3). A fallback move counts as a STORY repair; past `unit_repair_limit` the story stays stopped for a Human (the run blocks, it does not fail).
+- **Replays** (M1, M2). A take-over is complete only when its top-up is recorded; a fallback writes the state's top-up first, then the task's brief, then queues it, and pins the chosen brief before any write, so a replay finishes the same move.
+- **Autopilot** (M4). A stopped story keeps the autopilot waiting unless the next run would take it over under the same conditions (current content safety; the book's next part, or the autopilot's own idea for a first part).
+- **Launch qualification** (H4, M5). A record made stale by a model change is replaced like a missing one; the bookkeeping never fails a settings save or a films batch.

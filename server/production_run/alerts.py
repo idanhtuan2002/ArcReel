@@ -4,7 +4,7 @@ The host names one webhook: ``ARCREEL_ALERT_WEBHOOK_URL``. ``ARCREEL_ALERT_WEBHO
 message is the plain-text body, as ntfy topics take it) or ``json`` (``{"text", "content", ...}``, as Slack and
 Discord incoming webhooks and Telegram's ``sendMessage?chat_id=...`` take it). Each project's state is sent once per
 change: the same halt (run and reason) is not sent again, so a scan every minute does not repeat it; after a restart
-a standing halt is sent once more. Sending never raises; a failed send is logged and retried at the next change only.
+a standing halt is sent once more. Sending never raises; a failed send is logged and tried again at the next scan.
 """
 
 from __future__ import annotations
@@ -30,7 +30,7 @@ _HEADLINES: dict[Event, str] = {
 
 
 class Alerts(Protocol):
-    async def send(self, *, project_name: str, event: Event, run_id: str | None, reason: str | None) -> None: ...
+    async def send(self, *, project_name: str, event: Event, run_id: str | None, reason: str | None) -> bool: ...
 
 
 def message(*, project_name: str, event: Event, run_id: str | None, reason: str | None) -> str:
@@ -53,7 +53,8 @@ class WebhookAlerts:
     ) -> None:
         self._url, self._format, self._transport, self._timeout = url, body_format, transport, timeout_seconds
 
-    async def send(self, *, project_name: str, event: Event, run_id: str | None, reason: str | None) -> None:
+    async def send(self, *, project_name: str, event: Event, run_id: str | None, reason: str | None) -> bool:
+        """Whether the alert was delivered; never raises."""
         text = message(project_name=project_name, event=event, run_id=run_id, reason=reason)
         try:
             async with httpx.AsyncClient(transport=self._transport, timeout=self._timeout) as client:
@@ -65,14 +66,24 @@ class WebhookAlerts:
                         self._url, content=text.encode("utf-8"), headers={"Content-Type": "text/plain; charset=utf-8"}
                     )
                 response.raise_for_status()
-        except httpx.HTTPError as error:
+        except Exception as error:
             logger.warning("alert for %s not sent: %s", project_name, type(error).__name__)
+            return False
+        return True
 
 
 def alerts_from_env() -> WebhookAlerts | None:
     """The host's webhook, or ``None`` when none is configured."""
     url = os.environ.get(URL_ENV, "").strip()
     if not url:
+        return None
+    try:
+        parsed = httpx.URL(url)
+    except Exception:
+        logger.warning("%s is not a valid URL; alerts are off", URL_ENV)
+        return None
+    if parsed.scheme not in ("http", "https") or not parsed.host:
+        logger.warning("%s is not an http(s) URL; alerts are off", URL_ENV)
         return None
     body_format = "json" if os.environ.get(FORMAT_ENV, "").strip().lower() == "json" else "text"
     return WebhookAlerts(url, body_format=body_format)
@@ -102,8 +113,8 @@ class AlertGate:
         state = (event, run_id, reason)
         if self._alerts is None or self._sent.get(key) == state:
             return
-        self._sent[key] = state
-        await self._alerts.send(project_name=project_name, event=event, run_id=run_id, reason=reason)
+        if await self._alerts.send(project_name=project_name, event=event, run_id=run_id, reason=reason):
+            self._sent[key] = state
 
 
 __all__ = ["AlertGate", "Alerts", "WebhookAlerts", "alerts_from_env", "message"]

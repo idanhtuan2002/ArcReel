@@ -217,7 +217,7 @@ async def test_a_story_that_is_not_a_book_is_not_overwritten(session_factory):
 async def test_an_unfinished_story_run_makes_the_story_autopilot_wait(session_factory):
     from server.production_run.autopilot import AutopilotPlanner
 
-    async def busy(user_id, project_name):
+    async def busy(user_id, project_name, idea):
         return True
 
     planner = _planner(session_factory, _Service(story=False))
@@ -324,8 +324,9 @@ async def test_a_halted_autopilot_alerts_once_across_scans(session_factory):
     sent: list[tuple[str, str | None]] = []
 
     class _Alerts:
-        async def send(self, *, project_name, event, run_id, reason) -> None:
+        async def send(self, *, project_name, event, run_id, reason) -> bool:
             sent.append((event, reason))
+            return True
 
     delegation = _delegation("film")
     async with session_factory() as session, session.begin():

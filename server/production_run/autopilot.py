@@ -81,7 +81,7 @@ class AutopilotPlanner:
         unplanned_source: Callable[[str], bool],
         sync_story: Callable[[str, str], Awaitable[list[str]]],
         max_targets: Callable[[AutopilotDelegation], Awaitable[int]],
-        story_busy: Callable[[str, str], Awaitable[bool]] | None = None,
+        story_busy: Callable[[str, str, str | None], Awaitable[bool]] | None = None,
     ) -> None:
         self._sessions = sessions
         self._service = service
@@ -129,7 +129,9 @@ class AutopilotPlanner:
         if (
             delegation.kind == "story"
             and self._story_busy is not None
-            and await self._story_busy(delegation.user_id, delegation.project_name)
+            and await self._story_busy(
+                delegation.user_id, delegation.project_name, delegation.story.idea if delegation.story else None
+            )
         ):
             # Another story run of the project is unfinished (ADR-0124 §3).
             return AutopilotState("waiting", None, "STORY_RUN_UNFINISHED"), None

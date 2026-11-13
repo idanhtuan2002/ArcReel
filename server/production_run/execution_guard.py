@@ -13,6 +13,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from lib.db.models.host_hardening import CommandReceiptModel
+from lib.text_backends.fallback_rules import FallbackRules
 from r2.contracts.automation import RunScope
 from server.services.automation_grants import RunAutomationAuthority
 
@@ -31,12 +32,12 @@ def configure_run_task_authority(authority: RunAutomationAuthority | None) -> No
     _AUTHORITY = authority
 
 
-async def require_run_task_authorized(session: AsyncSession, task: dict[str, Any]) -> None:
+async def require_run_task_authorized(session: AsyncSession, task: dict[str, Any]) -> RunScope | None:
     """Refuse a task an automatic run submitted unless that run's authority is still current; without an
-    activated authority such a task never executes."""
+    activated authority such a task never executes. Returns the run the task follows, if any."""
     task_id = task.get("task_id")
     if not task_id:
-        return
+        return None
     async with session.begin():
         receipts = (
             await session.execute(
@@ -61,6 +62,35 @@ async def require_run_task_authorized(session: AsyncSession, task: dict[str, Any
                 await _AUTHORITY.require_queued_task_current(session, scope=scope)
             except PermissionError as refused:
                 raise RunTaskRefused(str(refused)) from None
+            return scope
+    return None
 
 
-__all__ = ["RUN_ACTOR_PREFIX", "RunTaskRefused", "configure_run_task_authority", "require_run_task_authorized"]
+async def run_fallback_rules_for(session: AsyncSession, scope: RunScope | None) -> FallbackRules | None:
+    """ADR-0139: the rules a run holds its tasks' text calls to: its frozen script model, its policy's local-only flag
+    and its reviewers."""
+    if scope is None:
+        return None
+    from lib.db.repositories.production_runs import ProductionRunRepository
+
+    run = await ProductionRunRepository(session).get(
+        user_id=scope.user_id, project_name=scope.project_name, run_id=scope.run_id
+    )
+    if run is None:
+        return FallbackRules(local_only=True)
+    reviewers = frozenset(r.model_identity for r in run.policy.routes if r.role in ("reviewer_a", "reviewer_b"))
+    script = next((r for r in run.policy.routes if r.role == "script"), None)
+    return FallbackRules(
+        local_only=run.policy.local_only,
+        excluded_identities=reviewers,
+        text_route=None if script is None else (script.provider_id, script.model_id),
+    )
+
+
+__all__ = [
+    "RUN_ACTOR_PREFIX",
+    "RunTaskRefused",
+    "configure_run_task_authority",
+    "require_run_task_authorized",
+    "run_fallback_rules_for",
+]

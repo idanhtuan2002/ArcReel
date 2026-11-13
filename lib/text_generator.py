@@ -14,8 +14,10 @@ from lib.ledger import Ledger
 from lib.providers import require_provider_pair
 from lib.telemetry import clears_baggage_at_provider_boundary
 from lib.text_backends.base import (
+    TEXT_TASK_TIERS,
     TextGenerationRequest,
     TextGenerationResult,
+    TextTaskTier,
     TextTaskType,
 )
 from lib.text_backends.factory import (
@@ -23,6 +25,7 @@ from lib.text_backends.factory import (
     create_text_backend_for_task,
     project_text_fallbacks,
 )
+from lib.text_backends.fallback_rules import RUN_FALLBACK_RULES
 from lib.text_backends.route_failure import is_route_failure
 
 if TYPE_CHECKING:
@@ -68,17 +71,24 @@ class TextGenerator:
         """工厂方法：根据任务类型创建对应的 backend + ledger。"""
         if (provider_id is None) != (model_id is None):
             raise ValueError("provider_id and model_id must be supplied together")
-        fallbacks: tuple[tuple[str, str], ...] = ()
-        if provider_id is None:
-            backend, resolved_provider = await create_text_backend_for_task(task_type, project_name)
-            fallbacks = tuple(
-                pair for pair in project_text_fallbacks(project_name) if pair != (resolved_provider, backend.model)
-            )
-        else:
+        if provider_id is not None:
             assert model_id is not None
             backend, resolved_provider = await create_text_backend_for_model(
                 task_type, provider_id=provider_id, model_id=model_id
             )
+            return cls(backend, Ledger(), resolved_provider)
+        rules = RUN_FALLBACK_RULES.get()
+        pinned = rules.text_route if rules is not None else None
+        if pinned is not None and TEXT_TASK_TIERS[task_type] is TextTaskTier.COMPLEX:
+            # An open run's script work stays on the model its policy froze (ADR-0139).
+            backend, resolved_provider = await create_text_backend_for_model(
+                task_type, provider_id=pinned[0], model_id=pinned[1]
+            )
+        else:
+            backend, resolved_provider = await create_text_backend_for_task(task_type, project_name)
+        fallbacks = tuple(
+            pair for pair in project_text_fallbacks(project_name) if pair != (resolved_provider, backend.model)
+        )
         return cls(backend, Ledger(), resolved_provider, task_type=task_type, fallbacks=fallbacks)
 
     async def _fall_back(self, error: BaseException) -> bool:

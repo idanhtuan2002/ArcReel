@@ -249,6 +249,7 @@ async def save_settings(
 
         routes = [await entry(choice) for choice in update.routes]
         primary = {(route["role"], route["provider_id"], route["model_id"]) for route in routes}
+        reviewers = {route["model_identity"] for route in routes if route["role"] in ("reviewer_a", "reviewer_b")}
         fallbacks = []
         for choice in update.fallbacks:
             key = (choice.role, choice.provider_id, choice.model_id)
@@ -256,7 +257,11 @@ async def save_settings(
                 raise SettingsRefused("FALLBACK_ROLE_UNSUPPORTED")
             if key in primary or key in {(f["role"], f["provider_id"], f["model_id"]) for f in fallbacks}:
                 raise SettingsRefused("FALLBACK_REPEATED")
-            fallbacks.append(await entry(choice))
+            fallback = await entry(choice)
+            if fallback["model_identity"] in reviewers:
+                # A reviewer never writes what it reviews (preflight REVIEWER_INDEPENDENCE_MISSING).
+                raise SettingsRefused("FALLBACK_IS_REVIEWER")
+            fallbacks.append(fallback)
     settings = {
         **current,
         **profile_fields,

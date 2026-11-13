@@ -188,3 +188,43 @@ class TestRouteFallback:
         lone = TextGenerator(backend, wired.ledger, "custom-1", task_type=TextTaskType.SCRIPT)
         with pytest.raises(_QuotaError):
             await lone.generate(TextGenerationRequest(prompt="x"), project_name="demo")
+
+
+class TestRunPinnedScriptModel:
+    """ADR-0139: inside a run's task, script work stays on the run's frozen script model."""
+
+    async def test_a_run_task_uses_the_frozen_script_model_not_the_projects_current_one(self, monkeypatch):
+        from lib import text_generator
+        from lib.text_backends.base import TextTaskType
+        from lib.text_backends.fallback_rules import FallbackRules, run_fallback_rules
+
+        built: list[tuple[str, str]] = []
+
+        async def by_model(task_type, *, provider_id, model_id):
+            built.append((provider_id, model_id))
+            return _make_backend("openai", model_id), provider_id
+
+        async def by_project(task_type, project_name):
+            raise AssertionError("a run task must not read the project's current text model")
+
+        monkeypatch.setattr(text_generator, "create_text_backend_for_model", by_model)
+        monkeypatch.setattr(text_generator, "create_text_backend_for_task", by_project)
+        monkeypatch.setattr(text_generator, "project_text_fallbacks", lambda name: ())
+        with run_fallback_rules(FallbackRules(text_route=("custom-7", "frozen"))):
+            gen = await TextGenerator.create(TextTaskType.SCRIPT, "demo")
+        assert (gen.model, built) == ("frozen", [("custom-7", "frozen")])
+
+
+class TestFallbackRules:
+    def test_a_runs_rules_pass_over_cloud_unbounded_and_reviewer_models(self):
+        from lib.text_backends.fallback_rules import FallbackRules, allowed_fallback, run_fallback_rules
+
+        local = {"local": True, "model_identity": "ollama/a"}
+        cloud = {"local": False, "max_cost_per_call": 3, "model_identity": "openai/b"}
+        assert allowed_fallback(local)
+        assert allowed_fallback(cloud)
+        assert not allowed_fallback({**cloud, "max_cost_per_call": None})
+        with run_fallback_rules(FallbackRules(local_only=True, excluded_identities=frozenset({"ollama/a"}))):
+            assert not allowed_fallback(local)
+            assert not allowed_fallback(cloud)
+        assert allowed_fallback(local)

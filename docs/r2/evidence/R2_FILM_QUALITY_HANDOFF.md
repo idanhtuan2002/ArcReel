@@ -59,3 +59,15 @@ Not run: full suite (policy), frontend checks, heavy Remotion/M6 render tests (r
 ## Sponsor decisions (2026-11-13)
 - **Adapter status change approved** ("duyệt chuyển trạng thái"): the agent may set `OFFLINE_VERIFIED` on the adapter profiles of the bake-off winners once their ADR-0091 F1 offline evidence file is complete (same form as the spatial precedent). The route canary remains a separate operator step.
 - **Gemini free tier allowed for trial content** ("cho phép đưa nội dung thử nghiệm lên gói miễn phí của Gemini"), accepting that free-tier inputs may be used by Google.
+
+
+## Release r2-v2.5.17 (prepared 2026-11-13)
+
+Independent review (Opus agent; Codex quota out): `R2_FILM_QUALITY_REVIEW_2026-11-13.md` ACCEPT_WITH_CONDITIONS (0 BLOCKING, 4 HIGH, 7 MEDIUM, 8 LOW) — all HIGH/MEDIUM fixed or turned into deploy steps; dispositions at the end of that file. No migrations.
+
+Deploy runbook (Human, sudo, real terminal):
+1. `sudo ~/arcreel-v2-staging/m8e-review-stop.sh`
+2. `sudo ~/arcreel-v2-staging/v2-deploy.sh r2-v2.5.17`
+3. `sudo ~/arcreel-v2-staging/v2-release-start.sh`
+4. (review H3) The run target moved to the project's own setting, so an autopilot enabled before the deploy is refused `POLICY_MOVED`. Production has one ENABLED delegation (`minh-co-so-thich-dac-bie-55335b61`): turn its autopilot off and on, or save its automation settings, if it should go on.
+5. (review L7) Once a story is rerouted or a run froze fallback routes, do not roll back below r2-v2.5.17 (older code refuses the new fields).

@@ -26,10 +26,11 @@ from typing import Literal
 
 import sqlalchemy as sa
 
-from lib.db.models.host_hardening import CommandReceiptModel
+from lib.db.models.production_run import ProductionStepModel
 from lib.db.repositories.production_runs import ProductionRunRepository
 from lib.db.repositories.task_repo import TaskRepository
 from lib.project_manager import ProjectManager
+from lib.text_backends.fallback_rules import FallbackRules, allowed_fallback
 from lib.text_backends.ollama import OllamaChatClient
 from r2.contracts.automation import (
     BudgetReservation,
@@ -176,6 +177,11 @@ _ENDED_RUN = frozenset({RunStatus.CANCELLED, RunStatus.FAILED, RunStatus.FAILED_
 def adoption_pin(run_id: str) -> str:
     """The blob-store pin naming the story run a production run took over."""
     return f"r2.story-adoption.v1:{run_id}"
+
+
+def fallback_pin(story_run_id: str, caller_ref: str) -> str:
+    """The blob-store pin naming the brief a STORY step moved a story to (ADR-0139)."""
+    return f"r2.story-fallback.v1:{story_run_id}:{caller_ref}"
 
 
 def adopted_story(projects: ProjectManager, project_name: str, run_id: str) -> str | None:
@@ -524,10 +530,12 @@ class StoryAdapter:
             _ref, state = await self._stories.get(user_id=run.user_id, project_name=run.project_name, run_id=adopted)
             if state.phase in ADOPTABLE_PHASES:
                 calls, seconds = await self._adoption_need(run, state, brief)
+                # A priced story spends at most what the run has left; the step reserves it (review H1).
+                money = (await self._room(run))[2] if brief.limits.cloud_prices is not None else 0
                 return StepPlan(
                     unit_key="story",
                     input_refs=(greenlight,),
-                    estimated_cost_minor_units=0,
+                    estimated_cost_minor_units=money,
                     estimated_model_calls=2 * calls,
                     estimated_tasks=1,
                     estimated_runtime_seconds=seconds,
@@ -536,13 +544,14 @@ class StoryAdapter:
         if stopped is not None and self._fallback_writer(run, stopped[0].brief) is not None:
             # ADR-0139: the story goes on, on the next writer, with what its caps leave within the run's room.
             state = stopped[1]
-            calls, seconds = await self._room(run)
+            calls, seconds, money = await self._room(run)
             left = max(1, state.limits.generate_calls_max - state.usage.generate_calls)
             wall = max(1, state.limits.wall_clock_max_seconds - state.usage.model_milliseconds // 1000)
+            # A priced fallback may spend what the run has left, no more; the step reserves it (review H1).
             return StepPlan(
                 unit_key="story",
                 input_refs=(greenlight,),
-                estimated_cost_minor_units=0,
+                estimated_cost_minor_units=money,
                 estimated_model_calls=2 * max(1, min(left, calls)),
                 estimated_tasks=1,
                 estimated_runtime_seconds=max(1, min(wall, seconds)),
@@ -582,7 +591,7 @@ class StoryAdapter:
         caller = intent.identity.command_id
         if adopted is not None:
             stopped = await self._unavailable_story_by_id(intent.scope.user_id, intent.scope.project_name, adopted)
-            if stopped is None or not await self._task_follows(intent, stopped[0].task_id):
+            if stopped is None or not await self._taken_over(intent, stopped[1]):
                 return await self._take_over(intent, greenlight, adopted)
             return await self._fall_back(intent, greenlight, *stopped)
         stopped = await self._unavailable_story_by_id(
@@ -630,8 +639,10 @@ class StoryAdapter:
             ref, _ = await self._stories.get(
                 user_id=run.user_id, project_name=run.project_name, run_id=receipt.receipt_ref.partition("#")[0]
             )
-            if self._fallback_writer(run, ref.brief) is not None:
+            reworks = sum(r.count for r in run.repair_counts if r.stage is RunStage.STORY)
+            if self._fallback_writer(run, ref.brief) is not None and reworks < run.policy.unit_repair_limit:
                 # ADR-0139: the step settles what the story spent; the story stage runs again on the next writer.
+                # Moves count as STORY repairs; past the run's repair limit the story stays stopped for a Human.
                 passing = outcome(intent, "PASS", receipts=(receipt,), owner_state=state.phase.value).model_dump(
                     mode="python"
                 )
@@ -699,7 +710,15 @@ class StoryAdapter:
             used = state.usage
             # ADR-0138: the greenlit brief is the story on this run's routes; their limit fields replace the story's.
             brief = _load_brief(self._projects, intent.scope.project_name, greenlight.digest)
-            routed = rerouted_limits(state.limits, brief.limits, used.input_tokens, used.output_tokens)
+            routes = brief.limits
+            if routes.cloud_prices is not None:
+                run = await current_run(self._sessions, intent)
+                unreserved = (await self._room(run))[2]
+                money = min(routes.max_cost_minor_units, unreserved + intent.estimated_cost_minor_units)
+                if money < 1:
+                    raise OwnerBlocked("STORY_BUDGET_EXHAUSTED")
+                routes = routes.model_copy(update={"max_cost_minor_units": money})
+            routed = rerouted_limits(state.limits, routes, used.input_tokens, used.output_tokens)
             limits = routed.model_copy(
                 update={
                     "generate_calls_max": used.generate_calls + calls,
@@ -764,15 +783,15 @@ class StoryAdapter:
         writer = route_for(run, "writer")
         settings = self._projects.load_project(run.project_name).get("automation")
         raw = settings.get("fallbacks") if isinstance(settings, dict) else None
-        reviewers = {route.model_identity for route in run.policy.routes if route.role in ("reviewer_a", "reviewer_b")}
+        rules = FallbackRules(
+            local_only=run.policy.local_only,
+            excluded_identities=frozenset(
+                route.model_identity for route in run.policy.routes if route.role in ("reviewer_a", "reviewer_b")
+            ),
+        )
         order = [writer] if writer is not None else []
         for route in raw or []:
-            if not isinstance(route, dict) or route.get("role") != "writer":
-                continue
-            local = route.get("local") is True
-            if (run.policy.local_only and not local) or (not local and not route.get("max_cost_per_call")):
-                continue
-            if route.get("model_identity") in reviewers:
+            if not isinstance(route, dict) or route.get("role") != "writer" or not allowed_fallback(route, rules):
                 continue
             pair = (str(route.get("provider_id")), str(route.get("model_id")))
             if pair not in order:
@@ -804,75 +823,88 @@ class StoryAdapter:
         """The run's story when its model failed (ADR-0139)."""
         return await self._unavailable_story_by_id(run.user_id, run.project_name, await self._story_id(run, greenlight))
 
-    async def _task_follows(self, intent: DispatchIntent, task_id: str) -> bool:
-        """Whether the story task already follows this run (its hand-over receipt is written)."""
+    async def _taken_over(self, intent: DispatchIntent, state: RunState) -> bool:
+        """Whether this run's take-over of the story is complete: a top-up of one of this run's steps is recorded (a
+        hand-over receipt alone is not; the take-over's replay finishes it)."""
+        callers = [top_up.caller_ref for top_up in state.top_ups]
+        if not callers:
+            return False
         async with self._sessions() as session:
             found = await session.execute(
-                sa.select(CommandReceiptModel.command_id).where(
-                    CommandReceiptModel.task_id == task_id, CommandReceiptModel.actor_scope == actor_scope(intent)
+                sa.select(ProductionStepModel.command_id).where(
+                    ProductionStepModel.command_id.in_(callers), ProductionStepModel.run_id == intent.scope.run_id
                 )
             )
             return found.first() is not None
 
-    async def _room(self, run: RunSnapshot) -> tuple[int, int]:
-        """The generate calls and seconds the run's caps still leave."""
+    async def _room(self, run: RunSnapshot) -> tuple[int, int, int]:
+        """The generate calls, seconds and money (minor units) the run's caps still leave (settled usage plus open
+        reservations, the current step's included)."""
         async with self._sessions() as session:
-            _cost, used_calls, _tasks, used_seconds = await ProductionRunRepository(session).usage_totals(
+            used_cost, used_calls, _tasks, used_seconds = await ProductionRunRepository(session).usage_totals(
                 RunScope(user_id=run.user_id, project_name=run.project_name, run_id=run.run_id)
             )
-        return max(0, run.policy.max_model_calls - used_calls) // 2, max(
-            0, run.policy.max_runtime_seconds - used_seconds
+        return (
+            max(0, run.policy.max_model_calls - used_calls) // 2,
+            max(0, run.policy.max_runtime_seconds - used_seconds),
+            max(0, run.policy.max_cost_minor_units - used_cost),
         )
 
     async def _fall_back(
         self, intent: DispatchIntent, greenlight: OwnerReceipt, ref: StoryRunRef, state: RunState
     ) -> OwnerReceipt:
         """ADR-0139: move the story whose model failed to the next writer and run it on from where it stopped, under
-        the Gate A it has (the fallback routes are part of the policy the run's grant approved). The step settles only
-        what is spent from here."""
+        the Gate A it has (the run's grant approved the policy its fallbacks are held to). The step settles only what
+        is spent from here. The chosen brief is pinned before anything is written, so a replay after a crash finishes
+        the same move instead of choosing again."""
         caller = intent.identity.command_id
-        done = next((t for t in state.top_ups if t.caller_ref == caller), None)
-        if done is None:
-            run = await current_run(self._sessions, intent)
-            brief = None
+        run = await current_run(self._sessions, intent)
+        blobs = _blobs(self._projects, run.project_name)
+        pin = fallback_pin(ref.run_id, caller)
+        try:
+            pinned = blobs.pinned(pin)
+            brief = None if pinned is None else StoryBrief.model_validate_json(blobs.read_exact(pinned))
+        except (BlobStoreError, ValueError):
+            raise OwnerBlocked("STORY_FALLBACK_UNAVAILABLE") from None
+        if brief is None:
+            _calls, _seconds, unreserved = await self._room(run)
+            money = min(10_000, unreserved + intent.estimated_cost_minor_units)
             for writer in self._fallback_writers(run, ref.brief):
                 try:
                     brief = await self._stories.reroute_brief(
                         StoryBrief.model_validate(ref.brief.model_dump(mode="json", exclude={"gate_a_decision_id"})),
                         provider_id=writer[0],
                         model_id=writer[1],
-                        max_cost_minor_units=max(1, min(10_000, run.policy.max_cost_minor_units)),
+                        # Below 1 a priced writer is refused (CLOUD_BUDGET_INVALID) and passed over.
+                        max_cost_minor_units=money,
                         project_name=run.project_name,
                     )
                     break
                 except StoryActionRefused:
-                    continue  # a fallback no longer configured is passed over
+                    continue  # a fallback no longer configured, or priced beyond what is left, is passed over
             if brief is None:
                 raise OwnerBlocked("STORY_MODEL_UNAVAILABLE")
             if brief.limits.cloud_prices is not None and run.policy.currency != "USD":
                 raise OwnerBlocked("CURRENCY_MISMATCH")
-            # The fallback routes are part of the policy this run's grant approved; the story keeps its Gate A.
-            subject = await current_subject(self._sessions, intent, subject_digest=greenlight.digest)
-            async with self._sessions() as session, session.begin():
-                await self._authority.require_locked(session, subject=subject)
-            used = state.usage
-            limits = rerouted_limits(state.limits, brief.limits, used.input_tokens, used.output_tokens)
-            try:
-                state = await self._stories.reroute(
-                    user_id=run.user_id,
-                    project_name=run.project_name,
-                    run_id=ref.run_id,
-                    caller_ref=caller,
-                    brief=brief.model_copy(update={"gate_a_decision_id": ref.brief.gate_a_decision_id}),
-                    limits=limits,
-                )
-            except StoryActionRefused as refused:
-                raise OwnerBlocked(refused.code) from None
-            done = next(t for t in state.top_ups if t.caller_ref == caller)
-        else:
-            await self._stories.requeue_finished(
-                user_id=intent.scope.user_id, project_name=intent.scope.project_name, run_id=ref.run_id
+            brief = brief.model_copy(update={"gate_a_decision_id": ref.brief.gate_a_decision_id})
+            blobs.pin(pin, blobs.put(brief.model_dump_json().encode("utf-8")))
+        subject = await current_subject(self._sessions, intent, subject_digest=greenlight.digest)
+        async with self._sessions() as session, session.begin():
+            await self._authority.require_locked(session, subject=subject)
+        used = state.usage
+        limits = rerouted_limits(state.limits, brief.limits, used.input_tokens, used.output_tokens)
+        try:
+            state = await self._stories.reroute(
+                user_id=run.user_id,
+                project_name=run.project_name,
+                run_id=ref.run_id,
+                caller_ref=caller,
+                brief=brief,
+                limits=limits,
             )
+        except StoryActionRefused as refused:
+            raise OwnerBlocked(refused.code) from None
+        done = next(t for t in state.top_ups if t.caller_ref == caller)
         return OwnerReceipt(
             owner=self.owner,
             receipt_ref=f"{ref.run_id}#top-up-{done.number}",

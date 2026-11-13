@@ -3630,11 +3630,39 @@ async def execute_generation_task(task: dict[str, Any], *, claimed_provider_id: 
         raise ValueError("task.task_type is required")
 
     from lib.db import async_session_factory
-    from server.production_run.execution_guard import require_run_task_authorized
+    from lib.text_backends.fallback_rules import run_fallback_rules
+    from server.production_run.execution_guard import require_run_task_authorized, run_fallback_rules_for
 
     async with async_session_factory() as session:
-        await require_run_task_authorized(session, task)
+        scope = await require_run_task_authorized(session, task)
+        rules = await run_fallback_rules_for(session, scope)
+    # ADR-0139: the text calls of a run's task fall back only to models the run's rules allow.
+    with run_fallback_rules(rules):
+        return await _execute_authorized_task(
+            task,
+            task_type,
+            project_name,
+            resource_id,
+            payload,
+            user_id,
+            queue_task_id,
+            claimed_provider_id=claimed_provider_id,
+            video_poll_timeout_seconds=video_poll_timeout_seconds,
+        )
 
+
+async def _execute_authorized_task(
+    task: dict[str, Any],
+    task_type: str,
+    project_name: str,
+    resource_id: str,
+    payload: dict[str, Any],
+    user_id: str,
+    queue_task_id: Any,
+    *,
+    claimed_provider_id: str | None,
+    video_poll_timeout_seconds: int,
+) -> dict[str, Any]:
     executor = _TASK_EXECUTORS.get(task_type)
     if task_type.startswith("text_"):
         from server.tool_runtime import execute_queued_text_task

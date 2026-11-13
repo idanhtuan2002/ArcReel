@@ -1020,18 +1020,9 @@ class StoryAuthoringService:
         limits: StoryLimits,
     ) -> RunState:
         """ADR-0139: a story stopped because its model failed goes on, in the same run, on ``brief`` (the story on a
-        fallback route, greenlit by the caller) under ``limits``; what was written stays (``brief.basis``). Recorded
-        as a top-up of ``caller_ref``; a replay changes nothing."""
-        ref, before = await self.get(user_id=user_id, project_name=project_name, run_id=run_id)
-        if any(t.caller_ref == caller_ref for t in before.top_ups):
-            await self.requeue_finished(user_id=user_id, project_name=project_name, run_id=run_id)
-            return before
-        if before.phase is not RunPhase.MODEL_UNAVAILABLE:
-            raise StoryActionRefused("ACTION_NOT_ALLOWED", f"a {before.phase.value} story run is not rerouted")
-        # The brief first, then the state, then the queue: a worker never runs the story on the old route again.
-        async with self._factory() as session:
-            if not await TaskRepository(session).set_story_brief(ref.task_id, brief.model_dump(mode="json")):
-                raise StoryActionRefused("ACTION_NOT_ALLOWED", "the story task is still queued or running")
+        fallback route) under ``limits``; what was written stays (``brief.basis``). Recorded as a top-up of
+        ``caller_ref``; a replay with the same brief finishes an interrupted move and changes nothing else."""
+        ref, _before = await self.get(user_id=user_id, project_name=project_name, run_id=run_id)
         store = RunStateStore(self._factory, task_id=ref.task_id)
 
         def change(current: RunState) -> tuple[RunState, bool]:
@@ -1049,9 +1040,18 @@ class StoryAuthoringService:
             )
             return moved, True
 
+        # The state first (its top-up names the move, so a replay finishes the same move), then the brief, then the
+        # queue: the task is finished until it is queued again, so no worker runs the story in between.
         state, allowed = await store.apply(change)
         if not allowed:
             raise StoryActionRefused("ACTION_NOT_ALLOWED", f"a {state.phase.value} story run is not rerouted")
+        async with self._factory() as session:
+            written = await TaskRepository(session).set_story_brief(ref.task_id, brief.model_dump(mode="json"))
+        if (
+            not written
+            and (await self.get(user_id=user_id, project_name=project_name, run_id=run_id))[0].brief != brief
+        ):
+            raise StoryActionRefused("ACTION_NOT_ALLOWED", "the story task is still queued or running")
         async with self._factory() as session:
             await TaskRepository(session).requeue_finished_story_run(ref.task_id)
         return state

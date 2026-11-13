@@ -737,7 +737,7 @@ async def test_a_drifting_storyboard_is_made_again_with_its_fix_and_the_better_v
     assert evidence["segments"]["E1S01"]["first"]["verdict"]["score"] == 55
     assert evidence["segments"]["E1S01"]["second"] == {
         "version": 2,
-        "verdict": {"score": 40, "status": "drift", "issues": [], "prompt_fix": "worse"},
+        "verdict": {"score": 40, "status": "drift", "issues": [], "prompt_fix": "worse", "cast_check": []},
     }
     assert evidence["segments"]["E1S01"]["kept_version"] == 1
     assert "second" not in evidence["segments"]["E1S02"]

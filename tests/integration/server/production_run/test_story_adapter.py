@@ -957,3 +957,76 @@ async def test_the_fallback_list_is_read_when_needed_and_held_to_the_runs_rules(
     assert adapter._writer_order(run)[1:] == []
     _list_fallbacks(host, FALLBACK)
     assert adapter._writer_order(run)[1:] == [(host.run.policy.fallback_routes[0].provider_id, FALLBACK)]
+
+
+async def _writer_fallback_without_repairs(sessions) -> dict:
+    return {**await _writer_fallback(sessions), "unit_repair_limit": 0}
+
+
+@pytest.mark.parametrize("story_policy", [_writer_fallback_without_repairs], indirect=True)
+async def test_a_move_past_the_runs_repair_limit_leaves_the_story_stopped_for_a_human(story_host: Host):
+    """Review M3: a fallback move is a STORY repair; past the limit the run blocks instead of failing for good."""
+    host = story_host
+    _list_fallbacks(host, FALLBACK)
+    await _tick(host)
+    await _tick(host)
+    task_id = await _story_task(host)
+    await _stop(host, task_id)
+
+    stopped = await _tick(host)
+
+    assert stopped.stage is RunStage.STORY
+    assert stopped.status not in (RunStatus.RUNNING, RunStatus.WAITING_TASK, RunStatus.FAILED_QUALITY)
+    assert (await _brief(host, task_id)).selection.model_id == MODEL
+
+
+@pytest.mark.parametrize("story_policy", [_writer_fallback], indirect=True)
+async def test_a_move_cut_off_after_its_state_was_written_is_finished_by_its_replay(story_host: Host):
+    """Review M2: the state's top-up is written first; replaying the same move writes the brief and queues the task."""
+    from server.production_run.story_adapter import rerouted_limits
+    from server.story_authoring.runtime import top_up
+
+    host = story_host
+    await _tick(host)
+    await _tick(host)
+    task_id = await _story_task(host)
+    await _stop(host, task_id)
+    before = await _brief(host, task_id)
+    [spare] = host.run.policy.fallback_routes
+    moved = await host.stories.reroute_brief(
+        StoryBrief.model_validate(before.model_dump(mode="json", exclude={"gate_a_decision_id"})),
+        provider_id=spare.provider_id,
+        model_id=FALLBACK,
+        max_cost_minor_units=1,
+        project_name="project",
+    )
+    moved = moved.model_copy(update={"gate_a_decision_id": before.gate_a_decision_id})
+    store = RunStateStore(host.sessions, task_id=task_id)
+    state = await store.load()
+    limits = rerouted_limits(state.limits, moved.limits, state.usage.input_tokens, state.usage.output_tokens)
+    # The crash: the state took the move, the task still names the old writer and is not queued.
+    await store.apply(
+        lambda s: (
+            top_up(
+                s,
+                caller_ref="step-1",
+                limits=limits,
+                phases=frozenset({RunPhase.MODEL_UNAVAILABLE}),
+                grow=False,
+                reroute=True,
+            ),
+            None,
+        )
+    )
+    assert (await _brief(host, task_id)).selection.model_id == MODEL
+
+    run_id = (await store.load()).run_id
+    again = await host.stories.reroute(
+        user_id="default", project_name="project", run_id=run_id, caller_ref="step-1", brief=moved, limits=limits
+    )
+
+    assert len(again.top_ups) == 1
+    assert (await _brief(host, task_id)).selection.model_id == FALLBACK
+    async with host.sessions() as session:
+        task = (await session.execute(sa.select(Task).where(Task.task_id == task_id))).scalar_one()
+    assert task.status == "queued"

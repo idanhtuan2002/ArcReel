@@ -12,6 +12,7 @@ unchanged.
 
 from __future__ import annotations
 
+import contextlib
 import re
 import subprocess
 import unicodedata
@@ -210,8 +211,15 @@ def timing_findings(srt: str, *, unit_key: str) -> list[AssessmentFinding]:
 
 
 def sound_findings(final: Path, *, unit_key: str, ffmpeg: str = "ffmpeg") -> list[AssessmentFinding]:
-    """MINOR findings for a final whose loudness misses the delivery target or that holds dead air."""
+    """MINOR findings for a final whose loudness misses the delivery target or that holds dead air. The checks are
+    advisory: a measurement that fails or times out gives no finding, never a failed review."""
     found: list[AssessmentFinding] = []
+    with contextlib.suppress(RenderRefused, subprocess.SubprocessError, OSError):
+        _sound_findings(final, unit_key=unit_key, ffmpeg=ffmpeg, found=found)
+    return found
+
+
+def _sound_findings(final: Path, *, unit_key: str, ffmpeg: str, found: list[AssessmentFinding]) -> None:
     try:
         measured = measure_loudness(final, ffmpeg=ffmpeg)
     except RenderRefused:
@@ -261,7 +269,6 @@ def sound_findings(final: Path, *, unit_key: str, ffmpeg: str = "ffmpeg") -> lis
                 detail=f"{len(gaps)} silence(s) of {DEAD_AIR_SECONDS:.0f}s or more, longest {max(gaps):.1f}s",
             )
         )
-    return found
 
 
 def length_findings(seconds: float, target: float | None, *, unit_key: str) -> list[AssessmentFinding]:

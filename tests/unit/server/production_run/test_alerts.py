@@ -11,11 +11,13 @@ from server.production_run.alerts import AlertGate, WebhookAlerts, alerts_from_e
 
 
 class _Recorder:
-    def __init__(self) -> None:
+    def __init__(self, delivered: bool = True) -> None:
         self.sent: list[tuple[str, str, str | None, str | None]] = []
+        self.delivered = delivered
 
-    async def send(self, *, project_name, event, run_id, reason) -> None:
+    async def send(self, *, project_name, event, run_id, reason) -> bool:
         self.sent.append((project_name, event, run_id, reason))
+        return self.delivered
 
 
 async def test_the_same_state_is_sent_once_and_a_new_halt_after_a_run_is_sent_again():
@@ -77,3 +79,16 @@ def test_the_webhook_comes_from_the_host_settings(monkeypatch):
     assert alerts_from_env() is None
     monkeypatch.setenv("ARCREEL_ALERT_WEBHOOK_URL", "https://ntfy.example.test/topic")
     assert isinstance(alerts_from_env(), WebhookAlerts)
+    for malformed in ("http://[::1", "ntfy.example.test/topic", "ftp://host/x"):
+        monkeypatch.setenv("ARCREEL_ALERT_WEBHOOK_URL", malformed)
+        assert alerts_from_env() is None
+
+
+async def test_a_malformed_url_never_raises_and_an_undelivered_alert_is_tried_again():
+    """Review M7: a bad URL must not stall the autopilot scan; a failed send is not remembered as sent."""
+    assert await WebhookAlerts("http://[::1").send(project_name="p", event="halted", run_id="r", reason="x") is False
+    recorder = _Recorder(delivered=False)
+    gate = AlertGate(recorder)
+    await gate.observe(user_id="u", project_name="p", event="halted", run_id="r", reason="x")
+    await gate.observe(user_id="u", project_name="p", event="halted", run_id="r", reason="x")
+    assert len(recorder.sent) == 2

@@ -173,7 +173,7 @@ async def test_text_roles_keep_ordered_fallback_models_and_a_cloud_one_makes_the
     projects = Projects({})
     fallbacks = [
         {"role": "writer", "provider_id": "custom-2", "model_id": "gemini-3.6-flash", "max_cost_per_call": 3},
-        {"role": "script", "provider_id": "custom-1", "model_id": TEXT[2]},
+        {"role": "script", "provider_id": "custom-2", "model_id": "gemini-3.6-flash", "max_cost_per_call": 2},
     ]
     update = SettingsUpdate.model_validate({**_update().model_dump(), "fallbacks": fallbacks})
 
@@ -182,10 +182,10 @@ async def test_text_roles_keep_ordered_fallback_models_and_a_cloud_one_makes_the
     stored = projects.project["automation"]
     assert [(f["role"], f["model_id"], f["model_identity"]) for f in stored["fallbacks"]] == [
         ("writer", "gemini-3.6-flash", "gemini/gemini-3.6-flash"),
-        ("script", TEXT[2], f"ollama/{TEXT[2]}@sha256:" + "9" * 64),
+        ("script", "gemini-3.6-flash", "gemini/gemini-3.6-flash"),
     ]
     assert (stored["local_only"], stored["paid"]) == (False, True)
-    assert [f["model_id"] for f in saved["fallbacks"]] == ["gemini-3.6-flash", TEXT[2]]
+    assert [f["model_id"] for f in saved["fallbacks"]] == ["gemini-3.6-flash", "gemini-3.6-flash"]
     # The script model chosen here is the project's text model for script work, so the text stages run on it.
     assert projects.project["text_backend_complex"] == f"custom-1/{TEXT[0]}"
 
@@ -196,6 +196,7 @@ async def test_text_roles_keep_ordered_fallback_models_and_a_cloud_one_makes_the
         ({"role": "reviewer_a", "provider_id": "custom-1", "model_id": TEXT[2]}, "FALLBACK_ROLE_UNSUPPORTED"),
         ({"role": "writer", "provider_id": "custom-1", "model_id": TEXT[0]}, "FALLBACK_REPEATED"),
         ({"role": "writer", "provider_id": "custom-2", "model_id": "gemini-3.6-flash"}, "UNBOUNDED_PAID_ROUTE"),
+        ({"role": "script", "provider_id": "custom-1", "model_id": TEXT[1]}, "FALLBACK_IS_REVIEWER"),
     ],
 )
 async def test_a_fallback_of_another_role_a_repeated_one_or_an_unbounded_cloud_one_is_refused(

@@ -156,6 +156,9 @@ async def qualify(
 
 
 ONLY_MISSING = ("LAUNCH_PROFILE_NOT_QUALIFIED",)
+#: A record whose routes, profile or resources moved since it was written is replaced the same way (ADR-0139): a
+#: Showrunner changing models re-qualifies the launch, the newest record being the current one.
+ONLY_STALE = ("LAUNCH_QUALIFICATION_CHANGED",)
 
 
 def evidence_receipt(path: Path) -> tuple[str, str]:
@@ -178,7 +181,7 @@ async def build_record(
         witness=ProjectInputWitness(sessions, projects=projects),
     )
     report = await ProductionPreflight(reader).check(user_id=user_id, project_name=project_name, policy=policy)
-    if report.blocking_reasons != ONLY_MISSING:
+    if report.blocking_reasons not in (ONLY_MISSING, ONLY_STALE):
         return None, report.blocking_reasons
     launch_profile = resolve_launch_profile(policy.launch_profile_id)
     receipt_ref, digest = evidence_receipt(evidence)
@@ -199,4 +202,4 @@ async def build_record(
     )
 
 
-__all__ = ["ONLY_MISSING", "build_record", "cannot_qualify", "evidence_receipt", "qualify"]
+__all__ = ["ONLY_MISSING", "ONLY_STALE", "build_record", "cannot_qualify", "evidence_receipt", "qualify"]

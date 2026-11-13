@@ -68,6 +68,7 @@ from server.production_run.text_adapter import (
 from server.production_run.vision_chat import model_access
 from server.services.automation_grants import AutomationGrantCustodian, RunAutomationAuthority
 from server.services.governance_grants import CurrentShowrunnerGrantReader
+from server.story_authoring.driver import StoryBrief
 from server.story_authoring.handoff import SourceUpload
 from server.story_authoring.service import StoryAuthoringService
 
@@ -409,8 +410,8 @@ def wire_autopilot(
         except StorySyncRefused as refused:
             return [refused.code]
 
-    async def story_busy(user_id: str, project_name: str) -> bool:
-        return await story_run_busy(stories, user_id, project_name)
+    async def story_busy(user_id: str, project_name: str, idea: str | None) -> bool:
+        return await story_run_busy(stories, user_id, project_name, idea)
 
     async def max_targets(delegation: AutopilotDelegation) -> int:
         policy = await service.resolve_policy(
@@ -432,14 +433,26 @@ def wire_autopilot(
 
 
 #: Story-run phases after which a run no longer holds the project's story (ADR-0124 §3).
-async def story_run_busy(stories: StoryAuthoringService, user_id: str, project_name: str) -> bool:
+async def story_run_busy(
+    stories: StoryAuthoringService, user_id: str, project_name: str, idea: str | None = None
+) -> bool:
     """Whether a story run of the project is unfinished, so a story autopilot starts nothing (ADR-0124 §3). A story
-    left stopped by automatic runs is not: the planner starts nothing while a run of the project is active, and the
-    next run takes that story over on the routes the project has now (ADR-0138)."""
+    left stopped by automatic runs is not, when the next run of an autopilot with ``idea`` takes it over (ADR-0138,
+    the same conditions as the run's own take-over): the project's current content safety, and the book's next part
+    or, for a first part, the same idea (an autopilot drawing its own idea takes nothing over)."""
     runs = await stories.list_runs(user_id=user_id, project_name=project_name)
     unfinished = [run for run in runs if run.get("phase") not in _STORY_RUN_ENDED]
     if len(unfinished) == 1:
-        found = await stories.adoptable(user_id=user_id, project_name=project_name, matches=lambda _brief: True)
+        safety = stories.content_safety(project_name)
+
+        def taken_over(brief: StoryBrief) -> bool:
+            if brief.prior is not None or brief.content_safety != safety:
+                return False
+            if brief.book is not None and brief.book.part > 1:
+                return True
+            return idea is not None and brief.idea == idea
+
+        found = await stories.adoptable(user_id=user_id, project_name=project_name, matches=taken_over)
         if (
             found is not None
             and found[0].run_id == unfinished[0].get("run_id")

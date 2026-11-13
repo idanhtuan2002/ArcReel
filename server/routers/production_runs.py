@@ -7,6 +7,7 @@ run's user and its automation grant, and never accepts identity or authority fro
 from __future__ import annotations
 
 import asyncio
+import logging
 from typing import Annotated, Any, Literal
 from uuid import uuid4
 
@@ -110,6 +111,7 @@ def _http(error: Exception) -> HTTPException:
     return HTTPException(status_code=status, detail=body)
 
 
+logger = logging.getLogger(__name__)
 _REFUSALS = (ProductionRunRefused, ProductionRunConflict, PermissionError, GovernanceStartupUnavailable)
 
 
@@ -209,6 +211,21 @@ async def get_settings(project_name: str, user: CurrentUser, service: Service) -
     return await settings_options(sessions, get_project_manager(), project_name, user_id=user.id)
 
 
+async def _launch_reasons(service: ProductionRunService, user_id: str, project_name: str) -> list[str]:
+    """Record the project's launch qualification when only it is missing or stale; the reasons it still has. The
+    bookkeeping never fails the request that asked for it (a settings save, a films batch)."""
+    try:
+        recorded = await _qualifications(service).record_launch(user_id=user_id, project_name=project_name)
+    except QualificationRefused as refused:
+        return [str(refused)]
+    except _REFUSALS as error:
+        return [str(getattr(error, "code", None) or type(error).__name__)]
+    except Exception as error:
+        logger.warning("launch qualification of %s not recorded: %s", project_name, type(error).__name__)
+        return [type(error).__name__]
+    return list(recorded["reasons"])
+
+
 @router.put("/projects/{project_name}/automation/settings")
 async def put_settings(
     project_name: str, body: SettingsUpdate, user: InteractiveUser, token: Token, service: Service, scheduler: Autopilot
@@ -227,11 +244,7 @@ async def put_settings(
     # ADR-0139: a change of models records the project's launch qualification again (as the Showrunner's own
     # "record launch" would: only when the real preflight blocks on nothing else), so a film is not stopped on
     # LAUNCH_QUALIFICATION_CHANGED by the change itself; the reasons it still has are returned.
-    try:
-        recorded = await _qualifications(active).record_launch(user_id=user.id, project_name=project_name)
-        saved = {**saved, "launch_reasons": list(recorded["reasons"])}
-    except QualificationRefused as refused:
-        saved = {**saved, "launch_reasons": [str(refused)]}
+    saved = {**saved, "launch_reasons": await _launch_reasons(active, user.id, project_name)}
     # ADR-0127: an autopilot on the project freezes the policy it was turned on with; the same Showrunner's change of
     # settings turns it on again with the new policy and the same parameters, so it does not stop on POLICY_MOVED.
     async with sessions() as session:
@@ -588,11 +601,7 @@ async def films_for_finished_stories_route(
         )
 
     async def qualify_launch(film: str) -> list[str]:
-        try:
-            recorded = await _qualifications(service).record_launch(user_id=user.id, project_name=film)
-        except QualificationRefused as refused:
-            return [str(refused)]
-        return list(recorded["reasons"])
+        return await _launch_reasons(active, user.id, film)
 
     try:
         result = await films_for_finished_stories(

@@ -169,14 +169,15 @@ async def test_another_actors_active_task_on_the_resource_blocks_instead_of_adop
     assert len(await _tasks(host, "text_asset_inventory")) == 1
 
 
-async def test_a_changed_script_route_blocks_before_any_task(story_host: Host):
+async def test_a_new_project_script_model_does_not_stop_an_open_run(story_host: Host):
+    """ADR-0139: the run's tasks stay on its frozen script model (the worker pins it), so a new default applies from
+    the next run and the open one goes on."""
     host = story_host
     await _at(host, RunStage.ASSET_ANALYSIS)
     controller = _controller(host)
     adapter = controller._adapters[RunStage.ASSET_ANALYSIS]
     adapter._resolver = Resolver(("custom-999", "other"))
 
-    blocked = await _tick(host, controller)
+    plan = await adapter.plan(run=host.run)
 
-    assert (blocked.status, blocked.reason) == (RunStatus.BLOCKED_CONFIGURATION, "MODEL_CONFIG_CHANGED")
-    assert await _tasks(host, "text_asset_inventory") == []
+    assert plan.unit_key == "asset-analysis"

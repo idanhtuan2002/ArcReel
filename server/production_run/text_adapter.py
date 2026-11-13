@@ -40,7 +40,6 @@ from lib.project_manager import ProjectManager
 from lib.script_batch_edit import script_revision as batch_script_revision
 from lib.script_review import content_fingerprint, script_plan_path, script_plan_quarantine_path
 from lib.speech_composition import SpeechProblemCode, admit_script_unit
-from lib.text_backends.base import TextTaskType
 from lib.workflow_state import WorkflowActionType, WorkflowStateService, WorkflowStatus
 from r2.automation.identity import digest_value
 from r2.contracts.automation import (
@@ -321,13 +320,10 @@ class WorkflowStageAdapter:
         return tuple(episode_number(target) for target in run.targets)
 
     async def _require_script_route(self, run: RunSnapshot) -> None:
-        """The project's script text route must still be the one the policy froze."""
-        frozen = route_for(run, "script")
-        if frozen is None:
+        """The run has a script route. Its owner tasks run on that frozen route whatever the project's settings say
+        now (the worker pins it for a run's tasks, ADR-0139), so a new default never stops an open run."""
+        if route_for(run, "script") is None:
             raise OwnerBlocked("MISSING_MODEL_ROLE")
-        current = await self._resolver.text_backend_for_task(TextTaskType.SCRIPT, run.project_name)
-        if tuple(current) != frozen:
-            raise OwnerBlocked("MODEL_CONFIG_CHANGED")
 
     def _project(self, project_name: str) -> dict[str, Any]:
         return self._projects.load_project(project_name)
