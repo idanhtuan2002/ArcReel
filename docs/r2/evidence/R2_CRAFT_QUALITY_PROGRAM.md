@@ -14,8 +14,8 @@ Donor checkouts: `/tmp/claude-1000/-home-anhtuan-content-production-os/9ab4f1ca-
 | P0-5 music bed (ACE-Step 1.5) + ducking | done | `edd9d037f`, ADR-0143; also fixes master lengthening (FINAL_DURATION_MISMATCH). Host: `/mnt/arcreel/D/ArcReel/ace-step-api.sh`, env `ARCREEL_MUSIC_URL`, `ARCREEL_MUSIC_FREE_URLS` |
 | P0-6 VieNeu emotion cues + pauses | waiting on a listening check | cue `[thở dài]` adds 0.48 s on the deployed v3 Turbo but is experimental upstream and unverifiable without listening; samples in `/mnt/arcreel/D/ArcReel/ace-step-cache/tts-cue/` (plain, sigh, laugh). Implementation touches the narration audio basis; build only if the Human hears a real sigh. |
 | P0-7 shot grammar (angle, coverage, variety) | done | `8f1dda78d`, ADR-0144 (AIVPE directorAgent, ShotBench) |
-| P1-8 image-prompt dialect per model | todo | A/B on klein |
-| P1-9 numeric look-consistency check | todo | |
+| P1-8 image-prompt dialect per model | done: measured, no change | `8af1d0270`, `docs/r2/evidence/prompt-dialect-ab-2026-11-14/`: no dialect wins; shot size ignored by all (reference sheet pulls framing → ID-1) |
+| P1-9 numeric look-consistency check | done | `5b614da68`, ADR-0145 |
 | P1-10 wardrobe/state derivatives in the run | todo | merges with ID-5 |
 | P1-11 ambience bed | todo | |
 | P1-12 screen direction | todo | |
