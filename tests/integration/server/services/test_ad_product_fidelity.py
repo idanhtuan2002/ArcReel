@@ -49,7 +49,7 @@ class TestAdProductFidelityStoryboard:
         assert all(isinstance(r, dict) and "保温杯" in r["label"] for r in refs[:2])
         # 附高保真还原指令
         prompt = generator.image_calls[0]["prompt"]
-        assert prompt.startswith("Style: Anime\nVisual style: cinematic")
+        assert prompt.startswith("Characters:\n- Alice: hero\n\nStyle: Anime\nVisual style: cinematic")
         assert "\n\n商品特写\n\n" in prompt
         assert "「保温杯」" in prompt
 
@@ -112,7 +112,7 @@ class TestAdProductFidelityStoryboard:
         assert [reference["label"] for reference in refs] == ["Alice", "祠堂"]
         assert generator.image_reference_bytes[0] == [b"png", b"png"]
         prompt = generator.image_calls[0]["prompt"]
-        assert prompt.startswith("Style: Anime\nVisual style: cinematic")
+        assert prompt.startswith("Characters:\n- Alice: hero\n\nStyle: Anime\nVisual style: cinematic")
         assert "\n\n氛围开场\n\n" in prompt
         assert "商品高保真还原" not in prompt
 

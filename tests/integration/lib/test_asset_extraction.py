@@ -36,7 +36,14 @@ def _answer(payload: object):
 
 
 EXTRACTED = {
-    "characters": [{"name": "Lan", "description": "Cô gái gầy, tóc dài, áo bà ba nâu.", "voice_style": "nhỏ nhẹ"}],
+    "characters": [
+        {
+            "name": "Lan",
+            "identity": "Cô gái 19 tuổi, gầy, tóc đen dài thẳng.",
+            "outfit": "Áo bà ba nâu #6B4A2B, quần đen #1A1A1A, vòng bạc ở cổ tay trái.",
+            "voice_style": "nhỏ nhẹ",
+        }
+    ],
     "scenes": [{"name": "Làng ven sông", "description": "Đường đất, hàng tre, ánh chiều vàng."}],
     "props": [{"name": "Vòng bạc", "description": "Chiếc vòng bạc mảnh, xỉn màu."}],
 }
@@ -53,6 +60,9 @@ async def test_extraction_completes_the_inventory_against_the_read_revision(tmp_
     project = pm.load_project("demo")
     assert completed.counts == {"characters": 1, "scenes": 1, "props": 1}
     assert project["characters"]["Lan"]["voice_style"] == "nhỏ nhẹ"
+    assert project["characters"]["Lan"]["description"] == (
+        "Cô gái 19 tuổi, gầy, tóc đen dài thẳng.\nÁo bà ba nâu #6B4A2B, quần đen #1A1A1A, vòng bạc ở cổ tay trái."
+    )
     assert project["workflow"]["asset_inventory"]["source_revision"] == revision
     assert seen[0].response_schema is AssetExtraction
     assert "chiếc vòng bạc" in seen[0].prompt
@@ -104,7 +114,13 @@ async def test_a_moved_source_is_refused_before_any_model_call(tmp_path: Path):
 
 async def test_a_character_the_source_never_names_is_not_registered(tmp_path: Path):
     pm, revision = _project(tmp_path)
-    invented = {**EXTRACTED, "characters": [*EXTRACTED["characters"], {"name": "Hùng", "description": "Chàng trai."}]}
+    invented = {
+        **EXTRACTED,
+        "characters": [
+            *EXTRACTED["characters"],
+            {"name": "Hùng", "identity": "Chàng trai.", "outfit": "Áo trắng #FFFFFF."},
+        ],
+    }
     generate, _ = _answer(invented)
 
     completed = await extract_asset_inventory(

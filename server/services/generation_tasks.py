@@ -96,6 +96,7 @@ from lib.prompt_builders import (
     build_prop_prompt,
     build_scene_prompt,
     render_storyboard_image_prompt,
+    storyboard_cast,
 )
 from lib.prompt_utils import render_storyboard_video_prompt
 from lib.reference_catalog import build_reference_catalog
@@ -401,11 +402,12 @@ def _normalize_storyboard_prompt(
     style: str,
     style_description: str = "",
     product_names: Sequence[str] | None = None,
+    cast: Sequence[tuple[str, str]] = (),
 ) -> str:
     """Render one semantic storyboard prompt through the shared provider projection."""
 
     return render_storyboard_image_prompt(
-        prompt, style=style, style_description=style_description, product_names=product_names
+        prompt, style=style, style_description=style_description, product_names=product_names, cast=cast
     )
 
 
@@ -1673,6 +1675,7 @@ async def execute_storyboard_task(
             _style,
             _style_description,
             _product_names_in_references(_product_refs) if _product_refs else None,
+            storyboard_cast(_project, _target_item),
         )
         _prompt_text = _with_prompt_addendum(_prompt_text, payload.get("prompt_addendum"))
         _frozen = freeze_image_references(_ref_images, _visual_references)

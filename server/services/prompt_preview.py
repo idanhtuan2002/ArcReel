@@ -18,7 +18,7 @@ from typing import Any
 
 from lib.artifact_activation import active_artifact_currency_resolver
 from lib.project_manager import ProjectManager, get_project_manager
-from lib.prompt_builders import render_storyboard_image_prompt
+from lib.prompt_builders import render_storyboard_image_prompt, storyboard_cast
 from lib.prompt_utils import render_storyboard_video_prompt
 from lib.script_models import resolve_content_mode
 from lib.storyboard_sequence import find_storyboard_item, get_storyboard_items
@@ -107,6 +107,7 @@ async def preview_item_prompts(
                 style=style if isinstance(style, str) else "",
                 style_description=style_description if isinstance(style_description, str) else "",
                 product_names=list(dict.fromkeys(product_names)) or None,
+                cast=storyboard_cast(project, item),
             ),
         )
         video = _render(

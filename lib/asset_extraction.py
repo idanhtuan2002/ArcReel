@@ -36,8 +36,18 @@ class _Entry(BaseModel):
     description: str = Field(min_length=1, max_length=600)
 
 
-class _Character(_Entry):
+class _Character(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    name: str = Field(min_length=1, max_length=40)
+    identity: str = Field(min_length=1, max_length=400)
+    outfit: str = Field(min_length=1, max_length=300)
     voice_style: str = Field(default="", max_length=200)
+
+    @property
+    def description(self) -> str:
+        """The character's appearance: who they are to the eye, then what they wear."""
+        return f"{self.identity.strip()}\n{self.outfit.strip()}"
 
 
 class AssetExtraction(BaseModel):
@@ -56,14 +66,23 @@ PROMPT = """You extract visual asset definitions for AI video production from th
 
 Return JSON with three lists: characters, scenes, props.
 - characters: named individuals with a substantial on-page presence and a stable look. Skip unnamed or generic
-  people (crowds, "an old man", numbered extras). description: appearance only (face, build, hair, clothing,
-  colours, signature items); no personality, relations or plot. voice_style: a short voice/tone description.
+  people (crowds, "an old man", numbered extras). Appearance only: no personality, relations or plot.
+  - identity: what stays the same in every scene: age (a number or a narrow range), gender, height and build,
+    face shape and features (eyes, nose, brows, jaw), skin tone, hair (colour, length, style), and any
+    distinguishing mark. Concrete visual words, never abstract ones ("large dark eyes, a high nose bridge", not
+    "beautiful").
+  - outfit: what the character wears through most of the story: each garment with its colour as a name and a
+    hex code bound to that garment (for example "a jade silk ao dai #2A7F7A, white trousers #F4F1EA"), shoes,
+    accessories, and one signature item they carry or wear.
+  - Where the text does not say, design plausible details that fit the setting and the character, and make the
+    characters clearly different from each other at a glance (hair, build, outfit colours).
+  - voice_style: a short voice/tone description.
 - scenes: recurring or visually distinctive places. description: space, atmosphere, light and colour of the
   place itself; never people or events.
 - props: recurring or visually distinctive objects. description: look, material, size and colour.
 Write every name and description in the source text's language. Use names exactly as the text writes them.
-At most {limit} entries per list. Do not invent visual details the text does not support; when the text gives
-none, write a short neutral description consistent with the story's setting.
+At most {limit} entries per list. For scenes and props, do not invent visual details the text does not support;
+when the text gives none, write a short neutral description consistent with the story's setting.
 
 Source text:
 <<<

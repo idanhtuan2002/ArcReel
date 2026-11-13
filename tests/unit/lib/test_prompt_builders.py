@@ -1,3 +1,5 @@
+from typing import ClassVar
+
 from lib.prompt_builders import (
     append_image_negative_tail,
     append_product_fidelity_tail,
@@ -6,6 +8,8 @@ from lib.prompt_builders import (
     build_product_prompt,
     build_prop_prompt,
     build_scene_prompt,
+    render_storyboard_image_prompt,
+    storyboard_cast,
 )
 
 
@@ -118,3 +122,34 @@ class TestProductFidelityTail:
         result = append_product_fidelity_tail("产品特写", "保温杯")
         assert "「保温杯」" in result
         assert "「保」" not in result
+
+
+class TestStoryboardCast:
+    PROJECT: ClassVar[dict] = {
+        "characters": {
+            "Lan": {
+                "description": "Cô gái 19 tuổi.\nÁo bà ba nâu #6B4A2B.",
+                "derivatives": {"mưa": {"description": "Ướt sũng."}},
+            },
+            "Minh": {"description": "Chàng trai 22 tuổi.\nÁo sơ mi trắng #FFFFFF."},
+            "Bà Tư": {"description": ""},
+        }
+    }
+
+    def test_each_character_in_the_shot_leads_the_prompt_with_its_appearance(self):
+        item = {"characters_in_segment": ["Lan/mưa", "Minh", "Bà Tư", "Minh"]}
+        cast = storyboard_cast(self.PROJECT, item)
+
+        prompt = render_storyboard_image_prompt({"scene": "Hai người đứng dưới mưa"}, cast=cast)
+
+        assert [name for name, _ in cast] == ["Lan/mưa", "Minh"]
+        assert prompt.startswith(
+            "Characters:\n- Lan/mưa: Cô gái 19 tuổi. Áo bà ba nâu #6B4A2B. 当前形态：Ướt sũng.\n"
+            "- Minh: Chàng trai 22 tuổi. Áo sơ mi trắng #FFFFFF.\n\n"
+        )
+
+    def test_a_shot_without_characters_renders_as_before(self):
+        prompt = render_storyboard_image_prompt({"scene": "Cánh đồng"})
+
+        assert prompt == render_storyboard_image_prompt({"scene": "Cánh đồng"}, cast=storyboard_cast(self.PROJECT, {}))
+        assert not prompt.startswith("Characters:")

@@ -14,8 +14,10 @@ WebUI（server/services/generation_tasks.py）和 Skill（agent_runtime_profile/
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
+from typing import Any
 
+from lib.prompt_rules.asset_appearance import iter_asset_appearances
 from lib.prompt_utils import image_prompt_to_yaml, project_storyboard_image_prompt
 from lib.schema_guards import is_str
 
@@ -188,15 +190,42 @@ def render_storyboard_image_prompt(
     style: str = "",
     style_description: str = "",
     product_names: Sequence[str] | None = None,
+    cast: Sequence[tuple[str, str]] = (),
 ) -> str:
     """分镜图最终提示词文本的唯一出口。
 
     执行路径与预览接口共用本函数：结构形态经项目风格投影为 YAML、文本形态原样作提示词主体，
     两者同样注入项目风格与反向约束，商品分镜再追加高保真还原指令（``product_names`` 取实际
-    注入了参考图的商品，与执行期同口径）。
+    注入了参考图的商品，与执行期同口径）。``cast`` 是该分镜出场角色的「名字 + 外观」，原样
+    置于提示词最前：同一角色在每个分镜里都以同一段文字出现，且越靠前的词权重越高。
     """
 
-    return append_product_fidelity_tail(build_storyboard_prompt(image_prompt, style, style_description), product_names)
+    body = append_product_fidelity_tail(build_storyboard_prompt(image_prompt, style, style_description), product_names)
+    block = render_cast_block(cast)
+    # 文本形态以「当前渲染结果」为初值时正文已带着这一块，再注入会叠出第二份。
+    if not block or (isinstance(image_prompt, str) and block in image_prompt):
+        return body
+    return f"{block}\n\n{body}"
+
+
+def storyboard_cast(project: Mapping[str, Any], item: Mapping[str, Any]) -> list[tuple[str, str]]:
+    """分镜出场角色的「引用名 + 当前外观」，按出场顺序；衍生名的外观是本体描述加上变化。"""
+    names: list[str] = []
+    for field in ("characters_in_segment", "characters_in_scene", "characters_in_shot"):
+        value = item.get(field)
+        if isinstance(value, list):
+            names.extend(str(name) for name in value if isinstance(name, str))
+    if not names:
+        return []
+    bucket = project.get("characters")
+    appearances = dict(iter_asset_appearances("character", bucket if isinstance(bucket, Mapping) else None))
+    return [(name, appearances[name]) for name in dict.fromkeys(names) if appearances.get(name)]
+
+
+def render_cast_block(cast: Sequence[tuple[str, str]]) -> str:
+    """出场角色块：每个角色一行，外观压成单行。"""
+    lines = [f"- {name}: {' '.join(appearance.split())}" for name, appearance in cast if appearance.strip()]
+    return "Characters:\n" + "\n".join(lines) if lines else ""
 
 
 def append_product_fidelity_tail(prompt: str, product_names: Sequence[str] | None) -> str:

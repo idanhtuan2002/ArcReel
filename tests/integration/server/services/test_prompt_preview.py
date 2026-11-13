@@ -150,7 +150,7 @@ class TestPreviewMatchesExecution:
 
     @pytest.mark.parametrize("content_mode", CONTENT_MODES)
     async def test_text_form_image_prompt_is_the_prompt_body(self, tmp_path, monkeypatch, content_mode):
-        """文本形态的分镜图提示词就是提示词主体，渲染层只注入项目风格与反向约束。"""
+        """文本形态的分镜图提示词就是提示词主体，渲染层只注入出场角色、项目风格与反向约束。"""
         body = "一条被雨水打湿的老街，霓虹反射在积水上"
         project_path = prepare_files(tmp_path)
         pm = _pm_for(content_mode, project_path)
@@ -166,7 +166,7 @@ class TestPreviewMatchesExecution:
         text = preview.storyboard_image.text
         assert text is not None
         assert preview.storyboard_image.is_text_form
-        assert text.startswith(f"Style: Anime\nVisual style: cinematic\n\n{body}")
+        assert text.startswith(f"Characters:\n- Alice: hero\n\nStyle: Anime\nVisual style: cinematic\n\n{body}")
         assert text == generator.image_calls[0]["prompt"]
 
     @pytest.mark.parametrize("content_mode", CONTENT_MODES)
