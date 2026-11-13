@@ -15,6 +15,7 @@ from lib.presentation_renderer import (
     RenderInput,
     RenderRefused,
     RenderUnit,
+    _mean_volume,
     render_presentations,
     sha256_file,
 )
@@ -242,3 +243,62 @@ def test_an_unknown_grade_or_move_is_refused(clips, tmp_path: Path, episode_fiel
             contract=CONTRACT,
         )
     assert refused.value.code == code
+
+
+def test_a_music_bed_fills_the_gaps_and_ducks_under_speech(clips, tmp_path: Path):
+    music = _media(tmp_path / "music.wav", "-f", "lavfi", "-i", "sine=frequency=220:sample_rate=44100", seconds=10)
+    units = (_unit(clips), _unit(clips, narration=None, cue=False))
+    plain = render_presentations(
+        episode=RenderInput(episode=1, units=units), output_dir=tmp_path / "plain", contract=CONTRACT
+    )
+    scored = render_presentations(
+        episode=RenderInput(episode=1, units=units, music_path=music), output_dir=tmp_path / "scored", contract=CONTRACT
+    )
+
+    manifest = json.loads(scored.manifest_path.read_text(encoding="utf-8"))
+    assert manifest["music"]["ducked"] is True
+    assert manifest["music"]["gain_db"] < 0
+    assert manifest["music"]["path"] == str(music)
+    assert str(music) in scored.source_hashes
+    # the unit without narration is silent without music and carries the bed with it
+    assert _mean_volume(plain.final_path, "ffmpeg", 3_500_000, 2_000_000) < -80
+    assert _mean_volume(scored.final_path, "ffmpeg", 3_500_000, 2_000_000) > -45
+    assert abs(scored.duration_seconds - 6.0) <= 0.12
+
+
+def test_a_missing_music_file_is_refused(clips, tmp_path: Path):
+    episode = RenderInput(episode=1, units=(_unit(clips),), music_path=tmp_path / "missing.wav")
+    with pytest.raises(RenderRefused) as refused:
+        render_presentations(episode=episode, output_dir=tmp_path / "o", contract=CONTRACT)
+    assert refused.value.code == "SOURCE_MEDIA_MISSING"
+
+
+def test_mastering_keeps_a_many_unit_film_at_its_length(tmp_path: Path):
+    video = _media(tmp_path / "six.mp4", "-f", "lavfi", "-i", "testsrc=size=576x1024:rate=24", seconds=6)
+    voice = _media(
+        tmp_path / "mono48.wav",
+        "-f",
+        "lavfi",
+        "-i",
+        # quiet speech-like level with sharp peaks: loudnorm cannot apply one linear gain and limits dynamically
+        "aevalsrc=0.03*sin(2*PI*330*t)+0.7*lt(mod(t\\,0.25)\\,0.003):s=48000",
+        seconds=3.36,
+    )
+    unit = RenderUnit(
+        unit_id="u",
+        video_path=video,
+        video_start_us=0,
+        duration_us=6_000_000,
+        video_audio=False,
+        video_gain=1.0,
+        narration_path=voice,
+        narration_start_us=1_000_000,
+        narration_duration_us=3_360_000,
+        cues=(RenderCue(1_000_000, 4_360_000, "Một câu."),),
+    )
+
+    receipt = render_presentations(
+        episode=RenderInput(episode=1, units=(unit, unit, unit, unit)), output_dir=tmp_path / "out", contract=CONTRACT
+    )
+
+    assert abs(receipt.duration_seconds - 24.0) <= 0.05

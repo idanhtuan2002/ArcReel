@@ -255,6 +255,16 @@ class ProjectOverview(BaseModel):
     color_grade: Grade = Field(
         description="成片调色预设，按题材与情绪基调选择：\n" + grade_prompt_options(),
     )
+    music_caption: str = Field(
+        description=(
+            "成片背景音乐（纯器乐、垫在旁白之下）的英文描述，写给音乐生成模型：具体的曲风、情绪、主奏乐器与音色、"
+            '年代感与制作质感，如 "slow cinematic piano and soft strings, melancholic, intimate, warm analog '
+            'recording, sparse arrangement"。不写人声、不写歌词、不写速度数字；不混搭相互冲突的曲风。'
+        ),
+    )
+    music_bpm: int = Field(
+        ge=50, le=160, description="背景音乐速度（BPM），与故事节奏相符：抒情 60-80，叙事 80-100，紧张 100-130"
+    )
 
 
 def _rename_agnostic_errors(

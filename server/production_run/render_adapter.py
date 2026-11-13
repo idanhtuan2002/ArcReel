@@ -11,15 +11,18 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 import math
 import time
 from collections.abc import Mapping
+from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
 from lib.db.repositories.production_runs import ProductionRunRepository
 from lib.episode_target_duration import MAX_EPISODE_TARGET_DURATION, MIN_EPISODE_TARGET_DURATION
 from lib.film_finish import GRADES, move_for
+from lib.music_bed import MusicService, MusicUnavailable, cue_for
 from lib.narration_delivery import USE_TTS
 from lib.path_safety import safe_join
 from lib.presentation_renderer import (
@@ -65,6 +68,8 @@ from server.services.presentation_read_model import (
 )
 
 RENDER_OWNER = "renderer"
+MUSIC_DIR = Path("production") / "music"
+logger = logging.getLogger(__name__)
 
 
 def render_contract(policy: RunPolicy) -> RenderContract:
@@ -150,8 +155,10 @@ class RenderAdapter:
         projects: ProjectManager,
         presentations: PresentationReadModelService | None = None,
         max_attempts: int = 2,
+        music: MusicService | None = None,
     ) -> None:
         self._sessions, self._authority, self._projects = sessions, authority, projects
+        self._music = music
         self._presentations = presentations or PresentationReadModelService(projects)
         self._max_attempts = max_attempts
         self._jobs: dict[str, asyncio.Task[float]] = {}
@@ -241,6 +248,7 @@ class RenderAdapter:
                 project_name=run.project_name, episode=episode, variant=USE_TTS
             )
             snapshot = render_input(project_path, episode, materialized)
+            snapshot = await self._with_music(project_path, materialized.project_snapshot, snapshot)
             started = time.monotonic()
             output = project_path / render_dir(run, episode)
             await asyncio.to_thread(
@@ -251,6 +259,21 @@ class RenderAdapter:
             timing.write_text(json.dumps({"render_seconds": round(seconds, 3)}), encoding="utf-8")
             total += seconds
         return total
+
+    async def _with_music(self, project_path: Path, project: Mapping[str, Any], snapshot: RenderInput) -> RenderInput:
+        """The snapshot with the episode's music bed, when a music server and a cue exist; a failed music request
+        renders the episode without music and says so in the log."""
+        seconds = sum(unit.duration_us for unit in snapshot.units) / 1_000_000
+        cue = cue_for(project, seconds)
+        if self._music is None or cue is None:
+            return snapshot
+        target = project_path / MUSIC_DIR / f"{cue.digest()}.wav"
+        try:
+            path = await self._music.render(cue, target)
+        except MusicUnavailable as error:
+            logger.warning("episode %s renders without music: %s", snapshot.episode, error)
+            return snapshot
+        return replace(snapshot, music_path=path)
 
     def _project_file(self, run: RunSnapshot, episode: int, suffix: str) -> Path:
         return (

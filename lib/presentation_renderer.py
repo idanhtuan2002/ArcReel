@@ -33,6 +33,12 @@ SILENCE_DB = -60.0
 AUDIO_RATE = 48_000
 #: Below this integrated loudness the final is treated as silent and is not mastered.
 MASTER_FLOOR_LUFS = -70.0
+#: A music bed sits this many LU under the speech it accompanies, before ducking lowers it further under each line.
+MUSIC_BED_BELOW_SPEECH_LU = 10.0
+#: Music bed level when the film has no audible speech.
+MUSIC_ALONE_LUFS = -20.0
+MUSIC_FADE_IN_SECONDS = 1.5
+MUSIC_FADE_OUT_SECONDS = 2.5
 
 
 class RenderRefused(ValueError):
@@ -89,6 +95,8 @@ class RenderInput:
     #: Colour grade (``lib.film_finish.GRADES``) applied to every unit; ``None`` leaves the picture as made.
     grade: str | None = None
     grade_intensity: float = DEFAULT_GRADE_INTENSITY
+    #: Instrumental music laid under the whole episode, faded in and out and ducked under speech.
+    music_path: Path | None = None
 
 
 @dataclass(frozen=True)
@@ -140,6 +148,8 @@ def _validate(episode: RenderInput, contract: RenderContract) -> None:
         raise RenderRefused("NO_PRESENTATIONS")
     if episode.grade is not None and (episode.grade not in GRADES or not 0 < episode.grade_intensity <= 1):
         raise RenderRefused("UNKNOWN_GRADE", episode.grade)
+    if episode.music_path is not None and not episode.music_path.is_file():
+        raise RenderRefused("SOURCE_MEDIA_MISSING", "music")
     total = 0
     for unit in episode.units:
         if unit.duration_us <= 0 or unit.video_start_us < 0:
@@ -347,9 +357,11 @@ def _lufs(value: str) -> float:
     return -math.inf if value.strip().lower() in {"-inf", "inf", "nan"} else float(value)
 
 
-def _master(final: Path, mastered: Path, contract: RenderContract, *, ffmpeg: str) -> dict[str, float | bool] | None:
+def _master(
+    final: Path, mastered: Path, contract: RenderContract, *, ffmpeg: str, seconds: float
+) -> dict[str, float | bool] | None:
     """Master ``final``'s audio into ``mastered`` (picture copied); ``None`` when the contract asks for no mastering
-    or the audio is silent."""
+    or the audio is silent. The mastered audio is cut to the film's ``seconds``: re-encoding lengthens it."""
     if contract.loudness_lufs is None:
         return None
     target = (contract.loudness_lufs, contract.true_peak_db, contract.loudness_range)
@@ -360,7 +372,8 @@ def _master(final: Path, mastered: Path, contract: RenderContract, *, ffmpeg: st
     audio = (
         f"loudnorm=I={integrated}:TP={peak}:LRA={lra}:linear=true:"
         f"measured_I={before['input_i']}:measured_TP={before['input_tp']}:measured_LRA={before['input_lra']}:"
-        f"measured_thresh={before['input_thresh']}:offset={before['target_offset']},aresample={AUDIO_RATE}"
+        f"measured_thresh={before['input_thresh']}:offset={before['target_offset']},aresample={AUDIO_RATE},"
+        f"atrim=duration={seconds:.6f}"
     )
     _run(
         [
@@ -460,7 +473,83 @@ def _sources(episode: RenderInput) -> dict[str, str]:
         for path in (unit.video_path, unit.narration_path):
             if path is not None and str(path) not in hashes:
                 hashes[str(path)] = sha256_file(path)
+    if episode.music_path is not None:
+        hashes[str(episode.music_path)] = sha256_file(episode.music_path)
     return hashes
+
+
+def _audio_seconds(path: Path, ffmpeg: str) -> float:
+    ffprobe = str(Path(ffmpeg).with_name("ffprobe")) if os.sep in ffmpeg else "ffprobe"
+    completed = _run([ffprobe, "-v", "error", "-show_entries", "format=duration", "-of", "json", str(path)], timeout=60)
+    return float(json.loads(completed.stdout or "{}").get("format", {}).get("duration") or 0.0)
+
+
+def _lay_music(final: Path, music: Path, scored: Path, *, seconds: float, ffmpeg: str) -> dict[str, float | str | bool]:
+    """Lay ``music`` under ``final``'s whole audio into ``scored`` (picture copied): faded in and out, set
+    ``MUSIC_BED_BELOW_SPEECH_LU`` under the speech, and ducked by a sidechain compressor keyed on the speech."""
+    speech = _lufs(measure_loudness(final, ffmpeg=ffmpeg)["input_i"])
+    bed = _lufs(measure_loudness(music, ffmpeg=ffmpeg)["input_i"])
+    if bed <= MASTER_FLOOR_LUFS:
+        raise RenderRefused("MUSIC_SILENT")
+    with_speech = speech > MASTER_FLOOR_LUFS
+    target = speech - MUSIC_BED_BELOW_SPEECH_LU if with_speech else MUSIC_ALONE_LUFS
+    gain_db = target - bed
+    length = min(_audio_seconds(music, ffmpeg), seconds)
+    fade_out_at = max(length - MUSIC_FADE_OUT_SECONDS, 0.0)
+    bed_chain = (
+        f"[1:a]aresample={AUDIO_RATE},aformat=channel_layouts=stereo,atrim=duration={length:.3f},"
+        f"afade=t=in:d={MUSIC_FADE_IN_SECONDS},afade=t=out:st={fade_out_at:.3f}:d={MUSIC_FADE_OUT_SECONDS},"
+        f"volume={gain_db:.2f}dB,apad,atrim=duration={seconds:.3f},asetpts=PTS-STARTPTS[bed]"
+    )
+    if with_speech:
+        graph = (
+            f"{bed_chain};[0:a]aresample={AUDIO_RATE},aformat=channel_layouts=stereo,asplit[speech][key];"
+            "[bed][key]sidechaincompress=threshold=0.02:ratio=9:attack=200:release=500[ducked];"
+            "[speech][ducked]amix=inputs=2:duration=first:normalize=0[a]"
+        )
+    else:
+        graph = f"{bed_chain};[0:a][bed]amix=inputs=2:duration=first:normalize=0[a]"
+    _run(
+        [
+            ffmpeg,
+            "-nostdin",
+            "-hide_banner",
+            "-loglevel",
+            "error",
+            "-y",
+            "-i",
+            str(final),
+            "-i",
+            str(music),
+            "-filter_complex",
+            graph,
+            "-map",
+            "0:v:0",
+            "-map",
+            "[a]",
+            "-c:v",
+            "copy",
+            "-c:a",
+            "aac",
+            "-b:a",
+            "160k",
+            "-ar",
+            str(AUDIO_RATE),
+            "-ac",
+            "2",
+            "-movflags",
+            "+faststart",
+            str(scored),
+        ],
+        timeout=900,
+    )
+    return {
+        "path": str(music),
+        "speech_lufs": speech,
+        "music_lufs": bed,
+        "gain_db": round(gain_db, 2),
+        "ducked": with_speech,
+    }
 
 
 def render_presentations(
@@ -520,8 +609,14 @@ def render_presentations(
             ],
             timeout=600,
         )
+        music = None
+        seconds = sum(unit.duration_us for unit in episode.units) / MICROSECONDS
+        if episode.music_path is not None:
+            scored = staging / f"scored_{episode.episode}.mp4"
+            music = _lay_music(final, episode.music_path, scored, seconds=seconds, ffmpeg=ffmpeg)
+            os.replace(scored, final)
         mastered = staging / f"mastered_{episode.episode}.mp4"
-        loudness = _master(final, mastered, contract, ffmpeg=ffmpeg)
+        loudness = _master(final, mastered, contract, ffmpeg=ffmpeg, seconds=seconds)
         if loudness is not None:
             os.replace(mastered, final)
         duration = _verify(final, episode, contract, ffmpeg=ffmpeg, ffprobe=ffprobe)
@@ -537,6 +632,7 @@ def render_presentations(
             "duration_seconds": duration,
             "final_sha256": sha256_file(final),
             "loudness": loudness,
+            "music": music,
             "grade": None if episode.grade is None else {"name": episode.grade, "intensity": episode.grade_intensity},
             "subtitle_sha256": sha256_file(subtitle),
             "units": [

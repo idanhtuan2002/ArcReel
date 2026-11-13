@@ -95,6 +95,8 @@ class _FakeTextBackend:
                     "world_setting": "古代",
                     "language": self._language,
                     "color_grade": "moody_dark",
+                    "music_caption": "slow cinematic piano, melancholic",
+                    "music_bpm": 72,
                 },
                 ensure_ascii=False,
             ),
