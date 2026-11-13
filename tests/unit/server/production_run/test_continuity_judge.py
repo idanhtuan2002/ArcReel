@@ -8,7 +8,7 @@ import httpx
 import pytest
 
 from r2.contracts.automation import ModelRoute
-from scripts.r2.qualify_continuity_judge import derive_swaps
+from scripts.r2.qualify_continuity_judge import _kept, case_digest, derive_swaps
 from server.production_run.continuity_judge import (
     ContinuityJudge,
     Shot,
@@ -160,3 +160,23 @@ def test_swapped_identity_cases_are_derived_from_other_stories() -> None:
     assert swaps["a1:swap"]["references"] == [{"label": "character Lan", "path": "b.png"}]
     assert swaps["a1:swap"]["expected"] == "drift"
     assert cases[0]["references"] == [{"label": "character Lan", "path": "a.png"}]
+
+
+def test_kept_answers_resume_only_for_the_same_judge_prompt_and_case_bytes(tmp_path) -> None:
+    import json
+
+    (tmp_path / "f.png").write_bytes(b"frame")
+    case = {"case_id": "a1", "expected": "ok", "frame": "f.png", "references": [], "previous": None}
+    key = case_digest(tmp_path, case)
+    answers = tmp_path / "answers.jsonl"
+    verdict = {"score": 95, "status": "aligned", "issues": [], "prompt_fix": ""}
+    lines = [
+        {"model_identity": "m", "prompt_digest": prompt_digest(), "case_digest": key, "verdict": verdict},
+        {"model_identity": "other", "prompt_digest": prompt_digest(), "case_digest": "x", "verdict": verdict},
+        {"model_identity": "m", "prompt_digest": "sha256:old", "case_digest": "y", "verdict": verdict},
+    ]
+    answers.write_text("".join(json.dumps(line) + "\n" for line in lines), encoding="utf-8")
+
+    assert _kept(answers, "m") == {key: verdict}
+    (tmp_path / "f.png").write_bytes(b"another frame")
+    assert case_digest(tmp_path, case) != key

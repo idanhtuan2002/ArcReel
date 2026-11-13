@@ -8,6 +8,11 @@ of a case from another story (``story`` field): the frame no longer shows the re
 construction. Each case is judged once through the production prompt; the evidence JSON names the model identity,
 the prompt digest, the corpus digest, every verdict and the report of ``qualify_continuity``. Exit 0 only when the
 judge qualifies.
+
+``--answers`` keeps every usable verdict as one JSON line as soon as it is given (keyed by model identity, prompt
+digest and the case's own digest), so a run stopped by a daily request quota resumes where it stopped without asking
+again. ``--stop-after`` stops a run after that many cases in a row got no usable answer (a quota is exhausted); the
+run then writes no evidence and exits 2.
 """
 
 from __future__ import annotations
@@ -24,6 +29,7 @@ from r2.contracts.automation import ModelRoute
 from server.production_run.continuity_judge import (
     ContinuityJudge,
     Shot,
+    parse_verdict,
     prompt_digest,
     qualify_continuity,
 )
@@ -84,6 +90,27 @@ def corpus_digest(corpus: Path, cases: list[dict]) -> str:
     return "sha256:" + digest.hexdigest()
 
 
+def case_digest(corpus: Path, case: dict) -> str:
+    """The case and the bytes of every picture it names."""
+    digest = hashlib.sha256(json.dumps(case, ensure_ascii=False, sort_keys=True).encode("utf-8"))
+    paths = [case["frame"], *(ref["path"] for ref in case.get("references") or []), case.get("previous") or ""]
+    for path in paths:
+        if path:
+            digest.update(hashlib.sha256((corpus / path).read_bytes()).digest())
+    return "sha256:" + digest.hexdigest()
+
+
+def _kept(path: Path | None, identity: str) -> dict[str, dict]:
+    if path is None or not path.is_file():
+        return {}
+    kept = {}
+    for line in path.read_text(encoding="utf-8").splitlines():
+        entry = json.loads(line)
+        if entry.get("model_identity") == identity and entry.get("prompt_digest") == prompt_digest():
+            kept[entry["case_digest"]] = entry["verdict"]
+    return kept
+
+
 async def _main(args: argparse.Namespace) -> int:
     cases = json.loads((args.corpus / "cases.json").read_text(encoding="utf-8"))["cases"]
     if args.derive_swaps:
@@ -102,9 +129,28 @@ async def _main(args: argparse.Namespace) -> int:
         }
     )
     judge = ContinuityJudge(access_for=model_access(async_session_factory))
-    results, answers = [], []
+    kept = _kept(args.answers, args.model_identity)
+    results, answers, missed = [], [], 0
     for case in cases:
-        verdict = await judge.judge(route, _shot(args.corpus, case), (args.corpus / case["frame"]).read_bytes())
+        key = case_digest(args.corpus, case)
+        if key in kept:
+            verdict = parse_verdict(json.dumps(kept[key]))
+        else:
+            verdict = await judge.judge(route, _shot(args.corpus, case), (args.corpus / case["frame"]).read_bytes())
+            if verdict is not None and args.answers is not None:
+                line = {
+                    "model_identity": args.model_identity,
+                    "prompt_digest": prompt_digest(),
+                    "case_digest": key,
+                    "case_id": case["case_id"],
+                    "verdict": verdict.as_json(),
+                }
+                with args.answers.open("a", encoding="utf-8") as handle:
+                    handle.write(json.dumps(line, ensure_ascii=False) + "\n")
+        missed = missed + 1 if verdict is None else 0
+        if args.stop_after and missed >= args.stop_after:
+            print(json.dumps({"stopped": case["case_id"], "unanswered_in_a_row": missed}))
+            return 2
         results.append((case["expected"], verdict))
         answers.append(
             {"case_id": case["case_id"], "expected": case["expected"], "verdict": verdict and verdict.as_json()}
@@ -132,6 +178,8 @@ def main() -> int:
     parser.add_argument("--model-identity", required=True, help="the judging route's exact model identity")
     parser.add_argument("--derive-swaps", action="store_true", help="add identity-swap drift cases")
     parser.add_argument("--out", required=True, type=Path, help="evidence JSON to write")
+    parser.add_argument("--answers", type=Path, help="JSON lines of verdicts already given, read and appended")
+    parser.add_argument("--stop-after", type=int, default=0, help="stop after this many unanswered cases in a row")
     return asyncio.run(_main(parser.parse_args()))
 
 
