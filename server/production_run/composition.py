@@ -45,6 +45,7 @@ from server.production_run.evaluators import QualifiedEvaluator
 from server.production_run.execution_guard import configure_run_task_authority
 from server.production_run.final_master_adapter import FinalMasterAdapter
 from server.production_run.gemini_reviewer import routed_reviewer
+from server.production_run.continuity_judge import ContinuityJudge
 from server.production_run.image_judge import ImageJudge
 from server.production_run.inputs import ProjectInputWitness
 from server.production_run.media_adapter import MediaAdapter
@@ -167,6 +168,14 @@ class ProjectPolicyResolver:
                     if launch.image_selection is not None
                     else {}
                 ),
+                **(
+                    {
+                        "continuity_judge_identity": launch.continuity.judge_model_identity,
+                        "continuity_judge_prompt_digest": launch.continuity.judge_prompt_digest,
+                    }
+                    if launch.continuity is not None
+                    else {}
+                ),
             }
         )
 
@@ -279,7 +288,12 @@ def build_adapters(
         RunStage.ADAPTATION: AdaptationAdapter(sessions, **text),
         RunStage.SCRIPT_PLAN: ScriptPlanAdapter(sessions, **text),
         RunStage.SCRIPT: ScriptAdapter(sessions, **text),
-        RunStage.MEDIA: MediaAdapter(sessions, **text, judge=ImageJudge(access_for=model_access(sessions))),
+        RunStage.MEDIA: MediaAdapter(
+            sessions,
+            **text,
+            judge=ImageJudge(access_for=model_access(sessions)),
+            continuity=ContinuityJudge(access_for=model_access(sessions)),
+        ),
         RunStage.RENDER: RenderAdapter(sessions, **owners),
         RunStage.MASTER: FinalMasterAdapter(sessions, **owners),
         RunStage.QUALITY: QualityAdapter(sessions, **owners, evaluator=evaluator),

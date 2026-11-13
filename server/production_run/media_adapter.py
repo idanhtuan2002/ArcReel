@@ -18,6 +18,11 @@ When the run's policy asks for several storyboard candidates, MEDIA makes the ex
 round at a time, has the pinned ranking judge (the reviewer route with the pinned identity) choose per segment off the lease, restores
 each winner as the current version and records the choices in ``image_selection.json`` beside the episode's render.
 
+When the run's policy pins a continuity judge (ADR-0134), MEDIA then judges every storyboard against its reference
+sheets and previous frame off the lease, regenerates once each storyboard judged a drift with the verdict's
+``prompt_fix`` as the task's prompt addendum, judges the new version and keeps the better-scoring one; the verdicts go
+to ``continuity.json`` beside the episode's render. A judge that gives no verdict keeps the frame; nothing blocks.
+
 Every target's final script is pinned when the stage is planned; a different current script is an external change.
 """
 
@@ -55,6 +60,8 @@ from server.media_tools.context import ToolContext
 from server.media_tools.narration_audio import handle_generate_narration_audio
 from server.media_tools.storyboards import handle_generate_storyboards
 from server.media_tools.videos import handle_generate_videos
+from server.production_run import continuity_pass
+from server.production_run.continuity_judge import ContinuityJudge, Verdict
 from server.production_run.image_judge import ImageJudge
 from server.production_run.owner_support import (
     OwnerBlocked,
@@ -121,6 +128,7 @@ class MediaAdapter:
         max_attempts: int = 2,
         judge: ImageJudge | None = None,
         restore: Callable[[str, str, str, int], Awaitable[Any]] | None = None,
+        continuity: ContinuityJudge | None = None,
     ) -> None:
         self._sessions, self._authority, self._projects, self._resolver = sessions, authority, projects, resolver
         self._planner = planner or WorkflowPlanner(projects)
@@ -130,9 +138,12 @@ class MediaAdapter:
         # Check results by (path, mtime, size): an unchanged file is not decoded again on every poll.
         self._checked: dict[tuple[str, int, int], str | None] = {}
         self._judge_client = judge
+        self._continuity = continuity
         self._restore = restore or restore_resource_version
         # Storyboard selections in flight, off the controller lease, by step command and episode.
         self._jobs: dict[str, asyncio.Task[dict[str, dict[str, Any]]]] = {}
+        # Continuity verdicts in flight, off the controller lease, by step command, episode and round.
+        self._continuity_jobs: dict[str, asyncio.Task[dict[str, tuple[int | None, Verdict | None]]]] = {}
 
     async def plan(self, *, run: RunSnapshot) -> StepPlan:
         pins = []
@@ -182,6 +193,8 @@ class MediaAdapter:
                     return outcome(intent, "WAIT", owner_state="UNIT_REGENERATING")
                 if await self._select_storyboards(intent, receipt.digest, plan, episode):
                     return outcome(intent, "WAIT", owner_state="STORYBOARDS_SELECTING")
+                if await self._check_continuity(intent, receipt.digest, plan, episode):
+                    return outcome(intent, "WAIT", owner_state="STORYBOARDS_CONTINUITY")
             action = plan.next_action
             if action.type is A.EXPORT or (action.type is A.PLAN_EPISODES and self._episode_media_current(plan)):
                 artifacts = digest_value("r2.production-media-artifacts.v1", ensure_json_value(plan.status.artifacts))
@@ -376,6 +389,164 @@ class MediaAdapter:
             }
         )
         evidence.write_text(json.dumps(recorded, ensure_ascii=False, indent=2, sort_keys=True), encoding="utf-8")
+
+    # --- continuity ----------------------------------------------------------------------------------
+
+    async def _check_continuity(
+        self, intent: DispatchIntent, subject_digest: str, plan: WorkflowPlan, episode: int
+    ) -> bool:
+        """Judge, regenerate drifts once with their fix, judge again; ``True`` while working."""
+        run = await self._run(intent)
+        target = plan.status.target
+        if (
+            run is None
+            or target is None
+            or run.policy.continuity_judge_identity is None
+            or self._continuity is None
+            or not self._all_made(plan, "storyboards")
+        ):
+            return False
+        items, id_field = self._script_items(intent.scope.project_name, target.script_filename)
+        units = [
+            str(item[id_field])
+            for item in items
+            if item.get(id_field) and (item.get("generated_assets") or {}).get("storyboard_image")
+        ]
+        first = [unit for unit in units if not await self._attempts(intent, f"continuity:{unit}:judged")]
+        if first:
+            return await self._continuity_round(intent, subject_digest, run, episode, "judged", first, target)
+        segments = continuity_pass.read_evidence(self._continuity_evidence(run, episode)).get("segments") or {}
+        fixes = {
+            unit: fix
+            for unit in units
+            if isinstance(verdict := (segments.get(unit) or {}).get("first", {}).get("verdict"), dict)
+            and verdict.get("status") == "drift"
+            and isinstance(fix := verdict.get("prompt_fix"), str)
+            and fix.strip()
+            and not await self._attempts(intent, f"continuity:{unit}:redo")
+        }
+        if fixes:
+            args: dict[str, Any] = {
+                "script": target.script_filename,
+                "segment_ids": sorted(fixes),
+                "prompt_addenda": {unit: fix.strip()[:600] for unit, fix in fixes.items()},
+            }
+            sub_keys = [f"continuity:{unit}:redo" for unit in sorted(fixes)]
+            await self._send(intent, subject_digest, sub_keys, A.GENERATE_STORYBOARDS, args, "MEDIA_RETRY_LIMIT")
+            return True
+        second = [
+            unit
+            for unit in units
+            if await self._attempts(intent, f"continuity:{unit}:redo")
+            and not await self._attempts(intent, f"continuity:{unit}:rejudged")
+        ]
+        if second:
+            return await self._continuity_round(intent, subject_digest, run, episode, "rejudged", second, target)
+        return False
+
+    async def _continuity_round(
+        self,
+        intent: DispatchIntent,
+        subject_digest: str,
+        run: RunSnapshot,
+        episode: int,
+        round_name: str,
+        units: list[str],
+        target: Any,
+    ) -> bool:
+        key = f"{intent.identity.command_id}:continuity:{episode}:{round_name}"
+        job = self._continuity_jobs.get(key)
+        if job is None:
+            self._continuity_jobs[key] = asyncio.create_task(self._judge_continuity(run, target.script_filename, units))
+            return True
+        if not job.done():
+            return True
+        self._continuity_jobs.pop(key, None)
+        try:
+            verdicts = job.result()
+        except Exception:
+            verdicts = dict.fromkeys(units, (None, None))
+        await self._apply_continuity(intent, subject_digest, run, episode, round_name, verdicts)
+        return True
+
+    async def _judge_continuity(
+        self, run: RunSnapshot, script_filename: str, units: list[str]
+    ) -> dict[str, tuple[int | None, Verdict | None]]:
+        """Per segment: the current storyboard version and the pinned judge's verdict on it (``None``: no verdict)."""
+        route = next(
+            (
+                r
+                for r in run.policy.routes
+                if r.role in {"reviewer_a", "reviewer_b"} and r.model_identity == run.policy.continuity_judge_identity
+            ),
+            None,
+        )
+        root = self._projects.get_project_path(run.project_name)
+        project = await asyncio.to_thread(self._projects.load_project, run.project_name)
+        script = await asyncio.to_thread(self._projects.load_script, run.project_name, script_filename)
+        versions = VersionManager(root)
+        verdicts: dict[str, tuple[int | None, Verdict | None]] = {}
+        for unit in units:
+            current = versions.get_versions("storyboards", unit)["current_version"]
+            listed = {v["version"]: v for v in versions.get_versions("storyboards", unit)["versions"]}
+            entry = listed.get(current)
+            shot = await asyncio.to_thread(continuity_pass.shot_for, project, root, script, unit)
+            verdict = None
+            if route is not None and self._continuity is not None and shot is not None and entry is not None:
+                frame = await asyncio.to_thread((root / entry["file"]).read_bytes)
+                verdict = await self._continuity.judge(route, shot, frame)
+            verdicts[unit] = (current if isinstance(current, int) else None, verdict)
+        return verdicts
+
+    def _continuity_evidence(self, run: RunSnapshot, episode: int) -> Path:
+        root = self._projects.get_project_path(run.project_name)
+        folder = root / "production" / "automation" / run.run_id / f"g{run.generation}" / f"episode_{episode}"
+        return folder / "continuity.json"
+
+    async def _apply_continuity(
+        self,
+        intent: DispatchIntent,
+        subject_digest: str,
+        run: RunSnapshot,
+        episode: int,
+        round_name: str,
+        verdicts: Mapping[str, tuple[int | None, Verdict | None]],
+    ) -> None:
+        """Under the run's locked authority, per segment: record the round write-ahead and its verdict in
+        ``continuity.json``; after the second round, restore the first version when it scored higher."""
+        evidence = self._continuity_evidence(run, episode)
+        identity = run.policy.continuity_judge_identity or ""
+        digest = run.policy.continuity_judge_prompt_digest or ""
+        subject = await current_subject(self._sessions, intent, subject_digest=subject_digest)
+        for unit, (version, verdict) in sorted(verdicts.items()):
+            fields: dict[str, Any] = {
+                ("first" if round_name == "judged" else "second"): continuity_pass.judged(version, verdict)
+            }
+            restore: int | None = None
+            if round_name == "rejudged":
+                earlier = (continuity_pass.read_evidence(evidence).get("segments") or {}).get(unit) or {}
+                before = earlier.get("first") or {}
+                old_score = (before.get("verdict") or {}).get("score")
+                old_version = before.get("version")
+                if (
+                    isinstance(old_score, int)
+                    and isinstance(old_version, int)
+                    and old_version != version
+                    and verdict is not None
+                    and verdict.score < old_score
+                ):
+                    restore = old_version
+                fields["kept_version"] = restore if restore is not None else version
+            async with self._sessions() as session, session.begin():
+                await self._authority.require_locked(session, subject=subject)
+                await ProductionRunRepository(session).record_owner_attempt(
+                    intent=intent, sub_key=f"continuity:{unit}:{round_name}"
+                )
+                await asyncio.to_thread(
+                    continuity_pass.record, evidence, identity=identity, prompt_digest=digest, unit=unit, fields=fields
+                )
+            if restore is not None:
+                await self._restore(run.project_name, "storyboards", unit, restore)
 
     # --- unit checks ---------------------------------------------------------------------------------
 

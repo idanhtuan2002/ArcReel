@@ -17,6 +17,7 @@ from lib.workflow_plan import WorkflowNarrationDelivery, WorkflowPlan
 from lib.workflow_state import WorkflowActionType, WorkflowNextAction, WorkflowProject, WorkflowStatus, WorkflowTarget
 from r2.automation.assessment import AssessmentFinding, ModelAssessment
 from r2.contracts.automation import ModelRoute, RunStage, RunStatus
+from server.production_run.continuity_judge import Verdict
 from server.production_run.controller import ProductionController
 from server.production_run.image_judge import Choice
 from server.production_run.media_adapter import MediaAdapter
@@ -623,3 +624,134 @@ async def test_a_choice_is_neither_recorded_nor_restored_once_the_runs_authority
     assert not (
         script.parent.parent / "production" / "automation" / run.run_id / "g1" / "episode_1" / "image_selection.json"
     ).exists()
+
+
+class ContinuityJudgeStub:
+    """A continuity judge with a scripted verdict per (segment, version)."""
+
+    def __init__(self, verdicts: dict[tuple[str, int], Verdict]) -> None:
+        self.verdicts, self.calls = verdicts, []
+
+    async def judge(self, route, shot, frame):
+        version = int(frame.decode().rsplit("v", 1)[1])
+        self.calls.append((route.role, shot.label, version, shot.previous_frame is not None))
+        return self.verdicts[(shot.label, version)]
+
+
+def _versions(root: Path, current: dict[str, int]) -> None:
+    versions: dict[str, dict] = {}
+    for unit, newest in current.items():
+        files = []
+        for version in range(1, newest + 1):
+            name = f"versions/storyboards/{unit}_v{version}.png"
+            (root / name).parent.mkdir(parents=True, exist_ok=True)
+            (root / name).write_bytes(f"{unit} v{version}".encode())
+            files.append({"version": version, "file": name, "prompt": "p", "created_at": "2026-11-13T00:00:00Z"})
+        versions[unit] = {"current_version": newest, "versions": files}
+    (root / "versions" / "versions.json").write_text(json.dumps({"storyboards": versions}), encoding="utf-8")
+
+
+async def test_a_drifting_storyboard_is_made_again_with_its_fix_and_the_better_version_kept(media_host, monkeypatch):
+    sessions, controller, run, planner, tools, script = media_host
+    _script_with_storyboards(script, blank=set())
+    root = script.parent.parent
+    (root / "project.json").write_text(json.dumps({"title": "t", "characters": {}}), encoding="utf-8")
+    _versions(root, {"E1S01": 1, "E1S02": 1})
+    adapter = controller._adapters[RunStage.MEDIA]
+    judge = ContinuityJudgeStub(
+        {
+            ("E1S01", 1): Verdict(score=55, status="drift", prompt_fix="Linh wears the yellow raincoat."),
+            ("E1S02", 1): Verdict(score=95, status="aligned"),
+            ("E1S01", 2): Verdict(score=40, status="drift", prompt_fix="worse"),
+        }
+    )
+    restored = []
+
+    async def restore(project, resource_type, unit, version):
+        restored.append((resource_type, unit, version))
+
+    adapter._continuity, adapter._restore = judge, restore
+    judge_route = ModelRoute.model_validate(
+        {
+            "role": "reviewer_a",
+            "provider_id": "gemini-aistudio",
+            "model_id": "gemini-3.5-flash",
+            "model_identity": "gemini-aistudio/gemini-3.5-flash@3.5-flash-05-2026",
+            "config_digest": "sha256:" + "2" * 64,
+            "local": False,
+            "paid": True,
+            "currency": "USD",
+            "max_cost_per_call": None,
+        }
+    )
+    real_run = adapter._run
+
+    async def judged_run(intent):
+        snapshot = await real_run(intent)
+        policy = snapshot.policy.model_copy(
+            update={
+                "continuity_judge_identity": judge_route.model_identity,
+                "continuity_judge_prompt_digest": "sha256:" + "4" * 64,
+                "routes": (judge_route,),
+            }
+        )
+        return snapshot.model_copy(update={"policy": policy})
+
+    monkeypatch.setattr(adapter, "_run", judged_run)
+    planner.plans = [_plan(A.GENERATE_TTS, artifacts=_storyboards_made())]
+
+    started = await _tick(sessions, controller, run)
+    await asyncio.sleep(0.05)
+    recorded = await _tick(sessions, controller, run)
+    redone = await _tick(sessions, controller, run)
+    _versions(root, {"E1S01": 2, "E1S02": 1})
+    rejudging = await _tick(sessions, controller, run)
+    await asyncio.sleep(0.05)
+    kept = await _tick(sessions, controller, run)
+    continued = await _tick(sessions, controller, run)
+
+    assert [s.status for s in (started, recorded, redone, rejudging, kept, continued)] == [RunStatus.WAITING_TASK] * 6
+    assert tools.calls == [
+        (
+            A.GENERATE_STORYBOARDS,
+            {
+                "script": "episode_1.json",
+                "segment_ids": ["E1S01"],
+                "prompt_addenda": {"E1S01": "Linh wears the yellow raincoat."},
+            },
+        ),
+        (A.GENERATE_TTS, {"script": "episode_1.json"}),
+    ]
+    assert judge.calls == [
+        ("reviewer_a", "E1S01", 1, False),
+        ("reviewer_a", "E1S02", 1, True),
+        ("reviewer_a", "E1S01", 2, False),
+    ]
+    assert restored == [("storyboards", "E1S01", 1)]
+    evidence = json.loads(
+        (root / "production" / "automation" / run.run_id / "g1" / "episode_1" / "continuity.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    assert evidence["judge_identity"] == judge_route.model_identity
+    assert evidence["segments"]["E1S01"]["first"]["verdict"]["score"] == 55
+    assert evidence["segments"]["E1S01"]["second"] == {
+        "version": 2,
+        "verdict": {"score": 40, "status": "drift", "issues": [], "prompt_fix": "worse"},
+    }
+    assert evidence["segments"]["E1S01"]["kept_version"] == 1
+    assert "second" not in evidence["segments"]["E1S02"]
+
+
+async def test_without_a_pinned_continuity_judge_nothing_is_judged(media_host):
+    sessions, controller, run, planner, tools, script = media_host
+    _script_with_storyboards(script, blank=set())
+    adapter = controller._adapters[RunStage.MEDIA]
+    judge = ContinuityJudgeStub({})
+    adapter._continuity = judge
+    planner.plans = [_plan(A.GENERATE_TTS, artifacts=_storyboards_made())]
+
+    await _tick(sessions, controller, run)
+
+    assert judge.calls == []
+    assert tools.calls == [(A.GENERATE_TTS, {"script": "episode_1.json"})]

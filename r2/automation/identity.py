@@ -14,7 +14,13 @@ def digest_value(domain: str, body: JSONValue) -> str:
     return "sha256:" + hashlib.sha256(canonical_json_bytes({"domain": domain, "body": body})).hexdigest()
 
 
-_LATER_DEFAULTS = {"image_candidates": 1, "image_judge_identity": None, "image_judge_prompt_digest": None}
+_LATER_DEFAULTS = {
+    "image_candidates": 1,
+    "image_judge_identity": None,
+    "image_judge_prompt_digest": None,
+    "continuity_judge_identity": None,
+    "continuity_judge_prompt_digest": None,
+}
 
 
 def policy_digest(policy: RunPolicy) -> str:

@@ -3,7 +3,13 @@
 from typing import Protocol
 
 from r2.automation.identity import policy_digest
-from r2.automation.profiles import image_judge_is_qualified, resolve_launch_profile, reviewer_is_qualified, route_digest
+from r2.automation.profiles import (
+    continuity_judge_is_qualified,
+    image_judge_is_qualified,
+    resolve_launch_profile,
+    reviewer_is_qualified,
+    route_digest,
+)
 from r2.contracts.automation import PreflightReport, PreflightSnapshot, RunPolicy
 from r2.contracts.quality import AssessorClass
 from r2.quality.digests import verify_caches
@@ -147,6 +153,21 @@ class ProductionPreflight:
                 or not image_judge_is_qualified(selection)
             ):
                 reasons.append("IMAGE_JUDGE_NOT_QUALIFIED")
+        if policy.continuity_judge_identity is not None:
+            # The continuity judge is the run's reviewer route with the launch profile's pinned identity, qualified.
+            check = launch.continuity if launch is not None else None
+            if (
+                check is None
+                or (policy.continuity_judge_identity, policy.continuity_judge_prompt_digest)
+                != (check.judge_model_identity, check.judge_prompt_digest)
+                or not any(
+                    roles[role].model_identity == check.judge_model_identity
+                    for role in ("reviewer_a", "reviewer_b")
+                    if role in roles
+                )
+                or not continuity_judge_is_qualified(check)
+            ):
+                reasons.append("CONTINUITY_JUDGE_NOT_QUALIFIED")
         profile = snapshot.profile
         if profile is None:
             reasons.append("MISSING_PUBLISHED_PROFILE")

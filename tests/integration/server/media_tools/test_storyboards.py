@@ -80,6 +80,25 @@ async def test_generate_storyboards_happy(fake_ctx: ToolContext, monkeypatch) ->
     out = await call(tool_obj, {"script": "episode_1.json"})
     assert out.get("is_error") is not True
     assert captured[0].payload["prompt"] == semantic_prompt
+    assert "prompt_addendum" not in captured[0].payload
+
+
+async def test_a_runs_correction_rides_on_its_segments_task(fake_ctx: ToolContext, monkeypatch) -> None:
+    from server.media_tools import storyboards as mod
+
+    captured: list[Any] = []
+
+    async def fake_batch(*, project_name, specs, on_success=None, on_failure=None, **_batch_kwargs):
+        captured.extend(specs)
+        return [], []
+
+    monkeypatch.setattr(mod, "batch_enqueue_and_wait", fake_batch)
+    segment_id = fake_ctx.pm.script_payload["segments"][0]["segment_id"]
+    await mod.handle_generate_storyboards(
+        fake_ctx,
+        {"script": "episode_1.json", "segment_ids": [segment_id], "prompt_addenda": {segment_id: "Keep the scarf red."}},
+    )
+    assert captured[0].payload["prompt_addendum"] == "Keep the scarf red."
 
 
 async def test_generate_storyboards_legacy_project_reverifies_image_file_on_disk(

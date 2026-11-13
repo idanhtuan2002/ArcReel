@@ -81,6 +81,18 @@ class TestGenerationTasks:
             "祠堂",
             "玉佩",
         ]
+        assert "Correction:" not in fake_generator.image_calls[1]["prompt"]
+
+        await generation_tasks.execute_storyboard_task(
+            "demo",
+            "E1S03",
+            {"script_file": "episode_1.json", "prompt": "direct prompt", "prompt_addendum": "Alice wears the red scarf."},
+        )
+        assert fake_generator.image_calls[2]["prompt"].endswith("\n\nCorrection: Alice wears the red scarf.")
+        with pytest.raises(ValueError, match="prompt_addendum"):
+            await generation_tasks.execute_storyboard_task(
+                "demo", "E1S03", {"script_file": "episode_1.json", "prompt": "direct prompt", "prompt_addendum": " "}
+            )
         assert fake_generator.image_reference_bytes[1] == [b"png"] * 3
 
         video_result = await generation_tasks.execute_video_task(

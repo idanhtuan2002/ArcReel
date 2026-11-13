@@ -354,3 +354,40 @@ async def test_storyboard_candidates_need_the_launch_profiles_pinned_qualified_j
     assert await check(selecting, None, True) is True
     assert await check(selecting, selection.model_copy(update={"judge_model_identity": "other"}), True) is True
     assert await check(frozen, None, False) is False
+
+
+async def test_a_continuity_judge_needs_the_launch_profiles_pinned_qualified_judge(monkeypatch):
+    from r2.automation import profiles
+    from server.production_run import preflight
+    from server.production_run.preflight import ProductionPreflight
+
+    frozen, snapshot = complete_snapshot()
+    judge = next(route for route in frozen.routes if route.role == "reviewer_a")
+    judged = frozen.model_copy(
+        update={
+            "continuity_judge_identity": judge.model_identity,
+            "continuity_judge_prompt_digest": "sha256:" + "3" * 64,
+        }
+    )
+    launch = profiles.resolve_launch_profile(frozen.launch_profile_id)
+
+    async def blocked(policy, check, qualified):
+        pinned = launch.model_copy(update={"continuity": check})
+        monkeypatch.setattr(preflight, "resolve_launch_profile", lambda _profile_id: pinned)
+        monkeypatch.setattr(preflight, "continuity_judge_is_qualified", lambda _check: qualified)
+        report = await ProductionPreflight(SnapshotReader(snapshot)).check(
+            user_id=snapshot.user_id, project_name=snapshot.project_name, policy=policy
+        )
+        return "CONTINUITY_JUDGE_NOT_QUALIFIED" in report.blocking_reasons
+
+    check = profiles.ContinuityCheck(
+        judge_model_identity=judge.model_identity,
+        judge_prompt_digest="sha256:" + "3" * 64,
+        qualification_evidence="docs/evidence.json",
+        qualification_digest="sha256:" + "4" * 64,
+    )
+    assert await blocked(judged, check, True) is False
+    assert await blocked(judged, check, False) is True
+    assert await blocked(judged, None, True) is True
+    assert await blocked(judged, check.model_copy(update={"judge_model_identity": "other"}), True) is True
+    assert await blocked(frozen, None, False) is False

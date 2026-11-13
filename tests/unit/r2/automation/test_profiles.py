@@ -8,7 +8,12 @@ from pydantic import ValidationError
 
 from r2.automation import profiles
 from r2.automation.identity import digest_value, policy_digest
-from r2.automation.profiles import ImageSelection, image_judge_is_qualified
+from r2.automation.profiles import (
+    ContinuityCheck,
+    ImageSelection,
+    continuity_judge_is_qualified,
+    image_judge_is_qualified,
+)
 from r2.contracts.automation import RunPolicy
 from r2.contracts.common import ensure_json_value
 
@@ -99,7 +104,13 @@ def test_a_policy_at_the_later_defaults_keeps_its_earlier_digest(policy_data):
     policy = RunPolicy.model_validate(policy_data)
     body = policy.model_dump(mode="json")
     body["checkpoints"] = []
-    for field in ("image_candidates", "image_judge_identity", "image_judge_prompt_digest"):
+    for field in (
+        "image_candidates",
+        "image_judge_identity",
+        "image_judge_prompt_digest",
+        "continuity_judge_identity",
+        "continuity_judge_prompt_digest",
+    ):
         body.pop(field)
 
     assert policy_digest(policy) == digest_value("r2.production-policy.v1", ensure_json_value(body))
@@ -135,3 +146,41 @@ def test_an_image_judge_qualifies_only_through_its_pinned_evidence_file(tmp_path
     assert image_judge_is_qualified(selection.model_copy(update={"qualification_evidence": "../outside.json"})) is False
     (tmp_path / "evidence.json").write_bytes(json.dumps({**evidence, "qualified": False}).encode())
     assert image_judge_is_qualified(selection) is False
+
+
+def test_a_continuity_judge_is_pinned_by_identity_and_prompt_digest_together(policy_data):
+    pinned = {
+        **policy_data,
+        "continuity_judge_identity": "gemini-aistudio/gemini-3.5-flash@3.5-flash-05-2026",
+        "continuity_judge_prompt_digest": "sha256:" + "5" * 64,
+    }
+    assert policy_digest(RunPolicy.model_validate(pinned)) != policy_digest(RunPolicy.model_validate(policy_data))
+    with pytest.raises(ValidationError):
+        RunPolicy.model_validate({**pinned, "continuity_judge_prompt_digest": None})
+
+
+def test_a_continuity_judge_qualifies_only_through_its_pinned_continuity_evidence(tmp_path, monkeypatch):
+    monkeypatch.setattr(profiles, "REPOSITORY_ROOT", tmp_path)
+    evidence = {
+        "schema": "r2.continuity-judge-qualification.v1",
+        "qualified": True,
+        "model_identity": "gemini/judge",
+        "prompt_digest": "sha256:" + "3" * 64,
+    }
+    data = json.dumps(evidence).encode()
+    (tmp_path / "evidence.json").write_bytes(data)
+    check = ContinuityCheck(
+        judge_model_identity="gemini/judge",
+        judge_prompt_digest="sha256:" + "3" * 64,
+        qualification_evidence="evidence.json",
+        qualification_digest="sha256:" + hashlib.sha256(data).hexdigest(),
+    )
+
+    assert continuity_judge_is_qualified(check) is True
+    assert (
+        continuity_judge_is_qualified(check.model_copy(update={"judge_prompt_digest": "sha256:" + "0" * 64})) is False
+    )
+    other = json.dumps({**evidence, "schema": "r2.image-judge"}).encode()
+    (tmp_path / "evidence.json").write_bytes(other)
+    pinned = check.model_copy(update={"qualification_digest": "sha256:" + hashlib.sha256(other).hexdigest()})
+    assert continuity_judge_is_qualified(pinned) is False

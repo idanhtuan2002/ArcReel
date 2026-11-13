@@ -103,6 +103,10 @@ async def handle_generate_storyboards(ctx: ToolContext, args: dict[str, Any]) ->
     try:
         script_filename = validate_script_filename(args["script"])
         segment_ids = normalize_requested_ids(args.get("segment_ids"), field="segment_ids")
+        # A production run's per-segment corrections (ADR-0134); not part of the agent's tool schema.
+        addenda = args.get("prompt_addenda") or {}
+        if not isinstance(addenda, dict) or not all(isinstance(v, str) for v in addenda.values()):
+            raise ValueError("prompt_addenda must map segment ids to text")
 
         script = ctx.pm.load_script(ctx.project_name, script_filename)
         project_dir = ctx.project_path
@@ -207,6 +211,9 @@ async def handle_generate_storyboards(ctx: ToolContext, args: dict[str, Any]) ->
                 dependency_index=plan.dependency_index,
                 unit_id=plan.resource_id,
                 source=ctx.caller.source,
+                extra_payload=(
+                    {"prompt_addendum": addenda[plan.resource_id]} if plan.resource_id in addenda else None
+                ),
             )
             for plan in plans
         ]

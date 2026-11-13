@@ -409,6 +409,21 @@ def _normalize_storyboard_prompt(
     )
 
 
+#: The longest correction a task may append to its storyboard prompt.
+MAX_PROMPT_ADDENDUM_CHARS = 600
+
+
+def _with_prompt_addendum(prompt_text: str, addendum: object) -> str:
+    """``prompt_text`` with the task's correction (a continuity judge's ``prompt_fix``, ADR-0134) appended as its own
+    paragraph; the script's ``image_prompt`` is not edited, and the provider prompt recorded with the version carries
+    the correction."""
+    if addendum is None:
+        return prompt_text
+    if not isinstance(addendum, str) or not addendum.strip() or len(addendum) > MAX_PROMPT_ADDENDUM_CHARS:
+        raise ValueError("prompt_addendum must be non-empty text of at most 600 characters")
+    return f"{prompt_text}\n\nCorrection: {addendum.strip()}"
+
+
 def _get_model_default_duration(provider_name: str, model_name: str | None) -> int:
     """从 PROVIDER_REGISTRY 查找模型的 supported_durations[0]，找不到则 fallback 4。"""
     provider_meta = PROVIDER_REGISTRY.get(provider_name)
@@ -1659,6 +1674,7 @@ async def execute_storyboard_task(
             _style_description,
             _product_names_in_references(_product_refs) if _product_refs else None,
         )
+        _prompt_text = _with_prompt_addendum(_prompt_text, payload.get("prompt_addendum"))
         _frozen = freeze_image_references(_ref_images, _visual_references)
         try:
             _formal_claims = list(

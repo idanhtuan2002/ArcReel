@@ -32,6 +32,17 @@ class ImageSelection(AutomationContract):
     qualification_digest: Digest
 
 
+class ContinuityCheck(AutomationContract):
+    """Storyboards judged for continuity against their references (ADR-0134), pinned to the judge's committed
+    qualification (``scripts/r2/qualify_continuity_judge.py``)."""
+
+    judge_model_identity: ExactIdentity
+    judge_prompt_digest: Digest
+    #: Repository-relative path of the judge's qualification evidence and that file's sha256 digest.
+    qualification_evidence: ExactIdentity
+    qualification_digest: Digest
+
+
 class LaunchProfile(AutomationContract):
     profile_id: ExactIdentity
     content_mode: Literal["fiction_narration", "fiction_drama"]
@@ -59,6 +70,8 @@ class LaunchProfile(AutomationContract):
     required_gpu_bytes: PositiveInt
     #: Absent: one storyboard per segment.
     image_selection: ImageSelection | None = None
+    #: Absent: storyboards are not judged for continuity.
+    continuity: ContinuityCheck | None = None
 
 
 def resolve_launch_profile(profile_id: str) -> LaunchProfile:
@@ -93,21 +106,46 @@ def reviewer_is_qualified(record: ReviewerQualification) -> bool:
     return True
 
 
-def image_judge_is_qualified(selection: ImageSelection) -> bool:
-    """The pinned evidence file exists with its pinned digest and qualifies exactly the pinned judge."""
-    selection = ImageSelection.model_validate(selection)
-    path = (REPOSITORY_ROOT / selection.qualification_evidence).resolve()
+def _evidence_qualifies(
+    evidence_path: str, digest: str, identity: str, prompt_digest: str, *, schema: str | None = None
+) -> bool:
+    path = (REPOSITORY_ROOT / evidence_path).resolve()
     if not path.is_relative_to(REPOSITORY_ROOT) or not path.is_file():
         return False
     data = path.read_bytes()
-    if "sha256:" + hashlib.sha256(data).hexdigest() != selection.qualification_digest:
+    if "sha256:" + hashlib.sha256(data).hexdigest() != digest:
         return False
     try:
         evidence = json.loads(data)
     except ValueError:
         return False
     return (
-        evidence.get("qualified") is True
-        and evidence.get("model_identity") == selection.judge_model_identity
-        and evidence.get("prompt_digest") == selection.judge_prompt_digest
+        isinstance(evidence, dict)
+        and (schema is None or evidence.get("schema") == schema)
+        and evidence.get("qualified") is True
+        and evidence.get("model_identity") == identity
+        and evidence.get("prompt_digest") == prompt_digest
+    )
+
+
+def image_judge_is_qualified(selection: ImageSelection) -> bool:
+    """The pinned evidence file exists with its pinned digest and qualifies exactly the pinned judge."""
+    selection = ImageSelection.model_validate(selection)
+    return _evidence_qualifies(
+        selection.qualification_evidence,
+        selection.qualification_digest,
+        selection.judge_model_identity,
+        selection.judge_prompt_digest,
+    )
+
+
+def continuity_judge_is_qualified(check: ContinuityCheck) -> bool:
+    """The pinned continuity qualification exists with its pinned digest and qualifies exactly the pinned judge."""
+    check = ContinuityCheck.model_validate(check)
+    return _evidence_qualifies(
+        check.qualification_evidence,
+        check.qualification_digest,
+        check.judge_model_identity,
+        check.judge_prompt_digest,
+        schema="r2.continuity-judge-qualification.v1",
     )
