@@ -191,6 +191,7 @@ def render_storyboard_image_prompt(
     style_description: str = "",
     product_names: Sequence[str] | None = None,
     cast: Sequence[tuple[str, str]] = (),
+    reference_labels: Sequence[str] = (),
 ) -> str:
     """分镜图最终提示词文本的唯一出口。
 
@@ -201,7 +202,7 @@ def render_storyboard_image_prompt(
     """
 
     body = append_product_fidelity_tail(build_storyboard_prompt(image_prompt, style, style_description), product_names)
-    block = render_cast_block(cast)
+    block = render_cast_block(cast, reference_labels)
     # 文本形态以「当前渲染结果」为初值时正文已带着这一块，再注入会叠出第二份。
     if block and not (isinstance(image_prompt, str) and block in image_prompt):
         body = f"{block}\n\n{body}"
@@ -254,9 +255,16 @@ def storyboard_cast(project: Mapping[str, Any], item: Mapping[str, Any]) -> list
     return [(name, appearances[name]) for name in dict.fromkeys(names) if appearances.get(name)]
 
 
-def render_cast_block(cast: Sequence[tuple[str, str]]) -> str:
-    """出场角色块：每个角色一行，外观压成单行。"""
-    lines = [f"- {name}: {' '.join(appearance.split())}" for name, appearance in cast if appearance.strip()]
+def render_cast_block(cast: Sequence[tuple[str, str]], reference_labels: Sequence[str] = ()) -> str:
+    """出场角色块：每个角色一行，外观压成单行；角色的资产图在本次参考图里时注明它是第几张，
+    让不支持参考图标签的后端也能从文字把图与人对上。"""
+    labels = list(reference_labels)
+    lines = []
+    for name, appearance in cast:
+        if not appearance.strip():
+            continue
+        image = f" (reference image {labels.index(name) + 1})" if name in labels else ""
+        lines.append(f"- {name}{image}: {' '.join(appearance.split())}")
     return "Characters:\n" + "\n".join(lines) if lines else ""
 
 

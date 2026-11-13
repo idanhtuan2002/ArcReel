@@ -9,6 +9,7 @@ from lib.prompt_builders import (
     build_prop_prompt,
     build_scene_prompt,
     framing_line,
+    render_cast_block,
     render_storyboard_image_prompt,
     storyboard_cast,
 )
@@ -175,3 +176,14 @@ class TestFramingLine:
 
         assert framing_line(eye) == "Framing: medium shot, framed from the waist up."
         assert framing_line("free text") == ""
+
+
+class TestCastReferenceBinding:
+    def test_each_character_names_the_reference_image_that_shows_it(self):
+        block = render_cast_block(
+            [("Lan", "cô gái"), ("Minh", "chàng trai"), ("Bà Tư", "bà cụ")], ["保温杯", "Lan", "", "Minh"]
+        )
+
+        assert block == (
+            "Characters:\n- Lan (reference image 2): cô gái\n- Minh (reference image 4): chàng trai\n- Bà Tư: bà cụ"
+        )

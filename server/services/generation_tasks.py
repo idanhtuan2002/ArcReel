@@ -403,12 +403,23 @@ def _normalize_storyboard_prompt(
     style_description: str = "",
     product_names: Sequence[str] | None = None,
     cast: Sequence[tuple[str, str]] = (),
+    reference_labels: Sequence[str] = (),
 ) -> str:
     """Render one semantic storyboard prompt through the shared provider projection."""
 
     return render_storyboard_image_prompt(
-        prompt, style=style, style_description=style_description, product_names=product_names, cast=cast
+        prompt,
+        style=style,
+        style_description=style_description,
+        product_names=product_names,
+        cast=cast,
+        reference_labels=reference_labels,
     )
+
+
+def reference_labels(references: Sequence[object] | None) -> list[str]:
+    """The label of each reference image in request order (empty for an unlabelled one)."""
+    return [str(ref.get("label") or "") if isinstance(ref, dict) else "" for ref in references or []]
 
 
 #: The longest correction a task may append to its storyboard prompt.
@@ -567,18 +578,43 @@ def _collect_reference_images(
     currency_resolver: ArtifactCurrencyResolver,
     formal_claims: list[ArtifactInputClaim] | None = None,
 ) -> list[object] | None:
-    sheet_refs, _ = _collect_sheet_references(
+    # Order is priority: a backend with fewer slots keeps the first ones. The cast comes first, then the previous
+    # storyboard of the same scene (it carries the room and the light), then the scene and prop sheets, then extras.
+    character_refs, _ = _collect_sheet_references(
         project,
         project_path,
         [target_item],
         char_field=char_field,
+        scene_field="",
+        prop_field="",
+        visual_references=visual_references,
+        currency_resolver=currency_resolver,
+        formal_claims=formal_claims,
+    )
+    reference_images: list[object] = list(character_refs)
+    previous_reference = _previous_storyboard_reference(
+        project_path,
+        previous_storyboard_path,
+        previous_storyboard_id,
+        artifact_episode=artifact_episode,
+        visual_references=visual_references,
+        currency_resolver=currency_resolver,
+        formal_claims=formal_claims,
+    )
+    if previous_reference is not None:
+        reference_images.append(previous_reference)
+    setting_refs, _ = _collect_sheet_references(
+        project,
+        project_path,
+        [target_item],
+        char_field=None,
         scene_field=scene_field,
         prop_field=prop_field,
         visual_references=visual_references,
         currency_resolver=currency_resolver,
         formal_claims=formal_claims,
     )
-    reference_images: list[object] = list(sheet_refs)
+    reference_images.extend(setting_refs)
 
     for extra in extra_reference_images or []:
         extra_path = Path(extra)
@@ -589,6 +625,20 @@ def _collect_reference_images(
             if visual_references is not None:
                 visual_references.append(VisualReference(path=extra_path, role="extra_reference"))
 
+    return reference_images or None
+
+
+def _previous_storyboard_reference(
+    project_path: Path,
+    previous_storyboard_path: Path | None,
+    previous_storyboard_id: str | None,
+    *,
+    artifact_episode: int | None,
+    visual_references: list[VisualReference] | None,
+    currency_resolver: ArtifactCurrencyResolver,
+    formal_claims: list[ArtifactInputClaim] | None,
+) -> object | None:
+    """The previous storyboard of the same scene as a reference, when it is a usable formal input."""
     if previous_storyboard_path and previous_storyboard_path.exists():
         if not previous_storyboard_id:
             raise ValueError("previous_storyboard_id is required for storyboard basis evidence")
@@ -602,8 +652,7 @@ def _collect_reference_images(
             artifact_path=previous_artifact_path,
             claims=formal_claims,
         ):
-            return reference_images or None
-        reference_images.append(build_previous_storyboard_reference(previous_storyboard_path))
+            return None
         if visual_references is not None:
             visual_references.append(
                 VisualReference(
@@ -613,8 +662,8 @@ def _collect_reference_images(
                     logical_id=previous_storyboard_id,
                 )
             )
-
-    return reference_images or None
+        return build_previous_storyboard_reference(previous_storyboard_path)
+    return None
 
 
 def collect_shot_product_references(
@@ -1676,6 +1725,7 @@ async def execute_storyboard_task(
             _style_description,
             _product_names_in_references(_product_refs) if _product_refs else None,
             storyboard_cast(_project, _target_item),
+            reference_labels(_ref_images),
         )
         _prompt_text = _with_prompt_addendum(_prompt_text, payload.get("prompt_addendum"))
         _frozen = freeze_image_references(_ref_images, _visual_references)
@@ -3714,3 +3764,32 @@ async def _execute_authorized_task(
                 await run_noninterruptible_sync(result.compensate_cancelled)
             raise
         return result
+
+
+def storyboard_reference_labels(project: dict, project_path: Path, script: dict, item_id: str) -> list[str]:
+    """The labels of the reference images a storyboard of ``item_id`` would be generated with, in request order
+    (product references, then the cast, the previous storyboard of the scene, scene and prop sheets): the prompt
+    preview numbers the cast by them exactly as execution does."""
+    resolver = active_artifact_currency_resolver(project_path, project)
+    items, id_field, char_field, scene_field, prop_field = get_storyboard_items(script)
+    resolved = find_storyboard_item(items, id_field, item_id)
+    if resolved is None:
+        return []
+    item, index = resolved
+    previous_path = resolve_previous_storyboard_path(project_path, items, id_field, item_id)
+    previous_id = str(items[index - 1].get(id_field) or "") if previous_path is not None and index > 0 else None
+    episode = script.get("episode")
+    refs = _collect_reference_images(
+        project,
+        project_path,
+        item,
+        char_field=char_field,
+        scene_field=scene_field,
+        prop_field=prop_field,
+        previous_storyboard_path=previous_path,
+        previous_storyboard_id=previous_id,
+        artifact_episode=episode if isinstance(episode, int) else None,
+        currency_resolver=resolver,
+    )
+    products = collect_shot_product_references(project, project_path, item, currency_resolver=resolver)
+    return reference_labels(list(products or []) + list(refs or []))

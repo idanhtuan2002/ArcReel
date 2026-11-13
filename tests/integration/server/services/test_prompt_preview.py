@@ -1,5 +1,6 @@
 """Tests for prompt_preview."""
 
+import re
 from pathlib import Path
 
 import pytest
@@ -166,7 +167,12 @@ class TestPreviewMatchesExecution:
         text = preview.storyboard_image.text
         assert text is not None
         assert preview.storyboard_image.is_text_form
-        assert text.startswith(f"Characters:\n- Alice: hero\n\nStyle: Anime\nVisual style: cinematic\n\n{body}")
+        # 商品分镜的商品参考排在最前，角色的参考图序号因创作类型而异。
+        assert re.match(
+            r"Characters:\n- Alice \(reference image \d\): hero\n\nStyle: Anime\nVisual style: cinematic\n\n"
+            + re.escape(body),
+            text,
+        )
         assert text == generator.image_calls[0]["prompt"]
 
     @pytest.mark.parametrize("content_mode", CONTENT_MODES)

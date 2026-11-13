@@ -161,6 +161,16 @@ class ComfyuiImageBackend:
         只有参考图一路。
         """
         slots = self.max_reference_images
+        dropped = request.reference_images[slots:]
+        if dropped:
+            # 调用方按优先级排序（角色、同场次上一张分镜、场景、道具）；记下被挤掉的几张，不静默丢弃。
+            logger.warning(
+                "%s: workflow 只有 %d 个参考图格子，未传入 %d 张：%s",
+                job_label,
+                slots,
+                len(dropped),
+                ", ".join(reference.label or Path(reference.path).name for reference in dropped),
+            )
         references: list[str] = []
         for index, reference in enumerate(request.reference_images[:slots]):
             path = Path(reference.path)

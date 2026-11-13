@@ -58,14 +58,15 @@ class TestGenerationTasks:
         storyboard_refs = fake_generator.image_calls[0]["reference_images"]
         # 资产 sheet 以「资产名 label」显式绑定（供 Gemini 等支持内联标签的后端
         # 把参考图与 prompt 专名对应）；provider 收到的是任务私有快照，extra 无标签仍保持裸 Path。
+        # 顺序即优先级：角色、同场次上一张分镜、场景与道具 sheet、额外参考。
         assert [ref.get("label") if isinstance(ref, dict) else None for ref in storyboard_refs] == [
             "Alice",
+            PREVIOUS_STORYBOARD_REFERENCE_LABEL,
             "祠堂",
             "玉佩",
             None,
-            PREVIOUS_STORYBOARD_REFERENCE_LABEL,
         ]
-        assert storyboard_refs[-1]["description"] == PREVIOUS_STORYBOARD_REFERENCE_DESCRIPTION
+        assert storyboard_refs[1]["description"] == PREVIOUS_STORYBOARD_REFERENCE_DESCRIPTION
         assert all(
             not (ref["image"] if isinstance(ref, dict) else ref).is_relative_to(project_path) for ref in storyboard_refs
         )

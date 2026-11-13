@@ -24,6 +24,7 @@ from lib.script_models import resolve_content_mode
 from lib.storyboard_sequence import find_storyboard_item, get_storyboard_items
 from server.services.generation_tasks import (
     collect_shot_product_references,
+    storyboard_reference_labels,
 )
 from server.services.video_batch_admission import resolve_voice_context
 
@@ -76,7 +77,7 @@ async def preview_item_prompts(
     ``projects`` 供工具运行时把已解析的 ProjectManager 注入进来（REST 路由用进程默认实例）。
     """
 
-    def _load() -> tuple[dict[str, Any], Path, dict[str, Any], str]:
+    def _load() -> tuple[dict[str, Any], Path, dict[str, Any], str, dict[str, Any]]:
         manager = projects if projects is not None else get_project_manager()
         project = manager.load_project(project_name)
         project_path = manager.get_project_path(project_name)
@@ -85,9 +86,9 @@ async def preview_item_prompts(
         resolved = find_storyboard_item(items, id_field, item_id)
         if resolved is None:
             raise ScriptItemNotFound(item_id)
-        return project, project_path, resolved[0], resolve_content_mode(script, project)
+        return project, project_path, resolved[0], resolve_content_mode(script, project), script
 
-    project, project_path, item, content_mode = await asyncio.to_thread(_load)
+    project, project_path, item, content_mode, script = await asyncio.to_thread(_load)
     # 声音绑定按项目当前的视频能力档解析（非 drama 或无声一律 None），与执行期同一判据。
     voice_characters = await resolve_voice_context(project, content_mode)
 
@@ -108,6 +109,7 @@ async def preview_item_prompts(
                 style_description=style_description if isinstance(style_description, str) else "",
                 product_names=list(dict.fromkeys(product_names)) or None,
                 cast=storyboard_cast(project, item),
+                reference_labels=storyboard_reference_labels(project, project_path, script, item_id),
             ),
         )
         video = _render(
