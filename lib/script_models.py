@@ -60,6 +60,14 @@ CameraMotion = Literal[
     "Shake",
 ]
 
+CameraAngle = Literal[
+    "Eye Level",
+    "Low Angle",
+    "High Angle",
+    "Overhead",
+    "Dutch Angle",
+]
+
 TransitionType = Literal[
     "cut",
     "fade",
@@ -82,9 +90,21 @@ def _canon_enum_key(value: str) -> str:
 # 单镜头词汇漂移不值得让整集剧本生成失败。
 _DEFAULT_SHOT_TYPE: ShotType = "Medium Shot"
 _DEFAULT_CAMERA_MOTION: CameraMotion = "Static"
+_DEFAULT_CAMERA_ANGLE: CameraAngle = "Eye Level"
 
 _SHOT_TYPE_BY_KEY: dict[str, str] = {_canon_enum_key(v): v for v in get_args(ShotType)}
 _CAMERA_MOTION_BY_KEY: dict[str, str] = {_canon_enum_key(v): v for v in get_args(CameraMotion)}
+_CAMERA_ANGLE_BY_KEY: dict[str, str] = {_canon_enum_key(v): v for v in get_args(CameraAngle)}
+
+
+def _normalize_camera_angle(value: object) -> object:
+    if not isinstance(value, str):
+        return value
+    hit = _CAMERA_ANGLE_BY_KEY.get(_canon_enum_key(value))
+    if hit is not None:
+        return hit
+    logger.warning("camera_angle 枚举漂移无法归一，降级为 %s: %r", _DEFAULT_CAMERA_ANGLE, value)
+    return _DEFAULT_CAMERA_ANGLE
 
 
 def _normalize_shot_type(value: object) -> object:
@@ -127,6 +147,9 @@ class Composition(BaseModel):
     model_config = _STRICT_CONFIG
 
     shot_type: Annotated[ShotType, BeforeValidator(_normalize_shot_type)] = Field(description="镜头类型")
+    camera_angle: Annotated[CameraAngle, BeforeValidator(_normalize_camera_angle)] = Field(
+        default=_DEFAULT_CAMERA_ANGLE, description="机位角度"
+    )
     lighting: str = Field(description="光线描述")
     ambiance: str = Field(description="整体氛围")
 

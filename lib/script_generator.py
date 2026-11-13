@@ -123,6 +123,7 @@ from lib.script_review import (
     migrate_script_plan_draft_in_place,
 )
 from lib.script_skeleton import resolve_declared_kind, resolve_kind_items, rewrite_episode_prefix
+from lib.shot_grammar import shot_grammar_issues
 from lib.speech_composition import admit_script_unit, require_script_unit_admitted, video_unit_replan_problems
 from lib.speech_rate import project_speech_rate_override
 from lib.text_backends.base import DEFAULT_MAX_OUTPUT_TOKENS, TextGenerationRequest, TextTaskType
@@ -914,6 +915,9 @@ class ScriptGenerator:
             if narration_looks is not None:
                 starts, kept = narration_looks
                 apply_looks(script_data["segments"], starts, visual_data.get("looks") or {}, kept)
+            grammar = shot_grammar_issues(script_data["segments"])
+            if grammar:
+                logger.warning("episode %s shot grammar: %s", episode, "; ".join(grammar))
         elif reference_script_plan is not None:
             # 违约不丢弃：把这次已付费的展开连同逐条报告落待修复草稿，由 Agent 修复后经
             # promote_reference_prompt_authoring_draft 重判晋升。重抽既烧钱又不收敛——同一个模型对同一份

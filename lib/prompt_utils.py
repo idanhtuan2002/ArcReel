@@ -75,6 +75,11 @@ def image_prompt_to_yaml(image_prompt: dict, project_style: str) -> str:
             "ambiance": image_prompt["composition"]["ambiance"],
         },
     }
+    angle = image_prompt["composition"].get("camera_angle")
+    if isinstance(angle, str) and angle:
+        ordered["Composition"] = {"shot_type": ordered["Composition"]["shot_type"], "camera_angle": angle} | {
+            key: ordered["Composition"][key] for key in ("lighting", "ambiance")
+        }
     look = image_prompt.get("look")
     if isinstance(look, Mapping):
         ordered["Scene_Look"] = {
@@ -123,6 +128,9 @@ def project_storyboard_image_prompt(image_prompt: object, project_style: str) ->
             "ambiance": str(composition.get("ambiance") or ""),
         },
     }
+    angle = composition.get("camera_angle")
+    if isinstance(angle, str) and angle:
+        projected["composition"]["camera_angle"] = angle
     look = image_prompt.get("look")
     if isinstance(look, Mapping):
         projected["look"] = {

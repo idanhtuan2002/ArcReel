@@ -2,8 +2,8 @@
 
 设计原则：
 - 不重复 schema 已声明的枚举（shot_type / camera_motion 等）；让 response_schema 直接约束。
-- 多选枚举字段不在 prompt 里写"如何选"判据，避免把人的镜头审美灌给 LLM；
-  让模型按画面内容自行决定。
+- 景别 / 机位 / 运镜给出镜头语法（建立镜头、插入镜头、景别变化、平稳单一运镜）而不是逐镜指定：
+  语法来自分镜行业惯例与视频模型能可靠执行的运镜范围，具体每镜仍由模型按画面内容决定。
 - 不写无法被 LLM 自检的字数硬限制（"≤200 字"）；用示例隐性表达节奏。
 - 字段说明用少量正例与带解说的反例传达要求，不堆"必须 / 禁止"清单。
 - 节奏建议由 lib.prompt_rules.episode_pacing 注入，跨子智能体与 builder 共享。
@@ -168,6 +168,21 @@ _LIGHTING_WRITING_GUIDE = (
     "让画面具备可观察的镜头语言而非抽象修辞；避免「光影神秘」「氛围唯美」这类抽象词。"
 )
 _AMBIANCE_WRITING_GUIDE = "描述可观察的环境效果（如「薄雾弥漫」「尘埃在光柱里翻飞」），避免抽象情绪词。"
+
+_SHOT_TYPE_GUIDE = (
+    "按镜头语法选择：每个场次（场景切换或时间跳转）的第一镜用 Long Shot / Extreme Long Shot 交代空间；"
+    "原文写到物件、手部、细节或线索时用 Close-up / Extreme Close-up 作插入镜头；情绪高点、关键台词与人物反应用 "
+    "Close-up / Medium Close-up；其余用 Medium Shot / Medium Long Shot 承接。相邻分镜的景别要有变化，同一景别不要"
+    "连续超过两镜。竖屏构图时人物的脸放在画面中上部，画面下方约四分之一留给字幕，不放关键面部或道具。"
+)
+_CAMERA_ANGLE_GUIDE = (
+    "平视（Eye Level）是常态；仰拍（Low Angle）表现力量或压迫，俯拍（High Angle）表现弱小或孤立，"
+    "顶视（Overhead）表现全局或命运感，荷兰角（Dutch Angle）表现失衡与不安——后四种只在剧情需要时少量使用。"
+)
+_CAMERA_MOTION_GUIDE = (
+    "每镜只选一种缓慢运镜：Static、Push In、Pull Out、Pan、Tilt 最稳定；推近用于聚焦与紧张，拉远用于孤独或释怀，"
+    "摇镜用于展示空间或跟随视线。避免 Orbit、Shake 等剧烈或旋转运动——视频模型对剧烈旋转的执行最差。"
+)
 _AMBIANCE_AUDIO_WRITING_GUIDE = (
     "只描写画内音（diegetic sound）：环境声、脚步、物体声响。不要写 BGM、配乐、画外音、旁白。"
 )
@@ -394,14 +409,15 @@ segments 表每个分镜已定稿（segment_id、逐字原文、时长、出场�
 ## 图片提示词（image_prompt）——切换到「摄影师」视角
 
 - **image_prompt.scene**：{_SCENE_WRITING_GUIDE}
-- **image_prompt.composition.shot_type**：从枚举中按画面内容选择，不强加倾向。
+- **image_prompt.composition.shot_type**：{_SHOT_TYPE_GUIDE}
+- **image_prompt.composition.camera_angle**：{_CAMERA_ANGLE_GUIDE}
 - **image_prompt.composition.lighting**：{_LIGHTING_WRITING_GUIDE}
 - **image_prompt.composition.ambiance**：{_AMBIANCE_WRITING_GUIDE}
 
 ## 视频提示词（video_prompt）——切换到「动作设计师」视角
 
 - **video_prompt.action**：{_ACTION_WRITING_GUIDE}
-- **video_prompt.camera_motion**：按画面内容自行选择。
+- **video_prompt.camera_motion**：{_CAMERA_MOTION_GUIDE}
 - **video_prompt.ambiance_audio**：{_AMBIANCE_AUDIO_WRITING_GUIDE}
 - **video_prompt.dialogue**：speaker 必须出现在该分镜的出场角色中。
 {looks_block}
@@ -551,14 +567,15 @@ def build_drama_prompt(
 ## 图片提示词（image_prompt）——切换到「摄影师」视角
 
 - **image_prompt.scene**：{_SCENE_WRITING_GUIDE}
-- **image_prompt.composition.shot_type**：从枚举中按画面内容选择，不强加倾向。
+- **image_prompt.composition.shot_type**：{_SHOT_TYPE_GUIDE}
+- **image_prompt.composition.camera_angle**：{_CAMERA_ANGLE_GUIDE}
 - **image_prompt.composition.lighting**：{_LIGHTING_WRITING_GUIDE}
 - **image_prompt.composition.ambiance**：{_AMBIANCE_WRITING_GUIDE}
 
 ## 视频提示词（video_prompt）——切换到「动作设计师」视角
 
 - **video_prompt.action**：{_ACTION_WRITING_GUIDE}
-- **video_prompt.camera_motion**：按画面内容自行选择。
+- **video_prompt.camera_motion**：{_CAMERA_MOTION_GUIDE}
 - **video_prompt.ambiance_audio**：{_AMBIANCE_AUDIO_WRITING_GUIDE}
 
 # 创作目标
