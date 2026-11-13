@@ -14,12 +14,12 @@ provider console by the sponsor; **[D]** from the provider's docs or third-party
 
 | Use in R2 | Usable now (free) | Notes |
 |---|---|---|
-| Continuity judge / vision reviewer (ADR-0134, ADR-0113) | Gemini `gemini-2.5-flash`, `gemini-3-flash-preview` (20 req/day each); Groq `qwen/qwen3.8-27b` (~28 judge calls/day) | Qualification needs 76 calls on one model identity → 3–4 days per model on free tiers |
+| Continuity judge / vision reviewer (ADR-0134, ADR-0113) | BytePlus `seed-2-0-pro`, `seed-2-0-lite`, `dola-seed-2-1-turbo`, `deepseek-v4-1-flash` (500k tokens each, once); Gemini `gemini-2.5-flash`, `gemini-3-flash-preview` (20 req/day each); Groq `qwen/qwen3.8-27b` (~28 judge calls/day) | Qualification needs 76 calls on one model identity: ~6.6k tokens each on Seed 2.0 Pro (≈ the whole 500k); 3–4 days per model on Gemini/Groq |
 | Text writer / text reviewer | Gemini Flash models (20 req/day each); Groq `openai/gpt-oss-120b`, `qwen/qwen3.8-27b` (1,000 req/day, 200k tokens/day) | Alibaba `qwen-*-character` only (role-play tuned) |
 | Vietnamese TTS A/B (B1) | Alibaba `qwen-audio-3.1-tts-flash` / `-next` (1M), `-plus` (10K) | Vietnamese quality not tested yet |
 | ASR (narration vs subtitles check) | Alibaba `qwen-audio-3.1-asr-flash*` (1M), `fun-asr-flash-2026-06-15` (36K); Groq `whisper-large-v3(-turbo)` | |
-| Image generation | none verified free (Gemini image models, Alibaba `wan2.7-image*` not in free quota) | local FLUX.2 klein (ComfyUI) |
-| Video generation (bake-off B1) | none verified free | Alibaba Wan not in free quota; BytePlus Seedance pending |
+| Image generation | BytePlus Seedream 4.0 / 4.5 (200 images each), 5.0-lite (50) [C] | local FLUX.2 klein (ComfyUI) stays the default |
+| Video generation (bake-off B1) | BytePlus Seedance 1.0 pro / pro-fast (2M tokens each) [C] | ≈ 108k tokens per 5 s 720p clip → ~18 clips per model; Seedance 2.x has no free quota |
 
 ## Google AI Studio (Gemini)
 
@@ -85,11 +85,36 @@ provider console by the sponsor; **[D]** from the provider's docs or third-party
   `qwen3.5/3.6/3.7/3.8-*`, `qwen3.x-omni-*`, `wan2.7-image(-pro)` — all paid.
 - **[D]** Wan video free quotas were removed for `wan2.7-*` and `wan3.0-video-prime` on 2026-10-29.
 
+## BytePlus ModelArk (international)
+
+- App provider: custom provider **`BytePlus(Ark)` = `custom-5`**, base `https://ark.ap-southeast.bytepluses.com/api/v3`
+  (OpenAI-compatible chat; video uses the Ark task API, endpoint `ark-seedance`). The built-in `ark` provider defaults to
+  the Volcengine (China) host and `doubao-*` ids, which a BytePlus key cannot use.
+- **[C 2026-11-13]** "Free credits only" mode **on**: a model stops when its free quota is used up; nothing is billed.
+  Free quotas are once per account (no daily reset):
+
+  | Model (console name) | Free quota | Notes |
+  |---|---|---|
+  | Seed 2.0 pro / lite / mini / code, Dola-Seed 2.1 turbo, Seed 1.8, Seed 1.6 (+flash), Seed Translation | 500k tokens each | Seed 2.x are vision models |
+  | DeepSeek V4 / V4.1 Flash (+Economy, GA), V4 Pro (+GA), V3.2; GLM 5.2, 5.3 Flash, 4.7 | 500k tokens each | V4.1 Flash takes images |
+  | Seedance 1.0 pro, 1.0 pro-fast, 1.5 pro | 2M tokens each | video; 1.5 pro has audio |
+  | Seedream 4.0, 4.5 | 200 images each | |
+  | Seedream 5.0-lite | 50 images | |
+  | Seedance 2.0 / 2.0 fast / 2.0 mini / 2.5 / 2.5 flash; Seedream 5.0 pro / flash, 5.5 | none | paused in free-only mode |
+  | Skylark embedding vision | 500k tokens | |
+
+- **[V 2026-11-13]** `GET /models` lists 35 ids, e.g. `seed-2-0-pro-260328`, `seed-2-0-lite-260428`,
+  `seed-2-0-mini-260428`, `dola-seed-2-1-turbo-260628`, `deepseek-v4-1-flash-261017` (VLM), `deepseek-v4-pro-ga-260813`,
+  `glm-5-2-260617`, `seedance-1-0-pro-250528`, `seedance-1-0-pro-fast-251015`, `seedream-4-0-250828`,
+  `seedream-4-5-251128`, `dreamina-seedance-2-*`. Seed 1.8 / 1.6 / Seedance 1.5 pro are not listed (not activated).
+- **[V 2026-11-13]** Image questions answered by `seed-2-0-pro`, `seed-2-0-lite`, `dola-seed-2-1-turbo`,
+  `deepseek-v4-1-flash`. One continuity judge case (4 images, no cap) on `seed-2-0-pro`: 5,777 prompt + 862 output
+  tokens (815 reasoning), 17 s.
+
 ## Pending registration
 
 | Provider | Expected free offer [D] | Would serve | App provider |
 |---|---|---|---|
-| BytePlus ModelArk (international) | new users ~500k tokens per LLM, ~2M tokens per vision model, once per account; "Free Tokens Only" mode | vision judge in one go (Seed vision models); Seedream / Seedance bake-off (not confirmed free) | built-in `ark` |
 | OpenRouter | `:free` models, 50 req/day, 20 req/min | fallback text / vision | custom provider, `https://openrouter.ai/api/v1` |
 | Mistral La Plateforme | free plan; terms differ between sources (may require training opt-in) | third-family reviewer (Pixtral / Mistral Medium) | custom provider, `https://api.mistral.ai/v1` |
 | GitHub Models | reported retired 2026-07-30 | — | — |
