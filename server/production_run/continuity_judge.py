@@ -42,7 +42,7 @@ ALIGNED_SCORE = 90
 DRIFT_BELOW = 70
 HIGH_SEVERITY_CAP = 69
 MAX_PROMPT_FIX_CHARS = 400
-JUDGE_MAX_TOKENS = 2048
+JUDGE_MAX_TOKENS = 4096
 
 type Status = Literal["aligned", "watch", "drift"]
 
@@ -56,6 +56,12 @@ Shot {label}: {description}
 Intended framing: {framing}
 In frame: {cast}{location}{props}
 {previous}
+
+First fill cast_check, one entry per character named in frame: "seen" says what the person in Image 1 who should \
+be that character looks like (gender, age, face, hair, main outfit); "same_person" is false when gender, age group, \
+face, hairstyle or main outfit clearly differ from their reference sheet, or when nobody in the frame can be them. \
+The names and the description say who SHOULD be in the frame, not who is: decide from the pictures. A different \
+person in the right place is the worst continuity error.
 
 Check, in this order:
 1. identity - every character matches their reference sheet: face, hair, age, build, gender.
@@ -71,6 +77,8 @@ Check, in this order:
 11. artifacts - image-model defects: ghosted or merged bodies, extra or missing limbs or fingers, warped faces, \
 duplicated people. Any of these is high severity.
 
+Severity: a different person or a changed main outfit is high; a wrong or missing key prop, place or time of day \
+is medium or high; garbled background signage, small framing differences and minor props are low.
 Scoring: 90-100 aligned (cuts cleanly), 70-89 watch (minor issues), below 70 drift (a viewer would notice).
 prompt_fix: one or two short sentences to ADD to the image prompt that fix the issues concretely (positions as \
 "on the left/right of frame", colours, counts). Empty when aligned.
@@ -79,6 +87,18 @@ Return JSON only."""
 SCHEMA: dict[str, Any] = {
     "type": "object",
     "properties": {
+        "cast_check": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "name": {"type": "string"},
+                    "seen": {"type": "string"},
+                    "same_person": {"type": "boolean"},
+                },
+                "required": ["name", "seen", "same_person"],
+            },
+        },
         "score": {"type": "number"},
         "issues": {
             "type": "array",
@@ -94,7 +114,7 @@ SCHEMA: dict[str, Any] = {
         },
         "prompt_fix": {"type": "string"},
     },
-    "required": ["score", "issues", "prompt_fix"],
+    "required": ["cast_check", "score", "issues", "prompt_fix"],
 }
 
 
@@ -121,11 +141,21 @@ class Issue:
 
 
 @dataclass(frozen=True)
+class CastCheck:
+    """What the judge saw where a character should be, and whether it is that character."""
+
+    name: str
+    seen: str
+    same_person: bool
+
+
+@dataclass(frozen=True)
 class Verdict:
     score: int
     status: Status
     issues: tuple[Issue, ...] = field(default_factory=tuple)
     prompt_fix: str = ""
+    cast: tuple[CastCheck, ...] = field(default_factory=tuple)
 
     def as_json(self) -> dict[str, Any]:
         return {
@@ -133,6 +163,7 @@ class Verdict:
             "status": self.status,
             "issues": [issue.__dict__ for issue in self.issues],
             "prompt_fix": self.prompt_fix,
+            "cast_check": [check.__dict__ for check in self.cast],
         }
 
 
@@ -223,12 +254,21 @@ def parse_verdict(answer: str) -> Verdict:
         for item in data.get("issues") or []
         if isinstance(item, dict) and item.get("category") in CATEGORIES and item.get("severity") in SEVERITIES
     )
+    cast = tuple(
+        CastCheck(str(item.get("name", "")).strip(), str(item.get("seen", "")).strip()[:300], item["same_person"])
+        for item in data.get("cast_check") or []
+        if isinstance(item, dict) and isinstance(item.get("same_person"), bool)
+    )
+    for check in cast:
+        # A character who is not the person of their sheet is an identity drift whatever else the answer says.
+        if not check.same_person and not any(i.category == "identity" and i.severity == "high" for i in issues):
+            issues = (*issues, Issue("identity", "high", f"{check.name}: {check.seen}".strip(": ")))
     score = max(0, min(100, round(float(raw_score))))
     if any(issue.severity == "high" for issue in issues):
         score = min(score, HIGH_SEVERITY_CAP)
     status: Status = "aligned" if score >= ALIGNED_SCORE else "watch" if score >= DRIFT_BELOW else "drift"
     fix = " ".join(str(data.get("prompt_fix") or "").split())[:MAX_PROMPT_FIX_CHARS]
-    return Verdict(score=score, status=status, issues=issues, prompt_fix="" if status == "aligned" else fix)
+    return Verdict(score=score, status=status, issues=issues, prompt_fix="" if status == "aligned" else fix, cast=cast)
 
 
 MIN_CASES_PER_CLASS = 30

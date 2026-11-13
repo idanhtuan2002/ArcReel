@@ -71,6 +71,25 @@ def test_unknown_categories_are_dropped_and_prose_around_the_json_is_ignored() -
     assert (verdict.status, verdict.issues) == ("watch", ())
 
 
+def test_a_character_who_is_not_the_person_of_their_sheet_is_an_identity_drift() -> None:
+    cast = [
+        {"name": "Linh", "seen": "a young woman in a white ao dai with long hair", "same_person": False},
+        {"name": "Mai", "seen": "matches", "same_person": True},
+    ]
+    answer = json.dumps({"score": 84, "issues": [], "prompt_fix": "Linh in a mustard raincoat.", "cast_check": cast})
+
+    verdict = parse_verdict(answer)
+
+    assert (verdict.status, verdict.score) == ("drift", 69)
+    assert verdict.issues[0].category == "identity"
+    assert verdict.issues[0].severity == "high"
+    assert "white ao dai" in verdict.issues[0].message
+    assert [check["same_person"] for check in verdict.as_json()["cast_check"]] == [False, True]
+    assert parse_verdict(json.dumps({"score": 95, "issues": [], "prompt_fix": "", "cast_check": cast[1:]})).status == (
+        "aligned"
+    )
+
+
 @pytest.mark.parametrize("answer", ["no json", '{"issues": []}', '{"score": true, "issues": []}', "[1]"])
 def test_an_unusable_answer_is_refused(answer: str) -> None:
     with pytest.raises(ValueError, match=r"JSON|score|object"):
