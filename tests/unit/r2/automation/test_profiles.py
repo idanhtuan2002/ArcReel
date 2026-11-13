@@ -110,6 +110,7 @@ def test_a_policy_at_the_later_defaults_keeps_its_earlier_digest(policy_data):
         "image_judge_prompt_digest",
         "continuity_judge_identity",
         "continuity_judge_prompt_digest",
+        "continuity_judge_max_pictures",
     ):
         body.pop(field)
 

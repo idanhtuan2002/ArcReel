@@ -158,8 +158,12 @@ class ProductionPreflight:
             check = launch.continuity if launch is not None else None
             if (
                 check is None
-                or (policy.continuity_judge_identity, policy.continuity_judge_prompt_digest)
-                != (check.judge_model_identity, check.judge_prompt_digest)
+                or (
+                    policy.continuity_judge_identity,
+                    policy.continuity_judge_prompt_digest,
+                    policy.continuity_judge_max_pictures,
+                )
+                != (check.judge_model_identity, check.judge_prompt_digest, check.max_pictures)
                 or not any(
                     roles[role].model_identity == check.judge_model_identity
                     for role in ("reviewer_a", "reviewer_b")

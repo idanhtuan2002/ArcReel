@@ -494,7 +494,9 @@ class MediaAdapter:
             verdict = None
             if route is not None and self._continuity is not None and shot is not None and entry is not None:
                 frame = await asyncio.to_thread((root / entry["file"]).read_bytes)
-                verdict = await self._continuity.judge(route, shot, frame)
+                verdict = await self._continuity.judge(
+                    route, shot, frame, max_pictures=run.policy.continuity_judge_max_pictures
+                )
             verdicts[unit] = (current if isinstance(current, int) else None, verdict)
         return verdicts
 

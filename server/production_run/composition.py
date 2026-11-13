@@ -172,6 +172,7 @@ class ProjectPolicyResolver:
                     {
                         "continuity_judge_identity": launch.continuity.judge_model_identity,
                         "continuity_judge_prompt_digest": launch.continuity.judge_prompt_digest,
+                        "continuity_judge_max_pictures": launch.continuity.max_pictures,
                     }
                     if launch.continuity is not None
                     else {}

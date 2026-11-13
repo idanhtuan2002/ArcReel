@@ -11,11 +11,13 @@ The checks and their order follow the AI Video Production Editor continuity rubr
 
 from __future__ import annotations
 
+import io
 import json
 from dataclasses import dataclass, field
 from typing import Any, Literal
 
 import httpx
+from PIL import Image
 
 from r2.automation.identity import digest_value
 from r2.contracts.automation import ModelRoute
@@ -134,24 +136,59 @@ class Verdict:
         }
 
 
-def prompt_digest() -> str:
-    """The digest of what the continuity judge is asked; a qualification and a launch profile pin it."""
-    return digest_value(
-        "r2.production-continuity-judge.v1",
-        ensure_json_value({"prompt": PROMPT, "schema": SCHEMA, "drift_below": DRIFT_BELOW, "cap": HIGH_SEVERITY_CAP}),
-    )
+def prompt_digest(max_pictures: int | None = None) -> str:
+    """The digest of what the continuity judge is asked, with the route's picture cap when it has one (the request
+    then carries a sheet); a qualification and a launch profile pin it."""
+    body: dict[str, Any] = {"prompt": PROMPT, "schema": SCHEMA, "drift_below": DRIFT_BELOW, "cap": HIGH_SEVERITY_CAP}
+    if max_pictures is not None:
+        body["max_pictures"] = max_pictures
+    return digest_value("r2.production-continuity-judge.v1", ensure_json_value(body))
 
 
-def build_request(shot: Shot, frame: bytes) -> tuple[str, list[bytes]]:
-    """The question and the pictures in the order the question names them."""
+#: Height of each panel when several pictures share one sheet.
+SHEET_PANEL_HEIGHT = 768
+
+
+def contact_sheet(pictures: list[bytes]) -> bytes:
+    """``pictures`` side by side at one height, left to right, as one JPEG."""
+    panels = []
+    for picture in pictures:
+        image = Image.open(io.BytesIO(picture)).convert("RGB")
+        width = max(1, round(image.width * SHEET_PANEL_HEIGHT / image.height))
+        panels.append(image.resize((width, SHEET_PANEL_HEIGHT)))
+    gap = 16
+    sheet = Image.new("RGB", (sum(p.width for p in panels) + gap * (len(panels) - 1), SHEET_PANEL_HEIGHT), "white")
+    x = 0
+    for panel in panels:
+        sheet.paste(panel, (x, 0))
+        x += panel.width + gap
+    out = io.BytesIO()
+    sheet.save(out, format="JPEG", quality=90)
+    return out.getvalue()
+
+
+def build_request(shot: Shot, frame: bytes, *, max_pictures: int | None = None) -> tuple[str, list[bytes]]:
+    """The question and the pictures in the order the question names them.
+
+    With ``max_pictures`` (a route that takes fewer images), the references, then also the previous frame, share one
+    side-by-side sheet whose panels the question names left to right; the frame stays a picture of its own."""
+    parts = [(f"reference - {label}", picture) for label, picture in shot.references]
+    if shot.previous_frame is not None:
+        parts.append(("the previous frame of the same scene", shot.previous_frame))
     pictures = [frame]
     labels = [f"Image 1: the frame to judge (shot {shot.label})"]
-    for label, picture in shot.references:
+    if max_pictures is not None and 1 + len(parts) > max_pictures:
+        if max_pictures < 2:
+            raise ValueError("the continuity judge needs at least two pictures")
+        separate = parts[len(parts) - (max_pictures - 2) :] if max_pictures > 2 else []
+        merged = parts[: len(parts) - len(separate)]
+        pictures.append(contact_sheet([picture for _, picture in merged]))
+        names = "; ".join(f"panel {i} = {name}" for i, (name, _) in enumerate(merged, start=1))
+        labels.append(f"Image 2: a sheet of {len(merged)} panels, left to right: {names}")
+        parts = separate
+    for name, picture in parts:
         pictures.append(picture)
-        labels.append(f"Image {len(pictures)}: reference - {label}")
-    if shot.previous_frame is not None:
-        pictures.append(shot.previous_frame)
-        labels.append(f"Image {len(pictures)}: the previous frame of the same scene")
+        labels.append(f"Image {len(pictures)}: {name}")
     previous = (
         f"Previous shot of the same scene: {shot.previous_description}"
         if shot.previous_frame is not None or shot.previous_description
@@ -245,10 +282,12 @@ class ContinuityJudge:
         self._access_for, self._timeout, self._transport = access_for, timeout_seconds, transport
         self._backoff = backoff_seconds
 
-    async def judge(self, route: ModelRoute, shot: Shot, frame: bytes) -> Verdict | None:
+    async def judge(
+        self, route: ModelRoute, shot: Shot, frame: bytes, *, max_pictures: int | None = None
+    ) -> Verdict | None:
         """The verdict on ``frame``; ``None`` when the model or the transport fails."""
-        text, pictures = build_request(shot, frame)
         try:
+            text, pictures = build_request(shot, frame, max_pictures=max_pictures)
             access = await self._access_for(route.provider_id, route.model_id)
             async with vision_chat(
                 access,
@@ -259,7 +298,7 @@ class ContinuityJudge:
             ) as chat:
                 reply = await chat.ask(text, pictures, max_tokens=JUDGE_MAX_TOKENS, schema=SCHEMA)
             return parse_verdict(reply.text)
-        except (httpx.HTTPError, KeyError, IndexError, TypeError, ValueError):
+        except (httpx.HTTPError, OSError, KeyError, IndexError, TypeError, ValueError):
             return None
 
 

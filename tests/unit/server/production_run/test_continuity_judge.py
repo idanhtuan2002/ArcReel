@@ -177,6 +177,34 @@ def test_kept_answers_resume_only_for_the_same_judge_prompt_and_case_bytes(tmp_p
     ]
     answers.write_text("".join(json.dumps(line) + "\n" for line in lines), encoding="utf-8")
 
-    assert _kept(answers, "m") == {key: verdict}
+    assert _kept(answers, "m", prompt_digest()) == {key: verdict}
+    assert _kept(answers, "m", prompt_digest(3)) == {}
     (tmp_path / "f.png").write_bytes(b"another frame")
     assert case_digest(tmp_path, case) != key
+
+
+def test_a_capped_route_gets_the_references_on_one_sheet_named_left_to_right() -> None:
+    import io
+
+    from PIL import Image
+
+    def png(color: str) -> bytes:
+        out = io.BytesIO()
+        Image.new("RGB", (60, 100), color).save(out, format="PNG")
+        return out.getvalue()
+
+    shot = Shot(
+        label="s1",
+        description="Lan walks",
+        references=(("character: Lan", png("red")), ("scene: street", png("blue"))),
+        previous_frame=png("green"),
+    )
+    text, pictures = build_request(shot, png("white"), max_pictures=3)
+
+    assert len(pictures) == 3
+    assert "Image 2: a sheet of 2 panels, left to right: panel 1 = reference - character: Lan; " in text
+    assert "Image 3: the previous frame of the same scene" in text
+    assert Image.open(io.BytesIO(pictures[1])).size == (2 * 461 + 16, 768)
+    assert len(build_request(shot, png("white"))[1]) == 4
+    assert len(build_request(shot, png("white"), max_pictures=2)[1]) == 2
+    assert prompt_digest(3) != prompt_digest()

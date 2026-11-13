@@ -38,6 +38,8 @@ class ContinuityCheck(AutomationContract):
 
     judge_model_identity: ExactIdentity
     judge_prompt_digest: Digest
+    #: The judge route's image cap per request; references then share one sheet (part of the prompt digest).
+    max_pictures: Annotated[int, Field(ge=2, le=16)] | None = None
     #: Repository-relative path of the judge's qualification evidence and that file's sha256 digest.
     qualification_evidence: ExactIdentity
     qualification_digest: Digest

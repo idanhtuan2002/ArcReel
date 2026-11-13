@@ -100,13 +100,13 @@ def case_digest(corpus: Path, case: dict) -> str:
     return "sha256:" + digest.hexdigest()
 
 
-def _kept(path: Path | None, identity: str) -> dict[str, dict]:
+def _kept(path: Path | None, identity: str, digest: str) -> dict[str, dict]:
     if path is None or not path.is_file():
         return {}
     kept = {}
     for line in path.read_text(encoding="utf-8").splitlines():
         entry = json.loads(line)
-        if entry.get("model_identity") == identity and entry.get("prompt_digest") == prompt_digest():
+        if entry.get("model_identity") == identity and entry.get("prompt_digest") == digest:
             kept[entry["case_digest"]] = entry["verdict"]
     return kept
 
@@ -129,18 +129,24 @@ async def _main(args: argparse.Namespace) -> int:
         }
     )
     judge = ContinuityJudge(access_for=model_access(async_session_factory))
-    kept = _kept(args.answers, args.model_identity)
+    digest = prompt_digest(args.max_pictures)
+    kept = _kept(args.answers, args.model_identity, digest)
     results, answers, missed = [], [], 0
     for case in cases:
         key = case_digest(args.corpus, case)
         if key in kept:
             verdict = parse_verdict(json.dumps(kept[key]))
         else:
-            verdict = await judge.judge(route, _shot(args.corpus, case), (args.corpus / case["frame"]).read_bytes())
+            verdict = await judge.judge(
+                route,
+                _shot(args.corpus, case),
+                (args.corpus / case["frame"]).read_bytes(),
+                max_pictures=args.max_pictures,
+            )
             if verdict is not None and args.answers is not None:
                 line = {
                     "model_identity": args.model_identity,
-                    "prompt_digest": prompt_digest(),
+                    "prompt_digest": digest,
                     "case_digest": key,
                     "case_id": case["case_id"],
                     "verdict": verdict.as_json(),
@@ -160,7 +166,8 @@ async def _main(args: argparse.Namespace) -> int:
         "schema": "r2.continuity-judge-qualification.v1",
         "recorded_at": datetime.now(UTC).isoformat(),
         "model_identity": args.model_identity,
-        "prompt_digest": prompt_digest(),
+        "prompt_digest": digest,
+        "max_pictures": args.max_pictures,
         "corpus_digest": corpus_digest(args.corpus, cases),
         "answers": answers,
         **report,
@@ -179,6 +186,7 @@ def main() -> int:
     parser.add_argument("--derive-swaps", action="store_true", help="add identity-swap drift cases")
     parser.add_argument("--out", required=True, type=Path, help="evidence JSON to write")
     parser.add_argument("--answers", type=Path, help="JSON lines of verdicts already given, read and appended")
+    parser.add_argument("--max-pictures", type=int, help="the route's image cap per request (references share a sheet)")
     parser.add_argument("--stop-after", type=int, default=0, help="stop after this many unanswered cases in a row")
     return asyncio.run(_main(parser.parse_args()))
 

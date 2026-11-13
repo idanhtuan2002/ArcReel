@@ -144,6 +144,7 @@ class RunPolicy(AutomationContract):
     #: ``None`` when storyboards are not judged for continuity.
     continuity_judge_identity: ExactIdentity | None = None
     continuity_judge_prompt_digest: Digest | None = None
+    continuity_judge_max_pictures: Annotated[StrictInt, Field(ge=2, le=16)] | None = None
 
     @model_validator(mode="after")
     def image_selection(self) -> Self:

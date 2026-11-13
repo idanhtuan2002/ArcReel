@@ -211,9 +211,7 @@ async def handle_generate_storyboards(ctx: ToolContext, args: dict[str, Any]) ->
                 dependency_index=plan.dependency_index,
                 unit_id=plan.resource_id,
                 source=ctx.caller.source,
-                extra_payload=(
-                    {"prompt_addendum": addenda[plan.resource_id]} if plan.resource_id in addenda else None
-                ),
+                extra_payload=({"prompt_addendum": addenda[plan.resource_id]} if plan.resource_id in addenda else None),
             )
             for plan in plans
         ]

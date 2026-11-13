@@ -632,7 +632,7 @@ class ContinuityJudgeStub:
     def __init__(self, verdicts: dict[tuple[str, int], Verdict]) -> None:
         self.verdicts, self.calls = verdicts, []
 
-    async def judge(self, route, shot, frame):
+    async def judge(self, route, shot, frame, *, max_pictures=None):
         version = int(frame.decode().rsplit("v", 1)[1])
         self.calls.append((route.role, shot.label, version, shot.previous_frame is not None))
         return self.verdicts[(shot.label, version)]
