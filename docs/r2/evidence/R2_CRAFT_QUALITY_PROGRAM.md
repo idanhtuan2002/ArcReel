@@ -17,16 +17,27 @@ Donor checkouts: `/tmp/claude-1000/-home-anhtuan-content-production-os/9ab4f1ca-
 | P1-8 image-prompt dialect per model | done: measured, no change | `8af1d0270`, `docs/r2/evidence/prompt-dialect-ab-2026-11-14/`: no dialect wins; shot size ignored by all (reference sheet pulls framing → ID-1) |
 | P1-9 numeric look-consistency check | done | `5b614da68`, ADR-0145 |
 | P1-10 wardrobe/state derivatives in the run | done (= ID-5) | `2f86da4ca`, ADR-0146 (Jellyfish CostumeTimeline) |
-| P1-11 ambience bed | todo | |
+| P1-11 ambience bed | done | `67ca6f0e6`, ADR-0150 (MMAudio shim on port 8002) |
 | P1-12 screen direction | done | `02f83cca6`, ADR-0147 (judge already checks; planner now writes blocking) |
 | P2-13 foley / leitmotif / ShotVL | deferred with reasons | per-clip foley needs a real video route (stills have no motion to sync); a leitmotif needs per-scene cues (one cue per episode today); ShotVL-3B needs GPU room the 2070 lacks while ComfyUI is resident, and ADR-0148's framing line addresses shot size at generation |
 | P2-14 BytePlus guides via browser | done | `docs/research/2026-11-14-byteplus-seedance-seedream-prompt-guides.md` (headless Chrome) |
-| ID-1 reference selection, view crops, 4th slot | in progress | A/B: view crops do not change framing (`775569ffa`); framing line shipped (ADR-0148). Remaining: slot priority, no silent truncation, 4th slot |
+| ID-1 reference selection, view crops, 4th slot | done | `775569ffa` ADR-0148 (framing line), `e8c0e14c1` ADR-0149 (priority, warning, 4-slot definition; crops measured and not adopted) |
 | ID-2 N candidates + pick | todo | ViMax best_image_selector; ADR-0112 |
 | ID-3 face-cosine instrument + calibration | todo | |
-| ID-4 reference name binding | todo | |
+| ID-4 reference name binding | done | `e8c0e14c1`, ADR-0149 |
 | ID-5 costume/state timeline → derivatives | done | `2f86da4ca`, ADR-0146 |
 | ID-6 face repair loop | todo | rules: repair only the picked image; independent acceptance; weight by face size |
 | ID-7 DreamO bake-off, cloud LoRA | todo | |
 
 Verification so far (HEAD `ceb92e7ab`): `tests/integration/lib/test_presentation_renderer.py`, `tests/integration/server/production_run/test_render_master_adapter.py`, `tests/integration/lib/test_project_manager.py`, `tests/unit/server/production_run/test_render_finish_inputs.py` 83 passed 2 skipped; read-model and jianying 25 passed; ruff, basedpyright 0, lint-imports 23 kept, audit_tests 0.
+
+## Host steps for the Human (after deploy)
+1. Start the audio services: `nohup /mnt/arcreel/D/ArcReel/ace-step-api.sh &` and `nohup /mnt/arcreel/D/ArcReel/mmaudio-ambience.sh &` (both currently running from this session).
+2. Add to `~/arcreel-v2-staging/v2-release-start.sh`: `export ARCREEL_MUSIC_URL=http://127.0.0.1:8001 ARCREEL_MUSIC_FREE_URLS=http://127.0.0.1:8188/free ARCREEL_AMBIENCE_URL=http://127.0.0.1:8002`.
+3. Optional: import `docs/r2/evidence/media-local-2026-10-30/flux2-klein-reference/endpoint-definition-4ref.json` to replace endpoint ce-3 (four reference slots).
+
+## Known pre-existing failure (not from this program)
+`tests/unit/lib/test_tts_skeleton.py::TestOrphanAudioRestartLost::test_orphan_audio_running_marked_restart_lost`: the test's fake queue lacks `requeue_free_restart_lost` (added by `0d09aaab9`, ADR-0129/0130, already in r2-v2.5.17).
+
+## Next (resume here)
+ID-2 (N candidates + pick; ADR-0112 best-of-N is disabled; `pairwise_judge` in `audits.py` has no caller), ID-3 (face-cosine instrument: needs InsightFace in a separate env + calibration pairs), ID-6 (face repair loop, rules in the ID research doc §), ID-7 (DreamO bake-off on 20 shots; cloud LoRA only with a free GPU path).
