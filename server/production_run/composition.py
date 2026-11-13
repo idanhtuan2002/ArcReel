@@ -27,6 +27,7 @@ from lib.episode_target_duration import project_episode_target_duration
 from lib.generation_resources import device_admission_configured
 from lib.music_bed import music_service_from_env
 from lib.project_manager import ProjectManager
+from lib.scene_ambience import ambience_service_from_env
 from r2.automation.profiles import resolve_launch_profile, route_digest
 from r2.contracts.automation import (
     AutomationMode,
@@ -310,7 +311,9 @@ def build_adapters(
             judge=ImageJudge(access_for=model_access(sessions)),
             continuity=ContinuityJudge(access_for=model_access(sessions)),
         ),
-        RunStage.RENDER: RenderAdapter(sessions, music=music_service_from_env(), **owners),
+        RunStage.RENDER: RenderAdapter(
+            sessions, music=music_service_from_env(), ambience=ambience_service_from_env(), **owners
+        ),
         RunStage.MASTER: FinalMasterAdapter(sessions, **owners),
         RunStage.QUALITY: QualityAdapter(sessions, **owners, evaluator=evaluator),
         RunStage.PACKAGE: PackagingAdapter(sessions, **owners),

@@ -174,6 +174,13 @@ class SceneLook(BaseModel):
         min_length=1, description="色彩怎样落在画面上，如「墙面与家具偏深青灰，唯一的暖色是台灯」"
     )
     mood: str = Field(min_length=1, description="该场次的情绪基调，一句话")
+    ambience: str = Field(
+        min_length=1,
+        description=(
+            "该场次的环境声，用英文写给音效生成模型：2-4 个具体、持续的声音来源，如 "
+            '"light rain on a tin roof, distant motorbikes, night insects"；不写人声对白、不写音乐；完全安静的空间写 "quiet room tone"'
+        ),
+    )
 
 
 class ImagePrompt(BaseModel):

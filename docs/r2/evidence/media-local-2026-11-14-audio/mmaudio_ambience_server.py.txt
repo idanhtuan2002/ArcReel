@@ -1,0 +1,115 @@
+"""Local ambience server for ArcReel: MMAudio text-to-audio behind one HTTP endpoint.
+
+    POST /v1/ambience {"prompt": "...", "seconds": 8, "seed": 1} -> audio/wav
+
+Run with the MMAudio environment on the data disk:
+    /mnt/arcreel/D/ArcReel/mmaudio/.venv/bin/python -m uvicorn mmaudio_ambience_server:app --app-dir /mnt/arcreel/D/ArcReel \
+        --host 127.0.0.1 --port 8002
+The model loads on the first request and stays in host memory; it is moved to the GPU only while generating, so the
+card stays free for image generation. ARCREEL_MMAUDIO_VARIANT picks the model (default large_44k_v2) and
+ARCREEL_MMAUDIO_DTYPE the precision (float16 on GPUs without bfloat16, float32 for safety).
+"""
+
+from __future__ import annotations
+
+import asyncio
+import io
+import os
+import threading
+
+import torch
+import torchaudio
+from fastapi import FastAPI, HTTPException
+from fastapi.responses import Response
+from mmaudio.eval_utils import all_model_cfg, generate
+from mmaudio.model.flow_matching import FlowMatching
+from mmaudio.model.networks import get_my_mmaudio
+from mmaudio.model.utils.features_utils import FeaturesUtils
+from pydantic import BaseModel, Field
+
+VARIANT = os.environ.get("ARCREEL_MMAUDIO_VARIANT", "large_44k_v2")
+DTYPE = {"float16": torch.float16, "float32": torch.float32, "bfloat16": torch.bfloat16}[
+    os.environ.get("ARCREEL_MMAUDIO_DTYPE", "float16")
+]
+NEGATIVE = "speech, talking, singing, music"
+
+app = FastAPI()
+_lock = threading.Lock()
+_state: dict[str, object] = {}
+
+
+class AmbienceRequest(BaseModel):
+    prompt: str = Field(min_length=1, max_length=400)
+    seconds: float = Field(default=8.0, ge=2.0, le=12.0)
+    seed: int = 1
+
+
+def _load() -> None:
+    if _state:
+        return
+    model = all_model_cfg[VARIANT]
+    model.download_if_needed()
+    net = get_my_mmaudio(model.model_name).to("cpu", DTYPE).eval()
+    net.load_weights(torch.load(model.model_path, map_location="cpu", weights_only=True))
+    features = (
+        FeaturesUtils(
+            tod_vae_ckpt=model.vae_path,
+            synchformer_ckpt=model.synchformer_ckpt,
+            enable_conditions=True,
+            mode=model.mode,
+            bigvgan_vocoder_ckpt=model.bigvgan_16k_path,
+            need_vae_encoder=False,
+        )
+        .to("cpu", DTYPE)
+        .eval()
+    )
+    _state.update(model=model, net=net, features=features)
+
+
+@torch.inference_mode()
+def _generate(request: AmbienceRequest) -> bytes:
+    with _lock:
+        _load()
+        model, net, features = _state["model"], _state["net"], _state["features"]
+        device = "cuda" if torch.cuda.is_available() else "cpu"
+        net.to(device)
+        features.to(device)
+        try:
+            seq_cfg = model.seq_cfg
+            seq_cfg.duration = request.seconds
+            net.update_seq_lengths(seq_cfg.latent_seq_len, seq_cfg.clip_seq_len, seq_cfg.sync_seq_len)
+            rng = torch.Generator(device=device)
+            rng.manual_seed(request.seed)
+            audio = generate(
+                None,
+                None,
+                [request.prompt],
+                negative_text=[NEGATIVE],
+                feature_utils=features,
+                net=net,
+                fm=FlowMatching(min_sigma=0, inference_mode="euler", num_steps=25),
+                rng=rng,
+                cfg_strength=4.5,
+            )
+            wave = audio.float().cpu()[0]
+        finally:
+            net.to("cpu")
+            features.to("cpu")
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
+        if not torch.isfinite(wave).all():
+            raise HTTPException(status_code=500, detail="non-finite audio")
+        buffer = io.BytesIO()
+        torchaudio.save(buffer, wave, seq_cfg.sampling_rate, format="wav")
+        return buffer.getvalue()
+
+
+@app.get("/health")
+async def health() -> dict[str, str]:
+    return {"status": "ok", "variant": VARIANT}
+
+
+@app.post("/v1/ambience")
+async def ambience(request: AmbienceRequest) -> Response:
+    data = await asyncio.to_thread(_generate, request)
+    return Response(content=data, media_type="audio/wav")

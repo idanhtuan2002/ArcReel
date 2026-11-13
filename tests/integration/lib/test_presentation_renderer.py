@@ -10,6 +10,7 @@ from pathlib import Path
 import pytest
 
 from lib.presentation_renderer import (
+    RenderAmbience,
     RenderContract,
     RenderCue,
     RenderInput,
@@ -302,3 +303,21 @@ def test_mastering_keeps_a_many_unit_film_at_its_length(tmp_path: Path):
     )
 
     assert abs(receipt.duration_seconds - 24.0) <= 0.05
+
+
+def test_scene_ambience_loops_over_its_window_under_the_speech(clips, tmp_path: Path):
+    room = _media(
+        tmp_path / "room.wav", "-f", "lavfi", "-i", "anoisesrc=color=pink:sample_rate=44100:amplitude=0.3", seconds=2
+    )
+    units = (_unit(clips), _unit(clips, narration=None, cue=False))
+    episode = RenderInput(episode=1, units=units, ambience=(RenderAmbience(room, 3_000_000, 3_000_000),))
+
+    receipt = render_presentations(episode=episode, output_dir=tmp_path / "out", contract=CONTRACT)
+
+    manifest = json.loads(receipt.manifest_path.read_text(encoding="utf-8"))
+    assert [layer["start_us"] for layer in manifest["ambience"]] == [3_000_000]
+    assert manifest["ambience"][0]["gain_db"] < 0
+    # the silent second unit now carries the looped room, the first unit's silence before speech does not
+    assert _mean_volume(receipt.final_path, "ffmpeg", 3_800_000, 1_500_000) > -60
+    assert _mean_volume(receipt.final_path, "ffmpeg", 0, 400_000) < -70
+    assert abs(receipt.duration_seconds - 6.0) <= 0.05

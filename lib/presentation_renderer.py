@@ -37,6 +37,10 @@ MASTER_FLOOR_LUFS = -70.0
 MUSIC_BED_BELOW_SPEECH_LU = 10.0
 #: Music bed level when the film has no audible speech.
 MUSIC_ALONE_LUFS = -20.0
+#: Ambience sits this many LU under the speech, with no ducking: a steady room the voice is heard in.
+AMBIENCE_BELOW_SPEECH_LU = 20.0
+AMBIENCE_ALONE_LUFS = -32.0
+AMBIENCE_FADE_SECONDS = 0.6
 MUSIC_FADE_IN_SECONDS = 1.5
 MUSIC_FADE_OUT_SECONDS = 2.5
 
@@ -89,6 +93,15 @@ class RenderContract:
 
 
 @dataclass(frozen=True)
+class RenderAmbience:
+    """One scene's ambience: a clip looped over the scene's window of the episode."""
+
+    path: Path
+    start_us: int
+    duration_us: int
+
+
+@dataclass(frozen=True)
 class RenderInput:
     episode: int
     units: tuple[RenderUnit, ...]
@@ -97,6 +110,8 @@ class RenderInput:
     grade_intensity: float = DEFAULT_GRADE_INTENSITY
     #: Instrumental music laid under the whole episode, faded in and out and ducked under speech.
     music_path: Path | None = None
+    #: Per-scene ambience laid low under everything.
+    ambience: tuple[RenderAmbience, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -150,6 +165,8 @@ def _validate(episode: RenderInput, contract: RenderContract) -> None:
         raise RenderRefused("UNKNOWN_GRADE", episode.grade)
     if episode.music_path is not None and not episode.music_path.is_file():
         raise RenderRefused("SOURCE_MEDIA_MISSING", "music")
+    if any(not layer.path.is_file() or layer.duration_us <= 0 or layer.start_us < 0 for layer in episode.ambience):
+        raise RenderRefused("SOURCE_MEDIA_MISSING", "ambience")
     total = 0
     for unit in episode.units:
         if unit.duration_us <= 0 or unit.video_start_us < 0:
@@ -475,7 +492,49 @@ def _sources(episode: RenderInput) -> dict[str, str]:
                 hashes[str(path)] = sha256_file(path)
     if episode.music_path is not None:
         hashes[str(episode.music_path)] = sha256_file(episode.music_path)
+    for layer in episode.ambience:
+        hashes.setdefault(str(layer.path), sha256_file(layer.path))
     return hashes
+
+
+def _lay_ambience(
+    final: Path, layers: Sequence[RenderAmbience], scored: Path, *, seconds: float, ffmpeg: str
+) -> list[dict[str, float | str]]:
+    """Lay each scene's ambience, looped over its window, ``AMBIENCE_BELOW_SPEECH_LU`` under the speech."""
+    speech = _lufs(measure_loudness(final, ffmpeg=ffmpeg)["input_i"])
+    target = speech - AMBIENCE_BELOW_SPEECH_LU if speech > MASTER_FLOOR_LUFS else AMBIENCE_ALONE_LUFS
+    argv = [ffmpeg, "-nostdin", "-hide_banner", "-loglevel", "error", "-y", "-i", str(final)]
+    parts: list[str] = []
+    labels: list[str] = []
+    placed: list[dict[str, float | str]] = []
+    for index, layer in enumerate(layers):
+        level = _lufs(measure_loudness(layer.path, ffmpeg=ffmpeg)["input_i"])
+        if level <= MASTER_FLOOR_LUFS:
+            continue
+        argv += ["-stream_loop", "-1", "-i", str(layer.path)]
+        input_index = len(labels) + 1
+        window = layer.duration_us / MICROSECONDS
+        fade_out_at = max(window - AMBIENCE_FADE_SECONDS, 0.0)
+        delay = round(layer.start_us / 1000)
+        gain = target - level
+        parts.append(
+            f"[{input_index}:a]aresample={AUDIO_RATE},aformat=channel_layouts=stereo,atrim=duration={window:.3f},"
+            f"asetpts=PTS-STARTPTS,afade=t=in:d={AMBIENCE_FADE_SECONDS},"
+            f"afade=t=out:st={fade_out_at:.3f}:d={AMBIENCE_FADE_SECONDS},volume={gain:.2f}dB,"
+            f"adelay={delay}|{delay}[amb{index}]"
+        )
+        labels.append(f"[amb{index}]")
+        placed.append({"path": str(layer.path), "start_us": layer.start_us, "gain_db": round(gain, 2)})
+    if not labels:
+        return []
+    graph = ";".join(parts) + (
+        f";[0:a]aresample={AUDIO_RATE},aformat=channel_layouts=stereo[speech];[speech]{''.join(labels)}"
+        f"amix=inputs={len(labels) + 1}:duration=first:normalize=0,atrim=duration={seconds:.6f}[a]"
+    )
+    argv += ["-filter_complex", graph, "-map", "0:v:0", "-map", "[a]", "-c:v", "copy", "-c:a", "aac", "-b:a", "160k"]
+    argv += ["-ar", str(AUDIO_RATE), "-ac", "2", "-movflags", "+faststart", str(scored)]
+    _run(argv, timeout=900)
+    return placed
 
 
 def _audio_seconds(path: Path, ffmpeg: str) -> float:
@@ -611,6 +670,12 @@ def render_presentations(
         )
         music = None
         seconds = sum(unit.duration_us for unit in episode.units) / MICROSECONDS
+        ambience: list[dict[str, float | str]] = []
+        if episode.ambience:
+            roomed = staging / f"ambience_{episode.episode}.mp4"
+            ambience = _lay_ambience(final, episode.ambience, roomed, seconds=seconds, ffmpeg=ffmpeg)
+            if ambience:
+                os.replace(roomed, final)
         if episode.music_path is not None:
             scored = staging / f"scored_{episode.episode}.mp4"
             music = _lay_music(final, episode.music_path, scored, seconds=seconds, ffmpeg=ffmpeg)
@@ -633,6 +698,7 @@ def render_presentations(
             "final_sha256": sha256_file(final),
             "loudness": loudness,
             "music": music,
+            "ambience": ambience,
             "grade": None if episode.grade is None else {"name": episode.grade, "intensity": episode.grade_intensity},
             "subtitle_sha256": sha256_file(subtitle),
             "units": [
@@ -683,6 +749,7 @@ def render_presentations(
 
 
 __all__ = [
+    "RenderAmbience",
     "RenderContract",
     "RenderCue",
     "RenderInput",

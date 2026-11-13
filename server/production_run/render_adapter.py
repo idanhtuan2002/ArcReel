@@ -26,6 +26,7 @@ from lib.music_bed import MusicService, MusicUnavailable, cue_for
 from lib.narration_delivery import USE_TTS
 from lib.path_safety import safe_join
 from lib.presentation_renderer import (
+    RenderAmbience,
     RenderContract,
     RenderCue,
     RenderInput,
@@ -35,6 +36,7 @@ from lib.presentation_renderer import (
     sha256_file,
 )
 from lib.project_manager import ProjectManager
+from lib.scene_ambience import AmbienceService, AmbienceUnavailable, scene_windows
 from lib.script_editor import resolve_items
 from lib.speech_presentation import SpeechPresentation
 from r2.automation.identity import digest_value
@@ -69,6 +71,7 @@ from server.services.presentation_read_model import (
 
 RENDER_OWNER = "renderer"
 MUSIC_DIR = Path("production") / "music"
+AMBIENCE_DIR = Path("production") / "ambience"
 logger = logging.getLogger(__name__)
 
 
@@ -156,9 +159,11 @@ class RenderAdapter:
         presentations: PresentationReadModelService | None = None,
         max_attempts: int = 2,
         music: MusicService | None = None,
+        ambience: AmbienceService | None = None,
     ) -> None:
         self._sessions, self._authority, self._projects = sessions, authority, projects
         self._music = music
+        self._ambience = ambience
         self._presentations = presentations or PresentationReadModelService(projects)
         self._max_attempts = max_attempts
         self._jobs: dict[str, asyncio.Task[float]] = {}
@@ -249,6 +254,7 @@ class RenderAdapter:
             )
             snapshot = render_input(project_path, episode, materialized)
             snapshot = await self._with_music(project_path, materialized.project_snapshot, snapshot)
+            snapshot = await self._with_ambience(project_path, materialized.script_snapshot, snapshot)
             started = time.monotonic()
             output = project_path / render_dir(run, episode)
             await asyncio.to_thread(
@@ -274,6 +280,26 @@ class RenderAdapter:
             logger.warning("episode %s renders without music: %s", snapshot.episode, error)
             return snapshot
         return replace(snapshot, music_path=path)
+
+    async def _with_ambience(self, project_path: Path, script: Mapping[str, Any], snapshot: RenderInput) -> RenderInput:
+        """The snapshot with each scene's ambience, when an ambience server exists; a scene whose clip fails renders
+        without ambience and says so in the log."""
+        if self._ambience is None:
+            return snapshot
+        items, id_field, _kind = resolve_items(dict(script))
+        durations = {unit.unit_id: unit.duration_us for unit in snapshot.units}
+        layers: list[RenderAmbience] = []
+        for window in scene_windows([i for i in items if isinstance(i, dict)], durations, id_field=id_field):
+            target = project_path / AMBIENCE_DIR / f"{window.digest()}.wav"
+            try:
+                path = await self._ambience.render(window.prompt, target)
+            except AmbienceUnavailable as error:
+                logger.warning(
+                    "episode %s scene at %sus renders without ambience: %s", snapshot.episode, window.start_us, error
+                )
+                continue
+            layers.append(RenderAmbience(path, window.start_us, window.duration_us))
+        return replace(snapshot, ambience=tuple(layers)) if layers else snapshot
 
     def _project_file(self, run: RunSnapshot, episode: int, suffix: str) -> Path:
         return (

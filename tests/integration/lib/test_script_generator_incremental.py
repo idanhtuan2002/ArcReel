@@ -739,6 +739,7 @@ class TestSceneLooks:
         "palette": ["#1F2A36", "#E8A65C"],
         "palette_note": "墙面深青灰，唯一暖色是台灯",
         "mood": "压抑的等待",
+        "ambience": "quiet room tone, a ticking wall clock",
     }
     LOOK_B: ClassVar[dict[str, Any]] = {
         "time_of_day": "dawn",
@@ -746,6 +747,7 @@ class TestSceneLooks:
         "palette": ["#9FB4C7", "#F2E6D0", "#3B4A5A"],
         "palette_note": "冷蓝的晨雾，桌面泛着浅米色",
         "mood": "疲惫后的清醒",
+        "ambience": "early birds, distant traffic",
     }
 
     @staticmethod
