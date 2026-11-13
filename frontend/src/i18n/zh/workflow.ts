@@ -293,6 +293,7 @@ export default {
   'auto_settings_fallback_for': "{{role}} 的备用模型 {{n}}",
   'auto_reason_FALLBACK_ROLE_UNSUPPORTED': "只有写作模型和剧本模型可以设置备用模型",
   'auto_reason_FALLBACK_REPEATED': "备用模型与该角色已选的模型重复",
+  'auto_reason_FALLBACK_IS_REVIEWER': "备用模型与某个审核模型相同；审核模型不能撰写它要审核的内容",
   'auto_reason_STORY_MODEL_FALLBACK': "写作模型出错，故事改由下一个备用模型继续",
   'auto_reason_STORY_MODEL_UNAVAILABLE': "写作模型及其所有备用模型都出错",
   'auto_settings_episodes': "每次运行集数",

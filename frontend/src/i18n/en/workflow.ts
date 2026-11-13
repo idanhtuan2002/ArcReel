@@ -291,6 +291,7 @@ export default {
   'auto_settings_fallback_for': "Fallback {{n}} for {{role}}",
   'auto_reason_FALLBACK_ROLE_UNSUPPORTED': "only the writer and script models can have fallbacks",
   'auto_reason_FALLBACK_REPEATED': "a fallback repeats a model already chosen for that role",
+  'auto_reason_FALLBACK_IS_REVIEWER': "a fallback model is one of the reviewers; a reviewer never writes what it reviews",
   'auto_reason_STORY_MODEL_FALLBACK': "the writer failed; the story continues on the next fallback model",
   'auto_reason_STORY_MODEL_UNAVAILABLE': "the writer and all its fallback models failed",
   'auto_settings_episodes': "Episodes per run",

@@ -293,6 +293,7 @@ export default {
   'auto_settings_fallback_for': "Model dự phòng {{n}} cho {{role}}",
   'auto_reason_FALLBACK_ROLE_UNSUPPORTED': "chỉ model viết truyện và model kịch bản có model dự phòng",
   'auto_reason_FALLBACK_REPEATED': "model dự phòng trùng với model đã chọn cho vai trò này",
+  'auto_reason_FALLBACK_IS_REVIEWER': "model dự phòng trùng với một reviewer; reviewer không được viết thứ mình chấm",
   'auto_reason_STORY_MODEL_FALLBACK': "model viết truyện lỗi; truyện viết tiếp bằng model dự phòng kế tiếp",
   'auto_reason_STORY_MODEL_UNAVAILABLE': "model viết truyện và mọi model dự phòng đều lỗi",
   'auto_settings_episodes': "Số tập mỗi run",
