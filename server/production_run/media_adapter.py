@@ -39,6 +39,7 @@ from lib.db.repositories.production_runs import ProductionRunRepository
 from lib.generation_queue import GenerationQueue, get_generation_queue
 from lib.narration_delivery import USE_TTS
 from lib.project_manager import ProjectManager
+from lib.scene_looks import kept_look, scene_starts
 from lib.storyboard_sequence import get_storyboard_items
 from lib.version_manager import VersionManager
 from lib.workflow_plan import WorkflowPlan, WorkflowPlanRequest
@@ -74,7 +75,7 @@ from server.production_run.owner_support import (
 from server.production_run.owner_tasks import attempt_window_tasks, tasks_usage
 from server.production_run.ports import StepPlan
 from server.production_run.text_adapter import episode_number, receipt_revision, revision_receipt
-from server.production_run.unit_checks import narration_problem, storyboard_problem
+from server.production_run.unit_checks import look_outliers, look_stats, narration_problem, storyboard_problem
 from server.routers.versions import restore_resource_version
 from server.services.automation_grants import RunAutomationAuthority
 from server.services.workflow_planner import WorkflowPlanner
@@ -585,6 +586,12 @@ class MediaAdapter:
                     redone.add(unit)
                 if self._unit_problem(root / path, field, portrait) is not None:
                     failing.append(unit)
+            if not failing and collection == "storyboards":
+                failing = [
+                    unit
+                    for unit in self._look_outliers(root, items, id_field)
+                    if not await self._attempts(intent, f"unit:{collection}:{unit}")
+                ]
             if failing:
                 ids = sorted(failing)
                 args: dict[str, Any] = {"script": target.script_filename, "segment_ids": ids}
@@ -610,6 +617,21 @@ class MediaAdapter:
             )
             return True
         return False
+
+    @staticmethod
+    def _look_outliers(root: Path, items: list[dict[str, Any]], id_field: str) -> list[str]:
+        """Storyboards lit or coloured unlike the rest of their scene; only shots carrying a scene look are grouped."""
+        starts = scene_starts([item for item in items if item.get(id_field)], id_field=id_field)
+        scenes: dict[str, list[tuple[str, tuple[float, float]]]] = {}
+        for item in items:
+            unit = str(item.get(id_field) or "")
+            path = (item.get("generated_assets") or {}).get("storyboard_image")
+            if not unit or kept_look(item) is None or not isinstance(path, str):
+                continue
+            stats = look_stats(root / path)
+            if stats is not None:
+                scenes.setdefault(starts[unit], []).append((unit, stats))
+        return look_outliers(scenes)
 
     def _unit_problem(self, path: Path, field: str, portrait: bool) -> str | None:
         stat = path.stat() if path.is_file() else None

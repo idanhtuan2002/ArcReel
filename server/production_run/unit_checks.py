@@ -8,7 +8,9 @@ code or ``None``; the MEDIA owner regenerates a failing unit a bounded number of
 from __future__ import annotations
 
 import re
+import statistics
 import subprocess
+from collections.abc import Mapping, Sequence
 from pathlib import Path
 
 from PIL import Image, ImageStat, UnidentifiedImageError
@@ -21,6 +23,12 @@ MIN_NARRATION_SECONDS = 0.5
 MIN_MEAN_VOLUME_DB = -50.0
 SILENCE_THRESHOLD_DB = -40
 MAX_SILENCE_SECONDS = 2.0
+#: A shot whose mean luminance (0-255) is this far from its scene's median is lit differently from the scene.
+LOOK_LUMA_TOLERANCE = 40.0
+#: A shot whose warmth ((mean red - mean blue) / 255) is this far from its scene's median has another colour cast.
+LOOK_WARMTH_TOLERANCE = 0.12
+#: Scenes shorter than this have no reliable median to compare a shot with.
+LOOK_MIN_SHOTS = 3
 
 _MEAN_VOLUME = re.compile(r"mean_volume:\s*(-?[0-9.]+|-inf) dB")
 _DURATION = re.compile(r"Duration:\s*(\d+):(\d+):(\d+(?:\.\d+)?)")
@@ -44,6 +52,34 @@ def storyboard_problem(path: Path, *, portrait: bool) -> str | None:
     if not MIN_MEAN_LUMA <= mean <= MAX_MEAN_LUMA or stddev < MIN_LUMA_STDDEV:
         return "IMAGE_BLANK"
     return None
+
+
+def look_stats(path: Path) -> tuple[float, float] | None:
+    """Mean luminance (0-255) and warmth ((mean red - mean blue) / 255) of a storyboard, or ``None`` if unreadable."""
+    try:
+        with Image.open(path) as image:
+            rgb = image.convert("RGB")
+            red, _green, blue = ImageStat.Stat(rgb).mean
+            luma = ImageStat.Stat(rgb.convert("L")).mean[0]
+    except (OSError, UnidentifiedImageError, ValueError):
+        return None
+    return luma, (red - blue) / 255.0
+
+
+def look_outliers(scenes: Mapping[str, Sequence[tuple[str, tuple[float, float]]]]) -> list[str]:
+    """Units whose storyboard is lit or coloured unlike the rest of its scene (scene → [(unit, stats)])."""
+    outliers: list[str] = []
+    for shots in scenes.values():
+        if len(shots) < LOOK_MIN_SHOTS:
+            continue
+        luma = statistics.median(stats[0] for _unit, stats in shots)
+        warmth = statistics.median(stats[1] for _unit, stats in shots)
+        outliers.extend(
+            unit
+            for unit, (shot_luma, shot_warmth) in shots
+            if abs(shot_luma - luma) > LOOK_LUMA_TOLERANCE or abs(shot_warmth - warmth) > LOOK_WARMTH_TOLERANCE
+        )
+    return outliers
 
 
 def narration_problem(path: Path, *, ffmpeg: str = "ffmpeg") -> str | None:
