@@ -52,6 +52,7 @@ from server.story_authoring.commit import CANON_BASE_MOVED, ManuscriptCommitter,
 from server.story_authoring.contracts import (
     OLLAMA_CHAT_ENDPOINT,
     AttemptKind,
+    CloudRouteProfile,
     StoryLimits,
     StoryModelSelection,
     StoryScope,
@@ -59,6 +60,7 @@ from server.story_authoring.contracts import (
 from server.story_authoring.driver import (
     CHAPTERS,
     NODE_CAPS,
+    StoryBasis,
     StoryBrief,
     StoryPrior,
     run_call_bound,
@@ -143,6 +145,21 @@ class BookProgress:
 
 
 @dataclass(frozen=True)
+class _Routes:
+    selection: StoryModelSelection
+    judge: StoryModelSelection | None
+    craft_judge: StoryModelSelection | None
+    profiles: tuple[CloudRouteProfile, ...]
+    limit_fields: dict[str, Any]
+
+
+def _json_fields(fields: dict[str, Any]) -> dict[str, Any]:
+    return {
+        name: value.model_dump(mode="json") if hasattr(value, "model_dump") else value for name, value in fields.items()
+    }
+
+
+@dataclass(frozen=True)
 class StoryRunRef:
     run_id: str
     task_id: str
@@ -223,6 +240,84 @@ class StoryAuthoringService:
 
     # --- brief and start ---------------------------------------------------------------------------
 
+    async def _routes(
+        self,
+        provider_id: str,
+        model_id: str,
+        *,
+        judge_provider_id: str | None = None,
+        judge_model_id: str | None = None,
+        max_cost_minor_units: int,
+        project_name: str | None,
+    ) -> _Routes:
+        """The frozen routes of a writer (and optional judge) and the limit fields they fix: input bound, context,
+        currency, money cap and prices."""
+        selection = await self._selection(provider_id, model_id)
+        judge = (
+            await self._selection(judge_provider_id, judge_model_id) if judge_provider_id and judge_model_id else None
+        )
+        craft_judge = None
+        if judge is None and selection.endpoint == OLLAMA_CHAT_ENDPOINT:
+            craft_judge = await self._craft_judge(selection, project_name)
+        profiles: list[CloudRouteProfile] = []
+        for route in (selection, judge):
+            if route is not None and route.endpoint != OLLAMA_CHAT_ENDPOINT:
+                resolved = await resolve_cloud_route(self._factory, route.provider_id, route.model_id)
+                if resolved.selection != route:
+                    raise StoryActionRefused("ROUTE_CHANGED", "cloud route changed while preparing the brief")
+                if resolved.profile not in profiles:
+                    profiles.append(resolved.profile)
+        fields: dict[str, Any] = {
+            name: getattr(DEFAULT_LIMITS, name) for name in ("max_input_tokens", "server_context_tokens")
+        } | {"currency": DEFAULT_LIMITS.currency, "max_cost_minor_units": 0, "cloud_prices": None}
+        if profiles:
+            if type(max_cost_minor_units) is not int or not 1 <= max_cost_minor_units <= 10_000:
+                raise StoryActionRefused(
+                    "CLOUD_BUDGET_INVALID", "cloud USD cap must be between 1 and 10000 cents", status=422
+                )
+            if any(profile.adapter_version == CLOUD_ADAPTERS[OPENAI_ENDPOINT] for profile in profiles):
+                # OpenAI-compatible input is bounded by bytes, not counted in tokens (cloud.OPENAI_MAX_INPUT_BOUND).
+                fields |= {
+                    "max_input_tokens": OPENAI_MAX_INPUT_BOUND,
+                    "server_context_tokens": OPENAI_MAX_INPUT_BOUND + DEFAULT_LIMITS.max_output_tokens,
+                }
+            fields |= {
+                "currency": "USD",
+                "max_cost_minor_units": max_cost_minor_units,
+                "cloud_prices": max_prices(tuple(profiles)),
+            }
+        return _Routes(selection, judge if judge != selection else None, craft_judge, tuple(profiles), fields)
+
+    async def reroute_brief(
+        self, brief: StoryBrief, *, provider_id: str, model_id: str, max_cost_minor_units: int, project_name: str
+    ) -> StoryBrief:
+        """ADR-0138: ``brief`` writing from here with the writer ``provider_id``/``model_id`` (and the judges that
+        writer gets): the story, its structure and its call caps stay; the routes, the limit fields they fix and the
+        cloud profiles change; what was written stays written (``basis``). ``brief`` itself when its routes
+        are already these."""
+        routes = await self._routes(
+            provider_id, model_id, max_cost_minor_units=max_cost_minor_units, project_name=project_name
+        )
+        rerouted = brief.model_copy(
+            update={
+                "selection": routes.selection,
+                "judge_selection": routes.judge,
+                "craft_judge_selection": routes.craft_judge,
+                "cloud_profiles": routes.profiles,
+            }
+        )
+        if rerouted.routes() == brief.routes() and rerouted.cloud_profiles == brief.cloud_profiles:
+            return brief
+        return StoryBrief.model_validate(
+            {
+                **rerouted.model_dump(mode="json", exclude={"gate_a_decision_id"}),
+                "limits": {**brief.limits.model_dump(mode="json"), **_json_fields(routes.limit_fields)},
+                "basis": (brief.basis or StoryBasis(routes=brief.routes(), brief_digest=brief.digest())).model_dump(
+                    mode="json"
+                ),
+            }
+        )
+
     async def draft_brief(
         self,
         *,
@@ -250,43 +345,16 @@ class StoryAuthoringService:
         variant instruction. The prior text is stored in ``project_name``'s blob store and named in the brief."""
         if (judge_provider_id is None) != (judge_model_id is None):
             raise StoryActionRefused("ROUTE_INCOMPLETE", "a judge route needs both a provider and a model", status=422)
-        selection = await self._selection(provider_id, model_id)
-        judge = (
-            await self._selection(judge_provider_id, judge_model_id) if judge_provider_id and judge_model_id else None
+        routes = await self._routes(
+            provider_id,
+            model_id,
+            judge_provider_id=judge_provider_id,
+            judge_model_id=judge_model_id,
+            max_cost_minor_units=max_cost_minor_units,
+            project_name=project_name,
         )
-        craft_judge = None
-        if judge is None and selection.endpoint == OLLAMA_CHAT_ENDPOINT:
-            craft_judge = await self._craft_judge(selection, project_name)
-        profiles = []
-        for route in (selection, judge):
-            if route is not None and route.endpoint != OLLAMA_CHAT_ENDPOINT:
-                resolved = await resolve_cloud_route(self._factory, route.provider_id, route.model_id)
-                if resolved.selection != route:
-                    raise StoryActionRefused("ROUTE_CHANGED", "cloud route changed while preparing the brief")
-                if resolved.profile not in profiles:
-                    profiles.append(resolved.profile)
-        limits = DEFAULT_LIMITS
-        if profiles:
-            if type(max_cost_minor_units) is not int or not 1 <= max_cost_minor_units <= 10_000:
-                raise StoryActionRefused(
-                    "CLOUD_BUDGET_INVALID", "cloud USD cap must be between 1 and 10000 cents", status=422
-                )
-            bounded = {}
-            if any(profile.adapter_version == CLOUD_ADAPTERS[OPENAI_ENDPOINT] for profile in profiles):
-                # OpenAI-compatible input is bounded by bytes, not counted in tokens (cloud.OPENAI_MAX_INPUT_BOUND).
-                bounded = {
-                    "max_input_tokens": OPENAI_MAX_INPUT_BOUND,
-                    "server_context_tokens": OPENAI_MAX_INPUT_BOUND + DEFAULT_LIMITS.max_output_tokens,
-                }
-            limits = StoryLimits.model_validate(
-                {
-                    **DEFAULT_LIMITS.model_dump(),
-                    **bounded,
-                    "currency": "USD",
-                    "max_cost_minor_units": max_cost_minor_units,
-                    "cloud_prices": max_prices(tuple(profiles)),
-                }
-            )
+        selection, judge, craft_judge, profiles = routes.selection, routes.judge, routes.craft_judge, routes.profiles
+        limits = StoryLimits.model_validate({**DEFAULT_LIMITS.model_dump(), **routes.limit_fields})
         part: books.BookPart | None = None
         if book is not None:
             if prior_mode is not None:
@@ -880,11 +948,14 @@ class StoryAuthoringService:
         actor_scope: str,
         command_id: str,
         limits: StoryLimits,
+        brief: StoryBrief | None = None,
     ) -> RunState:
         """ADR-0129: a later automatic run takes over an unfinished story run: the story goes on from where it stopped
         under ``limits`` (never smaller), its usage from here settled by the caller, and its task follows the caller's
-        authority. A replayed adoption changes nothing."""
+        authority. A replayed adoption changes nothing. ADR-0138: with ``brief`` (the story's brief on the caller's
+        routes, greenlit by the caller) the story writes on those routes from here."""
         ref, before = await self.get(user_id=user_id, project_name=project_name, run_id=run_id)
+        rerouted = brief is not None and brief.digest() != ref.brief.digest()
         store = RunStateStore(self._factory, task_id=ref.task_id)
         replay = any(t.caller_ref == caller_ref for t in before.top_ups)
         if not replay and before.phase not in ADOPTABLE_PHASES:
@@ -898,7 +969,8 @@ class StoryAuthoringService:
                 project_name=project_name,
                 actor_scope=actor_scope,
                 command_id=command_id,
-                command_digest=ref.brief.digest(),
+                command_digest=(brief or ref.brief).digest(),
+                brief=brief.model_dump(mode="json") if rerouted and brief is not None else None,
             )
         if not handed and not replay:
             raise StoryActionRefused("ACTION_NOT_ALLOWED", "the story task is still queued or running")
@@ -918,7 +990,17 @@ class StoryAuthoringService:
                     "output_tokens_max": max(limits.output_tokens_max, used.output_tokens),
                 }
             )
-            return top_up(current, caller_ref=caller_ref, limits=exact, phases=ADOPTABLE_PHASES, grow=False), True
+            return (
+                top_up(
+                    current,
+                    caller_ref=caller_ref,
+                    limits=exact,
+                    phases=ADOPTABLE_PHASES,
+                    grow=False,
+                    reroute=rerouted,
+                ),
+                True,
+            )
 
         state, allowed = await store.apply(change)
         if not allowed:

@@ -1287,11 +1287,13 @@ class TaskRepository(BaseRepository):
         actor_scope: str,
         command_id: str,
         command_digest: str,
+        brief: dict[str, Any] | None = None,
     ) -> bool:
         """Give a finished story-run task to a later automatic run (ADR-0129): record that run's command receipt for
         the task and leave the task finished (a cancelled one becomes failed, so the run state can be written); the
         caller queues it again once the run state is ready. A replayed hand-over adds nothing. Returns whether the
-        task can be handed over."""
+        task can be handed over. With ``brief`` (ADR-0138, the story on the later run's routes) the task carries that
+        brief from here; written with the receipt."""
         now = utc_now()
         task = (await self.session.execute(select(Task).where(Task.task_id == task_id))).scalar_one_or_none()
         if task is None or task.task_type != STORY_RUN_TASK_TYPE or task.status not in STORY_RUN_ADOPTABLE_STATUSES:
@@ -1313,6 +1315,10 @@ class TaskRepository(BaseRepository):
                     created_at=now,
                 ),
             )
+        if brief is not None:
+            payload = json.loads(task.payload_json or "{}")
+            task.payload_json = json.dumps({**payload, "brief": brief}, ensure_ascii=False)
+            task.updated_at = now
         if task.status == "cancelled":
             task.status, task.updated_at = "failed", now
         await self.session.commit()

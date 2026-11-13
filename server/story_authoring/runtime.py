@@ -452,6 +452,12 @@ ADOPTABLE_PHASES = frozenset(
 )
 
 
+#: The limit fields a story's routes fix (ADR-0138): its input bound and context, and its money.
+ROUTE_LIMIT_FIELDS = frozenset(
+    {"max_input_tokens", "server_context_tokens", "currency", "max_cost_minor_units", "cloud_prices"}
+)
+
+
 def top_up(
     state: RunState,
     *,
@@ -459,9 +465,11 @@ def top_up(
     limits: StoryLimits,
     phases: frozenset[RunPhase] = frozenset({RunPhase.BLOCKED_BUDGET}),
     grow: bool = True,
+    reroute: bool = False,
 ) -> RunState:
     """A budget-blocked run goes on under ``limits``, which only grow; recorded with the usage it had, and once per
-    ``caller_ref`` (a replayed top-up changes nothing)."""
+    ``caller_ref`` (a replayed top-up changes nothing). With ``reroute`` (a story taken over on other models,
+    ADR-0138) the limit fields its routes fix may change too."""
     if any(t.caller_ref == caller_ref for t in state.top_ups):
         return state
     if state.phase not in phases:
@@ -475,9 +483,10 @@ def top_up(
         "wall_clock_max_seconds",
         "max_cost_minor_units",
     )
+    fixed: set[str] = set(grown) | (set(ROUTE_LIMIT_FIELDS) if reroute else set())
     if (grow and any(getattr(limits, f) < getattr(before, f) for f in grown)) or limits.model_dump(
-        exclude=set(grown)
-    ) != before.model_dump(exclude=set(grown)):
+        exclude=fixed
+    ) != before.model_dump(exclude=fixed):
         raise ValueError("a top-up only raises the run's caps")
     record = BudgetTopUp(
         number=len(state.top_ups) + 1,

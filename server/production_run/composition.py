@@ -40,12 +40,12 @@ from server.production_run.alerts import alerts_from_env
 from server.production_run.assets_adapter import AssetsAdapter
 from server.production_run.autopilot import AutopilotPlanner, AutopilotScheduler, BookParts
 from server.production_run.configuration import inspect_model_route
+from server.production_run.continuity_judge import ContinuityJudge
 from server.production_run.controller import ProductionController
 from server.production_run.evaluators import QualifiedEvaluator
-from server.production_run.execution_guard import configure_run_task_authority
+from server.production_run.execution_guard import RUN_ACTOR_PREFIX, configure_run_task_authority
 from server.production_run.final_master_adapter import FinalMasterAdapter
 from server.production_run.gemini_reviewer import routed_reviewer
-from server.production_run.continuity_judge import ContinuityJudge
 from server.production_run.image_judge import ImageJudge
 from server.production_run.inputs import ProjectInputWitness
 from server.production_run.media_adapter import MediaAdapter
@@ -397,8 +397,7 @@ def wire_autopilot(
             return [refused.code]
 
     async def story_busy(user_id: str, project_name: str) -> bool:
-        runs = await stories.list_runs(user_id=user_id, project_name=project_name)
-        return any(run.get("phase") not in _STORY_RUN_ENDED for run in runs)
+        return await story_run_busy(stories, user_id, project_name)
 
     async def max_targets(delegation: AutopilotDelegation) -> int:
         policy = await service.resolve_policy(
@@ -420,6 +419,24 @@ def wire_autopilot(
 
 
 #: Story-run phases after which a run no longer holds the project's story (ADR-0124 §3).
+async def story_run_busy(stories: StoryAuthoringService, user_id: str, project_name: str) -> bool:
+    """Whether a story run of the project is unfinished, so a story autopilot starts nothing (ADR-0124 §3). A story
+    left stopped by automatic runs is not: the planner starts nothing while a run of the project is active, and the
+    next run takes that story over on the routes the project has now (ADR-0138)."""
+    runs = await stories.list_runs(user_id=user_id, project_name=project_name)
+    unfinished = [run for run in runs if run.get("phase") not in _STORY_RUN_ENDED]
+    if len(unfinished) == 1:
+        found = await stories.adoptable(user_id=user_id, project_name=project_name, matches=lambda _brief: True)
+        if (
+            found is not None
+            and found[0].run_id == unfinished[0].get("run_id")
+            and found[2]
+            and all(owner.startswith(RUN_ACTOR_PREFIX) for owner in found[2])
+        ):
+            return False
+    return bool(unfinished)
+
+
 _STORY_RUN_ENDED = frozenset({"COMMITTED", "WITHDRAWN", "DISCARDED", "ABORTED_PARTIAL"})
 
 GPU_PROBES_ENV = "ARCREEL_GPU_ADMISSION_PROBES"

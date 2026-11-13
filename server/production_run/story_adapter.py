@@ -76,7 +76,14 @@ from server.story_authoring.idea_profile import (
     record_bytes,
     record_profile,
 )
-from server.story_authoring.runtime import ADOPTABLE_PHASES, BudgetUsage, RunPhase, RunState, RunStateStore
+from server.story_authoring.runtime import (
+    ADOPTABLE_PHASES,
+    ROUTE_LIMIT_FIELDS,
+    BudgetUsage,
+    RunPhase,
+    RunState,
+    RunStateStore,
+)
 from server.story_authoring.service import (
     SECONDS_PER_CALL,
     StoryActionRefused,
@@ -146,6 +153,17 @@ def _grown(limits: StoryLimits, *, calls: int, seconds: int) -> StoryLimits:
             "wall_clock_max_seconds": limits.wall_clock_max_seconds + seconds,
         }
     )
+
+
+def rerouted_limits(story: StoryLimits, routes: StoryLimits, input_tokens: int, output_tokens: int) -> StoryLimits:
+    """ADR-0138: ``story``'s limits with the fields ``routes`` fixes. A priced route's money cap also covers the
+    tokens the story already used, counted at that route's prices, so the reservation it adds is exactly its own."""
+    fields = {name: getattr(routes, name) for name in ROUTE_LIMIT_FIELDS}
+    if routes.cloud_prices is not None:
+        fields["max_cost_minor_units"] = routes.max_cost_minor_units + routes.cloud_prices.minor_units(
+            input_tokens, output_tokens
+        )
+    return StoryLimits.model_validate({**story.model_dump(), **fields})
 
 
 #: Production runs that can no longer act; only their stories are taken over (ADR-0129).
@@ -326,17 +344,11 @@ class BriefAdapter:
         if found is None:
             return None
         ref, _state, owners = found
-        writer = route_for(run, "writer")
-        brief = ref.brief
-        if (
-            writer is None
-            or (brief.selection.provider_id, brief.selection.model_id) != writer
-            or brief.judge_selection is not None
-            or brief.limits.cloud_prices is not None
-            or brief.content_safety != self._stories.content_safety(run.project_name)
+        if route_for(run, "writer") is None or ref.brief.content_safety != self._stories.content_safety(
+            run.project_name
         ):
-            # Only a story this run could have written itself is taken over: its writer route, a free route (a
-            # paid story never spends past its approved cap without a Showrunner), the project's current safety.
+            # Only a story this run could have written itself is taken over: the project's current safety. Its
+            # routes may differ (ADR-0138): the story is rerouted onto this run's writer, under this run's caps.
             return None
         if not owners or any(not o.startswith(RUN_ACTOR_PREFIX) for o in owners):
             return None
@@ -352,8 +364,20 @@ class BriefAdapter:
 
     async def _greenlight_adopted(self, intent: DispatchIntent, run: RunSnapshot, ref: StoryRunRef) -> OwnerReceipt:
         """Greenlight the unfinished story's own brief under this run's grant and record which story run the STORY
-        stage takes over."""
-        brief = StoryBrief.model_validate(ref.brief.model_dump(mode="json", exclude={"gate_a_decision_id"}))
+        stage takes over. ADR-0138: the story writes on this run's writer from here (its routes, judges and cloud
+        profiles; what was written stays)."""
+        writer = route_for(run, "writer")
+        assert writer is not None
+        try:
+            brief = await self._stories.reroute_brief(
+                StoryBrief.model_validate(ref.brief.model_dump(mode="json", exclude={"gate_a_decision_id"})),
+                provider_id=writer[0],
+                model_id=writer[1],
+                max_cost_minor_units=max(1, min(10_000, run.policy.max_cost_minor_units)),
+                project_name=run.project_name,
+            )
+        except StoryActionRefused as refused:
+            raise OwnerBlocked(refused.code) from None
         if brief.limits.cloud_prices is not None and run.policy.currency != "USD":
             raise OwnerBlocked("CURRENCY_MISMATCH")
         blobs = _blobs(self._projects, run.project_name)
@@ -634,12 +658,15 @@ class StoryAdapter:
         if done is None:
             calls = intent.estimated_model_calls // 2
             used = state.usage
-            limits = state.limits.model_copy(
+            # ADR-0138: the greenlit brief is the story on this run's routes; their limit fields replace the story's.
+            brief = _load_brief(self._projects, intent.scope.project_name, greenlight.digest)
+            routed = rerouted_limits(state.limits, brief.limits, used.input_tokens, used.output_tokens)
+            limits = routed.model_copy(
                 update={
                     "generate_calls_max": used.generate_calls + calls,
                     "count_calls_max": used.count_calls + calls,
-                    "input_tokens_max": used.input_tokens + calls * state.limits.max_input_tokens,
-                    "output_tokens_max": used.output_tokens + calls * state.limits.max_output_tokens,
+                    "input_tokens_max": used.input_tokens + calls * routed.max_input_tokens,
+                    "output_tokens_max": used.output_tokens + calls * routed.max_output_tokens,
                     "wall_clock_max_seconds": used.model_milliseconds // 1000 + intent.estimated_runtime_seconds,
                 }
             )
@@ -655,6 +682,7 @@ class StoryAdapter:
                     actor_scope=actor_scope(intent),
                     command_id=sub_command(intent, "story"),
                     limits=limits,
+                    brief=brief.model_copy(update={"gate_a_decision_id": greenlight.receipt_ref}),
                 )
             except StoryActionRefused as refused:
                 raise OwnerBlocked(refused.code) from None

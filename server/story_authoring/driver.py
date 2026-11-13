@@ -233,6 +233,16 @@ class StoryPrior(BaseModel):
     origin: str = Field(default="instruction", min_length=1, max_length=80)
 
 
+class StoryBasis(BaseModel):
+    """The brief a story was first written under, kept when it is rerouted (ADR-0138)."""
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+    #: Its routes (``StoryBrief.routes``), part of every node's fingerprint.
+    routes: str = Field(min_length=1)
+    #: Its digest, an input of the story's first node.
+    brief_digest: str = Field(min_length=1)
+
+
 class StoryBrief(BaseModel):
     """The Gate A input of a run. Its digest, which the Human greenlights, covers everything but the decision id."""
 
@@ -258,6 +268,10 @@ class StoryBrief(BaseModel):
     #: A short story digests each chapter and carries what happened into the next (stage-by-stage F3). Briefs drafted
     #: before it leave it out, so their runs keep their exact inputs on resume.
     carries_digests: bool = Field(default=False, exclude_if=lambda value: not value)
+    #: What the story's nodes were first written under (ADR-0138). A story taken over on other models keeps it, so
+    #: what was already written stays written; the routes that write from here are ``selection`` and its judges,
+    #: and each attempt records the model that answered it.
+    basis: StoryBasis | None = Field(default=None, exclude_if=lambda value: value is None)
 
     @property
     def chapters(self) -> int:
@@ -267,6 +281,15 @@ class StoryBrief(BaseModel):
     def judge(self) -> StoryModelSelection:
         """The route of review calls (audits, confirmation, critic, outline and plan review); the writer's by default."""
         return self.judge_selection or self.selection
+
+    def routes(self) -> str:
+        """The digest of the routes this brief writes with: the writer's, then its judges'."""
+        route = self.selection.config_digest
+        if self.judge_selection is not None:
+            route += "+" + self.judge_selection.config_digest
+        if self.craft_judge_selection is not None:
+            route += "+craft:" + self.craft_judge_selection.config_digest
+        return route
 
     def digest(self) -> str:
         content = self.model_dump(mode="json", exclude={"gate_a_decision_id"})
@@ -418,12 +441,7 @@ class StoryRunDriver:
     # --- node mechanics ----------------------------------------------------------------------------
 
     def _route(self) -> str:
-        route = self._brief.selection.config_digest
-        if self._brief.judge_selection is not None:
-            route += "+" + self._brief.judge_selection.config_digest
-        if self._brief.craft_judge_selection is not None:
-            route += "+craft:" + self._brief.craft_judge_selection.config_digest
-        return route
+        return self._brief.basis.routes if self._brief.basis is not None else self._brief.routes()
 
     async def _ensure(
         self,
@@ -632,7 +650,7 @@ class StoryRunDriver:
         return books.BookState.model_validate_json(self._blobs.read_exact(self._book.state_digest))
 
     async def _converge(self) -> _Story:
-        brief = ("brief", self._brief.digest())
+        brief = ("brief", self._brief.basis.brief_digest if self._brief.basis is not None else self._brief.digest())
         base = self._canon_base
         recorded = None if base is None else [base.branch_id, base.canon_version_id]
         await self._ensure(

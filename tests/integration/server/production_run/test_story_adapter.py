@@ -45,6 +45,7 @@ from server.services.automation_grants import AutomationGrantCustodian, RunAutom
 from server.story_authoring.artifacts import StoryBlobStore
 from server.story_authoring.authority import GrantNarrativeShowrunnerAuthority
 from server.story_authoring.commit import load_offered_manifest, manifest_bytes
+from server.story_authoring.driver import StoryBrief
 from server.story_authoring.executor import execute_story_run_task
 from server.story_authoring.runtime import RunPhase, RunState, RunStateStore, set_phase
 from server.story_authoring.service import StoryAuthoringService
@@ -239,19 +240,26 @@ async def _story_task(host: Host) -> str:
     return task.task_id
 
 
-async def _execute_story(host: Host) -> str:
+async def _execute_story(host: Host, *, asked: list[str] | None = None, model_name: str = MODEL) -> str:
+    """Run the story task to its next stop on the local model ``model_name``; ``asked`` collects the model each
+    call named."""
     async with host.sessions() as session:
         task = (await session.execute(sa.select(Task).where(Task.task_type == "story_authoring_run"))).scalar_one()
     import json
 
     payload = json.loads(task.payload_json)
-    model = ScriptedModel()
+    model = ScriptedModel(model_name)
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if asked is not None and request.url.path.endswith("/chat"):
+            asked.append(json.loads(request.content)["model"])
+        return model.handler(request)
 
     def client_for(base_url, api_key):
         from lib.text_backends.ollama import OllamaChatClient
 
         assert base_url == BASE_URL
-        return OllamaChatClient(base_url=base_url, transport=httpx.MockTransport(model.handler))
+        return OllamaChatClient(base_url=base_url, transport=httpx.MockTransport(handler))
 
     result = await execute_story_run_task(
         "project",
@@ -666,7 +674,8 @@ async def _cancel(host: Host, run: RunSnapshot) -> None:
         )
 
 
-async def _second_run(host: Host) -> RunSnapshot:
+async def _second_run(host: Host, policy: RunPolicy | None = None) -> RunSnapshot:
+    policy = policy or host.run.policy
     witness = ProjectInputWitness(host.sessions, projects=host.projects)
     async with host.sessions() as session, session.begin():
         run = await ProductionRunRepository(session).create(
@@ -677,10 +686,10 @@ async def _second_run(host: Host) -> RunSnapshot:
                 action="START",
                 expected_version=0,
                 expected_input_digest=await witness.digest(user_id="default", project_name="project"),
-                policy_digest=policy_digest(host.run.policy),
+                policy_digest=policy_digest(policy),
                 idea="Một người con về làng bán căn nhà của cha.",
             ),
-            policy=host.run.policy,
+            policy=policy,
         )
     await host.issuer.issue(
         interactive_token=auth.create_token("actor"),
@@ -765,3 +774,56 @@ async def test_a_new_run_takes_over_the_story_a_cancelled_run_left_unfinished(st
     assert (await store.load()).phase is RunPhase.COMMITTED
     handed = await _tick_run(host, second.run_id)
     assert handed.stage is RunStage.ASSET_ANALYSIS
+
+
+async def test_a_new_run_on_another_writer_takes_over_the_story_and_keeps_what_was_written(story_host: Host):
+    """ADR-0138: the Showrunner switched the project's writer; the story goes on with it and nothing is rewritten."""
+    from server.production_run.story_adapter import adopted_story
+
+    host = story_host
+    await _tick(host)
+    await _tick(host)
+    task_id = await _story_task(host)
+    store = RunStateStore(host.sessions, task_id=task_id)
+    first_models: list[str] = []
+    assert await _execute_story(host, asked=first_models) == "READY_FOR_APPROVAL"
+    assert set(first_models) == {MODEL}
+    written = await store.load()
+    heads = {node_id: node.head_revision_id for node_id, node in written.nodes.items()}
+    # The writer's quota ran out before the Showrunner approved: the story stopped, its run was cancelled.
+    await store.apply(lambda s: (set_phase(s, RunPhase.MODEL_UNAVAILABLE, reason="quota exhausted"), None))
+    async with host.sessions() as session, session.begin():
+        await session.execute(sa.update(Task).where(Task.task_id == task_id).values(status="succeeded"))
+    await _cancel(host, host.run)
+
+    other = await _provider(host.sessions, model="writer-two")
+    routes = tuple(
+        route.model_copy(update={"provider_id": other, "model_id": "writer-two", "model_identity": "writer-two"})
+        if route.role in ("writer", "script")
+        else route
+        for route in host.run.policy.routes
+    )
+    second = await _second_run(host, host.run.policy.model_copy(update={"routes": routes}))
+    briefed = await _tick_run(host, second.run_id)
+    assert (briefed.stage, briefed.status) == (RunStage.STORY, RunStatus.RUNNING)
+    assert adopted_story(host.projects, "project", second.run_id) == written.run_id
+    waiting = await _tick_run(host, second.run_id)
+    assert (waiting.stage, waiting.status) == (RunStage.STORY, RunStatus.WAITING_TASK)
+
+    async with host.sessions() as session:
+        task = (await session.execute(sa.select(Task).where(Task.task_id == task_id))).scalar_one()
+    brief = StoryBrief.model_validate(json.loads(task.payload_json)["brief"])
+    assert (brief.selection.provider_id, brief.selection.model_id) == (other, "writer-two")
+    assert brief.basis is not None
+    assert brief.basis.routes != brief.routes()
+    assert brief.gate_a_decision_id is not None
+    state = await store.load()
+    assert state.phase is RunPhase.RUNNING
+    [taken] = state.top_ups
+    assert taken.baseline == written.usage
+
+    second_models: list[str] = []
+    assert await _execute_story(host, asked=second_models, model_name="writer-two") == "READY_FOR_APPROVAL"
+    assert set(second_models) <= {"writer-two"}
+    after = await store.load()
+    assert {node_id: node.head_revision_id for node_id, node in after.nodes.items() if node_id in heads} == heads
