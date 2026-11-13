@@ -1,0 +1,12 @@
+Characters:
+- Nam: sinh viên năm cuối, dáng gầy guộc, mái tóc đen ngắn; thường mặc quần áo đơn giản (áo thun và quần Jeans); đôi tay lúc nào cũng run nhẹ hoặc co lại.
+
+Style: 真人电视剧风格，精品短剧画风，大师级构图
+Scene: Nam 走进狭窄昏暗的 Quán xôi cuối cùng，他身形消瘦，黑色短发凌乱，身穿简单的白色 T-shirt 和蓝色牛仔裤。由于寒冷或紧张，他的双手紧握在胸前呈防御姿态且微微颤抖。身旁地面上放着一个磨损严重、皮质开胶的黑色旧书包（Chiếc
+  cặp sách cũ kỹ）。背景是冒着热气的灶台和陈旧的木质桌椅。
+Composition:
+  shot_type: Medium Shot
+  lighting: 右侧老旧白炽灯发出的昏黄暖光（约 2800K），在 Nam 脸上投下不均的阴影，突出其清瘦轮廓和手部颤抖的细节；背景灶台火光提供微弱补光。浅景深虚化后方环境。
+  ambiance: 空气中漂浮着细小的油雾颗粒、蒸汽升腾感、空间逼仄压抑
+
+画面避免：水印、多余文字、Logo。

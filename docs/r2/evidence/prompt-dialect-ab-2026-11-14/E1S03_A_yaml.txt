@@ -1,0 +1,11 @@
+Characters:
+- Nam: sinh viên năm cuối, dáng gầy guộc, mái tóc đen ngắn; thường mặc quần áo đơn giản (áo thun và quần Jeans); đôi tay lúc nào cũng run nhẹ hoặc co lại.
+
+Style: 真人电视剧风格，精品短剧画风，大师级构图
+Scene: Nam 坐在靠近门口的旧木椅上，身体前倾试图吸入周围弥漫的热气。画面左侧可见升腾的蒸汽与食物香气可视化的光感（丁达尔效应），背景是模糊的后厨灶台和冒着白烟的大锅。桌上摆放着一碗热粥和一个老式电饭煲盖。
+Composition:
+  shot_type: Close-up
+  lighting: 右侧暖色火光反射在墙壁与人物侧脸上，形成强烈的明暗对比；上升的热气流扭曲了背景光线，产生朦胧的光斑效果。胶片颗粒质感明显。
+  ambiance: 湿热、蒸汽升腾感、温暖但带有饥饿感的氛围
+
+画面避免：水印、多余文字、Logo。
