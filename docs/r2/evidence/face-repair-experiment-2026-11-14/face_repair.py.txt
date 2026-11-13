@@ -1,0 +1,45 @@
+"""ID-6 experiment: repair a wrong-person frame with a klein multi-reference edit and measure face cosine + structure."""
+import base64, json, time, urllib.request, uuid
+from pathlib import Path
+import numpy as np
+from PIL import Image
+COMFY = "http://127.0.0.1:8188"
+C = Path("/var/tmp/ar9b/cj-corpus2")
+OUT = Path("/mnt/arcreel/D/ArcReel/ace-step-cache/repair"); OUT.mkdir(exist_ok=True)
+d = json.loads(Path("docs/r2/evidence/media-local-2026-10-30/flux2-klein-reference/endpoint-definition.json").read_text())["definition"]
+def upload(path):
+    b = uuid.uuid4().hex
+    body = (f"--{b}\r\nContent-Disposition: form-data; name=\"image\"; filename=\"rep_{path.parent.name}_{path.name}\"\r\nContent-Type: image/png\r\n\r\n").encode() + path.read_bytes() + f"\r\n--{b}\r\nContent-Disposition: form-data; name=\"overwrite\"\r\n\r\ntrue\r\n--{b}--\r\n".encode()
+    return json.loads(urllib.request.urlopen(urllib.request.Request(COMFY + "/upload/image", data=body, headers={"Content-Type": f"multipart/form-data; boundary={b}"})).read())["name"]
+def face(ref, cand):
+    req = urllib.request.Request("http://127.0.0.1:8003/v1/face-similarity", data=json.dumps({"reference": base64.b64encode(ref.read_bytes()).decode(), "candidate": base64.b64encode(cand.read_bytes()).decode()}).encode(), headers={"Content-Type": "application/json"})
+    return json.loads(urllib.request.urlopen(req).read())["cosine"]
+def structure(a, b):
+    x = np.asarray(Image.open(a).convert("L").resize((144, 256)), dtype=float); y = np.asarray(Image.open(b).convert("L").resize((144, 256)), dtype=float)
+    return float(np.corrcoef(x.ravel(), y.ravel())[0, 1])
+def run(refs, prompt, name, w, h):
+    g = json.loads(json.dumps(d["workflow"]))
+    slots = [("100", "101", "102", "103"), ("110", "111", "112", "113"), ("120", "121", "122", "123")]
+    for (load, *_), ref in zip(slots, refs): g[load]["inputs"]["image"] = ref
+    for chain in slots[len(refs):]:
+        for n in chain: g.pop(n, None)
+    g["63"]["inputs"]["positive"] = [slots[len(refs) - 1][3], 0]
+    g["74"]["inputs"]["text"] = prompt; g["73"]["inputs"]["noise_seed"] = 7
+    for n in ("62", "66"): g[n]["inputs"]["width"], g[n]["inputs"]["height"] = w, h
+    pid = json.loads(urllib.request.urlopen(urllib.request.Request(COMFY + "/prompt", data=json.dumps({"prompt": g}).encode(), headers={"Content-Type": "application/json"})).read())["prompt_id"]
+    while True:
+        hh = json.loads(urllib.request.urlopen(f"{COMFY}/history/{pid}").read())
+        if pid in hh and hh[pid].get("outputs"):
+            img = hh[pid]["outputs"]["9"]["images"][0]; (OUT / name).write_bytes(urllib.request.urlopen(f"{COMFY}/view?filename={img['filename']}&type=output").read()); return OUT / name
+        time.sleep(2)
+cases = json.loads((C / "cases.json").read_text())["cases"]
+for cid in ("s1-0:wrong-person", "s2-1:wrong-person", "s4-2:wrong-person", "s5-3:wrong-person"):
+    case = next(c for c in cases if c["case_id"] == cid)
+    frame = C / case["frame"]; sheet = C / next(r["path"] for r in case["references"] if r["label"].startswith("character:"))
+    name = case["shot"]["characters"][0]
+    w, h = Image.open(frame).size
+    prompt = (f"Edit image 1: keep its composition, pose, clothing, background, lighting and framing exactly the same. "
+              f"Only replace the person's face and hair with the face and hair of {name} from image 2, matching the light of image 1.")
+    out = run([upload(frame), upload(sheet)], prompt, f"{cid.replace(':','_')}.png", w - w % 16, h - h % 16)
+    before, after = face(sheet, frame), face(sheet, out)
+    print(cid, "cos before", before, "after", after, "structure", round(structure(frame, out), 3), flush=True)
