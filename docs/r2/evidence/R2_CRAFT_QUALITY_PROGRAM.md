@@ -26,8 +26,8 @@ Donor checkouts: `/tmp/claude-1000/-home-anhtuan-content-production-os/9ab4f1ca-
 | ID-3 face-cosine instrument + calibration | done | `ff085078a`, ADR-0151 (corpus 2: 36/37 pairs, AUC 0.885; faceid shim port 8003) |
 | ID-4 reference name binding | done | `e8c0e14c1`, ADR-0149 |
 | ID-5 costume/state timeline → derivatives | done | `2f86da4ca`, ADR-0146 |
-| ID-6 face repair loop | todo | rules: repair only the picked image; independent acceptance; weight by face size |
-| ID-7 DreamO bake-off, cloud LoRA | todo | |
+| ID-6 face repair loop | measured, not wired | `219cda6fd`: klein edit repairs 2 of 4 look-alike frames; acceptance rule cos ≥ 0.29 and composition ≥ 0.85 keeps exactly those. Blocked on artifact currency for repaired versions (needs an ADR) and trial numbers |
+| ID-7 DreamO bake-off, cloud LoRA | blocked on the Human | DreamO runs on FLUX.1-dev, a gated Hub repo (needs the sponsor's licence acceptance and an HF token); a cloud LoRA needs a GPU we do not have on free tiers |
 
 Verification so far (HEAD `ceb92e7ab`): `tests/integration/lib/test_presentation_renderer.py`, `tests/integration/server/production_run/test_render_master_adapter.py`, `tests/integration/lib/test_project_manager.py`, `tests/unit/server/production_run/test_render_finish_inputs.py` 83 passed 2 skipped; read-model and jianying 25 passed; ruff, basedpyright 0, lint-imports 23 kept, audit_tests 0.
 
@@ -40,4 +40,4 @@ Verification so far (HEAD `ceb92e7ab`): `tests/integration/lib/test_presentation
 `tests/unit/lib/test_tts_skeleton.py::TestOrphanAudioRestartLost::test_orphan_audio_running_marked_restart_lost`: the test's fake queue lacks `requeue_free_restart_lost` (added by `0d09aaab9`, ADR-0129/0130, already in r2-v2.5.17).
 
 ## Next (resume here)
-ID-2 (N candidates + pick; ADR-0112 best-of-N is disabled; `pairwise_judge` in `audits.py` has no caller), ID-3 (face-cosine instrument: needs InsightFace in a separate env + calibration pairs), ID-6 (face repair loop, rules in the ID research doc §), ID-7 (DreamO bake-off on 20 shots; cloud LoRA only with a free GPU path).
+All items are done, measured, deferred with reasons or blocked on the Human. Remaining before release: run the trial story→film with a cloud writer, read the film against these changes (framing, looks, music, ambience, best-of-2), then the release review.
