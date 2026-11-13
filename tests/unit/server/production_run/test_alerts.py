@@ -35,7 +35,9 @@ async def test_the_same_state_is_sent_once_and_a_new_halt_after_a_run_is_sent_ag
 
 
 async def test_without_a_webhook_nothing_is_sent():
-    await AlertGate(None).observe(user_id="u", project_name="p", event="finished")
+    gate = AlertGate(None)
+    await gate.observe(user_id="u", project_name="p", event="finished")
+    assert gate._sent == {}  # pyright: ignore[reportPrivateUsage]
 
 
 @pytest.mark.parametrize("body_format", ["text", "json"])
@@ -61,12 +63,13 @@ async def test_the_webhook_gets_the_message_in_its_format(body_format):
         assert (body["text"], body["content"], body["event"], body["run_id"]) == (text, text, "halted", "run-9")
 
 
-async def test_a_failing_webhook_never_raises():
+async def test_a_failing_webhook_never_raises(caplog):
     def handler(request: httpx.Request) -> httpx.Response:
         raise httpx.ConnectError("down")
 
     alerts = WebhookAlerts("https://hooks.example.test/x", transport=httpx.MockTransport(handler))
     await alerts.send(project_name="p", event="finished", run_id=None, reason=None)
+    assert "alert for p not sent: ConnectError" in caplog.text
 
 
 def test_the_webhook_comes_from_the_host_settings(monkeypatch):
