@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Any, cast
+from typing import Any, ClassVar, cast
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -728,3 +728,71 @@ class TestLegacyEntryRevisionBackfill:
         await rerun.generate(1, rewritten_entry_ids=rewritten)
 
         assert rewritten == [first, second]
+
+
+class TestSceneLooks:
+    """场次光色基调：prompt_authoring 为被重写的场次首镜写一份 look，合并时抄进同场次每个分镜。"""
+
+    LOOK_A: ClassVar[dict[str, Any]] = {
+        "time_of_day": "night",
+        "key_light": "桌上台灯，左前方，暖黄 2800K，柔和",
+        "palette": ["#1F2A36", "#E8A65C"],
+        "palette_note": "墙面深青灰，唯一暖色是台灯",
+        "mood": "压抑的等待",
+    }
+    LOOK_B: ClassVar[dict[str, Any]] = {
+        "time_of_day": "dawn",
+        "key_light": "窗外天光，右侧，冷白 6500K，柔和",
+        "palette": ["#9FB4C7", "#F2E6D0", "#3B4A5A"],
+        "palette_note": "冷蓝的晨雾，桌面泛着浅米色",
+        "mood": "疲惫后的清醒",
+    }
+
+    @staticmethod
+    def _plan() -> dict[str, Any]:
+        document = _narration_plan(texts=("原文甲。", "原文乙。", "原文丙。"))
+        document["segments"][2]["segment_break"] = True
+        return document
+
+    @staticmethod
+    def _visual(ids: tuple[str, ...], looks: dict[str, Any]) -> str:
+        data = json.loads(_narration_visual(*ids))
+        data["looks"] = looks
+        return json.dumps(data, ensure_ascii=False)
+
+    async def test_each_scene_gets_one_look_copied_into_every_shot(self, tmp_path: Path) -> None:
+        project_dir = _write_project(tmp_path)
+        _write_plan(project_dir, "script_plan_segments.json", self._plan())
+        ids = ("E1S01", "E1S02", "E1S03")
+        generator = NARRATION.generator(project_dir, [self._visual(ids, {"E1S01": self.LOOK_A, "E1S03": self.LOOK_B})])
+
+        await generator.generate(1)
+
+        request = generator.generator.generate.call_args.args[0]
+        assert list(request.response_schema.model_fields["looks"].annotation.model_fields) == ["E1S01", "E1S03"]
+        assert "场次 E1S03" in request.prompt
+        looks = {s["segment_id"]: s["image_prompt"]["look"] for s in _script(project_dir)["segments"]}
+        assert looks == {"E1S01": self.LOOK_A, "E1S02": self.LOOK_A, "E1S03": self.LOOK_B}
+
+    async def test_a_rewritten_shot_inside_a_kept_scene_takes_the_kept_look(self, tmp_path: Path) -> None:
+        project_dir = _write_project(tmp_path)
+        plan_path = _write_plan(project_dir, "script_plan_segments.json", self._plan())
+        ids = ("E1S01", "E1S02", "E1S03")
+        await NARRATION.generator(
+            project_dir, [self._visual(ids, {"E1S01": self.LOOK_A, "E1S03": self.LOOK_B})]
+        ).generate(1)
+        document = json.loads(plan_path.read_text(encoding="utf-8"))
+        document["segments"][1]["novel_text"] = "原文乙改。"
+        plan_path.write_text(json.dumps(document, ensure_ascii=False), encoding="utf-8")
+        _activate(project_dir)
+
+        rerun = NARRATION.generator(project_dir, [_narration_visual("E1S02", mark="二轮")])
+        await rerun.generate(1)
+
+        request = rerun.generator.generate.call_args.args[0]
+        assert "looks" not in request.response_schema.model_fields
+        assert "已定的场次光色基调" in request.prompt
+        assert "2800K" in request.prompt
+        segments = {s["segment_id"]: s for s in _script(project_dir)["segments"]}
+        assert segments["E1S02"]["image_prompt"]["scene"] == "二轮-E1S02"
+        assert segments["E1S02"]["image_prompt"]["look"] == self.LOOK_A

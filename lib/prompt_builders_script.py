@@ -9,6 +9,10 @@
 - 节奏建议由 lib.prompt_rules.episode_pacing 注入，跨子智能体与 builder 共享。
 """
 
+import json
+from collections.abc import Mapping, Sequence
+from typing import Any
+
 from lib.prompt_rules.asset_appearance import asset_reference_names, iter_asset_appearances
 from lib.prompt_rules.episode_pacing import render_pacing_section
 from lib.prompt_rules.episode_target_duration import render_episode_target_duration_rule
@@ -250,7 +254,40 @@ def _neutralize_tags(value: str) -> str:
     return value.replace("<", "＜").replace(">", "＞")
 
 
-def _format_narration_script_plan_segments(script_plan_segments: list[dict]) -> str:
+_LOOKS_GUIDE = """
+## 场次光色基调（looks）——切换到「摄影指导」视角
+
+一个场次从「场景切换」分镜起，到下一个场景切换之前（分镜表里每个分镜都标了它所属的场次）。同一场次的所有分镜共用一份光色基调，生成时会原样注入每个分镜的画面，保证同场次光线与色彩一致；你写的每个分镜的 composition.lighting 只补充该镜头特有的光线细节，且必须与所属场次的 key_light 同源、同方向、同色温，不得另起光源或改变时段。
+
+为下列场次各写一份 looks（以场次首个分镜的 segment_id 为键）：{targets}
+
+- **time_of_day**：按原文推断故事时间；同一连续时间内的相邻场次保持一致，时间跳转才改变。
+- **key_light**：一个主光源（窗、灯、天光、火光等）及其方向、软硬与色温（K），并说明画面里还有没有别的光。
+- **palette**：2-4 个十六进制色值，主色在前；从场景陈设、服装与光源颜色里取，不要抽象配色。
+- **palette_note**：这些颜色具体落在画面的什么物体上。
+- **mood**：该场次在整集情绪弧线中的位置。相邻场次的色调随剧情转折变化（如温暖的回忆转入冷峻的现实），整集读起来像一张色彩脚本。
+"""
+
+
+def _format_scene_looks_section(look_ids: Sequence[str], kept_looks: Mapping[str, Mapping[str, Any]]) -> str:
+    """写 looks 的指引，外加本次不重写、已经定好的场次基调（只读，同场次被重写的分镜须服从它）。"""
+    if not look_ids and not kept_looks:
+        return ""
+    parts: list[str] = []
+    if look_ids:
+        parts.append(_LOOKS_GUIDE.format(targets="、".join(_neutralize_tags(str(i)) for i in look_ids)))
+    if kept_looks:
+        kept = "\n".join(
+            f"- 场次 {_neutralize_tags(str(start))}：{_neutralize_tags(json.dumps(dict(look), ensure_ascii=False))}"
+            for start, look in kept_looks.items()
+        )
+        parts.append(f"\n已定的场次光色基调（只读，属于这些场次的分镜按它写 composition.lighting）：\n{kept}\n")
+    return "".join(parts)
+
+
+def _format_narration_script_plan_segments(
+    script_plan_segments: list[dict], scene_starts: Mapping[str, str] | None = None
+) -> str:
     """把 script_plan 结构化分镜渲染为 prompt_authoring 的只读上下文：segment_id + 内容字段 + 逐字原文。
 
     这些字段在 script_plan 已定、prompt_authoring 透传不重出；此处仅作为「为该分镜写好视觉层」的依据呈现。
@@ -262,6 +299,9 @@ def _format_narration_script_plan_segments(script_plan_segments: list[dict]) -> 
         sid = _neutralize_tags(str(seg.get("segment_id", "?")))
         dur = seg.get("duration_seconds", "?")
         brk = "，场景切换" if seg.get("segment_break") else ""
+        start = (scene_starts or {}).get(str(seg.get("segment_id")))
+        if start is not None:
+            brk += f"，场次 {_neutralize_tags(start)}"
         chars = _neutralize_tags("、".join(seg.get("characters_in_segment") or []) or "无")
         scene_names = _neutralize_tags("、".join(seg.get("scenes") or []) or "无")
         prop_names = _neutralize_tags("、".join(seg.get("props") or []) or "无")
@@ -284,6 +324,9 @@ def build_narration_prompt(
     episode: int,
     aspect_ratio: str = "9:16",
     target_language: str = "中文",
+    scene_starts: Mapping[str, str] | None = None,
+    look_ids: Sequence[str] = (),
+    kept_looks: Mapping[str, Mapping[str, Any]] | None = None,
 ) -> str:
     """构建旁白/解说模式 prompt_authoring（视觉层）prompt。
 
@@ -292,7 +335,8 @@ def build_narration_prompt(
     LLM 不重出这些字段——novel_text 由此不再经 prompt_authoring 的 LLM 扩写漂移。
     """
     pacing_block = render_pacing_section("narration") + "\n\n"
-    segments_block = _format_narration_script_plan_segments(script_plan_segments)
+    segments_block = _format_narration_script_plan_segments(script_plan_segments, scene_starts)
+    looks_block = _format_scene_looks_section(look_ids, kept_looks or {})
 
     return f"""# 角色与任务
 
@@ -360,7 +404,7 @@ segments 表每个分镜已定稿（segment_id、逐字原文、时长、出场�
 - **video_prompt.camera_motion**：按画面内容自行选择。
 - **video_prompt.ambiance_audio**：{_AMBIANCE_AUDIO_WRITING_GUIDE}
 - **video_prompt.dialogue**：speaker 必须出现在该分镜的出场角色中。
-
+{looks_block}
 # 创作目标
 
 输出可直接驱动 AI 生成的、视觉一致、节奏紧凑的分镜视觉层。忠于原文叙事、保留情绪张力。

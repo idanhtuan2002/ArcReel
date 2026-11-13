@@ -131,6 +131,28 @@ class Composition(BaseModel):
     ambiance: str = Field(description="整体氛围")
 
 
+TimeOfDay = Literal["dawn", "day", "golden_hour", "dusk", "night"]
+
+
+class SceneLook(BaseModel):
+    """一个场次（相邻分镜从一个场景切换点到下一个之前）共用的光色基调：同场次每个分镜的画面都注入同一份。"""
+
+    model_config = _STRICT_CONFIG
+
+    time_of_day: TimeOfDay = Field(description="时段")
+    key_light: str = Field(
+        min_length=1,
+        description="主光：光源、方向、软硬与色温，如「左侧窗户透入的低角度暖光，约 3200K，柔和；室内无其他光源」",
+    )
+    palette: list[Annotated[str, Field(pattern=r"^#[0-9A-Fa-f]{6}$")]] = Field(
+        min_length=2, max_length=4, description="该场次的主色与点缀色，2-4 个十六进制色值，主色在前"
+    )
+    palette_note: str = Field(
+        min_length=1, description="色彩怎样落在画面上，如「墙面与家具偏深青灰，唯一的暖色是台灯」"
+    )
+    mood: str = Field(min_length=1, description="该场次的情绪基调，一句话")
+
+
 class ImagePrompt(BaseModel):
     """分镜图生成 Prompt"""
 
@@ -138,6 +160,8 @@ class ImagePrompt(BaseModel):
 
     scene: str = Field(description="画面静态描述；动态内容由 video_prompt.action 承载")
     composition: Composition = Field(description="构图信息")
+    # 场次光色基调由 prompt_authoring 按场次产出、合并时抄进同场次每个分镜；分镜级 LLM 输出不含它。
+    look: SkipJsonSchema[SceneLook | None] = Field(default=None, description="所属场次的光色基调")
 
 
 class _VideoPromptCore(BaseModel):
@@ -386,6 +410,9 @@ class NarrationVisualEpisodeScript(BaseModel):
 
     title: str = Field(description="剧集标题")
     segments: list[NarrationVisualSegment] = Field(description="各分镜的视觉层，按 segment_id 一一对齐 script_plan")
+    looks: dict[str, SceneLook] = Field(
+        default_factory=dict, description="各场次的光色基调，以场次首个分镜的 segment_id 为键"
+    )
 
 
 class NarrationVisualContent(BaseModel):
@@ -397,7 +424,7 @@ class NarrationVisualContent(BaseModel):
     video_prompt: VideoPrompt = Field(description="视频生成提示词")
 
 
-def build_narration_visual_model(segment_ids: list[str]) -> type[BaseModel]:
+def build_narration_visual_model(segment_ids: list[str], look_ids: Sequence[str] = ()) -> type[BaseModel]:
     """构造按本次 prompt_authoring 分镜表键控的旁白视觉层模型：``segments`` 是以每个 ``segment_id`` 为必填键的对象。
 
     每个分镜恰好一个键，LLM 生成层即无法发明、遗漏或重复分镜；对象形态的必填属性各结构化输出后端都支持。
@@ -408,11 +435,16 @@ def build_narration_visual_model(segment_ids: list[str]) -> type[BaseModel]:
         raise ValueError("segment_ids 为空，无法构造分镜键")
     fields: dict[str, Any] = dict.fromkeys(values, (NarrationVisualContent, ...))
     keyed = create_model("NarrationVisualSegmentsBySegmentId", __config__=_STRICT_CONFIG, **fields)
-    return create_model(
-        "NarrationVisualEpisodeScriptBySegmentId",
-        title=(str, Field(description="剧集标题")),
-        segments=(keyed, Field(description="各分镜的视觉层，以 script_plan 的 segment_id 为键，每个分镜恰好一项")),
-    )
+    top: dict[str, Any] = {
+        "title": (str, Field(description="剧集标题")),
+        "segments": (keyed, Field(description="各分镜的视觉层，以 script_plan 的 segment_id 为键，每个分镜恰好一项")),
+    }
+    looks = list(dict.fromkeys(look_ids))
+    if looks:
+        look_fields: dict[str, Any] = dict.fromkeys(looks, (SceneLook, ...))
+        looks_model = create_model("NarrationLooksBySceneStart", __config__=_STRICT_CONFIG, **look_fields)
+        top["looks"] = (looks_model, Field(description="各场次的光色基调，以场次首个分镜的 segment_id 为键"))
+    return create_model("NarrationVisualEpisodeScriptBySegmentId", **top)
 
 
 def narration_visual_segments(data: dict[str, Any]) -> dict[str, Any]:

@@ -83,6 +83,7 @@ from lib.reference_video.draft_validation import (
 )
 from lib.reference_video.duration_slots import resolve_duration_slot
 from lib.reference_video.text_parser import extract_mentions
+from lib.scene_looks import apply_looks, kept_look, looks_to_write, scene_starts
 from lib.script_models import (
     AD_TARGET_DURATION_DRIFT_THRESHOLD,
     AdEpisodeScript,
@@ -563,6 +564,7 @@ class ScriptGenerator:
         # narration 走两段式：script_plan 结构化分镜透传内容层（novel_text 等），prompt_authoring 仅产视觉层、
         # 按 segment_id 合并回 script_plan。非 narration 走单段（script_plan markdown 直喂 LLM）。
         narration_script_plan: list[dict] | None = None
+        narration_looks: tuple[dict[str, str], dict[str, dict[str, Any]]] | None = None
 
         authoring_scope: PromptAuthoringScope | None = None
         filename = output_filename or episode_script_filename(episode)
@@ -617,7 +619,18 @@ class ScriptGenerator:
             )
             if saved_path is not None:
                 return saved_path
+            full_plan = narration_script_plan
             narration_script_plan = authoring_scope.entries_to_rewrite
+            scene_start_ids = scene_starts(full_plan)
+            kept_looks = {
+                start: look
+                for start in set(scene_start_ids.values())
+                if (look := kept_look(authoring_scope.existing.get(str(rewrite_episode_prefix(start, episode)))))
+            }
+            look_ids = looks_to_write(
+                scene_start_ids, [str(s["segment_id"]) for s in narration_script_plan], kept_looks
+            )
+            narration_looks = (scene_start_ids, kept_looks)
             prompt = build_narration_prompt(
                 project_overview=self.project_json.get("overview", {}),
                 style=self.project_json.get("style", ""),
@@ -630,10 +643,17 @@ class ScriptGenerator:
                 episode=episode,
                 # 输出语言与 script_plan 同取项目 source_language，避免非中文项目 script_plan 透传内容与 prompt_authoring 视觉割裂（同 drama）
                 target_language=self.project_json.get("source_language") or "中文",
+                scene_starts=scene_start_ids,
+                look_ids=look_ids,
+                kept_looks={
+                    start: kept_looks[start]
+                    for start in dict.fromkeys(scene_start_ids[str(s["segment_id"])] for s in narration_script_plan)
+                    if start not in look_ids and start in kept_looks
+                },
             )
             # prompt_authoring 只产视觉层（image_prompt/video_prompt），按 segment_id 对齐 script_plan 合并；
             # novel_text/时长/break 由 script_plan 透传，不进 LLM 输出，从工程上根除扩写漂移。
-            schema = build_narration_visual_model([str(s["segment_id"]) for s in narration_script_plan])
+            schema = build_narration_visual_model([str(s["segment_id"]) for s in narration_script_plan], look_ids)
 
         # unit 时长的单一真相是 script_plan 完成内容确认时的值：schema 只把 duration_seconds 枚举约束到
         # supported_durations 成员，不会把它钉死在某个具体 unit 已确认的档位上，LLM 因而能在
@@ -662,6 +682,7 @@ class ScriptGenerator:
             output_filename,
             authoring_scope=authoring_scope,
             narration_script_plan=narration_script_plan,
+            narration_looks=narration_looks,
             reference_script_plan=script_plan_units,
             reference_max_refs=self._resolve_max_refs(caps) if script_plan_units is not None else None,
             reference_unit_durations=reference_unit_durations,
@@ -839,6 +860,7 @@ class ScriptGenerator:
         *,
         authoring_scope: PromptAuthoringScope | None = None,
         narration_script_plan: list[dict] | None = None,
+        narration_looks: tuple[dict[str, str], dict[str, dict[str, Any]]] | None = None,
         reference_script_plan: list[dict] | None = None,
         reference_max_refs: int | None = None,
         reference_unit_durations: dict[str, int] | None = None,
@@ -889,6 +911,9 @@ class ScriptGenerator:
         if narration_script_plan is not None:
             visual_data = self._parse_narration_visual(response_text, episode)
             script_data = self._merge_narration_visual(narration_script_plan, visual_data, episode)
+            if narration_looks is not None:
+                starts, kept = narration_looks
+                apply_looks(script_data["segments"], starts, visual_data.get("looks") or {}, kept)
         elif reference_script_plan is not None:
             # 违约不丢弃：把这次已付费的展开连同逐条报告落待修复草稿，由 Agent 修复后经
             # promote_reference_prompt_authoring_draft 重判晋升。重抽既烧钱又不收敛——同一个模型对同一份

@@ -75,6 +75,15 @@ def image_prompt_to_yaml(image_prompt: dict, project_style: str) -> str:
             "ambiance": image_prompt["composition"]["ambiance"],
         },
     }
+    look = image_prompt.get("look")
+    if isinstance(look, Mapping):
+        ordered["Scene_Look"] = {
+            "time_of_day": look.get("time_of_day"),
+            "key_light": look.get("key_light"),
+            "palette": ", ".join(str(color) for color in look.get("palette") or []),
+            "palette_note": look.get("palette_note"),
+            "mood": look.get("mood"),
+        }
     return yaml.dump(ordered, allow_unicode=True, default_flow_style=False, sort_keys=False)
 
 
@@ -106,17 +115,24 @@ def project_storyboard_image_prompt(image_prompt: object, project_style: str) ->
     scene = require_storyboard_scene(image_prompt)
     raw_composition = image_prompt.get("composition")
     composition = raw_composition if isinstance(raw_composition, Mapping) else {}
-    return (
-        {
-            "scene": scene,
-            "composition": {
-                "shot_type": str(composition.get("shot_type") or "Medium Shot"),
-                "lighting": str(composition.get("lighting") or ""),
-                "ambiance": str(composition.get("ambiance") or ""),
-            },
+    projected: dict[str, Any] = {
+        "scene": scene,
+        "composition": {
+            "shot_type": str(composition.get("shot_type") or "Medium Shot"),
+            "lighting": str(composition.get("lighting") or ""),
+            "ambiance": str(composition.get("ambiance") or ""),
         },
-        style,
-    )
+    }
+    look = image_prompt.get("look")
+    if isinstance(look, Mapping):
+        projected["look"] = {
+            "time_of_day": str(look.get("time_of_day") or ""),
+            "key_light": str(look.get("key_light") or ""),
+            "palette": [str(color) for color in look.get("palette") or []],
+            "palette_note": str(look.get("palette_note") or ""),
+            "mood": str(look.get("mood") or ""),
+        }
+    return projected, style
 
 
 def video_prompt_to_yaml(video_prompt: dict) -> str:

@@ -13,6 +13,7 @@ from lib.prompt_utils import (
     is_structured_video_prompt,
     normalize_style,
     normalize_video_prompt,
+    project_storyboard_image_prompt,
     render_storyboard_video_prompt,
     split_avoid_lines,
     utterances_to_dialogue,
@@ -351,3 +352,30 @@ class TestRenderStoryboardVideoPrompt:
     def test_non_drama_text_form_gets_no_speech_sections(self):
         rendered = self._render("镜头缓缓推近", content_mode="narration")
         assert "Line:" not in rendered
+
+
+class TestSceneLookInStoryboardPrompt:
+    LOOK: ClassVar[dict] = {
+        "time_of_day": "night",
+        "key_light": "台灯 2800K",
+        "palette": ["#1F2A36", "#E8A65C"],
+        "palette_note": "深青灰墙面",
+        "mood": "压抑",
+    }
+    PROMPT: ClassVar[dict] = {
+        "scene": "林清坐在桌前",
+        "composition": {"shot_type": "Close-up", "lighting": "台灯照亮侧脸", "ambiance": "安静"},
+    }
+
+    def test_a_shot_with_a_scene_look_renders_it_after_the_composition(self):
+        rendered = yaml.safe_load(image_prompt_to_yaml({**self.PROMPT, "look": self.LOOK}, "写实"))
+
+        assert list(rendered) == ["Style", "Scene", "Composition", "Scene_Look"]
+        assert rendered["Scene_Look"]["palette"] == "#1F2A36, #E8A65C"
+        assert rendered["Scene_Look"]["key_light"] == "台灯 2800K"
+
+    def test_a_shot_without_a_look_projects_exactly_as_before(self):
+        projected, _style = project_storyboard_image_prompt({**self.PROMPT, "look": None}, "写实")
+
+        assert "look" not in projected
+        assert "Scene_Look" not in image_prompt_to_yaml(projected, "写实")
