@@ -157,6 +157,12 @@ _SCENE_WRITING_GUIDE = """这段文字将直接生成一张静态图：只描述
 # 触发词避讳。避讳写在这里而非编排层的 CLAUDE.*.md：video_prompt 由本模块驱动的文案模型产出，
 # 编排层的系统 prompt 不进那次调用，写在那边约束不到真正落笔的模型。本常量为三条 prompt_authoring 路径
 # （drama / narration / ad）共用，改这一处即三路同步。
+_BLOCKING_WRITING_GUIDE = (
+    "人物站位遵守 180 度轴线：同一场次里人物第一次入画时写明他在画面左侧、中间还是右侧、面朝哪边、视线看向谁或什么，"
+    "此后同场次各镜沿用这一站位与朝向，不让人物在相邻镜头间无故左右互换；两人对话时一人在左面朝右、一人在右面朝左，"
+    "反打镜头保持这一关系。场景切换后可以重新安排站位。"
+)
+
 _ACTION_WRITING_GUIDE = """首帧画面已定格主体、场景与风格，这段文字驱动它动起来：只描述该时长内发生的运动与变化，不复述画面中的静态内容；镜头运动专由 camera_motion 字段承载，action 只写主体与环境的运动。按主体动作（肢体 / 手势 / 表情过渡）、物件互动（摩挲信纸、推门带起的气流等）、环境动态（衣摆、尘埃、雨势、光影移动）分层写成连贯叙述句；动词应描述物理可观察动作（伸手 / 转身 / 摩挲 / 投向 / 收紧），避免内心动词。优先低缓、连贯的细微动作，动作量与该分镜时长匹配：5 秒级分镜通常完成一个连贯动作 + 一个细节互动；8 秒级可承载一次动作过渡（如「抬头—对视—开口」）；更长的分镜保持单一低缓的动作主线，随时长递增动作段数（如「起身—走到窗前—驻足」），而非叠加多条并行动作。
    正例：「林清缓缓抬起头，眼角微微收紧，手指无意识地摩挲信纸边缘；窗外雨势渐大，桌面投下的雨痕影子在缓慢移动。」——主体动作、物件互动、环境动态各有一笔。
    反例：「林清像蝴蝶般飞舞，思绪在过去与现在之间快速切换。」——「思绪切换」不是可拍摄的运动；「像蝴蝶般」是修辞，不是动作描述。
@@ -281,6 +287,7 @@ _LOOKS_GUIDE = """
 - **palette**：2-4 个十六进制色值，主色在前；从场景陈设、服装与光源颜色里取，不要抽象配色。
 - **palette_note**：这些颜色具体落在画面的什么物体上。
 - **mood**：该场次在整集情绪弧线中的位置。相邻场次的色调随剧情转折变化（如温暖的回忆转入冷峻的现实），整集读起来像一张色彩脚本。
+- **ambience**：该场次持续存在的环境声（英文），由场景陈设与时段推出，如雨夜的老街 \"steady rain, water dripping from eaves, a distant dog\"；它会生成为垫在旁白与音乐之下的环境声。
 """
 
 
@@ -409,6 +416,7 @@ segments 表每个分镜已定稿（segment_id、逐字原文、时长、出场�
 ## 图片提示词（image_prompt）——切换到「摄影师」视角
 
 - **image_prompt.scene**：{_SCENE_WRITING_GUIDE}
+  站位：{_BLOCKING_WRITING_GUIDE}
 - **image_prompt.composition.shot_type**：{_SHOT_TYPE_GUIDE}
 - **image_prompt.composition.camera_angle**：{_CAMERA_ANGLE_GUIDE}
 - **image_prompt.composition.lighting**：{_LIGHTING_WRITING_GUIDE}
@@ -567,6 +575,7 @@ def build_drama_prompt(
 ## 图片提示词（image_prompt）——切换到「摄影师」视角
 
 - **image_prompt.scene**：{_SCENE_WRITING_GUIDE}
+  站位：{_BLOCKING_WRITING_GUIDE}
 - **image_prompt.composition.shot_type**：{_SHOT_TYPE_GUIDE}
 - **image_prompt.composition.camera_angle**：{_CAMERA_ANGLE_GUIDE}
 - **image_prompt.composition.lighting**：{_LIGHTING_WRITING_GUIDE}
