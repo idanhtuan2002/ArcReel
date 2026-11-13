@@ -387,6 +387,43 @@ async def test_storyboard_candidates_need_the_launch_profiles_pinned_qualified_j
     assert await check(frozen, None, False) is False
 
 
+async def test_the_face_identity_judge_needs_no_reviewer_route_but_its_server(monkeypatch):
+    from lib.face_identity import FACE_JUDGE_IDENTITY, FACE_JUDGE_RULE_DIGEST
+    from r2.automation import profiles
+    from server.production_run import preflight
+    from server.production_run.preflight import ProductionPreflight
+
+    frozen, snapshot = complete_snapshot()
+    selecting = frozen.model_copy(
+        update={
+            "image_candidates": 2,
+            "image_judge_identity": FACE_JUDGE_IDENTITY,
+            "image_judge_prompt_digest": FACE_JUDGE_RULE_DIGEST,
+        }
+    )
+    selection = profiles.ImageSelection(
+        candidates=2,
+        judge_model_identity=FACE_JUDGE_IDENTITY,
+        judge_prompt_digest=FACE_JUDGE_RULE_DIGEST,
+        qualification_evidence="docs/evidence.json",
+        qualification_digest="sha256:" + "4" * 64,
+    )
+    pinned = profiles.resolve_launch_profile(frozen.launch_profile_id).model_copy(update={"image_selection": selection})
+    monkeypatch.setattr(preflight, "resolve_launch_profile", lambda _profile_id: pinned)
+    monkeypatch.setattr(preflight, "image_judge_is_qualified", lambda _selection: True)
+
+    async def blocked() -> bool:
+        report = await ProductionPreflight(SnapshotReader(snapshot)).check(
+            user_id=snapshot.user_id, project_name=snapshot.project_name, policy=selecting
+        )
+        return "IMAGE_JUDGE_NOT_QUALIFIED" in report.blocking_reasons
+
+    monkeypatch.setenv("ARCREEL_FACE_ID_URL", "http://127.0.0.1:8003")
+    assert await blocked() is False
+    monkeypatch.delenv("ARCREEL_FACE_ID_URL")
+    assert await blocked() is True
+
+
 async def test_a_continuity_judge_needs_the_launch_profiles_pinned_qualified_judge(monkeypatch):
     from r2.automation import profiles
     from server.production_run import preflight

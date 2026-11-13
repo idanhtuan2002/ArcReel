@@ -1,0 +1,458 @@
+[
+ {
+  "case": "s1-0",
+  "same": true,
+  "cos": 0.2987,
+  "faces": 1
+ },
+ {
+  "case": "s1-1",
+  "same": true,
+  "cos": 0.1639,
+  "faces": 1
+ },
+ {
+  "case": "s1-2",
+  "same": true,
+  "cos": 0.3672,
+  "faces": 1
+ },
+ {
+  "case": "s1-3",
+  "same": true,
+  "cos": 0.1143,
+  "faces": 1
+ },
+ {
+  "case": "s1-4",
+  "same": true,
+  "cos": 0.3915,
+  "faces": 1
+ },
+ {
+  "case": "s2-0",
+  "same": true,
+  "cos": 0.4326,
+  "faces": 1
+ },
+ {
+  "case": "s2-1",
+  "same": true,
+  "cos": 0.599,
+  "faces": 1
+ },
+ {
+  "case": "s2-2",
+  "same": true,
+  "cos": 0.3412,
+  "faces": 1
+ },
+ {
+  "case": "s2-3",
+  "same": true,
+  "cos": 0.6916,
+  "faces": 1
+ },
+ {
+  "case": "s2-4",
+  "same": true,
+  "cos": 0.361,
+  "faces": 1
+ },
+ {
+  "case": "s3-0",
+  "same": true,
+  "cos": 0.2657,
+  "faces": 1
+ },
+ {
+  "case": "s3-1",
+  "same": true,
+  "cos": 0.1823,
+  "faces": 1
+ },
+ {
+  "case": "s3-2",
+  "same": true,
+  "cos": 0.4427,
+  "faces": 1
+ },
+ {
+  "case": "s3-3",
+  "same": true,
+  "cos": 0.1363,
+  "faces": 1
+ },
+ {
+  "case": "s3-4",
+  "same": true,
+  "cos": 0.1227,
+  "faces": 1
+ },
+ {
+  "case": "s4-0",
+  "same": true,
+  "cos": 0.5001,
+  "faces": 1
+ },
+ {
+  "case": "s4-1",
+  "same": true,
+  "cos": 0.6015,
+  "faces": 1
+ },
+ {
+  "case": "s4-2",
+  "same": true,
+  "cos": 0.449,
+  "faces": 1
+ },
+ {
+  "case": "s4-3",
+  "same": true,
+  "cos": 0.4898,
+  "faces": 1
+ },
+ {
+  "case": "s4-4",
+  "same": true,
+  "cos": 0.4165,
+  "faces": 1
+ },
+ {
+  "case": "s5-0",
+  "same": true,
+  "cos": 0.3109,
+  "faces": 1
+ },
+ {
+  "case": "s5-1",
+  "same": true,
+  "cos": 0.5573,
+  "faces": 1
+ },
+ {
+  "case": "s5-2",
+  "same": true,
+  "cos": 0.4021,
+  "faces": 2
+ },
+ {
+  "case": "s5-3",
+  "same": true,
+  "cos": 0.52,
+  "faces": 1
+ },
+ {
+  "case": "s5-4",
+  "same": true,
+  "cos": 0.5633,
+  "faces": 1
+ },
+ {
+  "case": "s6-0",
+  "same": true,
+  "cos": 0.1274,
+  "faces": 1
+ },
+ {
+  "case": "s6-2",
+  "same": true,
+  "cos": 0.1707,
+  "faces": 1
+ },
+ {
+  "case": "s6-3",
+  "same": true,
+  "cos": 0.1711,
+  "faces": 1
+ },
+ {
+  "case": "s7-0",
+  "same": true,
+  "cos": 0.279,
+  "faces": 3
+ },
+ {
+  "case": "s7-1",
+  "same": true,
+  "cos": 0.5029,
+  "faces": 1
+ },
+ {
+  "case": "s7-2",
+  "same": true,
+  "cos": null,
+  "faces": 0
+ },
+ {
+  "case": "s7-3",
+  "same": true,
+  "cos": 0.2939,
+  "faces": 1
+ },
+ {
+  "case": "s7-4",
+  "same": true,
+  "cos": 0.4813,
+  "faces": 2
+ },
+ {
+  "case": "s8-0",
+  "same": true,
+  "cos": 0.37,
+  "faces": 2
+ },
+ {
+  "case": "s8-1",
+  "same": true,
+  "cos": 0.4461,
+  "faces": 2
+ },
+ {
+  "case": "s8-2",
+  "same": true,
+  "cos": 0.4222,
+  "faces": 3
+ },
+ {
+  "case": "s8-3",
+  "same": true,
+  "cos": 0.5199,
+  "faces": 2
+ },
+ {
+  "case": "s8-4",
+  "same": true,
+  "cos": 0.4807,
+  "faces": 1
+ },
+ {
+  "case": "s1-0:wrong-person",
+  "same": false,
+  "cos": -0.0325,
+  "faces": 1
+ },
+ {
+  "case": "s1-1:wrong-person",
+  "same": false,
+  "cos": -0.0102,
+  "faces": 1
+ },
+ {
+  "case": "s1-2:wrong-person",
+  "same": false,
+  "cos": 0.2863,
+  "faces": 1
+ },
+ {
+  "case": "s1-3:wrong-person",
+  "same": false,
+  "cos": 0.0755,
+  "faces": 1
+ },
+ {
+  "case": "s1-4:wrong-person",
+  "same": false,
+  "cos": 0.2771,
+  "faces": 1
+ },
+ {
+  "case": "s2-0:wrong-person",
+  "same": false,
+  "cos": 0.1423,
+  "faces": 1
+ },
+ {
+  "case": "s2-1:wrong-person",
+  "same": false,
+  "cos": 0.2277,
+  "faces": 1
+ },
+ {
+  "case": "s2-2:wrong-person",
+  "same": false,
+  "cos": 0.054,
+  "faces": 1
+ },
+ {
+  "case": "s2-3:wrong-person",
+  "same": false,
+  "cos": 0.2644,
+  "faces": 1
+ },
+ {
+  "case": "s2-4:wrong-person",
+  "same": false,
+  "cos": 0.1609,
+  "faces": 1
+ },
+ {
+  "case": "s3-0:wrong-person",
+  "same": false,
+  "cos": 0.0583,
+  "faces": 1
+ },
+ {
+  "case": "s3-1:wrong-person",
+  "same": false,
+  "cos": 0.0579,
+  "faces": 1
+ },
+ {
+  "case": "s3-2:wrong-person",
+  "same": false,
+  "cos": 0.111,
+  "faces": 1
+ },
+ {
+  "case": "s3-3:wrong-person",
+  "same": false,
+  "cos": 0.1523,
+  "faces": 1
+ },
+ {
+  "case": "s3-4:wrong-person",
+  "same": false,
+  "cos": -0.0304,
+  "faces": 1
+ },
+ {
+  "case": "s4-0:wrong-person",
+  "same": false,
+  "cos": 0.1199,
+  "faces": 1
+ },
+ {
+  "case": "s4-1:wrong-person",
+  "same": false,
+  "cos": 0.2813,
+  "faces": 1
+ },
+ {
+  "case": "s4-2:wrong-person",
+  "same": false,
+  "cos": -0.005,
+  "faces": 1
+ },
+ {
+  "case": "s4-3:wrong-person",
+  "same": false,
+  "cos": 0.1693,
+  "faces": 1
+ },
+ {
+  "case": "s4-4:wrong-person",
+  "same": false,
+  "cos": 0.0996,
+  "faces": 1
+ },
+ {
+  "case": "s5-0:wrong-person",
+  "same": false,
+  "cos": 0.1492,
+  "faces": 2
+ },
+ {
+  "case": "s5-1:wrong-person",
+  "same": false,
+  "cos": 0.2682,
+  "faces": 1
+ },
+ {
+  "case": "s5-2:wrong-person",
+  "same": false,
+  "cos": 0.1624,
+  "faces": 2
+ },
+ {
+  "case": "s5-3:wrong-person",
+  "same": false,
+  "cos": 0.1769,
+  "faces": 1
+ },
+ {
+  "case": "s5-4:wrong-person",
+  "same": false,
+  "cos": 0.2158,
+  "faces": 2
+ },
+ {
+  "case": "s6-0:wrong-person",
+  "same": false,
+  "cos": -0.0415,
+  "faces": 1
+ },
+ {
+  "case": "s6-2:wrong-person",
+  "same": false,
+  "cos": 0.0701,
+  "faces": 1
+ },
+ {
+  "case": "s6-3:wrong-person",
+  "same": false,
+  "cos": -0.0768,
+  "faces": 1
+ },
+ {
+  "case": "s7-0:wrong-person",
+  "same": false,
+  "cos": 0.1906,
+  "faces": 2
+ },
+ {
+  "case": "s7-1:wrong-person",
+  "same": false,
+  "cos": 0.1933,
+  "faces": 1
+ },
+ {
+  "case": "s7-2:wrong-person",
+  "same": false,
+  "cos": null,
+  "faces": 0
+ },
+ {
+  "case": "s7-3:wrong-person",
+  "same": false,
+  "cos": 0.2323,
+  "faces": 1
+ },
+ {
+  "case": "s7-4:wrong-person",
+  "same": false,
+  "cos": 0.1765,
+  "faces": 2
+ },
+ {
+  "case": "s8-0:wrong-person",
+  "same": false,
+  "cos": 0.2032,
+  "faces": 2
+ },
+ {
+  "case": "s8-1:wrong-person",
+  "same": false,
+  "cos": 0.1445,
+  "faces": 1
+ },
+ {
+  "case": "s8-2:wrong-person",
+  "same": false,
+  "cos": 0.206,
+  "faces": 4
+ },
+ {
+  "case": "s8-3:wrong-person",
+  "same": false,
+  "cos": 0.1512,
+  "faces": 2
+ },
+ {
+  "case": "s8-4:wrong-person",
+  "same": false,
+  "cos": 0.1755,
+  "faces": 3
+ }
+]

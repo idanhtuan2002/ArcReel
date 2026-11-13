@@ -96,3 +96,15 @@ async def test_the_episode_target_comes_from_the_project(monkeypatch, target, fr
     policy = await resolver.resolve(user_id="u", project_name="p", mode=AutomationMode.AUTO)
 
     assert policy.target_duration_seconds == frozen
+
+
+def test_best_of_n_with_the_face_judge_needs_its_server(monkeypatch):
+    from r2.automation.profiles import resolve_launch_profile
+    from server.production_run.composition import _image_judge_available
+
+    selection = resolve_launch_profile("fiction_narration_vi_v1").image_selection
+    assert selection is not None
+    monkeypatch.delenv("ARCREEL_FACE_ID_URL", raising=False)
+    assert _image_judge_available(selection) is False
+    monkeypatch.setenv("ARCREEL_FACE_ID_URL", "http://127.0.0.1:8003")
+    assert _image_judge_available(selection) is True

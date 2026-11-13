@@ -10,12 +10,28 @@
   "audio_codec": "aac",
   "target_duration_seconds": 45,
   "speech_rate_units_per_second": 3.75,
-  "image_route": ["custom-3", "flux2-klein-4b-gguf"],
-  "video_route": ["custom-3", "still-clip-local"],
-  "audio_route": ["custom-2", "vieneu-tts-v3-turbo"],
+  "image_route": [
+    "custom-3",
+    "flux2-klein-4b-gguf"
+  ],
+  "video_route": [
+    "custom-3",
+    "still-clip-local"
+  ],
+  "audio_route": [
+    "custom-2",
+    "vieneu-tts-v3-turbo"
+  ],
   "requires_lip_sync": false,
   "support_status": "CANDIDATE",
   "quality_gate": "record",
   "required_disk_bytes": 8589934592,
-  "required_gpu_bytes": 7516192768
+  "required_gpu_bytes": 7516192768,
+  "image_selection": {
+    "candidates": 2,
+    "judge_model_identity": "insightface/buffalo_l@2.1",
+    "judge_prompt_digest": "sha256:8efee0d0d4ed04f2a1c3fef45f0eb5cdaccf65cda780a48dfeef3bb337332cb6",
+    "qualification_evidence": "docs/r2/evidence/face-identity-qualification-2026-11-14/qualification.json",
+    "qualification_digest": "sha256:7adc1492524ac19f452e8b41e78025067c07a79ab8a00506299ac0beeb5b66ac"
+  }
 }

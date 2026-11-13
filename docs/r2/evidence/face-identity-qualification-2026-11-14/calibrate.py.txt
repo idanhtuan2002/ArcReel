@@ -1,0 +1,37 @@
+"""Calibrate ArcFace (InsightFace buffalo_l) face cosine as a same-person signal on continuity corpus 2."""
+import json, sys
+from pathlib import Path
+import cv2, numpy as np
+from insightface.app import FaceAnalysis
+
+ROOT = Path("/var/tmp/ar9b/cj-corpus2")
+app = FaceAnalysis(name="buffalo_l", root="/mnt/arcreel/D/ArcReel/faceid/models", providers=["CPUExecutionProvider"])
+app.prepare(ctx_id=-1, det_size=(640, 640))
+
+def sheet_face(path):
+    img = cv2.imread(str(path)); h, w = img.shape[:2]
+    faces = [f for f in app.get(img) if f.bbox[0] < w / 3]
+    faces = faces or app.get(img)
+    return max(faces, key=lambda f: f.det_score) if faces else None
+
+def frame_faces(path):
+    return app.get(cv2.imread(str(path)))
+
+cases = json.loads((ROOT / "cases.json").read_text())["cases"]
+rows = []
+cache = {}
+for case in cases:
+    ref = next(r for r in case["references"] if r["label"].startswith("character:"))
+    key = ref["path"]
+    if key not in cache:
+        cache[key] = sheet_face(ROOT / key)
+    anchor = cache[key]
+    faces = frame_faces(ROOT / case["frame"])
+    same = case["expected"] == "ok"
+    if anchor is None or not faces:
+        rows.append({"case": case["case_id"], "same": same, "cos": None, "faces": len(faces)}); continue
+    a = anchor.normed_embedding
+    best = max(float(np.dot(a, f.normed_embedding)) for f in faces)
+    rows.append({"case": case["case_id"], "same": same, "cos": round(best, 4), "faces": len(faces)})
+    print(case["case_id"], same, round(best, 3), len(faces), flush=True)
+Path(sys.argv[1]).write_text(json.dumps(rows, indent=1))

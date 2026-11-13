@@ -24,11 +24,12 @@ from lib.db.repositories.launch_qualifications import LaunchQualificationReposit
 from lib.db.repositories.quality import QualityProfileRepository
 from lib.db.repositories.reviewer_qualifications import ReviewerQualificationRepository
 from lib.episode_target_duration import project_episode_target_duration
+from lib.face_identity import FACE_JUDGE_IDENTITY, face_identity_from_env
 from lib.generation_resources import device_admission_configured
 from lib.music_bed import music_service_from_env
 from lib.project_manager import ProjectManager
 from lib.scene_ambience import ambience_service_from_env
-from r2.automation.profiles import resolve_launch_profile, route_digest
+from r2.automation.profiles import ImageSelection, resolve_launch_profile, route_digest
 from r2.contracts.automation import (
     AutomationMode,
     ModelRoute,
@@ -93,6 +94,12 @@ def _automation(projects: ProjectManager, project_name: str) -> dict:
     if not isinstance(settings, dict):
         raise ProductionRunRefused("AUTOMATION_NOT_CONFIGURED", 409, ("PROJECT_AUTOMATION_SETTINGS_MISSING",))
     return settings
+
+
+def _image_judge_available(selection: ImageSelection) -> bool:
+    """Best-of-N runs only where its judge can score: the face-identity judge (ADR-0151) needs its local server; a
+    host without one makes one storyboard per shot, and the run's policy says so (``image_candidates`` stays 1)."""
+    return selection.judge_model_identity != FACE_JUDGE_IDENTITY or face_identity_from_env() is not None
 
 
 class ProjectPolicyResolver:
@@ -181,7 +188,7 @@ class ProjectPolicyResolver:
                         "image_judge_identity": launch.image_selection.judge_model_identity,
                         "image_judge_prompt_digest": launch.image_selection.judge_prompt_digest,
                     }
-                    if launch.image_selection is not None
+                    if launch.image_selection is not None and _image_judge_available(launch.image_selection)
                     else {}
                 ),
                 **(
@@ -310,6 +317,7 @@ def build_adapters(
             **text,
             judge=ImageJudge(access_for=model_access(sessions)),
             continuity=ContinuityJudge(access_for=model_access(sessions)),
+            face=face_identity_from_env(),
         ),
         RunStage.RENDER: RenderAdapter(
             sessions, music=music_service_from_env(), ambience=ambience_service_from_env(), **owners

@@ -37,6 +37,7 @@ from typing import Any
 from lib.asset_derivatives import DERIVATIVE_ASSET_TYPE, DERIVATIVE_TASK_TYPE
 from lib.config.resolver import ConfigResolver
 from lib.db.repositories.production_runs import ProductionRunRepository
+from lib.face_identity import FACE_JUDGE_IDENTITY, FaceIdentityService
 from lib.generation_queue import GenerationQueue, get_generation_queue
 from lib.narration_delivery import USE_TTS
 from lib.project_manager import ProjectManager
@@ -132,6 +133,7 @@ class MediaAdapter:
         judge: ImageJudge | None = None,
         restore: Callable[[str, str, str, int], Awaitable[Any]] | None = None,
         continuity: ContinuityJudge | None = None,
+        face: FaceIdentityService | None = None,
     ) -> None:
         self._sessions, self._authority, self._projects, self._resolver = sessions, authority, projects, resolver
         self._planner = planner or WorkflowPlanner(projects)
@@ -142,6 +144,7 @@ class MediaAdapter:
         self._checked: dict[tuple[str, int, int], str | None] = {}
         self._judge_client = judge
         self._continuity = continuity
+        self._face = face
         self._restore = restore or restore_resource_version
         # Storyboard selections in flight, off the controller lease, by step command and episode.
         self._jobs: dict[str, asyncio.Task[dict[str, dict[str, Any]]]] = {}
@@ -306,7 +309,12 @@ class MediaAdapter:
         job = self._jobs.get(key)
         if job is None:
             lines = {str(item[id_field]): str(item.get("novel_text") or "") for item in items if item.get(id_field)}
-            self._jobs[key] = asyncio.create_task(self._judge(run, undecided, lines))
+            judging = (
+                self._judge_by_face(run, target.script_filename, undecided)
+                if run.policy.image_judge_identity == FACE_JUDGE_IDENTITY
+                else self._judge(run, undecided, lines)
+            )
+            self._jobs[key] = asyncio.create_task(judging)
             return True
         if not job.done():
             return True
@@ -344,6 +352,33 @@ class MediaAdapter:
                     route, lines.get(unit, ""), pictures, prompt_digest=run.policy.image_judge_prompt_digest
                 )
                 decision.update(chosen_version=usable[choice.index]["version"], scores=choice.scores)
+            decisions[unit] = decision
+        return decisions
+
+    async def _judge_by_face(
+        self, run: RunSnapshot, script_filename: str, units: list[str]
+    ) -> dict[str, dict[str, Any]]:
+        """Per segment: the usable candidates and the one whose faces best match the cast's sheets (ADR-0151); a shot
+        with no scored face, or with fewer than two usable candidates, keeps its current version."""
+        root = self._projects.get_project_path(run.project_name)
+        project = await asyncio.to_thread(self._projects.load_project, run.project_name)
+        script = await asyncio.to_thread(self._projects.load_script, run.project_name, script_filename)
+        versions = VersionManager(root)
+        portrait = run.policy.height >= run.policy.width
+        decisions: dict[str, dict[str, Any]] = {}
+        for unit in units:
+            listed = sorted(versions.get_versions("storyboards", unit)["versions"], key=lambda v: v["version"])
+            newest = listed[-run.policy.image_candidates :]
+            usable = [v for v in newest if storyboard_problem(root / v["file"], portrait=portrait) is None]
+            decision: dict[str, Any] = {"candidates": [v["version"] for v in usable], "chosen_version": None}
+            shot = await asyncio.to_thread(continuity_pass.shot_for, project, root, script, unit)
+            sheets = [data for label, data in (shot.references if shot else ()) if label.startswith("character:")]
+            if self._face is not None and sheets and len(usable) >= 2:
+                pictures = [await asyncio.to_thread((root / v["file"]).read_bytes) for v in usable]
+                index, scores = await self._face.choose(sheets, pictures)
+                decision["scores"] = scores
+                if index is not None:
+                    decision["chosen_version"] = usable[index]["version"]
             decisions[unit] = decision
         return decisions
 

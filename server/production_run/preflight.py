@@ -2,6 +2,7 @@
 
 from typing import Protocol
 
+from lib.face_identity import FACE_JUDGE_IDENTITY, face_identity_from_env
 from r2.automation.identity import policy_digest
 from r2.automation.profiles import (
     continuity_judge_is_qualified,
@@ -134,8 +135,10 @@ class ProductionPreflight:
             if len(matches) != 1 or not reviewer_is_qualified(matches[0]):
                 reasons.append("MISSING_QUALIFIED_REVIEWER")
         if policy.image_candidates > 1:
-            # The judge is the run's reviewer route with the launch profile's pinned identity, and it is qualified.
+            # The judge is the run's reviewer route with the launch profile's pinned identity, and it is qualified; the
+            # face-identity judge is a local scorer, not a route, and needs its server configured instead.
             selection = launch.image_selection if launch is not None else None
+            face_judge = selection is not None and selection.judge_model_identity == FACE_JUDGE_IDENTITY
             judge = next(
                 (
                     roles[role]
@@ -148,10 +151,11 @@ class ProductionPreflight:
             )
             if (
                 selection is None
-                or judge is None
+                or (judge is None and not face_judge)
+                or (face_judge and face_identity_from_env() is None)
                 or (policy.image_judge_identity, policy.image_judge_prompt_digest)
                 != (selection.judge_model_identity, selection.judge_prompt_digest)
-                or judge.model_identity != selection.judge_model_identity
+                or (judge is not None and judge.model_identity != selection.judge_model_identity)
                 or not image_judge_is_qualified(selection)
             ):
                 reasons.append("IMAGE_JUDGE_NOT_QUALIFIED")

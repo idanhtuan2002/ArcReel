@@ -1,0 +1,58 @@
+"""Local face-identity server for ArcReel: ArcFace (InsightFace buffalo_l) cosine between a character sheet and a frame.
+
+    POST /v1/face-similarity {"reference": "<base64 png>", "candidate": "<base64 png>"} -> {"cosine": float | null, ...}
+
+The reference is a character sheet (front / side / back on white): its face is the most confident face in the left
+third (the front view), else the most confident face anywhere. The candidate's score is the highest cosine over the
+faces it shows. ``null`` when either picture shows no face. CPU only.
+"""
+
+from __future__ import annotations
+
+import asyncio
+import base64
+
+import cv2
+import numpy as np
+from fastapi import FastAPI, HTTPException
+from insightface.app import FaceAnalysis
+from pydantic import BaseModel, Field
+
+app = FastAPI()
+_face = FaceAnalysis(name="buffalo_l", root="/mnt/arcreel/D/ArcReel/faceid/models", providers=["CPUExecutionProvider"])
+_face.prepare(ctx_id=-1, det_size=(640, 640))
+
+
+class SimilarityRequest(BaseModel):
+    reference: str = Field(min_length=1)
+    candidate: str = Field(min_length=1)
+
+
+def _image(data: str) -> np.ndarray:
+    image = cv2.imdecode(np.frombuffer(base64.b64decode(data), np.uint8), cv2.IMREAD_COLOR)
+    if image is None:
+        raise HTTPException(status_code=400, detail="unreadable image")
+    return image
+
+
+def _score(request: SimilarityRequest) -> dict[str, object]:
+    sheet, frame = _image(request.reference), _image(request.candidate)
+    width = sheet.shape[1]
+    sheet_faces = _face.get(sheet)
+    front = [f for f in sheet_faces if f.bbox[0] < width / 3] or sheet_faces
+    frame_faces = _face.get(frame)
+    if not front or not frame_faces:
+        return {"cosine": None, "reference_faces": len(sheet_faces), "candidate_faces": len(frame_faces)}
+    anchor = max(front, key=lambda f: f.det_score).normed_embedding
+    cosine = max(float(np.dot(anchor, f.normed_embedding)) for f in frame_faces)
+    return {"cosine": round(cosine, 4), "reference_faces": len(sheet_faces), "candidate_faces": len(frame_faces)}
+
+
+@app.get("/health")
+async def health() -> dict[str, str]:
+    return {"status": "ok", "model": "insightface/buffalo_l"}
+
+
+@app.post("/v1/face-similarity")
+async def similarity(request: SimilarityRequest) -> dict[str, object]:
+    return await asyncio.to_thread(_score, request)

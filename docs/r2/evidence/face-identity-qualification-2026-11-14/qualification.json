@@ -1,0 +1,28 @@
+{
+  "model_identity": "insightface/buffalo_l@2.1",
+  "prompt_digest": "sha256:8efee0d0d4ed04f2a1c3fef45f0eb5cdaccf65cda780a48dfeef3bb337332cb6",
+  "rule": "score(candidate) = mean over the shot's characters of cosine(ArcFace(front-view face of the character sheet), max over the candidate's faces of ArcFace(face)); characters either picture does not show are left out; the highest score wins; a shot with no scored character keeps its current version",
+  "qualified": true,
+  "bar": "ranks the right person above the wrong one in at least 90 % of pairs (ADR-0112's ranking bar: at most 10 % wrong)",
+  "corpus": "continuity corpus 2 (/var/tmp/ar9b/cj-corpus2): 8 stories, 38 right-person frames and 38 look-alike frames drawn with local FLUX.2 klein 4B in the same place and beat",
+  "pairs": 37,
+  "pairs_ranked_right": 36,
+  "auc": 0.885,
+  "right_person_cosine": {
+    "n": 37,
+    "min": 0.1143,
+    "median": 0.4021,
+    "max": 0.6916
+  },
+  "look_alike_cosine": {
+    "n": 37,
+    "min": -0.0768,
+    "median": 0.1523,
+    "max": 0.2863
+  },
+  "no_face_cases": [
+    "s7-2",
+    "s7-2:wrong-person"
+  ],
+  "note": "As a gate it is weak (at 0.29 every look-alike is caught but 27 % of right frames fail); it is used to rank candidates only."
+}
