@@ -13,7 +13,9 @@ import json
 from pathlib import Path
 from typing import Any
 
+from lib.asset_derivatives import derivative_table
 from lib.asset_types import ASSET_SPECS, resolve_asset_key
+from lib.reference_catalog import split_derivative_reference
 from lib.storyboard_sequence import get_storyboard_items, resolve_previous_storyboard_path
 from server.production_run.continuity_judge import Shot, Verdict
 
@@ -27,17 +29,27 @@ def _names(value: object) -> list[str]:
 
 
 def _sheet(project: dict[str, Any], project_path: Path, asset_type: str, name: str) -> tuple[str, bytes] | None:
+    """The sheet a shot's reference name points at: an asset's own, or for ``owner/derivative`` the derivative's
+    sheet with the owner's description plus the derivative's change."""
     spec = ASSET_SPECS[asset_type]
     bucket = project.get(spec.bucket_key)
-    key = resolve_asset_key(bucket, name) if isinstance(bucket, dict) else None
+    owner_name, derivative_name = split_derivative_reference(name) if spec.supports_derivatives else (name, "")
+    key = resolve_asset_key(bucket, owner_name) if isinstance(bucket, dict) else None
     entry = bucket.get(key) if isinstance(bucket, dict) and key is not None else None
+    description = str(entry.get("description") or "").strip() if isinstance(entry, dict) else ""
+    if derivative_name:
+        table = derivative_table(entry)
+        derivative_key = resolve_asset_key(table, derivative_name)
+        entry = table.get(derivative_key) if derivative_key is not None else None
+        change = str(entry.get("description") or "").strip() if isinstance(entry, dict) else ""
+        description = f"{description} {change}".strip()
     relative = entry.get(spec.sheet_field) if isinstance(entry, dict) else None
     if not isinstance(relative, str) or not relative:
         return None
     path = (project_path / relative).resolve()
     if not path.is_relative_to(project_path.resolve()) or not path.is_file():
         return None
-    description = str(entry.get("description") or "").strip()[:300] if isinstance(entry, dict) else ""
+    description = description[:300]
     label = f"{asset_type}: {name}" + (f" - {description}" if description else "")
     return label, path.read_bytes()
 

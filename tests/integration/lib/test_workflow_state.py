@@ -1604,6 +1604,34 @@ def test_schema8_workflow_does_not_parse_an_unclaimed_malformed_script(tmp_path:
     assert status.next_action.type == "generate_script"
 
 
+def test_a_derivative_sheet_is_wanted_once_its_owner_sheet_is_current(tmp_path: Path) -> None:
+    pm, project_path = _make_project(tmp_path, "ad")
+    sheet_path = "characters/Alice.png"
+    _write_artifact(project_path, sheet_path)
+
+    def _seed(project: dict) -> None:
+        project["characters"] = {
+            "Alice": {
+                "description": "red coat",
+                "character_sheet": sheet_path,
+                "derivatives": {"雨夜": {"description": "浑身湿透，其余不变"}},
+            },
+            "Bob": {"description": "grey suit", "derivatives": {"少年": {"description": "十岁的样子"}}},
+        }
+
+    pm.update_project("demo", _seed)
+    script = {"episode": 1, "title": "广告", "content_mode": "ad", "shots": [_valid_ad_shot(image_prompt="hero")]}
+    atomic_write_json(project_path / "scripts" / "episode_1.json", script)
+    _register_produced_artifacts(project_path)
+
+    status = WorkflowStateService(pm).get_status("demo")
+
+    sheets = status.artifacts["asset_sheets"]["character"]
+    assert sheets["current_ids"] == ["Alice"]
+    assert sheets["missing_ids"] == ["Alice/雨夜", "Bob"]
+    assert status.state == "ASSET_SHEETS"
+
+
 def test_schema8_manifest_reports_current_stale_missing_and_blocked_without_file_fallback(tmp_path: Path) -> None:
     pm, project_path = _make_project(tmp_path, "ad")
     sheet_path = "characters/Alice.png"

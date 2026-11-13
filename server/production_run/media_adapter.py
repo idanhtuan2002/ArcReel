@@ -34,11 +34,13 @@ from collections.abc import Awaitable, Callable, Mapping
 from pathlib import Path
 from typing import Any
 
+from lib.asset_derivatives import DERIVATIVE_ASSET_TYPE, DERIVATIVE_TASK_TYPE
 from lib.config.resolver import ConfigResolver
 from lib.db.repositories.production_runs import ProductionRunRepository
 from lib.generation_queue import GenerationQueue, get_generation_queue
 from lib.narration_delivery import USE_TTS
 from lib.project_manager import ProjectManager
+from lib.reference_catalog import DERIVATIVE_SEPARATOR
 from lib.scene_looks import kept_look, scene_starts
 from lib.storyboard_sequence import get_storyboard_items
 from lib.version_manager import VersionManager
@@ -56,7 +58,7 @@ from r2.contracts.automation import (
     UsageReceipt,
 )
 from r2.contracts.common import ensure_json_value
-from server.media_tools.assets import handle_generate_assets
+from server.media_tools.assets import handle_generate_sheets
 from server.media_tools.context import ToolContext
 from server.media_tools.narration_audio import handle_generate_narration_audio
 from server.media_tools.storyboards import handle_generate_storyboards
@@ -85,7 +87,7 @@ type MediaTool = Callable[[ToolContext, dict[str, Any]], Awaitable[ToolOutcome[A
 
 A = WorkflowActionType
 MEDIA_TOOLS: dict[WorkflowActionType, MediaTool] = {
-    A.GENERATE_ASSET_SHEETS: handle_generate_assets,
+    A.GENERATE_ASSET_SHEETS: handle_generate_sheets,
     A.GENERATE_STORYBOARDS: handle_generate_storyboards,
     A.GENERATE_TTS: handle_generate_narration_audio,
     A.REGENERATE_TTS: handle_generate_narration_audio,
@@ -808,6 +810,11 @@ class MediaAdapter:
         )
         if action.type is A.GENERATE_ASSET_SHEETS:
             by_type = MediaAdapter._missing_sheets_by_type(plan, ids)
+            derivatives = [name for name in by_type.get(DERIVATIVE_ASSET_TYPE, []) if DERIVATIVE_SEPARATOR in name]
+            if derivatives:
+                by_type[DERIVATIVE_ASSET_TYPE] = [n for n in by_type[DERIVATIVE_ASSET_TYPE] if n not in derivatives]
+                by_type = {kind: names for kind, names in by_type.items() if names}
+                by_type[DERIVATIVE_TASK_TYPE] = derivatives
             return [(f"{key}:{kind}", {"type": kind, "names": names}) for kind, names in sorted(by_type.items())]
         if action.type is A.GENERATE_STORYBOARDS:
             return [(key, {"script": script, **({"segment_ids": ids} if ids else {})})]

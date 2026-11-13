@@ -11,19 +11,21 @@ from __future__ import annotations
 
 import asyncio
 import json
+import unicodedata
 from collections.abc import Awaitable, Callable
 from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from lib.asset_inventory import AssetInventoryCompletion, AssetInventoryError, complete_asset_inventory
-from lib.asset_types import resolve_asset_key, validate_asset_name
+from lib.asset_types import DERIVATIVES_FIELD, resolve_asset_key, validate_asset_name
 from lib.project_manager import ProjectManager
 from lib.source_revision import SourceScope, compute_source_revision
 from lib.text_attestation import named_in
 from lib.text_backends.base import TextGenerationRequest, TextGenerationResult
 
 MAX_PER_BUCKET = 12
+MAX_STATES = 4
 MAX_SOURCE_CHARS = 60_000
 
 type Generate = Callable[[TextGenerationRequest], Awaitable[TextGenerationResult]]
@@ -36,6 +38,14 @@ class _Entry(BaseModel):
     description: str = Field(min_length=1, max_length=600)
 
 
+class _State(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    name: str = Field(min_length=1, max_length=24)
+    change: str = Field(min_length=1, max_length=300)
+    evidence: str = Field(min_length=1, max_length=300)
+
+
 class _Character(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -43,6 +53,7 @@ class _Character(BaseModel):
     identity: str = Field(min_length=1, max_length=400)
     outfit: str = Field(min_length=1, max_length=300)
     voice_style: str = Field(default="", max_length=200)
+    states: list[_State] = Field(default_factory=list, max_length=MAX_STATES)
 
     @property
     def description(self) -> str:
@@ -77,6 +88,13 @@ Return JSON with three lists: characters, scenes, props.
   - Where the text does not say, design plausible details that fit the setting and the character, and make the
     characters clearly different from each other at a glance (hair, build, outfit colours).
   - voice_style: a short voice/tone description.
+  - states: only lasting, visible changes the text states explicitly for a stretch of the story: another outfit
+    (a wedding dress, a uniform, mourning clothes), an injury or bandage, a clearly different age (a childhood
+    flashback, years later), soaked or dirty after an event. Never a momentary expression, pose or held object.
+    name: a short state name; change: an image-edit instruction saying only what differs from identity and
+    outfit ("now wears a white wedding ao dai #F5F1E8 and a gold headband; everything else stays the same");
+    evidence: the exact sentence of the source text that shows it. At most {states} per character; none when
+    the character never changes.
 - scenes: recurring or visually distinctive places. description: space, atmosphere, light and colour of the
   place itself; never people or events.
 - props: recurring or visually distinctive objects. description: look, material, size and colour.
@@ -91,15 +109,35 @@ Source text:
 """
 
 
-def _entries(extraction: AssetExtraction, project: dict[str, Any], source: str) -> dict[str, dict[str, dict[str, str]]]:
-    buckets: dict[str, dict[str, dict[str, str]]] = {}
+def _normalized(text: str) -> str:
+    return " ".join(unicodedata.normalize("NFC", text).split()).casefold()
+
+
+def _attested_states(states: list[_State], source: str) -> dict[str, dict[str, str]]:
+    """The states whose evidence the source really contains, as derivatives (state name → change description);
+    a state the text never shows is invented and dropped, like a character the text never names."""
+    text = _normalized(source)
+    attested: dict[str, dict[str, str]] = {}
+    for state in states:
+        try:
+            name = validate_asset_name(state.name)
+        except ValueError:
+            continue
+        if name in attested or _normalized(state.evidence) not in text:
+            continue
+        attested[name] = {"description": state.change.strip()}
+    return attested
+
+
+def _entries(extraction: AssetExtraction, project: dict[str, Any], source: str) -> dict[str, dict[str, dict[str, Any]]]:
+    buckets: dict[str, dict[str, dict[str, Any]]] = {}
     for bucket, items in (
         ("characters", extraction.characters),
         ("scenes", extraction.scenes),
         ("props", extraction.props),
     ):
         existing = project.get(bucket) if isinstance(project.get(bucket), dict) else {}
-        chosen: dict[str, dict[str, str]] = {}
+        chosen: dict[str, dict[str, Any]] = {}
         for item in items:
             try:
                 name = validate_asset_name(item.name)
@@ -111,9 +149,13 @@ def _entries(extraction: AssetExtraction, project: dict[str, Any], source: str) 
             # may carry a descriptive name, so only characters are held to the source's words.
             if bucket == "characters" and not named_in(name, source):
                 continue
-            entry = {"description": item.description.strip()}
+            entry: dict[str, Any] = {"description": item.description.strip()}
             if isinstance(item, _Character) and item.voice_style.strip():
                 entry["voice_style"] = item.voice_style.strip()
+            if isinstance(item, _Character):
+                states = _attested_states(item.states, source)
+                if states:
+                    entry[DERIVATIVES_FIELD] = states
             chosen[name] = entry
         buckets[bucket] = chosen
     return buckets
@@ -141,7 +183,7 @@ async def extract_asset_inventory(
         raise AssetExtractionError("source text exceeds the extraction bound")
     result = await generate(
         TextGenerationRequest(
-            prompt=PROMPT.format(limit=MAX_PER_BUCKET, source=source),
+            prompt=PROMPT.format(limit=MAX_PER_BUCKET, states=MAX_STATES, source=source),
             response_schema=AssetExtraction,
         )
     )

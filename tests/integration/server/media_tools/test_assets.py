@@ -160,3 +160,37 @@ async def test_generate_assets_names_without_type(fake_ctx: ToolContext) -> None
     tool_obj = generate_assets_tool(fake_ctx)
     out = await call(tool_obj, {"names": ["张三"]})
     assert out.get("is_error") is True
+
+
+async def test_derivative_sheets_are_edits_of_their_owner_sheet(fake_ctx: ToolContext, monkeypatch) -> None:
+    from server.media_tools import assets as mod
+
+    sent = []
+
+    async def fake_batch(*, project_name, specs, on_success=None, on_failure=None, **_batch_kwargs):
+        from lib.generation_queue_client import BatchTaskResult
+
+        sent.extend(specs)
+        return [
+            BatchTaskResult(
+                resource_id=s.resource_id,
+                task_id="t1",
+                status="succeeded",
+                result={"file_path": f"characters/derivatives/{s.resource_id}.png", "version": 1},
+            )
+            for s in specs
+        ], []
+
+    (fake_ctx.project_path / "characters").mkdir(exist_ok=True)
+    (fake_ctx.project_path / "characters" / "张三.png").write_bytes(b"png")
+
+    zhang = fake_ctx.pm.project_payload["characters"]["张三"]
+    zhang["character_sheet"] = "characters/张三.png"
+    zhang["derivatives"] = {"雨夜": {"description": "浑身湿透，其余外观不变"}}
+    monkeypatch.setattr(mod, "batch_enqueue_and_wait", fake_batch)
+
+    out = await mod.handle_generate_sheets(fake_ctx, {"type": "character_derivative", "names": ["张三/雨夜"]})
+
+    assert [(spec.task_type, spec.resource_id) for spec in sent] == [("character_derivative", "张三/雨夜")]
+    assert "浑身湿透" in str(sent[0].payload)
+    assert out.value is not None

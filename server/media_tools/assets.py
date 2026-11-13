@@ -9,8 +9,18 @@ from __future__ import annotations
 
 from typing import Any
 
+from lib.api_errors import ApiError
 from lib.artifact_activation import ArtifactCurrencyResolver, active_artifact_currency_resolver
 from lib.artifact_manifest import ArtifactKey
+from lib.asset_derivatives import (
+    DERIVATIVE_ASSET_TYPE,
+    DERIVATIVE_TASK_TYPE,
+    DerivativeSheetSource,
+    derivative_artifact_key,
+    derivative_sheet_relative_path,
+    derivative_table,
+    resolve_derivative_sheet_source,
+)
 from lib.asset_types import ASSET_SPECS, AssetSpec, asset_name_comparison_key, resolve_asset_key
 from lib.generation_queue_client import (
     TaskSpec,
@@ -29,6 +39,7 @@ from lib.generation_result import (
     select_generation_targets,
 )
 from lib.project_manager import ProjectManager
+from lib.reference_catalog import derivative_reference, split_derivative_reference
 from server.media_tools.context import (
     ToolContext,
     generation_batch_submission_outcome,
@@ -40,6 +51,7 @@ from server.media_tools.context import (
     tool_services,
 )
 from server.media_tools.definition import tool
+from server.services.derivative_sheet_tasks import build_derivative_sheet_instruction
 from server.tool_runtime import ToolOutcome, submit_media_generation
 
 # Asset-type emoji shown in tool output. Other display fields (bucket_key,
@@ -303,3 +315,106 @@ __all__ = [
     "generate_assets_tool",
     "list_pending_assets_tool",
 ]
+
+
+_DERIVATIVE_OPERATION = "generate_derivative_sheets"
+
+
+def _derivative_candidates(project: dict[str, Any]) -> list[GenerationCandidate]:
+    """Every character derivative, addressed by its reference name ``owner/derivative``."""
+    spec = ASSET_SPECS[DERIVATIVE_ASSET_TYPE]
+    candidates: list[GenerationCandidate] = []
+    for owner, entry in (project.get(spec.bucket_key) or {}).items():
+        for name, derivative in derivative_table(entry).items():
+            sheet = derivative.get(spec.sheet_field) if isinstance(derivative, dict) else None
+            candidates.append(
+                GenerationCandidate(
+                    unit_id=derivative_reference(owner, name),
+                    artifact_key=derivative_artifact_key(
+                        asset_name_comparison_key(owner), asset_name_comparison_key(name)
+                    ),
+                    artifact_path=sheet if isinstance(sheet, str) else None,
+                )
+            )
+    return candidates
+
+
+async def handle_generate_derivative_sheets(ctx: ToolContext, args: dict[str, Any]) -> ToolOutcome[Any]:
+    """Generate the sheets of the named character derivatives (``owner/derivative``): each is an edit of its owner's
+    sheet by the derivative's change description, the same task the asset page submits."""
+    try:
+        names = normalize_requested_ids(args.get("names"), field="names")
+        project = ctx.pm.load_project(ctx.project_name)
+        resolver = active_artifact_currency_resolver(ctx.project_path, project)
+        builder = GenerationResultBuilder(
+            _DERIVATIVE_OPERATION,
+            GenerationSelectionMode.EXPLICIT if names is not None else GenerationSelectionMode.MISSING_ONLY,
+        )
+        selection = select_generation_targets(
+            candidates=_derivative_candidates(project), requested_ids=names, resolver=resolver
+        )
+        builder.absorb(selection)
+        targets: list[tuple[GenerationTargetState, DerivativeSheetSource]] = []
+        for state in selection.targets:
+            owner, derivative = split_derivative_reference(state.unit_id)
+            try:
+                source = resolve_derivative_sheet_source(project, owner, derivative)
+            except (KeyError, ApiError) as error:
+                builder.block(
+                    state.unit_id,
+                    problem=GenerationProblem(
+                        code=GenerationProblemCode.UNIT_REQUEST_INVALID,
+                        detail=f"衍生 '{state.unit_id}' 无法生成资产图：{error}",
+                        action=GenerationAction.FIX_INPUT,
+                    ),
+                    artifact_key=state.artifact_key,
+                    artifact_path=state.artifact_path,
+                    artifact_status=state.status,
+                )
+                continue
+            targets.append((state, source))
+        by_id = {state.unit_id: state for state, _source in targets}
+        by_resource = {source.target.artifact_id: state.unit_id for state, source in targets}
+        task_specs = [
+            TaskSpec.from_request(
+                task_type=DERIVATIVE_TASK_TYPE,
+                media_type="image",
+                resource_id=source.target.artifact_id,
+                unit_id=state.unit_id,
+                prompt=build_derivative_sheet_instruction(source.description),
+                source=ctx.caller.source,
+            )
+            for state, source in targets
+        ]
+        submitted = await submit_media_generation(
+            scope=ctx.scope,
+            caller=ctx.caller,
+            services=tool_services(ctx),
+            operation=_DERIVATIVE_OPERATION,
+            preflight=builder.build(),
+            pending_ids=list(by_id),
+            specs=task_specs,
+            states=by_id,
+            embedded_waiter=batch_enqueue_and_wait,
+        )
+        if submitted.successes is None or submitted.failures is None:
+            return generation_batch_submission_outcome(submitted.batch)
+        record_batch_outcomes(
+            builder,
+            successes=submitted.successes,
+            failures=submitted.failures,
+            states=by_id,
+            resolver=resolver,
+            unit_id_of=lambda rid: by_resource.get(rid, rid),
+            fallback_path=lambda unit_id: derivative_sheet_relative_path(*split_derivative_reference(unit_id)),
+        )
+        return generation_result_outcome(builder.build(), batch_id=submitted.batch.batch_id)
+    except Exception as exc:
+        return tool_error(_DERIVATIVE_OPERATION, exc)
+
+
+async def handle_generate_sheets(ctx: ToolContext, args: dict[str, Any]) -> ToolOutcome[Any]:
+    """Asset sheets of one type, or character derivative sheets when ``type`` is ``character_derivative``."""
+    if args.get("type") == DERIVATIVE_TASK_TYPE:
+        return await handle_generate_derivative_sheets(ctx, {"names": args.get("names")})
+    return await handle_generate_assets(ctx, args)

@@ -237,6 +237,24 @@ def test_an_asset_name_no_sheet_type_lists_blocks_the_media_step():
         MediaAdapter._requests(plan, "episode_1.json")
 
 
+def test_derivative_sheets_go_to_the_derivative_tool_and_base_sheets_to_the_asset_tool():
+    from server.production_run.media_adapter import MediaAdapter
+
+    plan = _plan(
+        A.GENERATE_ASSET_SHEETS,
+        ["Lan/áo cưới", "Minh", "Chợ"],
+        sheets={"character": ["Lan/áo cưới", "Minh"], "scene": ["Chợ"]},
+    )
+
+    calls = [args for _key, args in MediaAdapter._requests(plan, "episode_1.json")]
+
+    assert calls == [
+        {"type": "character", "names": ["Minh"]},
+        {"type": "character_derivative", "names": ["Lan/áo cưới"]},
+        {"type": "scene", "names": ["Chợ"]},
+    ]
+
+
 async def test_a_proposed_duration_tier_is_confirmed_and_sent_with_the_videos(media_host):
     sessions, controller, run, planner, tools, _ = media_host
     unit = {

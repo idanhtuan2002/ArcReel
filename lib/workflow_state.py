@@ -23,7 +23,8 @@ from pydantic import BaseModel, ConfigDict, Field
 from lib import script_review
 from lib.artifact_activation import ArtifactComparer, ArtifactCurrencyResolver, RegisteredArtifactResolver
 from lib.artifact_manifest import ArtifactKey, ArtifactManifestError, ArtifactStatus
-from lib.asset_types import ASSET_SPECS, asset_name_comparison_key
+from lib.asset_derivatives import derivative_artifact_key, derivative_table
+from lib.asset_types import ASSET_SPECS, AssetSpec, asset_name_comparison_key
 from lib.content_digest import prefixed_canonical_json_digest
 from lib.data_validator import DataValidator
 from lib.episode_adaptation import adaptation_mode, adaptation_state, adaptation_text_relpath, script_source_relpath
@@ -45,6 +46,7 @@ from lib.project_migration_failure import (
     MigrationFailureRecord,
     load_migration_verdict,
 )
+from lib.reference_catalog import derivative_reference
 from lib.script_models import get_generated_assets, script_duration_total
 from lib.script_plan_entries import (
     ScriptPlanEntryError,
@@ -579,8 +581,38 @@ class WorkflowStateService:
                     )
                 else:
                     collection["missing_ids"].append(name)
+                if spec.supports_derivatives and name in collection.get("current_ids", []):
+                    self._derivative_sheets(collection, spec, name, item, resolver, blockers)
             collections[asset_type] = collection
         return collections
+
+    def _derivative_sheets(
+        self,
+        collection: dict[str, Any],
+        spec: AssetSpec,
+        owner: str,
+        item: Mapping[str, Any],
+        resolver: ArtifactComparer | None,
+        blockers: list[WorkflowBlocker],
+    ) -> None:
+        """A current asset's derivative sheets, under their reference names (``owner/derivative``); a derivative is
+        an edit of its owner's sheet, so it is listed only once the owner's sheet is current."""
+        for name, derivative in derivative_table(item).items():
+            if not isinstance(derivative, Mapping):
+                continue
+            reference = derivative_reference(owner, name)
+            path = derivative.get(spec.sheet_field)
+            if resolver is not None and isinstance(path, str) and path:
+                self._classify_artifact(
+                    collection,
+                    resolver=resolver,
+                    key=derivative_artifact_key(asset_name_comparison_key(owner), asset_name_comparison_key(name)),
+                    artifact_path=path,
+                    resource_id=reference,
+                    blockers=blockers,
+                )
+            else:
+                collection["missing_ids"].append(reference)
 
     @staticmethod
     def _episodes(project: dict[str, Any], blockers: list[WorkflowBlocker]) -> list[tuple[int, dict[str, Any]]]:

@@ -129,3 +129,20 @@ async def test_a_character_the_source_never_names_is_not_registered(tmp_path: Pa
 
     assert completed.counts["characters"] == 1
     assert set(pm.load_project("demo")["characters"]) == {"Lan"}
+
+
+async def test_a_state_the_source_shows_becomes_a_derivative_and_an_invented_one_does_not(tmp_path: Path):
+    pm, revision = _project(tmp_path)
+    states = [
+        {"name": "về làng", "change": "đeo vòng bạc của mẹ; phần còn lại giữ nguyên", "evidence": "Lan  về làng, mang"},
+        {"name": "áo cưới", "change": "mặc áo dài cưới trắng #F5F1E8", "evidence": "Lan mặc áo cưới."},
+    ]
+    extracted = {**EXTRACTED, "characters": [{**EXTRACTED["characters"][0], "states": states}]}
+    generate, seen = _answer(extracted)
+
+    await extract_asset_inventory(pm, "demo", scope=ALL, expected_source_revision=revision, generate=generate)
+
+    lan = pm.load_project("demo")["characters"]["Lan"]
+    assert list(lan["derivatives"]) == ["về làng"]
+    assert lan["derivatives"]["về làng"]["description"] == "đeo vòng bạc của mẹ; phần còn lại giữ nguyên"
+    assert "states:" in seen[0].prompt
