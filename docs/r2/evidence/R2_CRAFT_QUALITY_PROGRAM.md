@@ -18,10 +18,10 @@ Donor checkouts: `/tmp/claude-1000/-home-anhtuan-content-production-os/9ab4f1ca-
 | P1-9 numeric look-consistency check | done | `5b614da68`, ADR-0145 |
 | P1-10 wardrobe/state derivatives in the run | done (= ID-5) | `2f86da4ca`, ADR-0146 (Jellyfish CostumeTimeline) |
 | P1-11 ambience bed | todo | |
-| P1-12 screen direction | todo | |
-| P2-13 foley / leitmotif / ShotVL | todo | |
-| P2-14 BytePlus guides via browser | todo | |
-| ID-1 reference selection, view crops, 4th slot | todo | ViMax reference_image_selector |
+| P1-12 screen direction | done | `02f83cca6`, ADR-0147 (judge already checks; planner now writes blocking) |
+| P2-13 foley / leitmotif / ShotVL | deferred with reasons | per-clip foley needs a real video route (stills have no motion to sync); a leitmotif needs per-scene cues (one cue per episode today); ShotVL-3B needs GPU room the 2070 lacks while ComfyUI is resident, and ADR-0148's framing line addresses shot size at generation |
+| P2-14 BytePlus guides via browser | done | `docs/research/2026-11-14-byteplus-seedance-seedream-prompt-guides.md` (headless Chrome) |
+| ID-1 reference selection, view crops, 4th slot | in progress | A/B: view crops do not change framing (`775569ffa`); framing line shipped (ADR-0148). Remaining: slot priority, no silent truncation, 4th slot |
 | ID-2 N candidates + pick | todo | ViMax best_image_selector; ADR-0112 |
 | ID-3 face-cosine instrument + calibration | todo | |
 | ID-4 reference name binding | todo | |
