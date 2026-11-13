@@ -18,3 +18,12 @@ Confound: the English text described "a white T-shirt" (from E1S02's scene text)
 Conclusions:
 - No dialect wins across shots; switching would add an LLM translation step for no shown gain. The prompt dialect stays as is (P1-8 closed: measured, no change).
 - **Shot size is ignored by every dialect**: four requested medium/close shots all came out full-body or medium-long. Inference: the full-body three-view sheet in the reference slot pulls the framing; ID-1 (the sheet view and a face crop matched to the shot size) is the lever to test next.
+
+## Follow-up: reference views and a framing line (ID-1), 2026-11-14
+
+Same route and shot E1S03 (requested close-up), seeds 11, 22, 33; script `ab_refs.py.txt`.
+
+1. **Reference choice** (`E1S03_references.jpg`, rows: whole three-view sheet / front panel only / front panel + face crop; columns: seeds). The rows are nearly identical; the seed decides the composition. No reference choice produced a close-up, and identity did not visibly change. Inference: on this model the full-body sheet is not what pulls the framing wide.
+2. **Framing line** (`E1S03_framing.jpg`, rows: an English line "Framing: close-up, head and shoulders fill the vertical frame, background softly out of focus." / the same in Chinese, placed first; columns: seeds). The English line tightens all three seeds from a seated full-body framing to a chest-up medium close-up; the Chinese line helps less. Still not a true close-up: the long environment description keeps pulling the frame out.
+
+Decision: the storyboard prompt now leads with an English framing line derived from `shot_type` and a non-eye-level `camera_angle` (`lib/prompt_builders.framing_line`). Reference views stay as they are for framing; ID-1 keeps its other goals (slot priority, the fourth slot, no silent truncation, name binding).

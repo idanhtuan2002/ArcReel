@@ -8,6 +8,7 @@ from lib.prompt_builders import (
     build_product_prompt,
     build_prop_prompt,
     build_scene_prompt,
+    framing_line,
     render_storyboard_image_prompt,
     storyboard_cast,
 )
@@ -153,3 +154,24 @@ class TestStoryboardCast:
 
         assert prompt == render_storyboard_image_prompt({"scene": "Cánh đồng"}, cast=storyboard_cast(self.PROJECT, {}))
         assert not prompt.startswith("Characters:")
+
+
+class TestFramingLine:
+    def test_a_structured_shot_leads_with_its_framing_and_non_eye_level_angle(self):
+        prompt = {
+            "scene": "Nam ngồi bên bếp",
+            "composition": {"shot_type": "Close-up", "camera_angle": "Low Angle", "lighting": "l", "ambiance": "a"},
+        }
+
+        rendered = render_storyboard_image_prompt(prompt, cast=[("Nam", "gầy")])
+
+        assert rendered.startswith(
+            "Framing: close-up, the face fills most of the frame, background softly out of focus, "
+            "low camera angle looking up.\n\nCharacters:\n- Nam: gầy\n\n"
+        )
+
+    def test_eye_level_adds_no_angle_and_text_prompts_get_no_framing(self):
+        eye = {"scene": "s", "composition": {"shot_type": "Medium Shot", "camera_angle": "Eye Level"}}
+
+        assert framing_line(eye) == "Framing: medium shot, framed from the waist up."
+        assert framing_line("free text") == ""

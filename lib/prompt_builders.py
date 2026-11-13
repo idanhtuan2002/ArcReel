@@ -203,9 +203,41 @@ def render_storyboard_image_prompt(
     body = append_product_fidelity_tail(build_storyboard_prompt(image_prompt, style, style_description), product_names)
     block = render_cast_block(cast)
     # 文本形态以「当前渲染结果」为初值时正文已带着这一块，再注入会叠出第二份。
-    if not block or (isinstance(image_prompt, str) and block in image_prompt):
-        return body
-    return f"{block}\n\n{body}"
+    if block and not (isinstance(image_prompt, str) and block in image_prompt):
+        body = f"{block}\n\n{body}"
+    framing = framing_line(image_prompt)
+    return f"{framing}\n\n{body}" if framing else body
+
+
+#: 景别 → 写给图像模型的英文取景句。实测（FLUX.2 klein 4B，docs/r2/evidence/prompt-dialect-ab-2026-11-14）
+#: 只在结构字段里写景别枚举时模型几乎无视它，提示词最前的一句英文取景描述能明显收紧画面。
+_FRAMING: dict[str, str] = {
+    "Extreme Close-up": "extreme close-up, one detail (the eyes, the hands or an object) fills the frame",
+    "Close-up": "close-up, the face fills most of the frame, background softly out of focus",
+    "Medium Close-up": "medium close-up, head and chest fill the frame",
+    "Medium Shot": "medium shot, framed from the waist up",
+    "Medium Long Shot": "medium long shot, framed from the knees up",
+    "Long Shot": "long shot, the whole body with the surroundings around it",
+    "Extreme Long Shot": "extreme long shot, a wide view where the setting dominates and people are small",
+    "Over-the-shoulder": "over-the-shoulder shot, framed past one person's shoulder toward the other",
+    "Point-of-view": "point-of-view shot, seen through the character's own eyes",
+}
+_ANGLE: dict[str, str] = {
+    "Low Angle": "low camera angle looking up",
+    "High Angle": "high camera angle looking down",
+    "Overhead": "top-down overhead view",
+    "Dutch Angle": "tilted dutch angle",
+}
+
+
+def framing_line(image_prompt: object) -> str:
+    """结构形态分镜的取景句（景别 + 非平视机位）；文本形态或无景别时为空串。"""
+    composition = image_prompt.get("composition") if isinstance(image_prompt, Mapping) else None
+    if not isinstance(composition, Mapping):
+        return ""
+    parts = [_FRAMING.get(str(composition.get("shot_type")), ""), _ANGLE.get(str(composition.get("camera_angle")), "")]
+    parts = [part for part in parts if part]
+    return f"Framing: {', '.join(parts)}." if parts else ""
 
 
 def storyboard_cast(project: Mapping[str, Any], item: Mapping[str, Any]) -> list[tuple[str, str]]:
