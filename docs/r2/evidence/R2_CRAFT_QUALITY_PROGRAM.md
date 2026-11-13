@@ -16,7 +16,7 @@ Donor checkouts: `/tmp/claude-1000/-home-anhtuan-content-production-os/9ab4f1ca-
 | P0-7 shot grammar (angle, coverage, variety) | done | `8f1dda78d`, ADR-0144 (AIVPE directorAgent, ShotBench) |
 | P1-8 image-prompt dialect per model | done: measured, no change | `8af1d0270`, `docs/r2/evidence/prompt-dialect-ab-2026-11-14/`: no dialect wins; shot size ignored by all (reference sheet pulls framing → ID-1) |
 | P1-9 numeric look-consistency check | done | `5b614da68`, ADR-0145 |
-| P1-10 wardrobe/state derivatives in the run | todo | merges with ID-5 |
+| P1-10 wardrobe/state derivatives in the run | done (= ID-5) | `2f86da4ca`, ADR-0146 (Jellyfish CostumeTimeline) |
 | P1-11 ambience bed | todo | |
 | P1-12 screen direction | todo | |
 | P2-13 foley / leitmotif / ShotVL | todo | |
@@ -25,7 +25,7 @@ Donor checkouts: `/tmp/claude-1000/-home-anhtuan-content-production-os/9ab4f1ca-
 | ID-2 N candidates + pick | todo | ViMax best_image_selector; ADR-0112 |
 | ID-3 face-cosine instrument + calibration | todo | |
 | ID-4 reference name binding | todo | |
-| ID-5 costume/state timeline → derivatives | todo | Jellyfish CostumeTimeline |
+| ID-5 costume/state timeline → derivatives | done | `2f86da4ca`, ADR-0146 |
 | ID-6 face repair loop | todo | rules: repair only the picked image; independent acceptance; weight by face size |
 | ID-7 DreamO bake-off, cloud LoRA | todo | |
 

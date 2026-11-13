@@ -2,7 +2,7 @@
 
 Question: does an English structured (BFL JSON) or English prose prompt beat the current prompt (Chinese/Vietnamese YAML with the `Characters:` block, ADR-0142) on the production image route?
 
-Setup: local ComfyUI, `flux-2-klein-4b-Q4_K_M.gguf`, text encoder `Qwen3-4B-Q4_K_M.gguf`, 4 steps, 576×1024, one reference slot = the character's three-view sheet (`characters/Nam.png` of production project `san-xuat-tu-ong-7fb4ef4b`, read only). Shots E1S02 (medium shot, nervous entry, bulb on the right) and E1S03 (close-up, leaning into steam). Variants: A = `render_storyboard_image_prompt` of the stored shot; B = the same content as BFL JSON in English; C = English prose, subject first. Seeds 11 and 22. Script: `ab_prompts.py`; prompts: `*.txt`; contact sheets: `E1S02_sheet.jpg`, `E1S03_sheet.jpg` (columns A, B, C; rows seed 11, 22). Judged by the main agent by eye.
+Setup: local ComfyUI, `flux-2-klein-4b-Q4_K_M.gguf`, text encoder `Qwen3-4B-Q4_K_M.gguf`, 4 steps, 576×1024, one reference slot = the character's three-view sheet (`characters/Nam.png` of production project `san-xuat-tu-ong-7fb4ef4b`, read only). Shots E1S02 (medium shot, nervous entry, bulb on the right) and E1S03 (close-up, leaning into steam). Variants: A = `render_storyboard_image_prompt` of the stored shot; B = the same content as BFL JSON in English; C = English prose, subject first. Seeds 11 and 22. Script: `ab_prompts.py.txt` (run as Python); prompts: `*.txt`; contact sheets: `E1S02_sheet.jpg`, `E1S03_sheet.jpg` (columns A, B, C; rows seed 11, 22). Judged by the main agent by eye.
 
 | Criterion | A (current) | B (EN JSON) | C (EN prose) |
 |---|---|---|---|
