@@ -66,6 +66,7 @@ from lib.episode_target_duration import (
     MIN_EPISODE_TARGET_DURATION,
     is_valid_episode_target_duration,
 )
+from lib.film_finish import Grade, grade_prompt_options
 from lib.formal_write import FormalWriteReceipt, formal_write_transaction, project_metadata_lock
 from lib.json_io import atomic_write_bytes, atomic_write_json, load_json, load_json_or_none
 from lib.path_safety import PathTraversalError, safe_join
@@ -251,6 +252,9 @@ class ProjectOverview(BaseModel):
     # 由 generate_overview 在落盘时同步写入。所有度量/切分调用方一律读顶层字段，
     # 不要直接读 overview.language。
     language: Literal["zh", "en", "vi"] = Field(description="小说源语言代码")
+    color_grade: Grade = Field(
+        description="成片调色预设，按题材与情绪基调选择：\n" + grade_prompt_options(),
+    )
 
 
 def _rename_agnostic_errors(

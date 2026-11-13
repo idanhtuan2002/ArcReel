@@ -94,6 +94,7 @@ class _FakeTextBackend:
                     "theme": "真相",
                     "world_setting": "古代",
                     "language": self._language,
+                    "color_grade": "moody_dark",
                 },
                 ensure_ascii=False,
             ),

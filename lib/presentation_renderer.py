@@ -25,6 +25,8 @@ from collections.abc import Sequence
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
+from lib.film_finish import DEFAULT_GRADE_INTENSITY, GRADES, MOVES, grade_filter, motion_filter
+
 MICROSECONDS = 1_000_000
 DURATION_TOLERANCE_SECONDS = 0.12
 SILENCE_DB = -60.0
@@ -61,6 +63,8 @@ class RenderUnit:
     narration_duration_us: int = 0
     narration_gain: float = 1.0
     cues: tuple[RenderCue, ...] = ()
+    #: Camera move (``lib.film_finish.MOVES``) made over the unit's picture when that picture is held still.
+    motion: str | None = None
 
 
 @dataclass(frozen=True)
@@ -82,6 +86,9 @@ class RenderContract:
 class RenderInput:
     episode: int
     units: tuple[RenderUnit, ...]
+    #: Colour grade (``lib.film_finish.GRADES``) applied to every unit; ``None`` leaves the picture as made.
+    grade: str | None = None
+    grade_intensity: float = DEFAULT_GRADE_INTENSITY
 
 
 @dataclass(frozen=True)
@@ -131,12 +138,16 @@ def _timestamp(us: int) -> str:
 def _validate(episode: RenderInput, contract: RenderContract) -> None:
     if not episode.units:
         raise RenderRefused("NO_PRESENTATIONS")
+    if episode.grade is not None and (episode.grade not in GRADES or not 0 < episode.grade_intensity <= 1):
+        raise RenderRefused("UNKNOWN_GRADE", episode.grade)
     total = 0
     for unit in episode.units:
         if unit.duration_us <= 0 or unit.video_start_us < 0:
             raise RenderRefused("INVALID_UNIT_WINDOW", unit.unit_id)
         if not unit.video_path.is_file():
             raise RenderRefused("SOURCE_MEDIA_MISSING", unit.unit_id)
+        if unit.motion is not None and unit.motion not in MOVES:
+            raise RenderRefused("UNKNOWN_MOTION", unit.unit_id)
         if unit.narration_path is not None:
             if not unit.narration_path.is_file():
                 raise RenderRefused("SOURCE_MEDIA_MISSING", unit.unit_id)
@@ -156,17 +167,36 @@ def _validate(episode: RenderInput, contract: RenderContract) -> None:
         raise RenderRefused("SUBTITLES_MISSING")
 
 
-def _unit_argv(unit: RenderUnit, output: Path, contract: RenderContract, ffmpeg: str) -> list[str]:
+def _unit_argv(
+    unit: RenderUnit,
+    output: Path,
+    contract: RenderContract,
+    ffmpeg: str,
+    *,
+    motion: str | None = None,
+    grade: str | None = None,
+    grade_intensity: float = DEFAULT_GRADE_INTENSITY,
+) -> list[str]:
     duration = _seconds(unit.duration_us)
     argv = [ffmpeg, "-nostdin", "-hide_banner", "-loglevel", "error", "-y"]
     argv += ["-ss", _seconds(unit.video_start_us), "-t", duration, "-i", str(unit.video_path)]
     if unit.narration_path is not None:
         argv += ["-i", str(unit.narration_path)]
+    moved = ""
+    if motion is not None:
+        frames = max(round(unit.duration_us / MICROSECONDS * contract.fps), 1)
+        moved = "," + motion_filter(
+            motion, width=contract.width, height=contract.height, fps=contract.fps, frames=frames
+        )
+    picture = "v" if grade is None else "ungraded"
     video = (
         f"[0:v]scale={contract.width}:{contract.height}:force_original_aspect_ratio=decrease,"
-        f"pad={contract.width}:{contract.height}:(ow-iw)/2:(oh-ih)/2,setsar=1,fps={contract.fps},"
-        f"format=yuv420p,trim=duration={duration},setpts=PTS-STARTPTS[v]"
+        f"pad={contract.width}:{contract.height}:(ow-iw)/2:(oh-ih)/2,setsar=1,fps={contract.fps}{moved},"
+        f"format=yuv420p,trim=duration={duration},setpts=PTS-STARTPTS[{picture}]"
     )
+    if grade is not None:
+        video += ";" + grade_filter(grade, grade_intensity, source="ungraded", output="graded")
+        video += ";[graded]format=yuv420p,setsar=1[v]"
     silence = f"anullsrc=r={AUDIO_RATE}:cl=stereo,atrim=duration={duration}[base]"
     parts = [video, silence]
     mix = ["[base]"]
@@ -189,6 +219,36 @@ def _unit_argv(unit: RenderUnit, output: Path, contract: RenderContract, ffmpeg:
     argv += ["-c:a", "aac", "-b:a", "160k", "-ar", str(AUDIO_RATE), "-ac", "2", "-t", duration]
     argv += ["-movflags", "+faststart", str(output)]
     return argv
+
+
+def _held_still(unit: RenderUnit, ffmpeg: str) -> bool:
+    """Whether the unit's picture stays the same frame for its whole window."""
+    seconds = unit.duration_us / MICROSECONDS
+    completed = _run(
+        [
+            ffmpeg,
+            "-nostdin",
+            "-hide_banner",
+            "-loglevel",
+            "info",
+            "-ss",
+            _seconds(unit.video_start_us),
+            "-t",
+            _seconds(unit.duration_us),
+            "-i",
+            str(unit.video_path),
+            "-map",
+            "0:v:0",
+            "-vf",
+            f"freezedetect=n=0.001:d={min(1.0, seconds / 2):.3f}",
+            "-f",
+            "null",
+            "-",
+        ],
+        timeout=120,
+    )
+    starts = re.findall(r"freeze_start: ([0-9.]+)", completed.stderr)
+    return bool(starts) and float(starts[0]) <= 0.05 and "freeze_end" not in completed.stderr
 
 
 def _has_audio(path: Path, ffmpeg: str) -> bool:
@@ -419,9 +479,21 @@ def render_presentations(
     staging.mkdir()
     try:
         segments: list[Path] = []
+        moves: dict[str, str | None] = {}
         for index, unit in enumerate(episode.units):
             segment = staging / f"unit_{index:04d}.mp4"
-            _run(_unit_argv(unit, segment, contract, ffmpeg), timeout=max(120.0, unit.duration_us / MICROSECONDS * 30))
+            motion = unit.motion if unit.motion is not None and _held_still(unit, ffmpeg) else None
+            moves[unit.unit_id] = motion
+            argv = _unit_argv(
+                unit,
+                segment,
+                contract,
+                ffmpeg,
+                motion=motion,
+                grade=episode.grade,
+                grade_intensity=episode.grade_intensity,
+            )
+            _run(argv, timeout=max(120.0, unit.duration_us / MICROSECONDS * 30))
             segments.append(segment)
         listing = staging / "concat.txt"
         listing.write_text("".join(f"file '{segment.name}'\n" for segment in segments), encoding="utf-8")
@@ -465,6 +537,7 @@ def render_presentations(
             "duration_seconds": duration,
             "final_sha256": sha256_file(final),
             "loudness": loudness,
+            "grade": None if episode.grade is None else {"name": episode.grade, "intensity": episode.grade_intensity},
             "subtitle_sha256": sha256_file(subtitle),
             "units": [
                 {
@@ -484,6 +557,7 @@ def render_presentations(
                         "duration_us": unit.narration_duration_us,
                     },
                     "cues": [asdict(cue) for cue in unit.cues],
+                    "motion": moves[unit.unit_id],
                 }
                 for unit in episode.units
             ],

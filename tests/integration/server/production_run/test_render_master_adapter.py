@@ -273,6 +273,7 @@ async def test_exact_presentations_render_and_become_the_runs_final_master(rende
     assert manifest["final_sha256"] == sha256_file(final_path)
     assert abs(manifest["duration_seconds"] - 32.0) <= 0.12
     assert [unit["unit_id"] for unit in manifest["units"]] == list(SEGMENTS)
+    assert manifest["grade"] == {"name": "neutral", "intensity": 0.7}
 
     mastered = await _tick(sessions, controller, run)
     assert (mastered.stage, mastered.status, mastered.reason) == (RunStage.QUALITY, RunStatus.RUNNING, None)

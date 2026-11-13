@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import asyncio
 from collections.abc import Awaitable, Callable, Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
@@ -98,6 +98,8 @@ class MaterializedEpisode:
 
     project_snapshot: Mapping[str, Any]
     presentations: tuple[MaterializedPresentation, ...]
+    #: The episode script the presentations were materialized from.
+    script_snapshot: Mapping[str, Any] = field(default_factory=dict)
 
 
 @dataclass(frozen=True, slots=True)
@@ -397,6 +399,7 @@ class PresentationReadModelService:
         return MaterializedEpisode(
             project_snapshot=snapshot.project,
             presentations=tuple(results),
+            script_snapshot=snapshot.script,
         )
 
     def _load_episode_snapshot(self, project_name: str, episode: int) -> _EpisodeSnapshot:

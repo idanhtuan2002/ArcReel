@@ -13,10 +13,13 @@ import asyncio
 import json
 import math
 import time
+from collections.abc import Mapping
 from pathlib import Path
+from typing import Any
 
 from lib.db.repositories.production_runs import ProductionRunRepository
 from lib.episode_target_duration import MAX_EPISODE_TARGET_DURATION, MIN_EPISODE_TARGET_DURATION
+from lib.film_finish import GRADES, move_for
 from lib.narration_delivery import USE_TTS
 from lib.path_safety import safe_join
 from lib.presentation_renderer import (
@@ -29,6 +32,7 @@ from lib.presentation_renderer import (
     sha256_file,
 )
 from lib.project_manager import ProjectManager
+from lib.script_editor import resolve_items
 from lib.speech_presentation import SpeechPresentation
 from r2.automation.identity import digest_value
 from r2.contracts.automation import (
@@ -80,7 +84,26 @@ def render_dir(run: RunSnapshot, episode: int) -> Path:
     return Path("production") / "automation" / run.run_id / f"g{run.generation}" / f"episode_{episode}"
 
 
+def _planned_moves(script: Mapping[str, Any]) -> dict[str, str]:
+    """Each script unit's camera move for a held picture, from its planned ``video_prompt.camera_motion``."""
+    items, id_field, _kind = resolve_items(dict(script))
+    moves: dict[str, str] = {}
+    for item in items:
+        if isinstance(item, dict) and isinstance(item.get(id_field), str):
+            prompt = item.get("video_prompt")
+            moves[item[id_field]] = move_for(prompt.get("camera_motion") if isinstance(prompt, dict) else None)
+    return moves
+
+
+def film_grade(project: Mapping[str, Any]) -> str:
+    """The project's colour grade: the one its overview chose, else ``neutral``."""
+    overview = project.get("overview")
+    grade = overview.get("color_grade") if isinstance(overview, Mapping) else None
+    return grade if isinstance(grade, str) and grade in GRADES else "neutral"
+
+
 def render_input(project_path: Path, episode: int, materialized: MaterializedEpisode) -> RenderInput:
+    moves = _planned_moves(materialized.script_snapshot)
     units: list[RenderUnit] = []
     for item in materialized.presentations:
         presentation = item.presentation
@@ -109,9 +132,10 @@ def render_input(project_path: Path, episode: int, materialized: MaterializedEpi
                 cues=tuple(
                     RenderCue(cue.start_microseconds, cue.end_microseconds, cue.text) for cue in presentation.subtitles
                 ),
+                motion=moves.get(presentation.unit_id, "static"),
             )
         )
-    return RenderInput(episode=episode, units=tuple(units))
+    return RenderInput(episode=episode, units=tuple(units), grade=film_grade(materialized.project_snapshot))
 
 
 class RenderAdapter:

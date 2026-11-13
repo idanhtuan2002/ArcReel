@@ -165,3 +165,80 @@ def test_a_contract_without_a_loudness_target_keeps_the_mix(clips, tmp_path: Pat
     )
 
     assert json.loads(receipt.manifest_path.read_text(encoding="utf-8"))["loudness"] is None
+
+
+def _frame_md5(path: Path, index: int) -> str:
+    return subprocess.run(
+        [
+            "ffmpeg",
+            "-v",
+            "error",
+            "-i",
+            str(path),
+            "-vf",
+            f"select=eq(n\\,{index})",
+            "-frames:v",
+            "1",
+            "-f",
+            "md5",
+            "-",
+        ],
+        capture_output=True,
+        text=True,
+        check=True,
+    ).stdout.strip()
+
+
+def test_a_held_picture_gets_its_camera_move_and_a_moving_clip_keeps_its_own(clips, tmp_path: Path):
+    still = _media(
+        tmp_path / "still.mp4",
+        "-f",
+        "lavfi",
+        "-i",
+        "testsrc2=size=576x1024:rate=24",
+        "-vf",
+        "trim=end_frame=1,loop=loop=-1:size=1",
+        seconds=3,
+    )
+    held = RenderUnit(**{**_unit(clips).__dict__, "unit_id": "held", "video_path": still, "motion": "push_in"})
+    moving = RenderUnit(**{**_unit(clips).__dict__, "unit_id": "moving", "motion": "pan_left"})
+
+    receipt = render_presentations(
+        episode=RenderInput(episode=1, units=(held, moving)), output_dir=tmp_path / "out", contract=CONTRACT
+    )
+
+    units = json.loads(receipt.manifest_path.read_text(encoding="utf-8"))["units"]
+    assert [unit["motion"] for unit in units] == ["push_in", None]
+    assert _frame_md5(receipt.final_path, 0) != _frame_md5(receipt.final_path, 60)
+    assert abs(receipt.duration_seconds - 6.0) <= 0.12
+
+
+def test_the_film_grade_is_applied_and_recorded(clips, tmp_path: Path):
+    plain = render_presentations(
+        episode=RenderInput(episode=1, units=(_unit(clips),)), output_dir=tmp_path / "plain", contract=CONTRACT
+    )
+    graded = render_presentations(
+        episode=RenderInput(episode=1, units=(_unit(clips),), grade="cinematic_warm", grade_intensity=0.7),
+        output_dir=tmp_path / "graded",
+        contract=CONTRACT,
+    )
+
+    manifest = json.loads(graded.manifest_path.read_text(encoding="utf-8"))
+    assert manifest["grade"] == {"name": "cinematic_warm", "intensity": 0.7}
+    assert _frame_md5(graded.final_path, 10) != _frame_md5(plain.final_path, 10)
+    assert abs(graded.duration_seconds - 3.0) <= 0.12
+
+
+@pytest.mark.parametrize(
+    ("episode_fields", "unit_fields", "code"),
+    [({"grade": "sepia"}, {}, "UNKNOWN_GRADE"), ({}, {"motion": "whip_pan"}, "UNKNOWN_MOTION")],
+)
+def test_an_unknown_grade_or_move_is_refused(clips, tmp_path: Path, episode_fields, unit_fields, code):
+    unit = RenderUnit(**{**_unit(clips).__dict__, **unit_fields})
+    with pytest.raises(RenderRefused) as refused:
+        render_presentations(
+            episode=RenderInput(episode=1, units=(unit,), **episode_fields),
+            output_dir=tmp_path / "o",
+            contract=CONTRACT,
+        )
+    assert refused.value.code == code
