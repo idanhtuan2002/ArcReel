@@ -228,7 +228,7 @@ async def test_an_unfinished_story_run_makes_the_story_autopilot_wait(session_fa
         book_parts=planner.book_parts,
         unplanned_source=lambda name: False,
         sync_story=planner.sync_story,
-        max_targets=lambda d: None,  # type: ignore[arg-type]
+        max_targets=lambda d: None,
         story_busy=busy,
     )
     state, command = await planner.state(_delegation())

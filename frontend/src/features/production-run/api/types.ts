@@ -231,6 +231,8 @@ export interface AutomationSettingsView {
   profile_id?: string | null;
   launch_profile_id: string;
   routes: RouteSetting[];
+  /** Models a text role falls back to, in order, when its own fails or runs out of quota (ADR-0139). */
+  fallbacks?: RouteSetting[];
   currency?: string;
   max_cost_minor_units?: number;
   max_model_calls?: number;
@@ -264,6 +266,7 @@ export interface AutomationSettingsUpdate {
   profile_id?: string | null;
   launch_profile_id: string;
   routes: RouteSetting[];
+  fallbacks: RouteSetting[];
   currency: string;
   max_cost_minor_units: number;
   max_model_calls: number;

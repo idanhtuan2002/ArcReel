@@ -9,7 +9,8 @@ import pytest
 
 from server import auth
 from tests.integration.lib.db.repositories.test_production_runs import policy
-from tests.integration.server.services.test_automation_grants import custodian, interactive_env  # noqa: F401
+from tests.integration.server.services.test_automation_grants import custodian as custodian
+from tests.integration.server.services.test_automation_grants import interactive_env as interactive_env
 from tests.integration.server.services.test_quality_profile_custodian import prepare_qualified_custody
 
 

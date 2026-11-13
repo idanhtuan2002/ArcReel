@@ -105,12 +105,13 @@ def _policy(provider_id: str, **overrides) -> RunPolicy:
 
 
 @pytest.fixture
-def story_policy():
-    """Policy fields a test module replaces; called with the session factory after custody exists, before the run."""
+def story_policy(request):
+    """Policy fields a test module replaces; called with the session factory after custody exists, before the run.
+    A test may give its own (indirect parametrization) as an async callable of the session factory."""
+    given = getattr(request, "param", None)
 
     async def overrides(sessions) -> dict:
-        del sessions
-        return {}
+        return await given(sessions) if given is not None else {}
 
     return overrides
 
@@ -250,10 +251,10 @@ async def _execute_story(host: Host, *, asked: list[str] | None = None, model_na
     payload = json.loads(task.payload_json)
     model = ScriptedModel(model_name)
 
-    def handler(request: httpx.Request) -> httpx.Response:
+    async def handler(request: httpx.Request) -> httpx.Response:
         if asked is not None and request.url.path.endswith("/chat"):
             asked.append(json.loads(request.content)["model"])
-        return model.handler(request)
+        return await model.handler(request)
 
     def client_for(base_url, api_key):
         from lib.text_backends.ollama import OllamaChatClient
@@ -827,3 +828,91 @@ async def test_a_new_run_on_another_writer_takes_over_the_story_and_keeps_what_w
     assert set(second_models) <= {"writer-two"}
     after = await store.load()
     assert {node_id: node.head_revision_id for node_id, node in after.nodes.items() if node_id in heads} == heads
+
+
+FALLBACK = "writer-two"
+
+
+async def _writer_fallback(sessions) -> dict:
+    """ADR-0139: the run's writer falls back to another local model."""
+    other = await _provider(sessions, model=FALLBACK)
+    fallback = ModelRoute(
+        role="writer",
+        provider_id=other,
+        model_id=FALLBACK,
+        model_identity=FALLBACK,
+        config_digest="sha256:" + "2" * 64,
+        local=True,
+        paid=False,
+        currency="USD",
+        max_cost_per_call=None,
+    )
+    return {"fallback_routes": (fallback,)}
+
+
+async def _stop(host: Host, task_id: str) -> None:
+    store = RunStateStore(host.sessions, task_id=task_id)
+    await store.apply(lambda s: (set_phase(s, RunPhase.MODEL_UNAVAILABLE, reason="429 quota exhausted"), None))
+    async with host.sessions() as session, session.begin():
+        await session.execute(sa.update(Task).where(Task.task_id == task_id).values(status="succeeded"))
+
+
+async def _brief(host: Host, task_id: str) -> StoryBrief:
+    async with host.sessions() as session:
+        task = (await session.execute(sa.select(Task).where(Task.task_id == task_id))).scalar_one()
+    return StoryBrief.model_validate(json.loads(task.payload_json)["brief"])
+
+
+@pytest.mark.parametrize("story_policy", [_writer_fallback], indirect=True)
+async def test_a_story_whose_writer_failed_goes_on_with_the_fallback_writer_in_the_same_run(story_host: Host):
+    host = story_host
+    await _tick(host)
+    await _tick(host)
+    task_id = await _story_task(host)
+    store = RunStateStore(host.sessions, task_id=task_id)
+    first: list[str] = []
+    assert await _execute_story(host, asked=first) == "READY_FOR_APPROVAL"
+    written = await store.load()
+    heads = {node_id: node.head_revision_id for node_id, node in written.nodes.items()}
+    await _stop(host, task_id)
+
+    reworked = await _tick(host)
+    assert (reworked.stage, reworked.status, reworked.generation) == (RunStage.STORY, RunStatus.RUNNING, 2)
+    waiting = await _tick(host)
+    assert (waiting.stage, waiting.status, waiting.reason) == (RunStage.STORY, RunStatus.WAITING_TASK, None)
+
+    brief = await _brief(host, task_id)
+    assert brief.selection.model_id == FALLBACK
+    assert brief.basis is not None
+    assert brief.gate_a_decision_id is not None
+    state = await store.load()
+    assert state.phase is RunPhase.RUNNING
+    [moved] = state.top_ups
+    assert moved.baseline == written.usage
+
+    second: list[str] = []
+    assert await _execute_story(host, asked=second, model_name=FALLBACK) == "READY_FOR_APPROVAL"
+    assert set(second) <= {FALLBACK}
+    after = await store.load()
+    assert {node_id: node.head_revision_id for node_id, node in after.nodes.items() if node_id in heads} == heads
+    offered = await _tick(host)
+    assert (offered.stage, offered.status) == (RunStage.STORY_COMMIT, RunStatus.RUNNING)
+
+
+@pytest.mark.parametrize("story_policy", [_writer_fallback], indirect=True)
+async def test_a_story_on_the_last_writer_stays_stopped_for_the_showrunner(story_host: Host):
+    host = story_host
+    await _tick(host)
+    await _tick(host)
+    task_id = await _story_task(host)
+    await _stop(host, task_id)
+    assert (await _tick(host)).stage is RunStage.STORY  # moves to the fallback
+    await _tick(host)
+    assert (await _brief(host, task_id)).selection.model_id == FALLBACK
+    await _stop(host, task_id)
+
+    blocked = await _tick(host)
+    assert blocked.stage is RunStage.STORY
+    assert blocked.status is not RunStatus.RUNNING
+    assert blocked.status is not RunStatus.WAITING_TASK
+    assert (await _brief(host, task_id)).selection.model_id == FALLBACK

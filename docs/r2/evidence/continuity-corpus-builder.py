@@ -10,7 +10,7 @@ import uuid
 from pathlib import Path
 
 BASE = "http://127.0.0.1:8188"
-WF = json.load(open("/var/tmp/ar9b/flux2-klein-reference.json"))["workflow"]
+WF = json.loads(Path("/var/tmp/ar9b/flux2-klein-reference.json").read_text(encoding="utf-8"))["workflow"]
 
 STORIES = [
     (

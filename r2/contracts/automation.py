@@ -108,6 +108,10 @@ class ModelRoute(AutomationContract):
     max_cost_per_call: NonnegativeInt | None
 
 
+#: Roles whose model may be replaced mid-run by a fallback route (ADR-0139).
+FALLBACK_ROLES = frozenset({"writer", "script"})
+
+
 class RunPolicy(AutomationContract):
     schema_id: Literal["r2.production-policy.v1"] = "r2.production-policy.v1"
     mode: AutomationMode = AutomationMode.AUTO
@@ -116,6 +120,9 @@ class RunPolicy(AutomationContract):
     launch_profile_id: ExactIdentity = "fiction_narration_vi_v1"
     local_only: StrictBool = False
     routes: tuple[ModelRoute, ...] = ()
+    #: Routes a role falls back to, in order, when its model fails or runs out of quota mid-run (ADR-0139); text
+    #: roles (``writer``, ``script``) only.
+    fallback_routes: tuple[ModelRoute, ...] = ()
     checkpoints: frozenset[Checkpoint] | None = None
     currency: Annotated[str, StringConstraints(pattern=r"^[A-Z][A-Z0-9_]{1,31}$")]
     max_cost_minor_units: NonnegativeInt
@@ -145,6 +152,21 @@ class RunPolicy(AutomationContract):
     continuity_judge_identity: ExactIdentity | None = None
     continuity_judge_prompt_digest: Digest | None = None
     continuity_judge_max_pictures: Annotated[StrictInt, Field(ge=2, le=16)] | None = None
+
+    @model_validator(mode="after")
+    def fallbacks_are_text_routes(self) -> Self:
+        for route in self.fallback_routes:
+            if route.role not in FALLBACK_ROLES:
+                raise ValueError(f"role {route.role} has no fallback routes")
+            if any(
+                (r.role, r.provider_id, r.model_id) == (route.role, route.provider_id, route.model_id)
+                for r in self.routes
+            ):
+                raise ValueError("a fallback route repeats the role's own route")
+        keys = [(r.role, r.provider_id, r.model_id) for r in self.fallback_routes]
+        if len(set(keys)) != len(keys):
+            raise ValueError("a fallback route is listed twice")
+        return self
 
     @model_validator(mode="after")
     def image_selection(self) -> Self:

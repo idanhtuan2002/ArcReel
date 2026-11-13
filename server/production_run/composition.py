@@ -99,11 +99,20 @@ class ProjectPolicyResolver:
         self._sessions, self._projects, self._resolver = sessions, projects, resolver
 
     async def routes(self, project_name: str) -> tuple[ModelRoute, ...]:
+        return await self._inspected(project_name, "routes")
+
+    async def fallback_routes(self, project_name: str) -> tuple[ModelRoute, ...]:
+        """The settings' fallback routes in order (ADR-0139); one no longer available is left out, never refusing."""
+        if not _automation(self._projects, project_name).get("fallbacks"):
+            return ()
+        return await self._inspected(project_name, "fallbacks")
+
+    async def _inspected(self, project_name: str, key: str) -> tuple[ModelRoute, ...]:
         settings = _automation(self._projects, project_name)
         project = self._projects.load_project(project_name)
         routes = []
         async with self._sessions() as session:
-            for raw in settings.get("routes") or []:
+            for raw in settings.get(key) or []:
                 declared = ModelRoute.model_validate(
                     {
                         "config_digest": "sha256:" + "0" * 64,
@@ -117,6 +126,8 @@ class ProjectPolicyResolver:
                 try:
                     routes.append(await inspect_model_route(session, self._resolver, route=declared, project=project))
                 except ValueError:
+                    if key == "fallbacks":
+                        continue
                     raise ProductionRunRefused(
                         "AUTOMATION_NOT_CONFIGURED", 409, ("PINNED_MODEL_UNAVAILABLE",)
                     ) from None
@@ -137,6 +148,7 @@ class ProjectPolicyResolver:
         del user_id
         settings = _automation(self._projects, project_name)
         routes = await self.routes(project_name)
+        fallbacks = await self.fallback_routes(project_name)
         launch = resolve_launch_profile(str(settings.get("launch_profile_id", "fiction_narration_vi_v1")))
         return RunPolicy.model_validate(
             {
@@ -146,6 +158,7 @@ class ProjectPolicyResolver:
                 "launch_profile_id": launch.profile_id,
                 "local_only": bool(settings.get("local_only", True)),
                 "routes": routes,
+                "fallback_routes": fallbacks,
                 "currency": settings.get("currency", "USD"),
                 "max_cost_minor_units": int(settings.get("max_cost_minor_units", 500)),
                 "max_model_calls": int(settings.get("max_model_calls", DEFAULT_MAX_MODEL_CALLS)),

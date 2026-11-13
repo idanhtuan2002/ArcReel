@@ -161,3 +161,49 @@ async def test_an_unpublished_quality_profile_is_refused(session_factory):
 
     with pytest.raises(SettingsRefused, match="MISSING_PUBLISHED_PROFILE"):
         await save_settings(session_factory, Projects({}), "p", update, user_id="default")
+
+
+async def test_text_roles_keep_ordered_fallback_models_and_a_cloud_one_makes_the_run_paid(session_factory):
+    """ADR-0139: the models a text role falls back to when its own fails or runs out of quota."""
+    await _providers(session_factory)
+
+    async def digest(base_url: str, model_id: str) -> str:
+        return f"ollama/{model_id}@sha256:" + "9" * 64
+
+    projects = Projects({})
+    fallbacks = [
+        {"role": "writer", "provider_id": "custom-2", "model_id": "gemini-3.6-flash", "max_cost_per_call": 3},
+        {"role": "script", "provider_id": "custom-1", "model_id": TEXT[2]},
+    ]
+    update = SettingsUpdate.model_validate({**_update().model_dump(), "fallbacks": fallbacks})
+
+    saved = await save_settings(session_factory, projects, "p", update, user_id="default", identify_ollama=digest)
+
+    stored = projects.project["automation"]
+    assert [(f["role"], f["model_id"], f["model_identity"]) for f in stored["fallbacks"]] == [
+        ("writer", "gemini-3.6-flash", "gemini/gemini-3.6-flash"),
+        ("script", TEXT[2], f"ollama/{TEXT[2]}@sha256:" + "9" * 64),
+    ]
+    assert (stored["local_only"], stored["paid"]) == (False, True)
+    assert [f["model_id"] for f in saved["fallbacks"]] == ["gemini-3.6-flash", TEXT[2]]
+
+
+@pytest.mark.parametrize(
+    ("fallback", "code"),
+    [
+        ({"role": "reviewer_a", "provider_id": "custom-1", "model_id": TEXT[2]}, "FALLBACK_ROLE_UNSUPPORTED"),
+        ({"role": "writer", "provider_id": "custom-1", "model_id": TEXT[0]}, "FALLBACK_REPEATED"),
+        ({"role": "writer", "provider_id": "custom-2", "model_id": "gemini-3.6-flash"}, "UNBOUNDED_PAID_ROUTE"),
+    ],
+)
+async def test_a_fallback_of_another_role_a_repeated_one_or_an_unbounded_cloud_one_is_refused(
+    session_factory, fallback, code
+):
+    await _providers(session_factory)
+
+    async def digest(base_url: str, model_id: str) -> str:
+        return f"ollama/{model_id}@sha256:" + "9" * 64
+
+    update = SettingsUpdate.model_validate({**_update().model_dump(), "fallbacks": [fallback]})
+    with pytest.raises(SettingsRefused, match=code):
+        await save_settings(session_factory, Projects({}), "p", update, user_id="default", identify_ollama=digest)

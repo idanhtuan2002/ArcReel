@@ -6,6 +6,9 @@ import { getAutomationSettings, saveAutomationSettings } from "../api/production
 import type { AutomationRole, AutomationSettings, RouteSetting } from "../api/types";
 
 const ROLES: readonly AutomationRole[] = ["writer", "script", "reviewer_a", "reviewer_b", "image", "video", "audio"];
+/** Roles that may name fallback models (ADR-0139). */
+const FALLBACK_ROLES: readonly AutomationRole[] = ["writer", "script"];
+const MAX_FALLBACKS = 8;
 const FIELD_CLS = "focus-ring rounded-md px-1.5 py-0.5";
 const FIELD_STYLE = { border: "1px solid var(--color-hairline-strong)", background: "transparent" };
 
@@ -13,6 +16,7 @@ interface Draft {
   profile_id: string;
   launch_profile_id: string;
   routes: Record<AutomationRole, RouteSetting | null>;
+  fallbacks: RouteSetting[];
   currency: string;
   max_cost_minor_units: number;
   max_model_calls: number;
@@ -29,6 +33,7 @@ function draftOf(loaded: AutomationSettings): Draft {
     profile_id: settings.profile_id ?? "",
     launch_profile_id: settings.launch_profile_id,
     routes,
+    fallbacks: settings.fallbacks ?? [],
     currency: settings.currency ?? "USD",
     max_cost_minor_units: settings.max_cost_minor_units ?? 500,
     max_model_calls: settings.max_model_calls ?? 2400,
@@ -85,6 +90,7 @@ export function AutomationSettingsEditor({ projectName, onSaved }: Props) {
         profile_id: draft.profile_id || null,
         launch_profile_id: draft.launch_profile_id,
         routes: routes.filter((route): route is RouteSetting => route !== null),
+        fallbacks: draft.fallbacks,
         currency: draft.currency,
         max_cost_minor_units: draft.max_cost_minor_units,
         max_model_calls: draft.max_model_calls,
@@ -120,6 +126,31 @@ export function AutomationSettingsEditor({ projectName, onSaved }: Props) {
     const route = draft?.routes[role];
     if (!draft || !route) return;
     setDraft({ ...draft, routes: { ...draft.routes, [role]: { ...route, max_cost_per_call: value || null } } });
+  };
+
+  const fallbacksOf = (role: AutomationRole) => (draft?.fallbacks ?? []).filter((route) => route.role === role);
+
+  const setFallbacks = (role: AutomationRole, next: RouteSetting[]) => {
+    if (!draft) return;
+    // Keep each role's fallbacks together, in the order the roles are listed.
+    const others = draft.fallbacks.filter((route) => route.role !== role);
+    const merged = FALLBACK_ROLES.flatMap((r) => (r === role ? next : others.filter((route) => route.role === r)));
+    setDraft({ ...draft, fallbacks: merged });
+  };
+
+  const setFallback = (role: AutomationRole, index: number, value: string) => {
+    if (!loaded) return;
+    const chosen = loaded.options[role].find((o) => `${o.provider_id}/${o.model_id}` === value);
+    const list = [...fallbacksOf(role)];
+    if (chosen) list[index] = { role, provider_id: chosen.provider_id, model_id: chosen.model_id };
+    else list.splice(index, 1);
+    setFallbacks(role, list);
+  };
+
+  const setFallbackCeiling = (role: AutomationRole, index: number, value: number) => {
+    const list = [...fallbacksOf(role)];
+    list[index] = { ...list[index], max_cost_per_call: value || null };
+    setFallbacks(role, list);
   };
 
   const numberField = (key: keyof Draft, label: string, min: number, max: number) => (
@@ -233,6 +264,79 @@ export function AutomationSettingsEditor({ projectName, onSaved }: Props) {
                       onChange={(event) => setCeiling(role, Number(event.target.value))}
                     />
                   </label>
+                )}
+                {FALLBACK_ROLES.includes(role) && loaded && (
+                  <div className="w-full space-y-1 pl-6">
+                    {fallbacksOf(role).length > 0 && (
+                      <p style={{ color: "var(--color-text-3)" }}>
+                        {t("auto_settings_fallbacks")} · {t("auto_settings_fallbacks_hint")}
+                      </p>
+                    )}
+                    {fallbacksOf(role).map((fallback, index) => {
+                      const spare = option(role, fallback);
+                      const n = index + 1;
+                      return (
+                        <div key={`${fallback.provider_id}/${fallback.model_id}/${n}`} className="flex flex-wrap items-center gap-2">
+                          <span style={{ color: "var(--color-text-3)" }}>{n}.</span>
+                          <select
+                            className={FIELD_CLS}
+                            style={FIELD_STYLE}
+                            aria-label={t("auto_settings_fallback_for", { n, role: t(`auto_role_${role}`) })}
+                            value={`${fallback.provider_id}/${fallback.model_id}`}
+                            onChange={(event) => setFallback(role, index, event.target.value)}
+                          >
+                            {loaded.options[role].map((o) => (
+                              <option key={`${o.provider_id}/${o.model_id}`} value={`${o.provider_id}/${o.model_id}`}>
+                                {o.label} · {o.local ? t("auto_setup_local") : t("auto_setup_cloud")}
+                              </option>
+                            ))}
+                          </select>
+                          {spare && !spare.local && (
+                            <input
+                              type="number"
+                              className={`${FIELD_CLS} w-20`}
+                              style={FIELD_STYLE}
+                              min={1}
+                              max={1000}
+                              aria-label={t("auto_settings_ceiling_for", { role: t("auto_settings_fallback_for", { n, role: t(`auto_role_${role}`) }) })}
+                              value={fallback.max_cost_per_call ?? ""}
+                              onChange={(event) => setFallbackCeiling(role, index, Number(event.target.value))}
+                            />
+                          )}
+                          <button
+                            type="button"
+                            className="focus-ring rounded-md px-1.5"
+                            style={FIELD_STYLE}
+                            aria-label={t("auto_settings_remove_fallback", { n })}
+                            onClick={() => setFallback(role, index, "")}
+                          >
+                            ×
+                          </button>
+                        </div>
+                      );
+                    })}
+                    {draft.fallbacks.length < MAX_FALLBACKS && loaded.options[role].length > 1 && (
+                      <button
+                        type="button"
+                        className="focus-ring rounded-md px-1.5 py-0.5"
+                        style={{ ...FIELD_STYLE, color: "var(--color-text-2)" }}
+                        onClick={() => {
+                          const taken = new Set(
+                            [route, ...fallbacksOf(role)].map((r) => (r ? `${r.provider_id}/${r.model_id}` : "")),
+                          );
+                          const free = loaded.options[role].find((o) => !taken.has(`${o.provider_id}/${o.model_id}`));
+                          if (free) {
+                            setFallbacks(role, [
+                              ...fallbacksOf(role),
+                              { role, provider_id: free.provider_id, model_id: free.model_id },
+                            ]);
+                          }
+                        }}
+                      >
+                        + {t("auto_settings_add_fallback")}
+                      </button>
+                    )}
+                  </div>
                 )}
               </div>
             );

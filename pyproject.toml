@@ -157,6 +157,7 @@ ignore_imports = [
     "lib.project_manager -> lib.text_backends.base",
     "lib.text_generator -> lib.text_backends.base",
     "lib.text_generator -> lib.text_backends.factory",
+    "lib.text_generator -> lib.text_backends.route_failure",
     # 失败渲染按 ComfyUI 产物白名单投影 comfyui_output_type_mismatch 的期望扩展名；comfyui.artifacts
     # 只依赖同包的纯函数与失败码，是一张静态白名单的叶子，task_repo 经此可达不引入运行时依赖。
     "lib.task_failure -> lib.custom_provider.comfyui.artifacts",

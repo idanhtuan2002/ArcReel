@@ -46,3 +46,29 @@ async def create_text_backend_for_model(
     if backend.model != model_id:
         raise ValueError("selected text model unavailable; refusing default fallback")
     return backend, provider_id
+
+
+#: The automation settings role whose fallback routes a project's text tasks take (ADR-0139).
+TEXT_FALLBACK_ROLE = "script"
+
+
+def project_text_fallbacks(project_name: str | None) -> tuple[tuple[str, str], ...]:
+    """The project's text fallback models in order, from its automation settings; none without a project."""
+    if not project_name:
+        return ()
+    from lib.project_manager import get_project_manager
+
+    try:
+        project = get_project_manager().load_project(project_name)
+    except (FileNotFoundError, ValueError, OSError):
+        return ()
+    settings = project.get("automation")
+    routes = settings.get("fallbacks") if isinstance(settings, dict) else None
+    return tuple(
+        (str(route["provider_id"]), str(route["model_id"]))
+        for route in routes or []
+        if isinstance(route, dict)
+        and route.get("role") == TEXT_FALLBACK_ROLE
+        and route.get("provider_id")
+        and route.get("model_id")
+    )

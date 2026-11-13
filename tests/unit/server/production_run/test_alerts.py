@@ -37,7 +37,7 @@ async def test_the_same_state_is_sent_once_and_a_new_halt_after_a_run_is_sent_ag
 async def test_without_a_webhook_nothing_is_sent():
     gate = AlertGate(None)
     await gate.observe(user_id="u", project_name="p", event="finished")
-    assert gate._sent == {}  # pyright: ignore[reportPrivateUsage]
+    assert gate._sent == {}
 
 
 @pytest.mark.parametrize("body_format", ["text", "json"])

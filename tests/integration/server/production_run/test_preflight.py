@@ -242,6 +242,37 @@ async def test_frozen_policy_still_cannot_admit_unqualified_or_unbounded_routes(
     assert reader.provider_submit_count == 0
 
 
+@pytest.mark.parametrize("kind", ["cloud", "paid", "alias"])
+async def test_a_fallback_route_is_held_to_the_rules_of_the_routes_it_replaces(kind):
+    """ADR-0139: a writer fallback is bounded like any route and never one of the run's reviewers."""
+    from server.production_run.preflight import ProductionPreflight
+
+    frozen, snapshot = complete_snapshot()
+    writer = next(route for route in snapshot.routes if route.role == "writer")
+    reviewer = next(route for route in snapshot.routes if route.role == "reviewer_a")
+    spare = writer.model_copy(update={"model_id": "spare-writer", "model_identity": "spare-writer"})
+    if kind == "cloud":
+        spare = spare.model_copy(update={"local": False})
+        frozen = frozen.model_copy(update={"local_only": True})
+        expected = "CLOUD_ROUTE_FORBIDDEN"
+    elif kind == "paid":
+        spare = spare.model_copy(update={"paid": True, "max_cost_per_call": None})
+        expected = "UNBOUNDED_PAID_ROUTE"
+    else:
+        spare = spare.model_copy(update={"model_identity": reviewer.model_identity})
+        expected = "REVIEWER_INDEPENDENCE_MISSING"
+    clean = await ProductionPreflight(SnapshotReader(snapshot)).check(
+        user_id=snapshot.user_id, project_name=snapshot.project_name, policy=frozen
+    )
+    report = await ProductionPreflight(SnapshotReader(snapshot)).check(
+        user_id=snapshot.user_id,
+        project_name=snapshot.project_name,
+        policy=frozen.model_copy(update={"fallback_routes": (spare,)}),
+    )
+    assert expected not in clean.blocking_reasons
+    assert expected in report.blocking_reasons
+
+
 async def test_a_media_route_outside_the_profile_is_admitted_by_its_passed_probe_only():
     from r2.automation.profiles import route_digest
     from server.production_run.preflight import ProductionPreflight

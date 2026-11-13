@@ -96,7 +96,11 @@ async def test_a_runs_correction_rides_on_its_segments_task(fake_ctx: ToolContex
     segment_id = fake_ctx.pm.script_payload["segments"][0]["segment_id"]
     await mod.handle_generate_storyboards(
         fake_ctx,
-        {"script": "episode_1.json", "segment_ids": [segment_id], "prompt_addenda": {segment_id: "Keep the scarf red."}},
+        {
+            "script": "episode_1.json",
+            "segment_ids": [segment_id],
+            "prompt_addenda": {segment_id: "Keep the scarf red."},
+        },
     )
     assert captured[0].payload["prompt_addendum"] == "Keep the scarf red."
 

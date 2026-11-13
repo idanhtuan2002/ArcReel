@@ -24,6 +24,9 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Literal
 
+import sqlalchemy as sa
+
+from lib.db.models.host_hardening import CommandReceiptModel
 from lib.db.repositories.production_runs import ProductionRunRepository
 from lib.db.repositories.task_repo import TaskRepository
 from lib.project_manager import ProjectManager
@@ -529,6 +532,21 @@ class StoryAdapter:
                     estimated_tasks=1,
                     estimated_runtime_seconds=seconds,
                 )
+        stopped = await self._unavailable_story(run, greenlight)
+        if stopped is not None and self._fallback_writer(run, stopped[0].brief) is not None:
+            # ADR-0139: the story goes on, on the next writer, with what its caps leave within the run's room.
+            state = stopped[1]
+            calls, seconds = await self._room(run)
+            left = max(1, state.limits.generate_calls_max - state.usage.generate_calls)
+            wall = max(1, state.limits.wall_clock_max_seconds - state.usage.model_milliseconds // 1000)
+            return StepPlan(
+                unit_key="story",
+                input_refs=(greenlight,),
+                estimated_cost_minor_units=0,
+                estimated_model_calls=2 * max(1, min(left, calls)),
+                estimated_tasks=1,
+                estimated_runtime_seconds=max(1, min(wall, seconds)),
+            )
         blocked = await self._blocked_story(run, greenlight)
         if blocked is not None:
             target = await self._top_up_target(run, blocked, brief)
@@ -563,7 +581,15 @@ class StoryAdapter:
         adopted = await asyncio.to_thread(adopted_story, self._projects, intent.scope.project_name, intent.scope.run_id)
         caller = intent.identity.command_id
         if adopted is not None:
-            return await self._take_over(intent, greenlight, adopted)
+            stopped = await self._unavailable_story_by_id(intent.scope.user_id, intent.scope.project_name, adopted)
+            if stopped is None or not await self._task_follows(intent, stopped[0].task_id):
+                return await self._take_over(intent, greenlight, adopted)
+            return await self._fall_back(intent, greenlight, *stopped)
+        stopped = await self._unavailable_story_by_id(
+            intent.scope.user_id, intent.scope.project_name, run_id_for(greenlight.receipt_ref)
+        )
+        if stopped is not None:
+            return await self._fall_back(intent, greenlight, *stopped)
         try:
             ref = await self._stories.start_greenlit(
                 user_id=intent.scope.user_id,
@@ -599,6 +625,19 @@ class StoryAdapter:
 
     async def inspect(self, *, intent: DispatchIntent, receipt: OwnerReceipt) -> StageOutcome:
         state = await self._state(receipt)
+        if state.phase is RunPhase.MODEL_UNAVAILABLE:
+            run = await current_run(self._sessions, intent)
+            ref, _ = await self._stories.get(
+                user_id=run.user_id, project_name=run.project_name, run_id=receipt.receipt_ref.partition("#")[0]
+            )
+            if self._fallback_writer(run, ref.brief) is not None:
+                # ADR-0139: the step settles what the story spent; the story stage runs again on the next writer.
+                passing = outcome(intent, "PASS", receipts=(receipt,), owner_state=state.phase.value).model_dump(
+                    mode="python"
+                )
+                return StageOutcome.model_validate(
+                    {**passing, "kind": "REWORK", "reason": "STORY_MODEL_FALLBACK", "repair_stage": RunStage.STORY}
+                )
         if state.phase is RunPhase.BLOCKED_BUDGET:
             run = await current_run(self._sessions, intent)
             [greenlight] = intent.input_refs
@@ -717,6 +756,107 @@ class StoryAdapter:
     async def _story_id(self, run: RunSnapshot, greenlight: OwnerReceipt) -> str:
         adopted = await asyncio.to_thread(adopted_story, self._projects, run.project_name, run.run_id)
         return adopted or run_id_for(greenlight.receipt_ref)
+
+    @staticmethod
+    def _fallback_writer(run: RunSnapshot, brief: StoryBrief) -> tuple[str, str] | None:
+        """ADR-0139: the writer after the story's current one in the run's order (its writer, then the writer's
+        fallback routes); ``None`` when the story is on the last one."""
+        writer = route_for(run, "writer")
+        order = ([writer] if writer is not None else []) + [
+            (route.provider_id, route.model_id) for route in run.policy.fallback_routes if route.role == "writer"
+        ]
+        current = (brief.selection.provider_id, brief.selection.model_id)
+        rest = order[order.index(current) + 1 :] if current in order else [w for w in order if w != current][:1]
+        return rest[0] if rest else None
+
+    async def _unavailable_story_by_id(
+        self, user_id: str, project_name: str, story_run_id: str
+    ) -> tuple[StoryRunRef, RunState] | None:
+        try:
+            ref, state = await self._stories.get(user_id=user_id, project_name=project_name, run_id=story_run_id)
+        except StoryActionRefused:
+            return None
+        return (ref, state) if state.phase is RunPhase.MODEL_UNAVAILABLE else None
+
+    async def _unavailable_story(
+        self, run: RunSnapshot, greenlight: OwnerReceipt
+    ) -> tuple[StoryRunRef, RunState] | None:
+        """The run's story when its model failed (ADR-0139)."""
+        return await self._unavailable_story_by_id(run.user_id, run.project_name, await self._story_id(run, greenlight))
+
+    async def _task_follows(self, intent: DispatchIntent, task_id: str) -> bool:
+        """Whether the story task already follows this run (its hand-over receipt is written)."""
+        async with self._sessions() as session:
+            found = await session.execute(
+                sa.select(CommandReceiptModel.command_id).where(
+                    CommandReceiptModel.task_id == task_id, CommandReceiptModel.actor_scope == actor_scope(intent)
+                )
+            )
+            return found.first() is not None
+
+    async def _room(self, run: RunSnapshot) -> tuple[int, int]:
+        """The generate calls and seconds the run's caps still leave."""
+        async with self._sessions() as session:
+            _cost, used_calls, _tasks, used_seconds = await ProductionRunRepository(session).usage_totals(
+                RunScope(user_id=run.user_id, project_name=run.project_name, run_id=run.run_id)
+            )
+        return max(0, run.policy.max_model_calls - used_calls) // 2, max(
+            0, run.policy.max_runtime_seconds - used_seconds
+        )
+
+    async def _fall_back(
+        self, intent: DispatchIntent, greenlight: OwnerReceipt, ref: StoryRunRef, state: RunState
+    ) -> OwnerReceipt:
+        """ADR-0139: move the story whose model failed to the next writer and run it on from where it stopped, under
+        the Gate A it has (the fallback routes are part of the policy the run's grant approved). The step settles only
+        what is spent from here."""
+        caller = intent.identity.command_id
+        done = next((t for t in state.top_ups if t.caller_ref == caller), None)
+        if done is None:
+            run = await current_run(self._sessions, intent)
+            writer = self._fallback_writer(run, ref.brief)
+            if writer is None:
+                raise OwnerBlocked("STORY_MODEL_UNAVAILABLE")
+            try:
+                brief = await self._stories.reroute_brief(
+                    StoryBrief.model_validate(ref.brief.model_dump(mode="json", exclude={"gate_a_decision_id"})),
+                    provider_id=writer[0],
+                    model_id=writer[1],
+                    max_cost_minor_units=max(1, min(10_000, run.policy.max_cost_minor_units)),
+                    project_name=run.project_name,
+                )
+            except StoryActionRefused as refused:
+                raise OwnerBlocked(refused.code) from None
+            if brief.limits.cloud_prices is not None and run.policy.currency != "USD":
+                raise OwnerBlocked("CURRENCY_MISMATCH")
+            # The fallback routes are part of the policy this run's grant approved; the story keeps its Gate A.
+            subject = await current_subject(self._sessions, intent, subject_digest=greenlight.digest)
+            async with self._sessions() as session, session.begin():
+                await self._authority.require_locked(session, subject=subject)
+            used = state.usage
+            limits = rerouted_limits(state.limits, brief.limits, used.input_tokens, used.output_tokens)
+            try:
+                state = await self._stories.reroute(
+                    user_id=run.user_id,
+                    project_name=run.project_name,
+                    run_id=ref.run_id,
+                    caller_ref=caller,
+                    brief=brief.model_copy(update={"gate_a_decision_id": ref.brief.gate_a_decision_id}),
+                    limits=limits,
+                )
+            except StoryActionRefused as refused:
+                raise OwnerBlocked(refused.code) from None
+            done = next(t for t in state.top_ups if t.caller_ref == caller)
+        else:
+            await self._stories.requeue_finished(
+                user_id=intent.scope.user_id, project_name=intent.scope.project_name, run_id=ref.run_id
+            )
+        return OwnerReceipt(
+            owner=self.owner,
+            receipt_ref=f"{ref.run_id}#top-up-{done.number}",
+            digest=greenlight.digest,
+            task_id=ref.task_id,
+        )
 
     async def _blocked_story(self, run: RunSnapshot, greenlight: OwnerReceipt) -> RunState | None:
         """The run's story when an earlier attempt of the stage left it blocked on its budget."""

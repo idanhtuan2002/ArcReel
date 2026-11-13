@@ -88,7 +88,7 @@ class ProductionPreflight:
             or snapshot.required_gpu_bytes < qualification.required_gpu_bytes
         ):
             reasons.append("LAUNCH_QUALIFICATION_CHANGED")
-        for route in snapshot.routes:
+        for route in (*snapshot.routes, *policy.fallback_routes):
             if policy.local_only and not route.local:
                 reasons.append("CLOUD_ROUTE_FORBIDDEN")
             if route.paid and (
@@ -99,7 +99,9 @@ class ProductionPreflight:
             ):
                 reasons.append("UNBOUNDED_PAID_ROUTE")
         reviewers = [roles[role] for role in ("reviewer_a", "reviewer_b") if role in roles]
-        writer_ids = {roles[role].model_identity for role in ("writer", "script") if role in roles}
+        writer_ids = {roles[role].model_identity for role in ("writer", "script") if role in roles} | {
+            route.model_identity for route in policy.fallback_routes
+        }
         if (
             len(reviewers) != 2
             or len({route.model_identity for route in reviewers}) != 2

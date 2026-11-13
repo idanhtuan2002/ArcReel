@@ -21,6 +21,7 @@ _LATER_DEFAULTS = {
     "continuity_judge_identity": None,
     "continuity_judge_prompt_digest": None,
     "continuity_judge_max_pictures": None,
+    "fallback_routes": [],
 }
 
 

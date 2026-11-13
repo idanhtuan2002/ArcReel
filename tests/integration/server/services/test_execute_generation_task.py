@@ -86,7 +86,11 @@ class TestGenerationTasks:
         await generation_tasks.execute_storyboard_task(
             "demo",
             "E1S03",
-            {"script_file": "episode_1.json", "prompt": "direct prompt", "prompt_addendum": "Alice wears the red scarf."},
+            {
+                "script_file": "episode_1.json",
+                "prompt": "direct prompt",
+                "prompt_addendum": "Alice wears the red scarf.",
+            },
         )
         assert fake_generator.image_calls[2]["prompt"].endswith("\n\nCorrection: Alice wears the red scarf.")
         with pytest.raises(ValueError, match="prompt_addendum"):

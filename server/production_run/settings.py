@@ -27,6 +27,7 @@ from lib.db.models.quality import QualityProfileHeadModel
 from lib.db.repositories.custom_provider_repo import CustomProviderRepository
 from lib.db.repositories.quality import QualityProfileRepository
 from lib.project_manager import ProjectManager
+from r2.contracts.automation import FALLBACK_ROLES
 from server.production_run.composition import DEFAULT_MAX_MODEL_CALLS, MAX_TARGET_EPISODES
 
 Role = Literal["writer", "script", "reviewer_a", "reviewer_b", "image", "video", "audio"]
@@ -42,6 +43,8 @@ ROLE_MEDIA: dict[str, str] = {
 #: The most a paid route may cost per call, in minor units of the run currency.
 MAX_COST_PER_CALL = 1000
 OLLAMA_ENDPOINT = "ollama-chat"
+#: The most fallback routes the settings hold, over all roles.
+MAX_FALLBACKS = 8
 LIMIT_KEYS = ("currency", "max_cost_minor_units", "max_model_calls", "max_runtime_seconds", "max_target_episodes")
 
 
@@ -71,6 +74,8 @@ class SettingsUpdate(BaseModel):
     #: A published quality profile of the project; its current revision's digest is pinned. ``None`` keeps the
     #: profile the settings already name.
     profile_id: Annotated[str, StringConstraints(min_length=1, max_length=128)] | None = None
+    #: Models a text role falls back to, in order, when its own fails or runs out of quota (ADR-0139).
+    fallbacks: list[RouteChoice] = Field(default_factory=list, max_length=MAX_FALLBACKS)
 
 
 async def published_profiles(session: AsyncSession, *, user_id: str, project_name: str) -> list[dict[str, Any]]:
@@ -124,6 +129,10 @@ def _view(settings: dict[str, Any]) -> dict[str, Any]:
         "routes": [
             {key: route.get(key) for key in ("role", "provider_id", "model_id", "max_cost_per_call")}
             for route in settings.get("routes") or []
+        ],
+        "fallbacks": [
+            {key: route.get(key) for key in ("role", "provider_id", "model_id", "max_cost_per_call")}
+            for route in settings.get("fallbacks") or []
         ],
         **{key: settings[key] for key in LIMIT_KEYS if key in settings},
     }
@@ -191,9 +200,8 @@ async def save_settings(
     current = projects.load_project(project_name).get("automation") or {}
     registered = {
         (route.get("role"), route.get("provider_id"), route.get("model_id")): route.get("model_identity")
-        for route in current.get("routes") or []
+        for route in [*(current.get("routes") or []), *(current.get("fallbacks") or [])]
     }
-    routes = []
     profile_fields: dict[str, str] = {}
     async with sessions() as session:
         if update.profile_id is not None:
@@ -209,7 +217,8 @@ async def save_settings(
                 raise SettingsRefused("MISSING_PUBLISHED_PROFILE")
             profile_fields = {"profile_id": chosen["profile_id"], "profile_digest": chosen["profile_digest"]}
         repository = CustomProviderRepository(session)
-        for choice in update.routes:
+
+        async def entry(choice: RouteChoice) -> dict[str, Any]:
             provider = await repository.get_provider(parse_provider_id(choice.provider_id))
             model = await repository.get_model_by_ids(parse_provider_id(choice.provider_id), choice.model_id)
             typed = {m.id for m in await repository.list_enabled_models_by_media_type(ROLE_MEDIA[choice.role])}
@@ -226,24 +235,34 @@ async def save_settings(
                     identity = f"gemini/{choice.model_id}"
                 else:
                     identity = f"{provider.discovery_format}/{choice.model_id}"
-            routes.append(
-                {
-                    "role": choice.role,
-                    "provider_id": choice.provider_id,
-                    "model_id": choice.model_id,
-                    "model_identity": identity,
-                    "local": local,
-                    "paid": not local,
-                    **({} if local else {"max_cost_per_call": choice.max_cost_per_call}),
-                }
-            )
+            return {
+                "role": choice.role,
+                "provider_id": choice.provider_id,
+                "model_id": choice.model_id,
+                "model_identity": identity,
+                "local": local,
+                "paid": not local,
+                **({} if local else {"max_cost_per_call": choice.max_cost_per_call}),
+            }
+
+        routes = [await entry(choice) for choice in update.routes]
+        primary = {(route["role"], route["provider_id"], route["model_id"]) for route in routes}
+        fallbacks = []
+        for choice in update.fallbacks:
+            key = (choice.role, choice.provider_id, choice.model_id)
+            if choice.role not in FALLBACK_ROLES:
+                raise SettingsRefused("FALLBACK_ROLE_UNSUPPORTED")
+            if key in primary or key in {(f["role"], f["provider_id"], f["model_id"]) for f in fallbacks}:
+                raise SettingsRefused("FALLBACK_REPEATED")
+            fallbacks.append(await entry(choice))
     settings = {
         **current,
         **profile_fields,
         "launch_profile_id": update.launch_profile_id,
         "routes": routes,
-        "local_only": all(route["local"] for route in routes),
-        "paid": any(route["paid"] for route in routes),
+        "fallbacks": fallbacks,
+        "local_only": all(route["local"] for route in [*routes, *fallbacks]),
+        "paid": any(route["paid"] for route in [*routes, *fallbacks]),
         "currency": update.currency,
         "max_cost_minor_units": update.max_cost_minor_units,
         "max_model_calls": update.max_model_calls,

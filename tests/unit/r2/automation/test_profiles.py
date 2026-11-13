@@ -111,6 +111,7 @@ def test_a_policy_at_the_later_defaults_keeps_its_earlier_digest(policy_data):
         "continuity_judge_identity",
         "continuity_judge_prompt_digest",
         "continuity_judge_max_pictures",
+        "fallback_routes",
     ):
         body.pop(field)
 
@@ -185,3 +186,26 @@ def test_a_continuity_judge_qualifies_only_through_its_pinned_continuity_evidenc
     (tmp_path / "evidence.json").write_bytes(other)
     pinned = check.model_copy(update={"qualification_digest": "sha256:" + hashlib.sha256(other).hexdigest()})
     assert continuity_judge_is_qualified(pinned) is False
+
+
+def test_fallback_routes_are_text_routes_that_repeat_nothing(policy_data):
+    writer = {
+        "role": "writer",
+        "provider_id": "custom-1",
+        "model_id": "writer",
+        "model_identity": "writer",
+        "config_digest": "sha256:" + "1" * 64,
+        "local": True,
+        "paid": False,
+        "currency": "USD",
+        "max_cost_per_call": None,
+    }
+    policy_data = {**policy_data, "routes": [writer]}
+    spare = {**writer, "model_id": "spare", "model_identity": "spare"}
+    policy = RunPolicy.model_validate({**policy_data, "fallback_routes": [spare]})
+
+    assert [route.model_id for route in policy.fallback_routes] == ["spare"]
+    assert policy_digest(policy) != policy_digest(RunPolicy.model_validate(policy_data))
+    for bad in ([{**spare, "role": "image"}], [writer], [spare, spare]):
+        with pytest.raises(ValidationError):
+            RunPolicy.model_validate({**policy_data, "fallback_routes": bad})

@@ -1324,6 +1324,18 @@ class TaskRepository(BaseRepository):
         await self.session.commit()
         return True
 
+    async def set_story_brief(self, task_id: str, brief: dict[str, Any]) -> bool:
+        """Give a finished story-run task the brief it runs with from its next start (ADR-0139: the story moved to a
+        fallback route). Refused (``False``) while the task is queued or running."""
+        task = (await self.session.execute(select(Task).where(Task.task_id == task_id))).scalar_one_or_none()
+        if task is None or task.task_type != STORY_RUN_TASK_TYPE or task.status not in STORY_RUN_ADOPTABLE_STATUSES:
+            return False
+        payload = json.loads(task.payload_json or "{}")
+        task.payload_json = json.dumps({**payload, "brief": brief}, ensure_ascii=False)
+        task.updated_at = utc_now()
+        await self.session.commit()
+        return True
+
     async def park_active(self) -> int:
         """Set every queued, running or cancelling task aside for maintenance while the app is stopped (the offline
         backup counts none of them as active); each remembers its status, which ``unpark`` gives back."""

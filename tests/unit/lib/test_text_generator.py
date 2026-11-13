@@ -124,3 +124,67 @@ async def test_generate_calls_the_backend_without_ambient_baggage(wired):
         otel_context.detach(token)
 
     assert seen == [{}]
+
+
+class _QuotaError(Exception):
+    status_code = 429
+
+
+class _BadOutput(Exception):
+    status_code = 400
+
+
+class TestRouteFallback:
+    """ADR-0139: a call that fails on its route is made again on the project's next fallback model."""
+
+    async def test_a_quota_failure_moves_to_the_next_fallback_and_stays_there(self, wired, monkeypatch):
+        from lib import text_generator
+        from lib.text_backends.base import TextTaskType
+
+        primary = _make_backend("openai", "spent")
+        primary.generate = AsyncMock(side_effect=_QuotaError("quota"))
+        spare = _make_backend("openai", "spare")
+        built: list[tuple[str, str]] = []
+
+        async def build(task_type, *, provider_id, model_id):
+            built.append((provider_id, model_id))
+            if model_id == "broken":
+                raise ValueError("model disabled")
+            return spare, provider_id
+
+        monkeypatch.setattr(text_generator, "create_text_backend_for_model", build)
+        gen = TextGenerator(
+            primary,
+            wired.ledger,
+            "custom-1",
+            task_type=TextTaskType.SCRIPT,
+            fallbacks=(("custom-2", "broken"), ("custom-3", "spare")),
+        )
+
+        result = await gen.generate(TextGenerationRequest(prompt="x"), project_name="demo")
+        again = await gen.generate(TextGenerationRequest(prompt="y"), project_name="demo")
+
+        assert (result.model, again.model) == ("spare", "spare")
+        assert built == [("custom-2", "broken"), ("custom-3", "spare")]
+        assert primary.generate.await_count == 1
+        assert gen.model == "spare"
+
+    async def test_an_answer_failure_or_no_fallback_left_is_raised(self, wired, monkeypatch):
+        from lib import text_generator
+        from lib.text_backends.base import TextTaskType
+
+        backend = _make_backend("openai", "m")
+        backend.generate = AsyncMock(side_effect=_BadOutput("schema"))
+        build = AsyncMock()
+        monkeypatch.setattr(text_generator, "create_text_backend_for_model", build)
+        gen = TextGenerator(
+            backend, wired.ledger, "custom-1", task_type=TextTaskType.SCRIPT, fallbacks=(("custom-2", "x"),)
+        )
+        with pytest.raises(_BadOutput):
+            await gen.generate(TextGenerationRequest(prompt="x"), project_name="demo")
+        build.assert_not_awaited()
+
+        backend.generate = AsyncMock(side_effect=_QuotaError("quota"))
+        lone = TextGenerator(backend, wired.ledger, "custom-1", task_type=TextTaskType.SCRIPT)
+        with pytest.raises(_QuotaError):
+            await lone.generate(TextGenerationRequest(prompt="x"), project_name="demo")

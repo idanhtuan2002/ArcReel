@@ -85,4 +85,29 @@ describe("AutomationSettingsEditor", () => {
 
     expect(await screen.findByRole("status")).toHaveTextContent("a paid model has no cost limit");
   });
+
+  it("adds ordered fallback models to the writer, with a ceiling for a cloud one, and removes them", async () => {
+    vi.spyOn(client, "getAutomationSettings").mockResolvedValue(loaded());
+    const save = vi.spyOn(client, "saveAutomationSettings").mockResolvedValue(loaded().settings);
+    const button = await open();
+
+    const [addWriterFallback] = screen.getAllByRole("button", { name: "+ Add fallback" });
+    fireEvent.click(addWriterFallback);
+    const fallback = screen.getByRole("combobox", { name: "Fallback 1 for Writer" });
+    expect(fallback).toHaveValue("custom-4/gemini-3.6-flash");
+    fireEvent.change(screen.getByRole("spinbutton", { name: "Max cost per call for Fallback 1 for Writer" }), {
+      target: { value: "3" },
+    });
+    fireEvent.click(button);
+
+    await waitFor(() => expect(save).toHaveBeenCalledTimes(1));
+    expect(save.mock.calls[0][1].fallbacks).toEqual([
+      { role: "writer", provider_id: "custom-4", model_id: "gemini-3.6-flash", max_cost_per_call: 3 },
+    ]);
+
+    fireEvent.click(screen.getByRole("button", { name: "Remove fallback 1" }));
+    fireEvent.click(button);
+    await waitFor(() => expect(save).toHaveBeenCalledTimes(2));
+    expect(save.mock.calls[1][1].fallbacks).toEqual([]);
+  });
 });

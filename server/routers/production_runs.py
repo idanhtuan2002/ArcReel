@@ -224,6 +224,14 @@ async def put_settings(
         saved = await save_settings(sessions, get_project_manager(), project_name, body, user_id=user.id)
     except SettingsRefused as refused:
         raise HTTPException(status_code=422, detail={"code": str(refused), "reasons": []}) from None
+    # ADR-0139: a change of models records the project's launch qualification again (as the Showrunner's own
+    # "record launch" would: only when the real preflight blocks on nothing else), so a film is not stopped on
+    # LAUNCH_QUALIFICATION_CHANGED by the change itself; the reasons it still has are returned.
+    try:
+        recorded = await _qualifications(active).record_launch(user_id=user.id, project_name=project_name)
+        saved = {**saved, "launch_reasons": list(recorded["reasons"])}
+    except QualificationRefused as refused:
+        saved = {**saved, "launch_reasons": [str(refused)]}
     # ADR-0127: an autopilot on the project freezes the policy it was turned on with; the same Showrunner's change of
     # settings turns it on again with the new policy and the same parameters, so it does not stop on POLICY_MOVED.
     async with sessions() as session:
