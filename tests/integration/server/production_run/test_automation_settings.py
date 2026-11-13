@@ -186,6 +186,8 @@ async def test_text_roles_keep_ordered_fallback_models_and_a_cloud_one_makes_the
     ]
     assert (stored["local_only"], stored["paid"]) == (False, True)
     assert [f["model_id"] for f in saved["fallbacks"]] == ["gemini-3.6-flash", TEXT[2]]
+    # The script model chosen here is the project's text model for script work, so the text stages run on it.
+    assert projects.project["text_backend_complex"] == f"custom-1/{TEXT[0]}"
 
 
 @pytest.mark.parametrize(

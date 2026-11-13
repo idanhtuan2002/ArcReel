@@ -850,6 +850,20 @@ async def _writer_fallback(sessions) -> dict:
     return {"fallback_routes": (fallback,)}
 
 
+def _list_fallbacks(host: Host, *models: str, local: bool = True) -> None:
+    """The project's writer fallbacks as the settings hold them now (ADR-0139: edited freely, read when needed)."""
+    [spare] = host.run.policy.fallback_routes
+    entries = [
+        {"role": "writer", "provider_id": spare.provider_id, "model_id": m, "model_identity": m, "local": local}
+        for m in models
+    ]
+
+    def write(project: dict) -> None:
+        project.setdefault("automation", {})["fallbacks"] = entries
+
+    host.projects.update_project("project", write)
+
+
 async def _stop(host: Host, task_id: str) -> None:
     store = RunStateStore(host.sessions, task_id=task_id)
     await store.apply(lambda s: (set_phase(s, RunPhase.MODEL_UNAVAILABLE, reason="429 quota exhausted"), None))
@@ -866,6 +880,7 @@ async def _brief(host: Host, task_id: str) -> StoryBrief:
 @pytest.mark.parametrize("story_policy", [_writer_fallback], indirect=True)
 async def test_a_story_whose_writer_failed_goes_on_with_the_fallback_writer_in_the_same_run(story_host: Host):
     host = story_host
+    _list_fallbacks(host, FALLBACK)
     await _tick(host)
     await _tick(host)
     task_id = await _story_task(host)
@@ -902,6 +917,7 @@ async def test_a_story_whose_writer_failed_goes_on_with_the_fallback_writer_in_t
 @pytest.mark.parametrize("story_policy", [_writer_fallback], indirect=True)
 async def test_a_story_on_the_last_writer_stays_stopped_for_the_showrunner(story_host: Host):
     host = story_host
+    _list_fallbacks(host, FALLBACK)
     await _tick(host)
     await _tick(host)
     task_id = await _story_task(host)
@@ -916,3 +932,28 @@ async def test_a_story_on_the_last_writer_stays_stopped_for_the_showrunner(story
     assert blocked.status is not RunStatus.RUNNING
     assert blocked.status is not RunStatus.WAITING_TASK
     assert (await _brief(host, task_id)).selection.model_id == FALLBACK
+
+
+@pytest.mark.parametrize("story_policy", [_writer_fallback], indirect=True)
+async def test_the_fallback_list_is_read_when_needed_and_held_to_the_runs_rules(story_host: Host):
+    """Fallbacks removed while the run is open are not used; a cloud one under a local-only policy is passed over."""
+    host = story_host
+    await _tick(host)
+    await _tick(host)
+    task_id = await _story_task(host)
+    _list_fallbacks(host)
+    await _stop(host, task_id)
+    stopped = await _tick(host)
+    assert stopped.stage is RunStage.STORY
+    assert stopped.status not in (RunStatus.RUNNING, RunStatus.WAITING_TASK)
+    assert (await _brief(host, task_id)).selection.model_id == MODEL
+
+    _list_fallbacks(host, FALLBACK, local=False)
+    local_only = host.run.policy.model_copy(update={"local_only": True})
+    from server.production_run.story_adapter import StoryAdapter
+
+    adapter = StoryAdapter(host.sessions, authority=host.authority, stories=host.stories, projects=host.projects)
+    run = host.run.model_copy(update={"policy": local_only})
+    assert adapter._writer_order(run)[1:] == []
+    _list_fallbacks(host, FALLBACK)
+    assert adapter._writer_order(run)[1:] == [(host.run.policy.fallback_routes[0].provider_id, FALLBACK)]

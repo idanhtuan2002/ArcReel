@@ -110,4 +110,31 @@ describe("AutomationSettingsEditor", () => {
     await waitFor(() => expect(save).toHaveBeenCalledTimes(2));
     expect(save.mock.calls[1][1].fallbacks).toEqual([]);
   });
+
+  it("reorders fallbacks and makes one the default, the old default taking its place", async () => {
+    const settings = loaded();
+    const third: ModelOption = { provider_id: "custom-5", model_id: "glm", label: "BytePlus · glm", local: false };
+    settings.options.writer = [LOCAL, CLOUD, third];
+    settings.settings.fallbacks = [
+      { role: "writer", provider_id: "custom-4", model_id: "gemini-3.6-flash", max_cost_per_call: 2 },
+      { role: "writer", provider_id: "custom-5", model_id: "glm", max_cost_per_call: 4 },
+    ];
+    vi.spyOn(client, "getAutomationSettings").mockResolvedValue(settings);
+    const save = vi.spyOn(client, "saveAutomationSettings").mockResolvedValue(settings.settings);
+    const button = await open();
+
+    fireEvent.click(screen.getByRole("button", { name: "Move fallback 2 up" }));
+    fireEvent.click(screen.getByRole("button", { name: "Make fallback 1 the default model" }));
+    fireEvent.click(button);
+
+    await waitFor(() => expect(save).toHaveBeenCalledTimes(1));
+    const update = save.mock.calls[0][1];
+    expect(update.routes.find((route) => route.role === "writer")).toEqual({
+      role: "writer",
+      provider_id: "custom-5",
+      model_id: "glm",
+      max_cost_per_call: 4,
+    });
+    expect(update.fallbacks.map((route) => route.model_id)).toEqual(["local-m", "gemini-3.6-flash"]);
+  });
 });

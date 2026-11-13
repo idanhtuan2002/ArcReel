@@ -8,7 +8,7 @@ import type { AutomationRole, AutomationSettings, RouteSetting } from "../api/ty
 const ROLES: readonly AutomationRole[] = ["writer", "script", "reviewer_a", "reviewer_b", "image", "video", "audio"];
 /** Roles that may name fallback models (ADR-0139). */
 const FALLBACK_ROLES: readonly AutomationRole[] = ["writer", "script"];
-const MAX_FALLBACKS = 8;
+const MAX_FALLBACKS = 32;
 const FIELD_CLS = "focus-ring rounded-md px-1.5 py-0.5";
 const FIELD_STYLE = { border: "1px solid var(--color-hairline-strong)", background: "transparent" };
 
@@ -151,6 +151,27 @@ export function AutomationSettingsEditor({ projectName, onSaved }: Props) {
     const list = [...fallbacksOf(role)];
     list[index] = { ...list[index], max_cost_per_call: value || null };
     setFallbacks(role, list);
+  };
+
+  const moveFallback = (role: AutomationRole, index: number, delta: -1 | 1) => {
+    const list = [...fallbacksOf(role)];
+    const target = index + delta;
+    if (target < 0 || target >= list.length) return;
+    [list[index], list[target]] = [list[target], list[index]];
+    setFallbacks(role, list);
+  };
+
+  /** The fallback becomes the role's model; the model it replaces takes its place in the list. */
+  const makeDefault = (role: AutomationRole, index: number) => {
+    if (!draft) return;
+    const list = [...fallbacksOf(role)];
+    const chosen = list[index];
+    const previous = draft.routes[role];
+    if (previous) list[index] = { ...previous, role };
+    else list.splice(index, 1);
+    const others = draft.fallbacks.filter((route) => route.role !== role);
+    const merged = FALLBACK_ROLES.flatMap((r) => (r === role ? list : others.filter((route) => route.role === r)));
+    setDraft({ ...draft, routes: { ...draft.routes, [role]: chosen }, fallbacks: merged });
   };
 
   const numberField = (key: keyof Draft, label: string, min: number, max: number) => (
@@ -303,6 +324,35 @@ export function AutomationSettingsEditor({ projectName, onSaved }: Props) {
                               onChange={(event) => setFallbackCeiling(role, index, Number(event.target.value))}
                             />
                           )}
+                          <button
+                            type="button"
+                            className="focus-ring rounded-md px-1.5 disabled:opacity-40"
+                            style={FIELD_STYLE}
+                            aria-label={t("auto_settings_move_up", { n })}
+                            disabled={index === 0}
+                            onClick={() => moveFallback(role, index, -1)}
+                          >
+                            ↑
+                          </button>
+                          <button
+                            type="button"
+                            className="focus-ring rounded-md px-1.5 disabled:opacity-40"
+                            style={FIELD_STYLE}
+                            aria-label={t("auto_settings_move_down", { n })}
+                            disabled={index === fallbacksOf(role).length - 1}
+                            onClick={() => moveFallback(role, index, 1)}
+                          >
+                            ↓
+                          </button>
+                          <button
+                            type="button"
+                            className="focus-ring rounded-md px-1.5"
+                            style={{ ...FIELD_STYLE, color: "var(--color-text-2)" }}
+                            aria-label={t("auto_settings_make_default_for", { n })}
+                            onClick={() => makeDefault(role, index)}
+                          >
+                            {t("auto_settings_make_default")}
+                          </button>
                           <button
                             type="button"
                             className="focus-ring rounded-md px-1.5"

@@ -43,8 +43,10 @@ ROLE_MEDIA: dict[str, str] = {
 #: The most a paid route may cost per call, in minor units of the run currency.
 MAX_COST_PER_CALL = 1000
 OLLAMA_ENDPOINT = "ollama-chat"
-#: The most fallback routes the settings hold, over all roles.
-MAX_FALLBACKS = 8
+#: A sanity bound on the fallback routes the settings hold, over all roles; the list itself is free to edit.
+MAX_FALLBACKS = 32
+#: The project setting naming its text model for script work (the complex text tier).
+SCRIPT_TEXT_KEY = "text_backend_complex"
 LIMIT_KEYS = ("currency", "max_cost_minor_units", "max_model_calls", "max_runtime_seconds", "max_target_episodes")
 
 
@@ -269,7 +271,15 @@ async def save_settings(
         "max_runtime_seconds": update.max_runtime_seconds,
         "max_target_episodes": update.max_target_episodes,
     }
-    projects.update_project(project_name, lambda project: project.update(automation=settings))
+    script = next(route for route in routes if route["role"] == "script")
+
+    def write(project: dict[str, Any]) -> None:
+        project["automation"] = settings
+        # ADR-0139: the script model chosen here is the project's text model for script work, so the text stages
+        # run on it (they compare the two) and a new default needs no second setting.
+        project[SCRIPT_TEXT_KEY] = f"{script['provider_id']}/{script['model_id']}"
+
+    projects.update_project(project_name, write)
     return _view(settings)
 
 

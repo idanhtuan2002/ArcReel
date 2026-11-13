@@ -41,7 +41,6 @@ from lib.script_batch_edit import script_revision as batch_script_revision
 from lib.script_review import content_fingerprint, script_plan_path, script_plan_quarantine_path
 from lib.speech_composition import SpeechProblemCode, admit_script_unit
 from lib.text_backends.base import TextTaskType
-from lib.text_backends.factory import project_text_fallbacks
 from lib.workflow_state import WorkflowActionType, WorkflowStateService, WorkflowStatus
 from r2.automation.identity import digest_value
 from r2.contracts.automation import (
@@ -328,12 +327,6 @@ class WorkflowStageAdapter:
             raise OwnerBlocked("MISSING_MODEL_ROLE")
         current = await self._resolver.text_backend_for_task(TextTaskType.SCRIPT, run.project_name)
         if tuple(current) != frozen:
-            raise OwnerBlocked("MODEL_CONFIG_CHANGED")
-        # ADR-0139: the owner tasks fall back to the project's text fallbacks, which must be the ones frozen.
-        frozen_fallbacks = tuple(
-            (route.provider_id, route.model_id) for route in run.policy.fallback_routes if route.role == "script"
-        )
-        if await asyncio.to_thread(project_text_fallbacks, run.project_name) != frozen_fallbacks:
             raise OwnerBlocked("MODEL_CONFIG_CHANGED")
 
     def _project(self, project_name: str) -> dict[str, Any]:

@@ -757,16 +757,36 @@ class StoryAdapter:
         adopted = await asyncio.to_thread(adopted_story, self._projects, run.project_name, run.run_id)
         return adopted or run_id_for(greenlight.receipt_ref)
 
-    @staticmethod
-    def _fallback_writer(run: RunSnapshot, brief: StoryBrief) -> tuple[str, str] | None:
-        """ADR-0139: the writer after the story's current one in the run's order (its writer, then the writer's
-        fallback routes); ``None`` when the story is on the last one."""
+    def _writer_order(self, run: RunSnapshot) -> list[tuple[str, str]]:
+        """ADR-0139: the run's writer, then the project's writer fallbacks as the settings name them now (the list
+        is edited freely, also while a run is open), each held to the run's rules: none cloud under a local-only
+        policy, none paid without a ceiling, none that is one of the run's reviewers."""
         writer = route_for(run, "writer")
-        order = ([writer] if writer is not None else []) + [
-            (route.provider_id, route.model_id) for route in run.policy.fallback_routes if route.role == "writer"
-        ]
+        settings = self._projects.load_project(run.project_name).get("automation")
+        raw = settings.get("fallbacks") if isinstance(settings, dict) else None
+        reviewers = {route.model_identity for route in run.policy.routes if route.role in ("reviewer_a", "reviewer_b")}
+        order = [writer] if writer is not None else []
+        for route in raw or []:
+            if not isinstance(route, dict) or route.get("role") != "writer":
+                continue
+            local = route.get("local") is True
+            if (run.policy.local_only and not local) or (not local and not route.get("max_cost_per_call")):
+                continue
+            if route.get("model_identity") in reviewers:
+                continue
+            pair = (str(route.get("provider_id")), str(route.get("model_id")))
+            if pair not in order:
+                order.append(pair)
+        return order
+
+    def _fallback_writers(self, run: RunSnapshot, brief: StoryBrief) -> list[tuple[str, str]]:
+        """The writers after the story's current one, in order; empty when the story is on the last one."""
+        order = self._writer_order(run)
         current = (brief.selection.provider_id, brief.selection.model_id)
-        rest = order[order.index(current) + 1 :] if current in order else [w for w in order if w != current][:1]
+        return order[order.index(current) + 1 :] if current in order else [w for w in order if w != current]
+
+    def _fallback_writer(self, run: RunSnapshot, brief: StoryBrief) -> tuple[str, str] | None:
+        rest = self._fallback_writers(run, brief)
         return rest[0] if rest else None
 
     async def _unavailable_story_by_id(
@@ -814,19 +834,21 @@ class StoryAdapter:
         done = next((t for t in state.top_ups if t.caller_ref == caller), None)
         if done is None:
             run = await current_run(self._sessions, intent)
-            writer = self._fallback_writer(run, ref.brief)
-            if writer is None:
+            brief = None
+            for writer in self._fallback_writers(run, ref.brief):
+                try:
+                    brief = await self._stories.reroute_brief(
+                        StoryBrief.model_validate(ref.brief.model_dump(mode="json", exclude={"gate_a_decision_id"})),
+                        provider_id=writer[0],
+                        model_id=writer[1],
+                        max_cost_minor_units=max(1, min(10_000, run.policy.max_cost_minor_units)),
+                        project_name=run.project_name,
+                    )
+                    break
+                except StoryActionRefused:
+                    continue  # a fallback no longer configured is passed over
+            if brief is None:
                 raise OwnerBlocked("STORY_MODEL_UNAVAILABLE")
-            try:
-                brief = await self._stories.reroute_brief(
-                    StoryBrief.model_validate(ref.brief.model_dump(mode="json", exclude={"gate_a_decision_id"})),
-                    provider_id=writer[0],
-                    model_id=writer[1],
-                    max_cost_minor_units=max(1, min(10_000, run.policy.max_cost_minor_units)),
-                    project_name=run.project_name,
-                )
-            except StoryActionRefused as refused:
-                raise OwnerBlocked(refused.code) from None
             if brief.limits.cloud_prices is not None and run.policy.currency != "USD":
                 raise OwnerBlocked("CURRENCY_MISMATCH")
             # The fallback routes are part of the policy this run's grant approved; the story keeps its Gate A.
