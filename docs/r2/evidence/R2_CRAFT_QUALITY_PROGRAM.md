@@ -41,3 +41,12 @@ Verification so far (HEAD `ceb92e7ab`): `tests/integration/lib/test_presentation
 
 ## Next (resume here)
 All items are done, measured, deferred with reasons or blocked on the Human. Remaining before release: run the trial story→film with a cloud writer, read the film against these changes (framing, looks, music, ambience, best-of-2), then the release review.
+
+## Release r2-v2.5.18 (2026-11-14)
+- Tag `r2-v2.5.18` (local, lightweight) on `impl/r2-film-quality`; contains ADR-0140 … 0152 and the review fixes. Independent review `R2_CRAFT_REVIEW_2026-11-14.md`: round 1 REJECT (H1 planner/execution reference order), round 2 **ACCEPT** at `cf4b6b70e`; leftovers fixed in `f3c19746b`.
+- No database migration.
+- Deploy (Human, real terminal): `sudo ~/arcreel-v2-staging/m8e-review-stop.sh`, `sudo ~/arcreel-v2-staging/v2-deploy.sh r2-v2.5.18`, `sudo ~/arcreel-v2-staging/v2-release-start.sh`. The start script already exports the four service URLs (patched 2026-11-14) and the three services have systemd units.
+- After deploy (agent, by Chrome): save each project's automation settings once (narration launch profile changed: ADR-0151 → re-records launch qualification); check one storyboard preview shows the framing line and cast block; confirm the run panel shows no `LAUNCH_QUALIFICATION_CHANGED`.
+- Expected after deploy: storyboards made under 2.5.17 that have both a previous storyboard and a scene/prop sheet are stale once and regenerate (ADR-0149); new scripts carry scene looks, camera angles, narration cues.
+- Rollback: `v2-deploy.sh r2-v2.5.17` is safe (no migration); new script fields are ignored by 2.5.17 (strict models reject unknown keys only on save through the new paths — verify on the first rollback if ever needed).
+- Licence note for a commercial release: `docs/research/2026-11-14-model-licences-and-identity-alternatives.md` (MMAudio and InsightFace weights are non-commercial; both are switched off by unsetting their URL).
