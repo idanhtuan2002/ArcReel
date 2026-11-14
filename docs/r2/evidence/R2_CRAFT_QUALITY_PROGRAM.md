@@ -27,7 +27,7 @@ Donor checkouts: `/tmp/claude-1000/-home-anhtuan-content-production-os/9ab4f1ca-
 | ID-4 reference name binding | done | `e8c0e14c1`, ADR-0149 |
 | ID-5 costume/state timeline → derivatives | done | `2f86da4ca`, ADR-0146 |
 | ID-6 face repair loop | measured, not wired | `219cda6fd`: klein edit repairs 2 of 4 look-alike frames; acceptance rule cos ≥ 0.29 and composition ≥ 0.85 keeps exactly those. Blocked on artifact currency for repaired versions (needs an ADR) and trial numbers |
-| ID-7 DreamO bake-off, cloud LoRA | blocked on the Human | DreamO runs on FLUX.1-dev, a gated Hub repo (needs the sponsor's licence acceptance and an HF token); a cloud LoRA needs a GPU we do not have on free tiers |
+| ID-7 identity model bake-off | in progress | sponsor 2026-11-14: Qwen-Image-Edit-2511 (Apache-2.0, not gated) instead of DreamO (FLUX.1-dev non-commercial, gated); licences in `docs/research/2026-11-14-model-licences-and-identity-alternatives.md` |
 
 Verification so far (HEAD `ceb92e7ab`): `tests/integration/lib/test_presentation_renderer.py`, `tests/integration/server/production_run/test_render_master_adapter.py`, `tests/integration/lib/test_project_manager.py`, `tests/unit/server/production_run/test_render_finish_inputs.py` 83 passed 2 skipped; read-model and jianying 25 passed; ruff, basedpyright 0, lint-imports 23 kept, audit_tests 0.
 
