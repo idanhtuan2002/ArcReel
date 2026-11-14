@@ -435,7 +435,7 @@ class NarrationVisualSegment(BaseModel):
     video_prompt: VideoPrompt = Field(description="视频生成提示词")
     narration_cue: Literal["none", "sigh", "laugh", "clear_throat"] = Field(
         default="none",
-        description="旁白在本分镜开口前的非语言声音：none / sigh（叹气）/ laugh（轻笑）/ clear_throat（清嗓）"
+        description="旁白在本分镜开口前的非语言声音：none / sigh（叹气）/ laugh（轻笑）/ clear_throat（清嗓）",
     )
 
 
@@ -462,7 +462,7 @@ class NarrationVisualContent(BaseModel):
     video_prompt: VideoPrompt = Field(description="视频生成提示词")
     narration_cue: Literal["none", "sigh", "laugh", "clear_throat"] = Field(
         default="none",
-        description="旁白在本分镜开口前的非语言声音：none / sigh（叹气）/ laugh（轻笑）/ clear_throat（清嗓）"
+        description="旁白在本分镜开口前的非语言声音：none / sigh（叹气）/ laugh（轻笑）/ clear_throat（清嗓）",
     )
 
 
