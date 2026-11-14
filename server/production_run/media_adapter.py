@@ -624,10 +624,12 @@ class MediaAdapter:
                 if self._unit_problem(root / path, field, portrait) is not None:
                     failing.append(unit)
             if not failing and collection == "storyboards":
+                # A storyboard the selection judge already chose keeps the judge's pick (ADR-0151 over ADR-0145).
                 failing = [
                     unit
                     for unit in self._look_outliers(root, items, id_field)
                     if not await self._attempts(intent, f"unit:{collection}:{unit}")
+                    and not await self._attempts(intent, f"select:{unit}:chosen")
                 ]
             if failing:
                 ids = sorted(failing)

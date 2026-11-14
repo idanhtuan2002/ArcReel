@@ -279,7 +279,7 @@ def generate_assets_tool(ctx: ToolContext):
         _OPERATION,
         "批量生成角色/场景/道具/商品资产图。"
         "type 省略则按 character→scene→prop→product 顺序纳入同一 durable batch；"
-        "names 指定具体名称（必须同时给 type）；all=true 表示该 type 的全部缺图资产。"
+        "names 指定具体名称（必须同时给 type）；角色衍生写作「本体名/衍生名」（只含衍生时单独调用）；all=true 表示该 type 的全部缺图资产。"
         "不传 names 时只选缺资产图的资产：已失效但可用的旧图会被复用，不会自动重生。"
         "结果按 requested / succeeded / failed / blocked 逐 ID 返回，ID 形如 character/张三。",
         {
@@ -303,6 +303,13 @@ def generate_assets_tool(ctx: ToolContext):
         },
     )
     async def _handler(args: dict[str, Any]) -> ToolOutcome[Any]:
+        raw = args.get("names")
+        names: list[Any] = list(raw) if isinstance(raw, list) else []
+        derivatives = [n for n in names if isinstance(n, str) and "/" in n]
+        if args.get("type") == "character" and derivatives:
+            if len(derivatives) != len(names):
+                return tool_problem("角色衍生（本体名/衍生名）与本体资产请分两次调用 generate_assets")
+            return await handle_generate_derivative_sheets(ctx, {"names": derivatives})
         return await handle_generate_assets(ctx, args)
 
     return _handler

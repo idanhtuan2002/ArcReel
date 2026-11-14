@@ -138,9 +138,16 @@ class MusicService:
         raise MusicUnavailable("music generation timed out")
 
 
+#: The smallest answer taken for audio: a WAV header plus a few frames.
+MIN_WAV_BYTES = 1024
+
+
 def _place(output: Path, content: bytes) -> None:
+    """Cache ``content`` at ``output`` only when it is a WAV file, so a bad answer is never reused."""
+    if not content.startswith(b"RIFF") or len(content) < MIN_WAV_BYTES:
+        raise MusicUnavailable("music server returned no WAV audio")
     output.parent.mkdir(parents=True, exist_ok=True)
-    staging = output.with_suffix(".part")
+    staging = output.with_name(f"{output.name}.{os.getpid()}.{id(content)}.part")
     staging.write_bytes(content)
     os.replace(staging, output)
 

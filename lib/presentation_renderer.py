@@ -673,13 +673,21 @@ def render_presentations(
         ambience: list[dict[str, float | str]] = []
         if episode.ambience:
             roomed = staging / f"ambience_{episode.episode}.mp4"
-            ambience = _lay_ambience(final, episode.ambience, roomed, seconds=seconds, ffmpeg=ffmpeg)
-            if ambience:
-                os.replace(roomed, final)
+            try:
+                ambience = _lay_ambience(final, episode.ambience, roomed, seconds=seconds, ffmpeg=ffmpeg)
+            except RenderRefused as refused:
+                ambience = [{"skipped": refused.code}]
+            else:
+                if ambience:
+                    os.replace(roomed, final)
         if episode.music_path is not None:
             scored = staging / f"scored_{episode.episode}.mp4"
-            music = _lay_music(final, episode.music_path, scored, seconds=seconds, ffmpeg=ffmpeg)
-            os.replace(scored, final)
+            try:
+                music = _lay_music(final, episode.music_path, scored, seconds=seconds, ffmpeg=ffmpeg)
+            except RenderRefused as refused:
+                music = {"skipped": refused.code}
+            else:
+                os.replace(scored, final)
         mastered = staging / f"mastered_{episode.episode}.mp4"
         loudness = _master(final, mastered, contract, ffmpeg=ffmpeg, seconds=seconds)
         if loudness is not None:

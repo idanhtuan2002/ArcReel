@@ -46,7 +46,7 @@ from lib.project_migration_failure import (
     MigrationFailureRecord,
     load_migration_verdict,
 )
-from lib.reference_catalog import derivative_reference
+from lib.reference_catalog import DERIVATIVE_SEPARATOR, derivative_reference
 from lib.script_models import get_generated_assets, script_duration_total
 from lib.script_plan_entries import (
     ScriptPlanEntryError,
@@ -355,6 +355,19 @@ def _new_source_precedes_cursor(project: Mapping[str, Any], sources: tuple[Sourc
         unicodedata.normalize("NFC", source.rel_path) not in canonical_recorded
         for source in sources[: cursor_indexes[0] + 1]
     )
+
+
+def _named_in_items(items: object) -> set[str]:
+    """Every character reference name the episode's script items list."""
+    names: set[str] = set()
+    for item in items if isinstance(items, list) else []:
+        if not isinstance(item, Mapping):
+            continue
+        for field in ("characters_in_segment", "characters_in_scene", "characters_in_shot"):
+            value = item.get(field)
+            if isinstance(value, list):
+                names.update(name for name in value if isinstance(name, str))
+    return names
 
 
 def _empty_collection() -> dict[str, list[str]]:
@@ -1676,6 +1689,8 @@ class WorkflowStateService:
                         for asset_type, collection in sheets.items()
                         if asset_type != "product"
                         for asset_id in collection.get("missing_ids", [])
+                        # A derivative's sheet is wanted once a shot of this episode names it.
+                        if DERIVATIVE_SEPARATOR not in asset_id or asset_id in _named_in_items(items)
                     ]
                     if missing_sheets:
                         state = "ASSET_SHEETS"

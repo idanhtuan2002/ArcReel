@@ -886,6 +886,7 @@ class ScriptGenerator:
         """
         assert self.generator is not None  # generate() 入口已检查
         filename = output_filename or episode_script_filename(episode)
+        written_looks: dict[str, Any] = {}
         formal_baseline = await asyncio.to_thread(content_fingerprint, self.project_path / "scripts" / filename)
         prompt_authoring_draft_baseline = (
             await asyncio.to_thread(self._reference_prompt_authoring_draft_revision, episode)
@@ -914,7 +915,8 @@ class ScriptGenerator:
             script_data = self._merge_narration_visual(narration_script_plan, visual_data, episode)
             if narration_looks is not None:
                 starts, kept = narration_looks
-                apply_looks(script_data["segments"], starts, visual_data.get("looks") or {}, kept)
+                written_looks = visual_data.get("looks") or {}
+                apply_looks(script_data["segments"], starts, written_looks, kept)
             grammar = shot_grammar_issues(script_data["segments"])
             if grammar:
                 logger.warning("episode %s shot grammar: %s", episode, "; ".join(grammar))
@@ -968,6 +970,10 @@ class ScriptGenerator:
         # 作用于本轮产出，未变条目原样过路才谈得上逐字节不变。
         if authoring_scope is not None:
             script_data = self._assemble_script(script_data, authoring_scope)
+            if written_looks and isinstance(script_data.get("segments"), list):
+                # 场次首镜被重写时新的光色基调覆盖整场：沿用的同场次分镜也换上它，同场不出现两份基调。
+                segments = [s for s in script_data["segments"] if isinstance(s, dict) and s.get("segment_id")]
+                apply_looks(segments, scene_starts(segments), written_looks, {})
 
         # 经写盘统一入口保存：整集生成无「改前」，按严格结构校验（等价原 response_schema 的
         # Pydantic 校验），并继承 metadata 重算、加锁、filename↔episode 一致性与 project.json

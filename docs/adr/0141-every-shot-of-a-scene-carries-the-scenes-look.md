@@ -13,3 +13,5 @@ Shots were lit one by one: each storyboard's `composition.lighting` was written 
 3. The prompt asks the shot's `composition.lighting` to stay with the scene's key light (same source, direction and colour temperature), and the looks of successive scenes to follow the episode's emotional arc, so the episode reads like a colour script.
 
 This follows Calliope's continuity ledger (`calliope-backend/src/calliope/agent/continuity.py`: a locked lighting and style overview plus per-shot light state), adapted to our per-scene keyed schema; BFL's FLUX.2 guide names `lighting` and `color_palette` as the prompt keys for this. Drama scenes, a critic checking each shot against its look (Calliope's nine-bucket critic) and a numeric consistency check are later items (P1-9, P1-12).
+
+Amended after the release review (M4): when an incremental authoring rewrites a scene's first shot and writes a new look, the kept shots of that scene take the new look too, so one scene never carries two looks.

@@ -13,3 +13,5 @@ The narration launch profile's video route holds each storyboard still for the w
 3. The render manifest records each unit's move (or none) and the grade; an unknown move or grade is refused (`UNKNOWN_MOTION`, `UNKNOWN_GRADE`).
 
 Not covered: a per-scene look record and its grade offset (P0-3), and a numeric check of colour consistency between shots (P1-9).
+
+Amended after the release review (M5): the overview's `color_grade`, `music_caption` and `music_bpm` have defaults (`neutral`, none, 80), an unknown grade falls back to `neutral`, and the tempo has no schema bounds (it is clamped when the music cue is made), so a backend that does not enforce the schema cannot fail the overview.

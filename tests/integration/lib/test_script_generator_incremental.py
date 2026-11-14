@@ -798,3 +798,21 @@ class TestSceneLooks:
         segments = {s["segment_id"]: s for s in _script(project_dir)["segments"]}
         assert segments["E1S02"]["image_prompt"]["scene"] == "二轮-E1S02"
         assert segments["E1S02"]["image_prompt"]["look"] == self.LOOK_A
+
+    async def test_a_rewritten_scene_start_restyles_the_kept_shots_of_its_scene(self, tmp_path: Path) -> None:
+        project_dir = _write_project(tmp_path)
+        plan_path = _write_plan(project_dir, "script_plan_segments.json", self._plan())
+        ids = ("E1S01", "E1S02", "E1S03")
+        await NARRATION.generator(
+            project_dir, [self._visual(ids, {"E1S01": self.LOOK_A, "E1S03": self.LOOK_B})]
+        ).generate(1)
+        document = json.loads(plan_path.read_text(encoding="utf-8"))
+        document["segments"][0]["novel_text"] = "原文甲改。"
+        plan_path.write_text(json.dumps(document, ensure_ascii=False), encoding="utf-8")
+        _activate(project_dir)
+        new_look = {**self.LOOK_A, "time_of_day": "dawn", "mood": "清醒"}
+
+        await NARRATION.generator(project_dir, [self._visual(("E1S01",), {"E1S01": new_look})]).generate(1)
+
+        looks = {s["segment_id"]: s["image_prompt"]["look"] for s in _script(project_dir)["segments"]}
+        assert looks == {"E1S01": new_look, "E1S02": new_look, "E1S03": self.LOOK_B}

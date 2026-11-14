@@ -22,7 +22,7 @@ from typing import Any
 from lib.db.repositories.production_runs import ProductionRunRepository
 from lib.episode_target_duration import MAX_EPISODE_TARGET_DURATION, MIN_EPISODE_TARGET_DURATION
 from lib.film_finish import GRADES, move_for
-from lib.music_bed import MusicService, MusicUnavailable, cue_for
+from lib.music_bed import MusicService, cue_for
 from lib.narration_delivery import USE_TTS
 from lib.path_safety import safe_join
 from lib.presentation_renderer import (
@@ -36,7 +36,7 @@ from lib.presentation_renderer import (
     sha256_file,
 )
 from lib.project_manager import ProjectManager
-from lib.scene_ambience import AmbienceService, AmbienceUnavailable, scene_windows
+from lib.scene_ambience import AmbienceService, scene_windows
 from lib.script_editor import resolve_items
 from lib.speech_presentation import SpeechPresentation
 from r2.automation.identity import digest_value
@@ -276,7 +276,7 @@ class RenderAdapter:
         target = project_path / MUSIC_DIR / f"{cue.digest()}.wav"
         try:
             path = await self._music.render(cue, target)
-        except MusicUnavailable as error:
+        except Exception as error:
             logger.warning("episode %s renders without music: %s", snapshot.episode, error)
             return snapshot
         return replace(snapshot, music_path=path)
@@ -293,7 +293,7 @@ class RenderAdapter:
             target = project_path / AMBIENCE_DIR / f"{window.digest()}.wav"
             try:
                 path = await self._ambience.render(window.prompt, target)
-            except AmbienceUnavailable as error:
+            except Exception as error:
                 logger.warning(
                     "episode %s scene at %sus renders without ambience: %s", snapshot.episode, window.start_us, error
                 )

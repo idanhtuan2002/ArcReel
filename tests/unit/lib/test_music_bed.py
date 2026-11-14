@@ -11,6 +11,7 @@ import pytest
 from lib.music_bed import MusicCue, MusicService, MusicUnavailable, cue_for, music_service_from_env
 
 pytestmark = pytest.mark.asyncio
+WAV = b"RIFF" + bytes(2048)
 CUE = MusicCue(caption="slow piano", bpm=72, seconds=50.0)
 
 
@@ -27,7 +28,7 @@ def _server(status_after: list[int], seen: list[httpx.Request]) -> httpx.MockTra
             status = next(statuses)
             result = json.dumps([{"file": "/v1/audio?path=a.wav", "status": status}]) if status == 1 else ""
             return httpx.Response(200, json={"data": [{"task_id": "t1", "status": status, "result": result}]})
-        return httpx.Response(200, content=b"RIFFwav")
+        return httpx.Response(200, content=WAV)
 
     return httpx.MockTransport(handle)
 
@@ -40,7 +41,7 @@ async def test_the_cue_is_asked_as_an_instrumental_at_a_fixed_seed_after_freeing
 
     path = await service.render(CUE, tmp_path / "bed.wav")
 
-    assert path.read_bytes() == b"RIFFwav"
+    assert path.read_bytes() == WAV
     assert [request.url.path for request in seen][:2] == ["/free", "/release_task"]
     body = json.loads(seen[1].content)
     assert body["lyrics"] == "[Instrumental]"
@@ -79,3 +80,18 @@ def test_the_cue_comes_from_the_overview_and_covers_the_episode():
 def test_no_music_url_means_no_music():
     assert music_service_from_env({}) is None
     assert music_service_from_env({"ARCREEL_MUSIC_URL": "http://127.0.0.1:8001"}) is not None
+
+
+async def test_an_answer_that_is_not_audio_is_never_cached(tmp_path: Path):
+    def handle(request: httpx.Request) -> httpx.Response:
+        if request.url.path == "/release_task":
+            return httpx.Response(200, json={"data": {"task_id": "t1"}})
+        if request.url.path == "/query_result":
+            result = json.dumps([{"file": "/v1/audio?path=a.wav"}])
+            return httpx.Response(200, json={"data": [{"task_id": "t1", "status": 1, "result": result}]})
+        return httpx.Response(200, content=b"<html>error</html>")
+
+    service = MusicService("http://music", poll_seconds=0, transport=httpx.MockTransport(handle))
+    with pytest.raises(MusicUnavailable):
+        await service.render(CUE, tmp_path / "bed.wav")
+    assert not (tmp_path / "bed.wav").exists()

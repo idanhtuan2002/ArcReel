@@ -21,10 +21,10 @@ from collections.abc import AsyncGenerator, Callable, Generator, Mapping, Sequen
 from contextlib import ExitStack, asynccontextmanager, contextmanager
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, ClassVar, Literal, cast
+from typing import Annotated, Any, ClassVar, Literal, cast
 
 import portalocker
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, BeforeValidator, Field
 
 from lib.agent_profile import agent_profile_dir
 from lib.app_data_dir import app_data_dir
@@ -66,7 +66,7 @@ from lib.episode_target_duration import (
     MIN_EPISODE_TARGET_DURATION,
     is_valid_episode_target_duration,
 )
-from lib.film_finish import Grade, grade_prompt_options
+from lib.film_finish import GRADES, Grade, grade_prompt_options
 from lib.formal_write import FormalWriteReceipt, formal_write_transaction, project_metadata_lock
 from lib.json_io import atomic_write_bytes, atomic_write_json, load_json, load_json_or_none
 from lib.path_safety import PathTraversalError, safe_join
@@ -241,6 +241,11 @@ class EmptySourceError(ValueError):
 # ==================== 数据模型 ====================
 
 
+def _known_grade(value: object) -> object:
+    """An unknown grade (a backend that does not enforce the enum) falls back to ``neutral`` instead of failing."""
+    return value if isinstance(value, str) and value in GRADES else "neutral"
+
+
 class ProjectOverview(BaseModel):
     """项目概述数据模型，用于 Gemini Structured Outputs"""
 
@@ -252,18 +257,21 @@ class ProjectOverview(BaseModel):
     # 由 generate_overview 在落盘时同步写入。所有度量/切分调用方一律读顶层字段，
     # 不要直接读 overview.language。
     language: Literal["zh", "en", "vi"] = Field(description="小说源语言代码")
-    color_grade: Grade = Field(
+    color_grade: Annotated[Grade, BeforeValidator(_known_grade)] = Field(
+        default="neutral",
         description="成片调色预设，按题材与情绪基调选择：\n" + grade_prompt_options(),
     )
     music_caption: str = Field(
+        default="",
         description=(
             "成片背景音乐（纯器乐、垫在旁白之下）的英文描述，写给音乐生成模型：具体的曲风、情绪、主奏乐器与音色、"
             '年代感与制作质感，如 "slow cinematic piano and soft strings, melancholic, intimate, warm analog '
             'recording, sparse arrangement"。不写人声、不写歌词、不写速度数字；不混搭相互冲突的曲风。'
         ),
     )
+    # 不在 schema 上设上下限：不强制约束的后端越界时会让整份概述失败；越界值在生成音乐时收进可用范围。
     music_bpm: int = Field(
-        ge=50, le=160, description="背景音乐速度（BPM），与故事节奏相符：抒情 60-80，叙事 80-100，紧张 100-130"
+        default=80, description="背景音乐速度（BPM，50-160），与故事节奏相符：抒情 60-80，叙事 80-100，紧张 100-130"
     )
 
 

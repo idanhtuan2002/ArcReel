@@ -36,6 +36,7 @@ from lib.asset_derivatives import (
     DERIVATIVE_SOURCE_ROLE,
     build_derivative_sheet_basis,
     derivative_artifact_key,
+    derivative_table,
 )
 from lib.asset_types import ASSET_SPECS, DERIVATIVES_FIELD, AssetSpec, asset_name_comparison_key
 from lib.episode_adaptation import script_source_relpath
@@ -45,6 +46,7 @@ from lib.media_artifact_currency import build_current_audio_artifact_basis, buil
 from lib.narration_delivery import POST_PRODUCTION, USE_TTS
 from lib.project_migration_failure import ProjectMigrationError
 from lib.project_schema import CURRENT_PROJECT_SCHEMA_VERSION, parse_project_schema_version, project_schema_is_current
+from lib.reference_catalog import split_derivative_reference
 from lib.resource_paths import resource_relative_path
 from lib.script_editor import resolve_items
 from lib.speech_artifact_provenance import RenditionVariant, SelectedMediaEvidence, media_content_digest
@@ -591,14 +593,7 @@ class TargetStatePlanner:
                         key, basis = grid_target
                         self._add_if_present(key, artifact_path, basis)
                     continue
-                references = self._storyboard_references(
-                    item,
-                    char_field=char_field,
-                    scene_field=scene_field,
-                    prop_field=prop_field,
-                )
-                if references is None:
-                    continue
+                previous: VisualReference | None = None
                 if index and not item.get("segment_break"):
                     previous_item = storyboard_items[index - 1]
                     previous_id = str(previous_item.get(id_field) or "")
@@ -612,14 +607,22 @@ class TargetStatePlanner:
                         previous_path = self._safe_present_path(previous_rel)
                         if previous_path is None:
                             continue
-                        references.append(
-                            self._visual_reference(
-                                path=previous_path,
-                                role="previous_storyboard",
-                                logical_type="storyboard",
-                                logical_id=previous_id,
-                            )
+                        previous = self._visual_reference(
+                            path=previous_path,
+                            role="previous_storyboard",
+                            logical_type="storyboard",
+                            logical_id=previous_id,
                         )
+                # Same order as execution (ADR-0149): products, cast, the previous storyboard, scene and prop sheets.
+                references = self._storyboard_references(
+                    item,
+                    char_field=char_field,
+                    scene_field=scene_field,
+                    prop_field=prop_field,
+                    previous=previous,
+                )
+                if references is None:
+                    continue
                 try:
                     basis = build_storyboard_image_visual_basis(
                         resource_id=resource_id,
@@ -641,6 +644,7 @@ class TargetStatePlanner:
         char_field: str | None,
         scene_field: str,
         prop_field: str,
+        previous: VisualReference | None = None,
     ) -> list[VisualReference] | None:
         references: list[VisualReference] = []
         seen_paths: set[str] = set()
@@ -656,16 +660,28 @@ class TargetStatePlanner:
             if not isinstance(bucket, Mapping):
                 valid = False
                 return
+            owner, derivative = split_derivative_reference(name) if spec.supports_derivatives else (name, "")
             entry = next(
                 (
                     candidate
                     for raw_name, candidate in bucket.items()
                     if isinstance(raw_name, str)
-                    and asset_name_comparison_key(raw_name) == asset_name_comparison_key(name)
+                    and asset_name_comparison_key(raw_name) == asset_name_comparison_key(owner)
                     and isinstance(candidate, Mapping)
                 ),
                 None,
             )
+            if derivative and isinstance(entry, Mapping):
+                table = derivative_table(entry)
+                entry = next(
+                    (
+                        candidate
+                        for raw_name, candidate in table.items()
+                        if asset_name_comparison_key(raw_name) == asset_name_comparison_key(derivative)
+                        and isinstance(candidate, Mapping)
+                    ),
+                    None,
+                )
             if not isinstance(entry, Mapping):
                 valid = False
                 return
@@ -706,6 +722,8 @@ class TargetStatePlanner:
         else:
             valid = False
         for asset_type, field in (("character", char_field), ("scene", scene_field), ("prop", prop_field)):
+            if asset_type == "scene" and previous is not None:
+                references.append(previous)
             values = item.get(field, []) if field is not None else []
             if isinstance(values, Sequence) and not isinstance(values, (str, bytes)):
                 for name in values:

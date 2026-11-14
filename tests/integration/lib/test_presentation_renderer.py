@@ -321,3 +321,15 @@ def test_scene_ambience_loops_over_its_window_under_the_speech(clips, tmp_path: 
     assert _mean_volume(receipt.final_path, "ffmpeg", 3_800_000, 1_500_000) > -60
     assert _mean_volume(receipt.final_path, "ffmpeg", 0, 400_000) < -70
     assert abs(receipt.duration_seconds - 6.0) <= 0.05
+
+
+def test_a_silent_music_file_is_skipped_not_fatal(clips, tmp_path: Path):
+    silent = _media(tmp_path / "silent.wav", "-f", "lavfi", "-i", "anullsrc=r=44100:cl=stereo", seconds=10)
+
+    receipt = render_presentations(
+        episode=RenderInput(episode=1, units=(_unit(clips),), music_path=silent),
+        output_dir=tmp_path / "out",
+        contract=CONTRACT,
+    )
+
+    assert json.loads(receipt.manifest_path.read_text(encoding="utf-8"))["music"] == {"skipped": "MUSIC_SILENT"}

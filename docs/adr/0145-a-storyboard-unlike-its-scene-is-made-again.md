@@ -13,3 +13,5 @@ Shots of a scene share one look (ADR-0141), but a generator can still render one
 3. Shots without a scene look (older scripts, other skeletons) are not grouped.
 
 The thresholds are first estimates; the trial film's measurements will show whether they catch real drift without remaking deliberate changes (a lamp switched off inside a scene).
+
+Amended after the release review (M2): a storyboard the best-of-N judge already chose (ADR-0151) is not remade by this check; the judge's pick wins.

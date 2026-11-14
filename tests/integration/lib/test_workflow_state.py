@@ -1630,6 +1630,13 @@ def test_a_derivative_sheet_is_wanted_once_its_owner_sheet_is_current(tmp_path: 
     assert sheets["current_ids"] == ["Alice"]
     assert sheets["missing_ids"] == ["Alice/雨夜", "Bob"]
     assert status.state == "ASSET_SHEETS"
+    # no shot names the derivative yet, so only the base sheet is asked for
+    assert status.next_action.requested_ids == ["Bob"]
+
+    script["shots"][0]["characters_in_shot"] = ["Alice/雨夜"]
+    atomic_write_json(project_path / "scripts" / "episode_1.json", script)
+
+    assert WorkflowStateService(pm).get_status("demo").next_action.requested_ids == ["Alice/雨夜", "Bob"]
 
 
 def test_schema8_manifest_reports_current_stale_missing_and_blocked_without_file_fallback(tmp_path: Path) -> None:

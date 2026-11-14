@@ -10,6 +10,8 @@ import pytest
 
 from lib.scene_ambience import AmbienceService, AmbienceUnavailable, ambience_service_from_env, scene_windows
 
+WAV = b"RIFF" + bytes(2048)
+
 
 def _item(sid: str, ambience: str | None, *, scene_break: bool = False) -> dict:
     look = {"ambience": ambience} if ambience is not None else None
@@ -41,7 +43,7 @@ async def test_the_clip_is_asked_once_and_cached(tmp_path: Path):
 
     def handle(request: httpx.Request) -> httpx.Response:
         seen.append(request)
-        return httpx.Response(200, content=b"RIFF")
+        return httpx.Response(200, content=WAV)
 
     service = AmbienceService("http://amb", transport=httpx.MockTransport(handle))
     target = tmp_path / "a.wav"
@@ -49,7 +51,7 @@ async def test_the_clip_is_asked_once_and_cached(tmp_path: Path):
     await service.render("rain", target)
     await service.render("rain", target)
 
-    assert target.read_bytes() == b"RIFF"
+    assert target.read_bytes() == WAV
     assert len(seen) == 1
     assert json.loads(seen[0].content) == {"prompt": "rain", "seconds": 8.0, "seed": 1}
 

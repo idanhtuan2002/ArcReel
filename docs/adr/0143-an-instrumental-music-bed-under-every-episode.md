@@ -16,3 +16,5 @@ The automatic film had narration only: no music anywhere in composition or rende
 Host setup (done by the Human): run `/mnt/arcreel/D/ArcReel/ace-step-api.sh` (installed on the data disk; ACE-Step checkpoints about 10 GB there) and export `ARCREEL_MUSIC_URL=http://127.0.0.1:8001` and `ARCREEL_MUSIC_FREE_URLS=http://127.0.0.1:8188/free` in the app's start script.
 
 Not covered: several candidates and a music judge, per-scene cues and leitmotifs (P2-13), ambience (P1-11).
+
+Amended after the release review (M1): only a WAV answer is cached; any music failure (server, bad file, a silent bed) renders the episode without music, recorded as `{"skipped": <code>}` in the manifest, instead of blocking the render. The same holds for ambience (ADR-0150). Temporary download paths are unique per write.
