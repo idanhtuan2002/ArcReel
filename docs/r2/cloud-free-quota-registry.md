@@ -10,16 +10,37 @@ tiers, no billing. "Free only" switches are on where a provider has one.
 Legend — **[V]** verified by a call or a 429 message from the provider on the date shown; **[C]** read in the
 provider console by the sponsor; **[D]** from the provider's docs or third-party listings, not yet verified.
 
-## Summary by use
+## Allocation (re-audited 2026-11-14)
 
-| Use in R2 | Usable now (free) | Notes |
-|---|---|---|
-| Continuity judge / vision reviewer (ADR-0134, ADR-0113) | BytePlus `seed-2-0-pro`, `seed-2-0-lite`, `dola-seed-2-1-turbo`, `deepseek-v4-1-flash` (500k tokens each, once); Gemini `gemini-2.5-flash`, `gemini-3-flash-preview` (20 req/day each); Groq `qwen/qwen3.8-27b` (~28 judge calls/day) | Qualification needs 76 calls on one model identity: ~6.6k tokens each on Seed 2.0 Pro (≈ the whole 500k); 3–4 days per model on Gemini/Groq |
-| Text writer / text reviewer | OpenRouter `ernie-5.5-flash-preview:free`, `particle-1:free` (1,000 req/day shared); Gemini Flash models (20 req/day each); Groq `openai/gpt-oss-120b`, `qwen/qwen3.8-27b` (1,000 req/day, 200k tokens/day) | Alibaba `qwen-*-character` only (role-play tuned) |
-| Vietnamese TTS A/B (B1) | Alibaba `qwen-audio-3.1-tts-flash` / `-next` (1M), `-plus` (10K) | Vietnamese quality not tested yet |
-| ASR (narration vs subtitles check) | Alibaba `qwen-audio-3.1-asr-flash*` (1M), `fun-asr-flash-2026-06-15` (36K); Groq `whisper-large-v3(-turbo)` | |
-| Image generation | BytePlus Seedream 4.0 / 4.5 (200 images each), 5.0-lite (50) [C] | local FLUX.2 klein (ComfyUI) stays the default |
-| Video generation (bake-off B1) | BytePlus Seedance 1.0 pro / pro-fast (2M tokens each) [C] | ≈ 108k tokens per 5 s 720p clip → ~18 clips per model; Seedance 2.x has no free quota |
+Rule: renewable daily pools carry bulk work; once-only pools (BytePlus, Alibaba) are kept for fallbacks and scarce roles;
+local models stay the last resort so a run never stops on quota. Writer ranking comes from one shared probe (a
+Vietnamese scene, `json_schema`, read by the main agent; `scratchpad/or_probe.py`, `writer_probe2.py`).
+
+| Role | Order of use | Pool | Why |
+|---|---|---|---|
+| Story writer (prose) | OpenRouter `ernie-5.5-flash-preview:free` → `particle-1:free` → BytePlus `deepseek-v4-1-flash` → OpenRouter `ling-3.2-flash:free` → `gemma-4-31b-it:free` → local `qwen3.5-vimax:9b` | 1,000/day shared (OpenRouter); 500k once (BytePlus) | best prose in the probe; DeepSeek V4.1 Flash is as good but finite |
+| Script / storyboard JSON | local `qwen3.5-vimax:9b` (unchanged) | local | runs proved it; cloud script needs its own probe first |
+| Final reviewers (vision) | local `qwen2.5vl:7b` + `gemma3:4b` (qualified) | local | a cloud reviewer must be re-qualified on the corpus before use |
+| Continuity judge (ADR-0134) | Gemini Flash (20/day/model) → Groq `qwen/qwen3.8-27b` (≤3 images) → BytePlus `seed-2-0-lite` / `dola-seed-2-1-turbo` | daily / once | qualification still open; `seed-2-0-pro` free quota is used up |
+| Craft judge (ADR-0132) | local `gemma3:12b` | local | |
+| Image / video / TTS | local ComfyUI klein, still-clip, VieNeu | local | BytePlus Seedream 4.5 (200) / Seedance 1.0 pro-fast (2M) kept for bake-offs |
+| ASR / TTS A/B | Alibaba `qwen-audio-3.1-*` (1M each, until 2027-02-11), Groq `whisper-large-v3-turbo` | once / daily | |
+
+Not for writing: Groq `qwen/qwen3.8-27b` (Han characters leak into Vietnamese prose), `gpt-oss-120b` (121 of 350 words),
+Alibaba `qwen-plus-character` (76 words), BytePlus `seed-2-0-lite` (states the brief in the prose), `glm-5-2` (good prose,
+7k tokens and 111 s per scene), OpenRouter `nemotron-3-ultra` (Devanagari leak).
+
+**[V 2026-11-14]** state per key:
+- OpenRouter: `free_model_daily_requests` limit 1,000; spend 0. Non-`:free` models are **disabled** in the app (14 enabled);
+  default `ernie-5.5-flash-preview:free`.
+- Groq: 1,000 req/day, 8,000 tokens/min per model (headers). Python's default User-Agent is refused by Cloudflare
+  (error 1010); the app's OpenAI SDK is not affected.
+- BytePlus: `seed-2-0-pro` → 429 `SetLimitExceeded` (free quota used). App defaults moved to free-quota models:
+  image `seedream-4-5-251128`, video `seedance-1-0-pro-fast-251015`. `deepseek-v4-1-flash-261017` priced 0 USD.
+- Gemini AI Studio: `gemma-4-31b-it`, `gemma-4-26b-a4b-it`, `gemini-4-hydrogen` answer; `gemini-4-argon`, `gemini-4-carbon`,
+  `gemini-pro-latest`, `gemini-3.1-pro-preview` → 429 at once (no free quota). Gemma answers start with its reasoning
+  ("* Input: …") unless thinking is off.
+- Alibaba: 102 models listed; free use limited to the table below.
 
 ## OpenRouter
 
