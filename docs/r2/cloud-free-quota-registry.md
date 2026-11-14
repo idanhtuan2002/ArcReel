@@ -15,11 +15,32 @@ provider console by the sponsor; **[D]** from the provider's docs or third-party
 | Use in R2 | Usable now (free) | Notes |
 |---|---|---|
 | Continuity judge / vision reviewer (ADR-0134, ADR-0113) | BytePlus `seed-2-0-pro`, `seed-2-0-lite`, `dola-seed-2-1-turbo`, `deepseek-v4-1-flash` (500k tokens each, once); Gemini `gemini-2.5-flash`, `gemini-3-flash-preview` (20 req/day each); Groq `qwen/qwen3.8-27b` (~28 judge calls/day) | Qualification needs 76 calls on one model identity: ~6.6k tokens each on Seed 2.0 Pro (≈ the whole 500k); 3–4 days per model on Gemini/Groq |
-| Text writer / text reviewer | Gemini Flash models (20 req/day each); Groq `openai/gpt-oss-120b`, `qwen/qwen3.8-27b` (1,000 req/day, 200k tokens/day) | Alibaba `qwen-*-character` only (role-play tuned) |
+| Text writer / text reviewer | OpenRouter `ernie-5.5-flash-preview:free`, `particle-1:free` (1,000 req/day shared); Gemini Flash models (20 req/day each); Groq `openai/gpt-oss-120b`, `qwen/qwen3.8-27b` (1,000 req/day, 200k tokens/day) | Alibaba `qwen-*-character` only (role-play tuned) |
 | Vietnamese TTS A/B (B1) | Alibaba `qwen-audio-3.1-tts-flash` / `-next` (1M), `-plus` (10K) | Vietnamese quality not tested yet |
 | ASR (narration vs subtitles check) | Alibaba `qwen-audio-3.1-asr-flash*` (1M), `fun-asr-flash-2026-06-15` (36K); Groq `whisper-large-v3(-turbo)` | |
 | Image generation | BytePlus Seedream 4.0 / 4.5 (200 images each), 5.0-lite (50) [C] | local FLUX.2 klein (ComfyUI) stays the default |
 | Video generation (bake-off B1) | BytePlus Seedance 1.0 pro / pro-fast (2M tokens each) [C] | ≈ 108k tokens per 5 s 720p clip → ~18 clips per model; Seedance 2.x has no free quota |
+
+## OpenRouter
+
+- App provider: custom provider **`OpenRouter` = `custom-6`**, base `https://openrouter.ai/api/v1`, endpoint `openai-chat`;
+  discovery imported 436 models (14 `:free`). Only `:free` ids are free; the others bill the account's credits.
+- **[D]** Limits for `:free` ids: 20 req/min; 1,000 req/day because the account has bought ≥ 10 credits (sponsor, 2026-11-14).
+- **[V 2026-11-14]** Probe: one Vietnamese scene (~350 words, `json_schema` strict, temperature 0.7), script
+  `scratchpad/or_probe.py`, read by the main agent:
+
+  | Model | JSON | Time | Reading |
+  |---|---|---|---|
+  | `baidu/ernie-5.5-flash-preview:free` | ok | 6 s | natural prose, sharp dialogue, concrete detail — best |
+  | `particle-ai/particle-1:free` | ok | 15 s | very good, close second |
+  | `inclusionai/ling-3.2-flash:free` | ok | 95 s | good, slow |
+  | `nvidia/nemotron-3-ultra-550b-a55b:free` | ok | 23 s | awkward phrases, one Devanagari word leaked — not used |
+  | `google/gemma-4-31b-it:free`, `gemma-4-26b-a4b-it:free` | 429 upstream (Google AI Studio) at probe time | — | kept as late fallback |
+  | `nvidia/nemotron-3.5-super-vl:free`, `dots-studio/dots-3-note-preview:free`, `recursive/flint-v1.0:free` | invalid / cut JSON | — | not used |
+  | `thinkingmachines/inkling-2-small:free` | 403 (agentic harnesses only) | — | not usable |
+- In the app (2026-11-14): the five used models carry price `token` 0/0 USD (a story route needs explicit USD prices);
+  project `san-xuat-tu-ong-7fb4ef4b` writer = ernie, writer fallbacks particle-1 → ling-3.2-flash → gemma-4-31b →
+  local `qwen3.5-vimax:9b`; per-call ceiling 1 cent, run cap 5,000 cents (reservation only; settled cost is 0).
 
 ## Google AI Studio (Gemini)
 
@@ -115,7 +136,6 @@ provider console by the sponsor; **[D]** from the provider's docs or third-party
 
 | Provider | Expected free offer [D] | Would serve | App provider |
 |---|---|---|---|
-| OpenRouter | `:free` models, 50 req/day, 20 req/min | fallback text / vision | custom provider, `https://openrouter.ai/api/v1` |
 | Mistral La Plateforme | free plan; terms differ between sources (may require training opt-in) | third-family reviewer (Pixtral / Mistral Medium) | custom provider, `https://api.mistral.ai/v1` |
 | GitHub Models | reported retired 2026-07-30 | — | — |
 
