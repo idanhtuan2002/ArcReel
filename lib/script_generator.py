@@ -967,7 +967,7 @@ class ScriptGenerator:
 
         # 装配：本次重写的条目与旧剧本里未变的条目按脚本规划顺序合并成整份剧本。放在
         # _add_metadata 之后——元数据重算（集号前缀改写、时长回传、needs_replan 重判）只该
-        # 作用于本轮产出，未变条目原样过路才谈得上逐字节不变。
+        # 作用于本轮产出，未变条目原样过路；唯一例外是场次首镜被重写时，同场次沿用条目换上新的光色基调（ADR-0141）。
         if authoring_scope is not None:
             script_data = self._assemble_script(script_data, authoring_scope)
             if written_looks and isinstance(script_data.get("segments"), list):

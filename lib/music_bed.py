@@ -54,7 +54,7 @@ def cue_for(project: Mapping[str, Any], episode_seconds: float) -> MusicCue | No
     if not isinstance(caption, str) or not caption.strip() or not isinstance(bpm, int):
         return None
     seconds = min(max(episode_seconds + LENGTH_MARGIN_SECONDS, MIN_SECONDS), MAX_SECONDS)
-    return MusicCue(caption=caption.strip(), bpm=min(max(bpm, 30), 300), seconds=round(seconds, 1))
+    return MusicCue(caption=caption.strip(), bpm=min(max(bpm, 50), 160), seconds=round(seconds, 1))
 
 
 class MusicService:

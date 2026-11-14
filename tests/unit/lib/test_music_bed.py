@@ -72,7 +72,7 @@ def test_the_cue_comes_from_the_overview_and_covers_the_episode():
     cue = cue_for(project, 46.0)
 
     assert cue is not None
-    assert (cue.caption, cue.bpm, cue.seconds) == ("piano", 300, 50.0)
+    assert (cue.caption, cue.bpm, cue.seconds) == ("piano", 160, 50.0)
     assert cue_for({"overview": {}}, 46.0) is None
     assert cue.digest() == cue_for(project, 46.0).digest()
 

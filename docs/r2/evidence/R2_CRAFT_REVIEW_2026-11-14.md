@@ -150,3 +150,38 @@ Conditions for r2-v2.5.18:
 | L4 | Accepted for this release: the face server is a local service with a systemd unit; a down server leaves the current version (no wrong pick). |
 | L5 | Accepted (small images, bounded count). |
 | L6 | Temp paths fixed; cache keys and host env accepted (documented in ADR-0143/0150/0151). |
+
+## Round 2: verification of `cf4b6b70e` (independent reviewer)
+
+**Evidence**
+
+- Read the fix diff: `git diff HEAD~1 -- lib server`.
+- Recreated the round-1 throwaway probe. It now generates E1S02 (Alice, 祠堂, 玉佩, previous storyboard E1S01) and asserts that the digest execution registers equals the digest from `resolve_current_artifact_basis`. **It passes** end to end. The probe was deleted after the run.
+- Related tests, run with `uv run python -m pytest -n 4`: **357 passed, 22 skipped**. The run included the new `test_storyboard_reference_parity.py`, the renderer, render inputs, music and ambience, look consistency, media adapter, workflow state, the assets tool, incremental script generation, project manager, prompt preview, formal image finalization, execute generation, prompt builders and preflight.
+
+**Per-finding verdict**
+
+- **H1: fixed.**
+  - `artifact_planner._storyboard_references` now inserts the previous storyboard before the scene sheets, so its order matches execution: products, cast, previous, scenes, props.
+  - Derivative names (`owner/derivative`) now resolve to the derivative's sheet. Before, a shot naming a derivative was not planned at all; now it can be current. This is an improvement, not a regression.
+  - Expected one-time effect after deploy: storyboards registered under 2.5.17 that have both kinds of reference go stale once. ADR-0149 now says so.
+- **M1: fixed.**
+  - `_place` caches only RIFF content of at least 1 KiB, and the staging path is unique per write.
+  - The adapter catches every `Exception` (`CancelledError` is a `BaseException`, so cancellation is not swallowed).
+  - The renderer skips a layer on any `RenderRefused`, with `measure_loudness` raising `AUDIO_PROBE_FAILED`, and records `{"skipped": code}`.
+  - Residual LOW: a valid but silent WAV stays cached, so that cue renders without music every time. It no longer blocks anything.
+- **M2: fixed.** An outlier is skipped when `select:<unit>:chosen` has an attempt.
+- **M3: fixed.**
+  - Only derivatives named by a shot of the target episode gate `ASSET_SHEETS`. Unnamed ones are still reported in `missing_ids`.
+  - The agent tool routes `character` + `owner/derivative` names to `handle_generate_derivative_sheets` and refuses mixed batches with a clear problem message.
+  - Residual LOW: a script name that differs from the canonical `derivative_reference` spelling (case or spacing) does not gate. That fails safe.
+- **M4: fixed.** After `_assemble_script`, a scene's newly written look is applied to every segment of that scene. Kept siblings of a rewritten scene start therefore change basis and are regenerated once. This is intended, but it relaxes the "unchanged entries pass byte-identical" note in that function. LOW: update the comment.
+- **M5: fixed.**
+  - `color_grade` has a default plus a fallback to `neutral`; `music_caption` defaults to `""`; `music_bpm` defaults to 80 with no bounds.
+  - `cue_for` clamps the tempo to 30–300, not to the 50–160 the description states. LOW.
+  - Now that these fields are optional, a backend may leave them out. The episode then has no music. That is acceptable.
+- **LOW items L1–L6: unchanged.** They are tracked work and do not block the release.
+
+**New issues introduced by the fixes:** none at MEDIUM or above.
+
+**Final verdict: ACCEPT** for r2-v2.5.18 at `cf4b6b70e`. Deployment note: expect one stale-and-regenerate pass for 2.5.17 storyboards that have both a previous storyboard and scene or prop sheets.
