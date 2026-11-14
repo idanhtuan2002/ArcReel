@@ -80,6 +80,7 @@ from lib.narration_delivery import (
     prepare_current_narrated_video_duration,
     prepare_narrated_video_duration,
     register_narration_audio_transactionally,
+    synthesis_text,
 )
 from lib.path_safety import safe_exists, safe_join, try_safe_join
 from lib.project_change_hints import build_change_label, emit_project_change_batch, project_change_source
@@ -2116,7 +2117,7 @@ async def execute_tts_task(
         )
 
     output_path, version = await generator.generate_audio_async(
-        text=text,
+        text=synthesis_text(text, settings.model_id),
         resource_id=resource_id,
         voice=voice,
         speed=speed,

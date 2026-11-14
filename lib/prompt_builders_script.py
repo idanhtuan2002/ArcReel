@@ -157,6 +157,11 @@ _SCENE_WRITING_GUIDE = """这段文字将直接生成一张静态图：只描述
 # 触发词避讳。避讳写在这里而非编排层的 CLAUDE.*.md：video_prompt 由本模块驱动的文案模型产出，
 # 编排层的系统 prompt 不进那次调用，写在那边约束不到真正落笔的模型。本常量为三条 prompt_authoring 路径
 # （drama / narration / ad）共用，改这一处即三路同步。
+_NARRATION_CUE_GUIDE = (
+    "旁白开口前的一声非语言声音，由配音模型真实发出：原文写到叹息、无奈、释然时用 sigh，写到忍俊不禁、自嘲时用 laugh，"
+    "郑重宣布或转折前用 clear_throat；其余一律 none。整集最多每五个分镜用一次，只用在情绪确实到位的地方，宁缺毋滥。"
+)
+
 _BLOCKING_WRITING_GUIDE = (
     "人物站位遵守 180 度轴线：同一场次里人物第一次入画时写明他在画面左侧、中间还是右侧、面朝哪边、视线看向谁或什么，"
     "此后同场次各镜沿用这一站位与朝向，不让人物在相邻镜头间无故左右互换；两人对话时一人在左面朝右、一人在右面朝左，"
@@ -428,6 +433,7 @@ segments 表每个分镜已定稿（segment_id、逐字原文、时长、出场�
 - **video_prompt.camera_motion**：{_CAMERA_MOTION_GUIDE}
 - **video_prompt.ambiance_audio**：{_AMBIANCE_AUDIO_WRITING_GUIDE}
 - **video_prompt.dialogue**：speaker 必须出现在该分镜的出场角色中。
+- **narration_cue**：{_NARRATION_CUE_GUIDE}
 {looks_block}
 # 创作目标
 

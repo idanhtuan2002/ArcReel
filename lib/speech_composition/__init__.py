@@ -101,6 +101,8 @@ class SpeechUnitSnapshot:
     unit_id: str
     entries: tuple[SpeechInputUtterance, ...]
     problems: tuple[SpeechProblem, ...] = ()
+    #: A non-verbal delivery cue the narrator voices before the line (``lib.narration_delivery.DELIVERY_CUES``).
+    delivery_cue: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -111,6 +113,8 @@ class SpeechPreparation:
     mode: SpeechMode | None
     utterances: tuple[SpeechUtterance, ...]
     problems: tuple[SpeechProblem, ...] = ()
+    #: The narrator's delivery cue; spoken (not subtitled) by voices that support it.
+    delivery_cue: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -207,7 +211,8 @@ class SpeechComposition:
             mode = SpeechMode.NARRATOR_VOICEOVER
         else:
             mode = SpeechMode.SILENT
-        return SpeechPreparation(snapshot.unit_id, mode, tuple(utterances), tuple(problems))
+        cue = snapshot.delivery_cue if mode is SpeechMode.NARRATOR_VOICEOVER else None
+        return SpeechPreparation(snapshot.unit_id, mode, tuple(utterances), tuple(problems), cue)
 
 
 #: 说话人位为空的台词（``@[ ]：{台词}``）。发声记号的说话人位必须非空，这一形态因此不成记号、
@@ -322,6 +327,10 @@ def _append_video_prompt_dialogue(
         problems.append(_parse_problem(unit_id, SpeechFieldLocation(("video_prompt", "dialogue"))))
 
 
+#: Non-verbal cues a narration segment may carry; mirrors ``lib.narration_delivery.DELIVERY_CUES``.
+_DELIVERY_CUES = frozenset({"sigh", "laugh", "clear_throat"})
+
+
 def adapt_narration_segment(segment: Mapping[str, object]) -> SpeechUnitSnapshot:
     """Translate a narration segment without persisting a duplicate utterance."""
 
@@ -342,7 +351,11 @@ def adapt_narration_segment(segment: Mapping[str, object]) -> SpeechUnitSnapshot
         )
     else:
         problems.append(_parse_problem(normalized_unit_id, SpeechFieldLocation(("novel_text",))))
-    return SpeechUnitSnapshot(normalized_unit_id, tuple(entries), tuple(problems))
+    raw_cue = segment.get("narration_cue")
+    cue = raw_cue if isinstance(raw_cue, str) else None
+    return SpeechUnitSnapshot(
+        normalized_unit_id, tuple(entries), tuple(problems), cue if cue in _DELIVERY_CUES else None
+    )
 
 
 def adapt_drama_scene(scene: Mapping[str, object]) -> SpeechUnitSnapshot:

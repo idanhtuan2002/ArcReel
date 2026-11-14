@@ -295,8 +295,24 @@ class NarratedVideoDurationBlockedError(ValueError):
         super().__init__(f"unit {preparation.narration.unit_id} narrated video blocked: {codes}")
 
 
+#: Narration delivery cue → the inline tag VieNeu-TTS v3 voices as a non-verbal sound (README "Emotion cues").
+DELIVERY_CUES: dict[str, str] = {"sigh": "thở dài", "laugh": "cười", "clear_throat": "hắng giọng"}
+#: TTS models that voice the inline cue tags; any other model gets the text without them.
+CUE_VOICING_MODELS = frozenset({"vieneu-tts-v3-turbo", "vieneu-tts-v3-nano"})
+
+
+def synthesis_text(text: str, model_id: str | None) -> str:
+    """The canonical narration text as sent to ``model_id``: cue tags kept for a model that voices them."""
+    if model_id in CUE_VOICING_MODELS:
+        return text
+    for tag in DELIVERY_CUES.values():
+        text = text.replace(f"[{tag}] ", "").replace(f"[{tag}]", "")
+    return text
+
+
 def canonical_narration_text(preparation: SpeechPreparation) -> str:
-    """Return the exact canonical narrator text consumed by synthesis and its basis."""
+    """Return the exact canonical narrator text consumed by synthesis and its basis; a delivery cue leads it as an
+    inline tag (subtitles come from the utterances and never show it)."""
 
     parts: list[str] = []
     for utterance in preparation.utterances:
@@ -306,7 +322,9 @@ def canonical_narration_text(preparation: SpeechPreparation) -> str:
         stripped = normalized.strip()
         if stripped:
             parts.append(stripped)
-    return "\n".join(parts)
+    text = "\n".join(parts)
+    cue = DELIVERY_CUES.get(preparation.delivery_cue or "")
+    return f"[{cue}] {text}" if cue and text else text
 
 
 def build_narration_audio_basis(

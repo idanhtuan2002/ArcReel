@@ -312,6 +312,10 @@ class NarrationSegment(BaseModel):
     props: list[str] = Field(default_factory=list, description="出场道具名称列表")
     image_prompt: ImagePrompt | PromptText = Field(description="分镜图生成提示词")
     video_prompt: VideoPrompt | PromptText = Field(description="视频生成提示词")
+    # 旁白的非语言声音提示由 prompt_authoring 产出、合并时写入；配音时只有支持该标签的语音模型会念出它，字幕不显示。
+    narration_cue: SkipJsonSchema[Literal["none", "sigh", "laugh", "clear_throat"] | None] = Field(
+        default=None, description="旁白开口前的非语言声音"
+    )
     # transition_to_next 由 _add_metadata default + 用户 PATCH 路径(projects.py UpdateSegmentRequest)管理;
     # LLM 无 prompt 引导,隐藏避免乱填污染剪映/compose-video 合成
     transition_to_next: SkipJsonSchema[TransitionType] = Field(default="cut", description="转场类型")
@@ -429,6 +433,10 @@ class NarrationVisualSegment(BaseModel):
     segment_id: str = Field(min_length=1, description="对齐锚：必须取自 script_plan 分镜表，逐一对应、不增不减")
     image_prompt: ImagePrompt = Field(description="分镜图生成提示词")
     video_prompt: VideoPrompt = Field(description="视频生成提示词")
+    narration_cue: Literal["none", "sigh", "laugh", "clear_throat"] = Field(
+        default="none",
+        description="旁白在本分镜开口前的非语言声音：none / sigh（叹气）/ laugh（轻笑）/ clear_throat（清嗓）"
+    )
 
 
 class NarrationVisualEpisodeScript(BaseModel):
@@ -452,6 +460,10 @@ class NarrationVisualContent(BaseModel):
 
     image_prompt: ImagePrompt = Field(description="分镜图生成提示词")
     video_prompt: VideoPrompt = Field(description="视频生成提示词")
+    narration_cue: Literal["none", "sigh", "laugh", "clear_throat"] = Field(
+        default="none",
+        description="旁白在本分镜开口前的非语言声音：none / sigh（叹气）/ laugh（轻笑）/ clear_throat（清嗓）"
+    )
 
 
 def build_narration_visual_model(segment_ids: list[str], look_ids: Sequence[str] = ()) -> type[BaseModel]:

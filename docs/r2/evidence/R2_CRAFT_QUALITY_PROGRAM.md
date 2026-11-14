@@ -12,7 +12,7 @@ Donor checkouts: `/tmp/claude-1000/-home-anhtuan-content-production-os/9ab4f1ca-
 | P0-3 scene look record (time of day, key light, palette, mood) | done | `e0699b04e`, ADR-0141 (Calliope ledger design) |
 | P0-4 character bible + canonical block | done | `2289e06ee`, ADR-0142 (ViMax static/dynamic features, BFL) |
 | P0-5 music bed (ACE-Step 1.5) + ducking | done | `edd9d037f`, ADR-0143; also fixes master lengthening (FINAL_DURATION_MISMATCH). Host: `/mnt/arcreel/D/ArcReel/ace-step-api.sh`, env `ARCREEL_MUSIC_URL`, `ARCREEL_MUSIC_FREE_URLS` |
-| P0-6 VieNeu emotion cues + pauses | waiting on a listening check | cue `[thở dài]` adds 0.48 s on the deployed v3 Turbo but is experimental upstream and unverifiable without listening; samples in `/mnt/arcreel/D/ArcReel/ace-step-cache/tts-cue/` (plain, sigh, laugh). Implementation touches the narration audio basis; build only if the Human hears a real sigh. |
+| P0-6 VieNeu emotion cues + pauses | done (cues) | ADR-0152; sponsor confirmed the cues sound real 2026-11-14. Pauses not built: no native control, unit timing already follows measured audio |
 | P0-7 shot grammar (angle, coverage, variety) | done | `8f1dda78d`, ADR-0144 (AIVPE directorAgent, ShotBench) |
 | P1-8 image-prompt dialect per model | done: measured, no change | `8af1d0270`, `docs/r2/evidence/prompt-dialect-ab-2026-11-14/`: no dialect wins; shot size ignored by all (reference sheet pulls framing → ID-1) |
 | P1-9 numeric look-consistency check | done | `5b614da68`, ADR-0145 |
@@ -36,8 +36,8 @@ Verification so far (HEAD `ceb92e7ab`): `tests/integration/lib/test_presentation
 2. Add to `~/arcreel-v2-staging/v2-release-start.sh`: `export ARCREEL_MUSIC_URL=http://127.0.0.1:8001 ARCREEL_MUSIC_FREE_URLS=http://127.0.0.1:8188/free ARCREEL_AMBIENCE_URL=http://127.0.0.1:8002 ARCREEL_FACE_ID_URL=http://127.0.0.1:8003`; also start `/mnt/arcreel/D/ArcReel/faceid.sh`. After deploy, save each project's automation settings once (the narration launch profile changed: ADR-0151).
 3. Optional: import `docs/r2/evidence/media-local-2026-10-30/flux2-klein-reference/endpoint-definition-4ref.json` to replace endpoint ce-3 (four reference slots).
 
-## Known pre-existing failure (not from this program)
-`tests/unit/lib/test_tts_skeleton.py::TestOrphanAudioRestartLost::test_orphan_audio_running_marked_restart_lost`: the test's fake queue lacks `requeue_free_restart_lost` (added by `0d09aaab9`, ADR-0129/0130, already in r2-v2.5.17).
+## Known pre-existing failures (not from this program)
+`tests/unit/lib/test_tts_skeleton.py::TestOrphanAudioRestartLost::test_orphan_audio_running_marked_restart_lost`: the test's fake queue lacks `requeue_free_restart_lost` (added by `0d09aaab9`, ADR-0129/0130, already in r2-v2.5.17); the same cause fails 3 tests in `tests/integration/lib/test_generation_worker_module.py`. `tests/integration/server/test_remote_mcp.py::test_remote_mcp_returns_typed_workflow_plan_and_rejects_bad_project` expects `adapt_episode`/`translate_story` tools; no change to `server/remote_mcp.py` or `server/agent_runtime` since the tag.
 
 ## Next (resume here)
 All items are done, measured, deferred with reasons or blocked on the Human. Remaining before release: run the trial story→film with a cloud writer, read the film against these changes (framing, looks, music, ambience, best-of-2), then the release review.
