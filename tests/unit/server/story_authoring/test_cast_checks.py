@@ -136,6 +136,19 @@ def test_the_seed_must_carry_the_ideas_own_names_and_places_count():
     assert idea_names("Minh co so thich dac biet. trong mot lan, Minh dat duoc kha nang giup anh") == ["Minh"]
 
 
+def test_a_sentence_opening_word_is_not_taken_for_a_name():
+    from server.story_authoring.cast_checks import idea_names
+
+    # The run panel's example ideas name no character.
+    assert idea_names("Trên chuyến đò cuối cùng trước ngày cây cầu thông xe, ông lái đò già chở thêm một khách.") == []
+    assert idea_names("Con trai một ngư dân nhặt được lá thư trong chai của người cha đã rời làng.") == []
+    assert idea_names("Một cô gái ở thành phố tìm cách nấu lại món canh của người bà đã mất.") == []
+    assert idea_names("Dưới chân đèo, Lan chờ xe. Suốt đêm ấy Lan không ngủ. Bên kia sông, ông Tư đợi.") == [
+        "Lan",
+        "Tư",
+    ]
+
+
 def test_a_name_one_letter_from_a_characters_is_repaired_not_recorded():
     from server.story_authoring.checks import near_name
 
