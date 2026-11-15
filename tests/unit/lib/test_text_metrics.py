@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import pytest
+
 from lib.text_metrics import contains_cjk, count_reading_units, find_reading_unit_offset, reading_unit_noun
 
 
@@ -176,3 +178,18 @@ class TestContainsCjk:
 
     def test_vietnamese_with_curly_quotes_and_dashes_is_not_cjk(self):
         assert not contains_cjk("Đò Cuối Sông: Chương 3 – “Hội Tập” …")
+
+
+@pytest.mark.parametrize(
+    ("text", "expected"),
+    [
+        ("“Bố ơi, đèn cầu sáng rồi kìa.” Giọng Hải dội xuống bến.", "vi"),
+        ("The ferryman wiped the boat and did not look up.", "en"),
+        ("父亲没有抬头，继续擦着船舱。", "zh"),
+        ("   \n", None),
+    ],
+)
+def test_the_language_of_a_source_is_read_from_its_letters(text, expected):
+    from lib.text_metrics import detect_source_language
+
+    assert detect_source_language(text) == expected

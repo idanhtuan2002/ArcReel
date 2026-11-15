@@ -41,3 +41,21 @@ async def test_a_handed_off_story_in_decomposed_unicode_still_counts_as_unchange
     assert witness._digest("demo", handed) == with_unchanged_file  # the unchanged hand-off never counted
     source.write_text("Căn nhà cũ\n\nMinh bỏ làng đi.\n", encoding="utf-8")
     assert witness._digest("demo", handed) != with_unchanged_file  # an edit does
+
+
+async def test_a_project_story_without_a_language_gets_the_language_of_its_text(tmp_path: Path):
+    projects = ProjectManager(tmp_path / "projects")
+    projects.create_project("demo")
+    projects.create_project_metadata("demo", "Demo", "", "narration")
+    (projects.get_project_path("demo") / "source" / "story.txt").write_text(
+        "Ông Ba vẫn cúi, giẻ trong tay khựng lại giữa khoang.", encoding="utf-8"
+    )
+    witness = ProjectInputWitness(None, projects=projects)
+    before = witness._digest("demo", frozenset())
+    await witness.settle_source_language("demo")
+    assert projects.load_project("demo")["source_language"] == "vi"
+    assert witness._digest("demo", frozenset()) == before  # the language is no witnessed setting
+
+    projects.update_project("demo", lambda project: project.update(source_language="en"))
+    await witness.settle_source_language("demo")
+    assert projects.load_project("demo")["source_language"] == "en"  # a recorded language is kept

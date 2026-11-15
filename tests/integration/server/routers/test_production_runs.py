@@ -154,6 +154,7 @@ async def host(concurrent_session_factory, tmp_path, interactive_env):
             activation=ProductionActivation(enabled=True),
             on_change=scheduler.wake,
             has_story=_has_story,
+            settle_language=_settle_language,
         )
         app.include_router(production_runs.router, prefix="/api/v1", dependencies=AUTH_DEPENDENCIES)
         register_error_handlers(app)
@@ -279,6 +280,13 @@ async def _has_story(_project_name: str) -> bool:
     return STORIES["has"]
 
 
+SETTLED: list[str] = []
+
+
+async def _settle_language(project_name: str) -> None:
+    SETTLED.append(project_name)
+
+
 async def test_a_run_from_the_projects_story_needs_no_idea_and_starts_at_asset_analysis(host):
     offer = (await host.http.get(BASE, headers=host.headers)).json()["start"]
     body = {
@@ -295,7 +303,9 @@ async def test_a_run_from_the_projects_story_needs_no_idea_and_starts_at_asset_a
     finally:
         STORIES["has"] = True
     assert (missing.status_code, missing.json()["detail"]["code"]) == (409, "PROJECT_SOURCE_MISSING")
+    SETTLED.clear()
     started = await host.http.post(BASE, json=body, headers=host.headers)
+    assert SETTLED == [started.json()["project_name"]]  # the story's language is recorded before the run
     assert started.status_code == 200, started.text
     assert started.json()["stage"] == "ASSET_ANALYSIS"
 

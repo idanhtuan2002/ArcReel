@@ -372,6 +372,7 @@ def compose_production(
         activation=activation,
         on_change=scheduler.wake,
         has_story=witness.has_source_text,
+        settle_language=witness.settle_source_language,
     )
     return service, scheduler
 

@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import bisect
 import re
+import unicodedata
 
 from lib.cjk_ranges import CJK_RANGES
 
@@ -45,6 +46,28 @@ def contains_cjk(text: str) -> bool:
         if position >= 0 and code <= CJK_RANGES[position][1]:
             return True
     return False
+
+
+#: Letters only Vietnamese writes among the languages a source can have (base letters after the tone marks are
+#: removed, plus the tone marks themselves on any vowel).
+_VIETNAMESE_LETTERS = frozenset("ăâđêôơư")
+_VIETNAMESE_TONES = frozenset("\u0300\u0301\u0303\u0309\u0323")
+
+
+def detect_source_language(text: str) -> str | None:
+    """The language a story source is written in, read from its letters: ``zh`` when CJK characters are at least a
+    fifth of its letters, ``vi`` when Vietnamese letters or tone marks are at least one in fifty, else ``en``;
+    ``None`` for text without letters."""
+    letters = [char for char in text if char.isalpha()]
+    if not letters:
+        return None
+    cjk = sum(1 for char in letters if contains_cjk(char))
+    if cjk * 5 >= len(letters):
+        return "zh"
+    decomposed = unicodedata.normalize("NFD", "".join(letters).lower())
+    marked = sum(1 for char in decomposed if char in _VIETNAMESE_TONES)
+    marked += sum(1 for char in unicodedata.normalize("NFC", "".join(letters).lower()) if char in _VIETNAMESE_LETTERS)
+    return "vi" if marked * 50 >= len(letters) else "en"
 
 
 def count_reading_units(text: str, language: str | None) -> int:

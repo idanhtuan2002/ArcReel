@@ -21,6 +21,7 @@ from lib.episode_target_duration import EPISODE_TARGET_DURATION_FIELD
 from lib.episode_target_volume import EPISODE_TARGET_UNITS_FIELD
 from lib.project_manager import ProjectManager
 from lib.source_revision import SourceScope, compute_source_revision
+from lib.text_metrics import detect_source_language
 from r2.automation.identity import digest_value
 from r2.contracts.automation import OwnerReceipt, RunStage
 from r2.contracts.common import ensure_json_value
@@ -68,6 +69,30 @@ class ProjectInputWitness:
             return any(doc.text.strip() for doc in revision.documents)
 
         return await asyncio.to_thread(read)
+
+    async def settle_source_language(self, project_name: str) -> None:
+        """Record the language of the project's story text as ``source_language`` when none is recorded, so a run of
+        an uploaded story plans, counts and writes in the story's language; a recorded language is kept."""
+
+        def settle() -> None:
+            project = self._projects.load_project(project_name)
+            recorded = project.get("source_language")
+            if isinstance(recorded, str) and recorded.strip():
+                return
+            path = self._projects.get_project_path(project_name)
+            revision = compute_source_revision(path, project, SourceScope(kind="all"))
+            language = detect_source_language("\n".join(doc.text for doc in revision.documents))
+            if language is None:
+                return
+
+            def record(current: dict) -> None:
+                value = current.get("source_language")
+                if not isinstance(value, str) or not value.strip():
+                    current["source_language"] = language
+
+            self._projects.update_project(project_name, record)
+
+        await asyncio.to_thread(settle)
 
     async def digest(self, *, user_id: str, project_name: str) -> str:
         handed_off = await self._run_sources(user_id, project_name)

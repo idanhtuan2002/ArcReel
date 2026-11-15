@@ -125,6 +125,10 @@ async def _always_has_story(_project_name: str) -> bool:
     return True
 
 
+async def _language_unchanged(_project_name: str) -> None:
+    return None
+
+
 class ProductionRunService:
     def __init__(
         self,
@@ -138,6 +142,7 @@ class ProductionRunService:
         grant_ttl_seconds: int = 86_400,
         on_change: Callable[[], None] | None = None,
         has_story: Callable[[str], Awaitable[bool]] | None = None,
+        settle_language: Callable[[str], Awaitable[None]] | None = None,
     ) -> None:
         self._sessions = sessions
         self._custodian = custodian
@@ -148,6 +153,9 @@ class ProductionRunService:
         self._grant_ttl = timedelta(seconds=grant_ttl_seconds)
         self._on_change = on_change or (lambda: None)
         self._has_story = has_story or _always_has_story
+        # A run of the project's own story records the story's language when the project has none (an uploaded
+        # story never passes the hand-off that records it); the language is not a witnessed input.
+        self._settle_language = settle_language or _language_unchanged
 
     # Reads ---------------------------------------------------------------------------------------------------
 
@@ -280,8 +288,10 @@ class ProductionRunService:
                 raise ProductionRunRefused("POLICY_MOVED")
             if len(set(command.targets)) != len(command.targets) or len(command.targets) > policy.max_target_episodes:
                 raise ProductionRunRefused("TARGETS_OVER_LIMIT", 422, (str(policy.max_target_episodes),))
-            if command.story_source in {"project", "continue"} and not await self._has_story(command.project_name):
-                raise ProductionRunRefused("PROJECT_SOURCE_MISSING", 409)
+            if command.story_source in {"project", "continue"}:
+                if not await self._has_story(command.project_name):
+                    raise ProductionRunRefused("PROJECT_SOURCE_MISSING", 409)
+                await self._settle_language(command.project_name)
             if command.source_project is not None:
                 # A variant copies another project's story: its starter must be that project's Showrunner too.
                 await self.require_showrunner(
@@ -401,8 +411,10 @@ class ProductionRunService:
                 raise ProductionRunRefused("POLICY_MOVED")
             if len(set(command.targets)) != len(command.targets) or len(command.targets) > policy.max_target_episodes:
                 raise ProductionRunRefused("TARGETS_OVER_LIMIT", 422, (str(policy.max_target_episodes),))
-            if command.story_source in {"project", "continue"} and not await self._has_story(command.project_name):
-                raise ProductionRunRefused("PROJECT_SOURCE_MISSING", 409)
+            if command.story_source in {"project", "continue"}:
+                if not await self._has_story(command.project_name):
+                    raise ProductionRunRefused("PROJECT_SOURCE_MISSING", 409)
+                await self._settle_language(command.project_name)
             current_input = await self._witness.digest(user_id=command.user_id, project_name=command.project_name)
             if current_input != command.expected_input_digest:
                 raise ProductionRunRefused("INPUT_MOVED")
@@ -478,6 +490,7 @@ class ProductionRunService:
             and command.expected_input_digest != observed.input_digest
         )
         if command.action == "RESUME":
+            await self._settle_language(command.project_name)
             # Without a rebind the controller itself blocks on moved input at its next tick.
             if rebind and command.expected_input_digest != await self._witness.digest(
                 user_id=command.user_id, project_name=command.project_name
