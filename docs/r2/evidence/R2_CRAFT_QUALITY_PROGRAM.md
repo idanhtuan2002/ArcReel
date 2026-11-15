@@ -75,3 +75,8 @@ All items are done, measured, deferred with reasons or blocked on the Human. Rem
 - r2-v2.5.22 deployed 11:34. Donor check for ADR-0155 recorded in the ADR.
 - ADR-0156: endpoint `ark-seedream` (Seedream through `ArkImageBackend`, references in `image`, `watermark: false`), endpoint `gemini-tts` (`GeminiAudioBackend`, 30 voices, cue tags → `<sigh>`/`<laugh>`). Tests: custom provider + audio + image backends + router catalog + i18n 1458 passed; integration custom provider / config resolver / capability overrides / narration 309 passed (1 known pre-existing failure `test_tts_skeleton` orphan audio); frontend `pnpm check` 2719 passed; static gates clean.
 - After deploy: switch BytePlus `seedream-4-5-251128` to endpoint `ark-seedream`; the sponsor adds a custom provider "Gemini TTS" (base `https://generativelanguage.googleapis.com`, their Gemini key, model `gemini-3.8-flash-tts`, endpoint `gemini-tts`); run the media qualification canary for both routes; then the cloud arm of the comparison.
+
+## Release r2-v2.5.24 (2026-11-15)
+- r2-v2.5.23 deployed; provider `custom-7` "Gemini TTS" added by the sponsor (TTS models only enabled, default `gemini-3.8-flash-tts`); BytePlus Seedream 4.5/4.0 switched to `ark-seedream`. Smoke through the app's builders: Gemini TTS WAV 24 kHz 6.2 s; Seedream with one reference keeps the ferryman's face, hat and clothes, 1600x2848, no watermark.
+- ADR-0157: a plan finding is span-patched in the round's first cycle; rewrite and replan only when it survives. Trigger: trial 4 chapter 1 replanned twice (one note a pronoun slip), 61 review calls. Tests: story_authoring unit + integration + story adapter 485 passed (PG); static gates clean.
+- Deploy (Human): the agent stops its DB watchers first.

@@ -1355,7 +1355,9 @@ class StoryRunDriver:
                     await self._ensure_scene(
                         story, ref, refs, delta, version, proposal, plan, [seed_in, bible_in, style_in, plan_ins[c - 1]]
                     )
-                if cycle == REVIEW_CYCLES or not await self._review_chapter(story, c, chapter_refs, final=False):
+                if cycle == REVIEW_CYCLES or not await self._review_chapter(
+                    story, c, chapter_refs, final=False, cycle=cycle
+                ):
                     break
             await self._review_chapter(story, c, chapter_refs, final=True)
             if self._digesting and (self._book is not None or c < self._chapters):
@@ -1671,8 +1673,14 @@ class StoryRunDriver:
         history.append(outcome.reason)
         return outcome.text
 
-    async def _review_chapter(self, story: _Story, chapter: int, refs: Sequence[SceneRef], *, final: bool) -> bool:
-        """Run the chapter's audits; repair named scenes. Returns whether a scene changed. ``final`` seals the chapter."""
+    async def _review_chapter(
+        self, story: _Story, chapter: int, refs: Sequence[SceneRef], *, final: bool, cycle: int = 0
+    ) -> bool:
+        """Run the chapter's audits; repair named scenes. Returns whether a scene changed. ``final`` seals the chapter.
+
+        Repairs escalate (ADR-0157): in a round's first cycle every repairable finding, a plan finding too, gets the
+        span patch, which keeps the rest of the scene byte-identical; a plan finding still there in a later cycle has its
+        scene rewritten, and one still there at the seal replans the chapter."""
         node = chapter_review(chapter)
         heads = {ref.node_id: json.loads(await self._head(ref.node_id)) for ref in refs}
         inputs = [
@@ -1781,8 +1789,8 @@ class StoryRunDriver:
                 scene_findings = [f for f in repairable if f.node_id == scene_node]
                 memo = [f for f in scene_findings if f.code.startswith(f"{AuditDimension.MEMO_COMPLIANCE.value}:")]
                 contract = [f for f in memo if f.blocking and not _excess(f)]
-                scene_findings = [f for f in scene_findings if f not in memo or _excess(f)]
-                if contract:
+
+                async def rewrite(scene_node: str = scene_node, contract: list[Finding] = contract) -> None:
                     note = (
                         AUTO_NOTE
                         + f"thẩm định chương {chapter} yêu cầu viết lại cảnh này để sửa: "
@@ -1791,6 +1799,10 @@ class StoryRunDriver:
                     await self._store.apply(
                         lambda s, n=scene_node, note=note: (add_intent(s, node_ids=(n,), note=note), None)
                     )
+
+                if contract and cycle > 0:
+                    # It survived the span patch of the first cycle: the scene misses what its plan asks for.
+                    await rewrite()
                     changed = True
                     continue
                 if not scene_findings:
@@ -1818,12 +1830,18 @@ class StoryRunDriver:
                         cut if not rest else await self._repair_once(scene_node, scene_epoch, cut, rest, context, [])
                     )
                 except Blocked:
-                    continue
-                if (
+                    repaired = scene_head["prose"]
+                accepted = (
                     repaired != scene_head["prose"]
                     and self._no_worse(story, scene_head["prose"], repaired)
                     and not _restores(scene_head, repaired)
-                ):
+                )
+                if not accepted and contract:
+                    # The patch could not place a fix for a plan finding: the scene is rewritten with the note.
+                    await rewrite()
+                    changed = True
+                    continue
+                if accepted:
                     fixed = [*kept, *(f"{f.code}: “{f.quote[:80]}”" for f in scene_findings if f.quote)]
                     # Only passages this repair actually removed are guarded against coming back.
                     fixed_quotes = [

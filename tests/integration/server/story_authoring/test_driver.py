@@ -837,9 +837,15 @@ async def test_a_contract_finding_regenerates_the_scene_with_an_editor_note_insi
     assert state.intents[scene_draft(1, 3)][0].startswith("Biên tập tự động: ")
     assert "Minh chưa thấy cuốn sổ" in [p for k, p in model.prompts if k == "prose"][3]
     assert model.calls["prose"] == 10
-    assert model.calls.get("patches", 0) == 0
+    # The span patch is tried first (ADR-0157); it places no fix, so the scene is rewritten with the note.
+    assert model.calls.get("patches", 0) == 1
     scene_steps = {a.step_id for a in state.attempts if a.step_id.startswith(scene_draft(1, 3))}
-    assert scene_steps == {f"{scene_draft(1, 3)}@r0.0.0#1", f"{scene_draft(1, 3)}@r0.0.0+1#1"}
+    # Draft, the patch attempt (same round and cap), then the rewrite's round.
+    assert scene_steps == {
+        f"{scene_draft(1, 3)}@r0.0.0#1",
+        f"{scene_draft(1, 3)}@r0.0.0#2",
+        f"{scene_draft(1, 3)}@r0.0.0+1#1",
+    }
 
 
 async def test_a_withheld_card_that_stays_revealed_is_patched_replanned_then_offered_to_the_human(
@@ -1608,3 +1614,46 @@ async def test_the_safety_audit_reads_at_the_briefs_content_safety_level(concurr
     safety = [p for k, p in model.prompts if k == "issues" and "NỘI DUNG NHẠY CẢM" in p]
     assert safety
     assert all("chỉ ghi là minor" in p and "người dưới 18 tuổi" in p for p in safety)
+
+
+async def test_a_plan_finding_is_patched_in_place_before_any_scene_is_rewritten(
+    concurrent_session_factory: Factory, tmp_path
+):
+    """A memo-compliance finding first gets the span patch every local finding gets (a pronoun slip, a wrong detail);
+    only one that survives the patch has its scene rewritten, and only one that survives that replans the chapter."""
+    store = await _store(concurrent_session_factory)
+    model = ScriptedModel()
+    flagged: list[str] = []
+    patch_prompts: list[str] = []
+
+    def audit(prompt: str, _schema: dict[str, Any]) -> dict[str, Any]:
+        if "GHI CHÚ CHƯƠNG" not in prompt or "[Chương 1 cần thẩm định]" not in prompt:
+            return {"issues": []}
+        if not flagged:
+            flagged.append(prompt.rsplit("\n\n", 1)[-1].split(". ")[0] + ".")
+        if flagged[0] not in prompt:
+            return {"issues": []}
+        issue = {
+            "severity": "critical",
+            "issue_type": "pronoun_mismatch",
+            "description": "Lan là nữ nhưng câu này gọi Lan là anh",
+            "quote": flagged[0],
+            "suggested_fix": "đổi cách gọi cho đúng",
+        }
+        return {"issues": [issue]}
+
+    def patches(prompt: str, _schema: dict[str, Any]) -> dict[str, Any]:
+        patch_prompts.append(prompt)
+        if flagged and flagged[0] in prompt:
+            return {"patches": [{"before": flagged[0], "after": flagged[0][:-1] + " ấy."}], "notes": "sửa cách gọi"}
+        return {"patches": [], "notes": "không sửa"}
+
+    model.overrides["issues"] = audit
+    model.overrides["patches"] = patches
+
+    state = await _driver(concurrent_session_factory, store, model, StoryBlobStore(tmp_path)).run()
+
+    assert state.phase is RunPhase.READY_FOR_APPROVAL, state.block_reason
+    assert any("pronoun_mismatch" in p or "gọi Lan là anh" in p for p in patch_prompts)
+    assert not any(n.startswith("scene_draft[1,") for n in state.intents)
+    assert "chapter_plan[1]" not in state.intents
