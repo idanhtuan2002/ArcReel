@@ -789,8 +789,10 @@ async def test_a_run_blocked_by_spent_task_attempts_retries_its_stage_in_a_new_l
     submitted = host.owner.provider_submit_count
 
     host.owner.inspect = original
+    SETTLED.clear()
     resumed = await host.command(blocked, "resume", command_id="resume-after-fix")
     assert resumed.status_code == 200, resumed.text
+    assert SETTLED == []  # the language is part of the pinned source revision; a resume never records it
     view = resumed.json()
     assert (view["status"], view["stage"], view["generation"]) == (
         "RUNNING",

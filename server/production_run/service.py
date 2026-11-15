@@ -157,8 +157,9 @@ class ProductionRunService:
         self._grant_ttl = timedelta(seconds=grant_ttl_seconds)
         self._on_change = on_change or (lambda: None)
         self._has_story = has_story or _always_has_story
-        # A run of the project's own story records the story's language when the project has none (an uploaded
-        # story never passes the hand-off that records it); the language is not a witnessed input.
+        # A new run of the project's own story records the story's language when the project has none (an uploaded
+        # story never passes the hand-off that records it). Only at the start: the language is part of the workflow's
+        # source revision, so recording it under a running run would move the inputs that run already pinned.
         self._settle_language = settle_language or _language_unchanged
 
     # Reads ---------------------------------------------------------------------------------------------------
@@ -494,7 +495,6 @@ class ProductionRunService:
             and command.expected_input_digest != observed.input_digest
         )
         if command.action == "RESUME":
-            await self._settle_language(command.project_name)
             # Without a rebind the controller itself blocks on moved input at its next tick.
             if rebind and command.expected_input_digest != await self._witness.digest(
                 user_id=command.user_id, project_name=command.project_name
