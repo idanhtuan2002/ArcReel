@@ -48,8 +48,9 @@ class ProfilePublicationAuthorizationModel(Base):
         sa.PrimaryKeyConstraint(
             "user_id", "project_name", "authorization_id", name="pk_m10_publication_authorizations"
         ),
+        # The grant chain the authorization was issued under: the project's own, or ``@workspace`` (ADR-0123).
         sa.ForeignKeyConstraint(
-            ["user_id", "project_name", "actor_id", "grant_sequence"],
+            ["user_id", "grant_project_name", "actor_id", "grant_sequence"],
             [
                 "r2_showrunner_grant_events.user_id",
                 "r2_showrunner_grant_events.project_name",
@@ -76,6 +77,7 @@ class ProfilePublicationAuthorizationModel(Base):
     policy_version: Mapped[str] = mapped_column(sa.String(255), nullable=False)
     evidence_digest: Mapped[str] = mapped_column(sa.String(71), nullable=False)
     grant_sequence: Mapped[int] = mapped_column(sa.Integer, nullable=False)
+    grant_project_name: Mapped[str] = mapped_column(sa.String(255), nullable=False)
     issued_at: Mapped[datetime] = mapped_column(sa.DateTime(timezone=True), nullable=False)
     admit_not_after: Mapped[datetime] = mapped_column(sa.DateTime(timezone=True), nullable=False)
     request_json: Mapped[dict[str, Any]] = mapped_column(sa.JSON, nullable=False)

@@ -83,8 +83,9 @@ async def test_oversized_factory_input_refuses_before_auth_database_or_archive(i
         await bind(sized_request(1_048_577), None, tmp_path)
 
 
-async def prepare_qualified_custody(sessions, tmp_path: Path):
-    """Construct real signed/checkpointed host fixtures; version-table input is fixture state."""
+async def prepare_qualified_custody(sessions, tmp_path: Path, grant_project: str = "project"):
+    """Construct real signed/checkpointed host fixtures; version-table input is fixture state. ``grant_project`` is
+    the chain the grant is issued on: the project itself or ``@workspace`` (ADR-0123)."""
     import hashlib
     import importlib.util
     import json
@@ -107,9 +108,11 @@ async def prepare_qualified_custody(sessions, tmp_path: Path):
     event_key = Ed25519PrivateKey.from_private_bytes(bytes(range(32, 64)))
     public = event_key.public_key().public_bytes(serialization.Encoding.Raw, serialization.PublicFormat.Raw)
     importer = GovernanceGrantImporter(sessions, key_id="grant-key-a", public_key=public)
-    body = _event("ISSUE", 1, None, "2026-01-01T00:00:00Z", project_name="project")
+    body = _event("ISSUE", 1, None, "2026-01-01T00:00:00Z", project_name=grant_project)
     body.update(user_id="default", principal="actor", signer_key_id="grant-key-a")
-    event = await importer.import_event(_signed(body, event_key), scope=GrantScopeV1("default", "project", "actor"))
+    if grant_project.startswith("@"):
+        body["schema"] = "governance.showrunner_grant_event.v2"
+    event = await importer.import_event(_signed(body, event_key), scope=GrantScopeV1("default", grant_project, "actor"))
 
     def files():
         root, paths = _tree(tmp_path)
@@ -121,7 +124,7 @@ async def prepare_qualified_custody(sessions, tmp_path: Path):
         checkpoint_body["heads"] = [
             {
                 "user_id": "default",
-                "project_name": "project",
+                "project_name": grant_project,
                 "principal": "actor",
                 "head_sequence": 1,
                 "head_event_digest": event.event_digest,
@@ -159,13 +162,13 @@ async def prepare_qualified_custody(sessions, tmp_path: Path):
     return root, runtime, importer, event_key, event
 
 
-@pytest.fixture
-async def qualified_host(session_factory, tmp_path: Path, interactive_env):
+@pytest.fixture(params=["project", "@workspace"])
+async def qualified_host(session_factory, tmp_path: Path, interactive_env, request):
     import os
 
     from server.services.governance_attestation import serve_governance_attestor
 
-    root, runtime, importer, key, event = await prepare_qualified_custody(session_factory, tmp_path)
+    root, runtime, importer, key, event = await prepare_qualified_custody(session_factory, tmp_path, request.param)
     async with serve_governance_attestor(
         root, runtime, session_factory=session_factory, expected_uid=os.getuid(), expected_gid=os.getgid()
     ):
@@ -187,7 +190,7 @@ async def test_real_activated_issuer_persists_action_receipt_and_admits_under_cu
     from lib.db.models.quality import ProfilePublicationAuthorizationModel
     from lib.db.repositories.quality import QualityProfileRepository
 
-    wrapper, sessions, *_ = qualified_host
+    wrapper, sessions, *_, event = qualified_host
     request = publication_request(user_id="default")
     lease = await wrapper.authorize_publication(request)
     assert lease.action == "PROFILE_PUBLICATION"
@@ -198,6 +201,8 @@ async def test_real_activated_issuer_persists_action_receipt_and_admits_under_cu
         assert stored is not None
         assert stored.lease == lease
         assert stored.grant_sequence == 1
+        row = (await session.execute(sa.select(ProfilePublicationAuthorizationModel))).scalar_one()
+        assert row.grant_project_name == event.body.project_name
         await wrapper.lock_current_grant(session, request, lease)
         admitted = await wrapper.admit_locked(session, request, lease)
         assert lease.issued_at <= admitted < lease.admit_not_after
@@ -240,9 +245,12 @@ async def test_revoked_current_grant_refuses_existing_action_lease(qualified_hos
     wrapper, sessions, _, _, importer, key, event = qualified_host
     request = publication_request(user_id="default")
     lease = await wrapper.authorize_publication(request)
-    body = _event("REVOKE", 2, event.event_digest, "2026-10-27T00:00:00Z", project_name="project")
+    chain = event.body.project_name
+    body = _event("REVOKE", 2, event.event_digest, "2026-10-27T00:00:00Z", project_name=chain)
     body.update(user_id="default", principal="actor", signer_key_id="grant-key-a")
-    await importer.import_event(_signed(body, key), scope=GrantScopeV1("default", "project", "actor"))
+    if chain.startswith("@"):
+        body["schema"] = "governance.showrunner_grant_event.v2"
+    await importer.import_event(_signed(body, key), scope=GrantScopeV1("default", chain, "actor"))
     async with sessions() as session, session.begin():
         with pytest.raises(ProfilePublicationUnauthorizedError):
             await wrapper.admit_locked(session, request, lease)

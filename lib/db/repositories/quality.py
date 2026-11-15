@@ -228,7 +228,10 @@ class QualityProfileRepository:
         lease: q.ProfilePublicationAuthorizationLease,
         *,
         grant_sequence: int,
+        grant_project_name: str | None = None,
     ) -> None:
+        """``grant_project_name`` is the grant chain the lease rests on: the project's own (default) or
+        ``@workspace`` when the reader fell back to the workspace grant (ADR-0123)."""
         request = _normalized(request)
         lease = _lease(lease)
         self._postgresql(transaction=True)
@@ -251,6 +254,7 @@ class QualityProfileRepository:
                 policy_version=lease.policy_version,
                 evidence_digest=lease.evidence_digest,
                 grant_sequence=grant_sequence,
+                grant_project_name=grant_project_name or lease.project_name,
                 issued_at=lease.issued_at,
                 admit_not_after=lease.admit_not_after,
                 request_json=request.model_dump(mode="json"),

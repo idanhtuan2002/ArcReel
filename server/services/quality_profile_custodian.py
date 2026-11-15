@@ -134,7 +134,7 @@ class InteractiveProfilePublicationCustodian:
                     admit_not_after=deadline,
                 )
                 await QualityProfileRepository(session).record_authorization(
-                    request, lease, grant_sequence=grant.body.sequence
+                    request, lease, grant_sequence=grant.body.sequence, grant_project_name=grant.body.project_name
                 )
             return lease
         except (

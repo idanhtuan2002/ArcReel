@@ -28,6 +28,9 @@ MODELS = (
     QualityOutboxModel,
 )
 TABLES = {model.__tablename__ for model in MODELS}
+#: Columns a later migration added to these tables (b7a310300005: the grant chain of a publication authorization);
+#: at this revision the authorization's grant key still names its own project.
+LATER_COLUMNS = {"m10_profile_publication_authorizations": {"grant_project_name": "project_name"}}
 
 
 def test_exact_singleton_head_and_predecessor(alembic_cfg: tuple[Config, Path]) -> None:
@@ -54,12 +57,14 @@ def test_upgrade_downgrade_upgrade_preserves_predecessor_and_matches_orm(alembic
         for model in MODELS:
             table = model.__table__
             reflected = connection.execute(f'PRAGMA table_info("{table.name}")').fetchall()
-            assert {row[1] for row in reflected} == {column.name for column in table.columns}
+            later = LATER_COLUMNS.get(table.name, {})
+            columns = [column for column in table.columns if column.name not in later]
+            assert {row[1] for row in reflected} == {column.name for column in columns}
             assert [row[1] for row in sorted(reflected, key=lambda row: row[5]) if row[5]] == [
                 column.name for column in table.primary_key
             ]
             assert {row[1]: not bool(row[3]) for row in reflected} == {
-                column.name: column.nullable for column in table.columns
+                column.name: column.nullable for column in columns
             }
             foreign = connection.execute(f'PRAGMA foreign_key_list("{table.name}")').fetchall()
             assert any(row[2:5] == ("users", "user_id", "id") and row[6] == "RESTRICT" for row in foreign)
@@ -76,7 +81,7 @@ def test_upgrade_downgrade_upgrade_preserves_predecessor_and_matches_orm(alembic
             }
             expected_keys = {
                 (
-                    tuple(column.name for column in key.columns),
+                    tuple(later.get(column.name, column.name) for column in key.columns),
                     key.referred_table.name,
                     tuple(element.column.name for element in key.elements),
                 )
