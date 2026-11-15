@@ -45,7 +45,7 @@ from server.services.automation_grants import AutomationGrantCustodian, RunAutom
 from server.story_authoring.artifacts import StoryBlobStore
 from server.story_authoring.authority import GrantNarrativeShowrunnerAuthority
 from server.story_authoring.commit import load_offered_manifest, manifest_bytes
-from server.story_authoring.driver import StoryBrief
+from server.story_authoring.driver import CAP_EXHAUSTED, StoryBrief
 from server.story_authoring.executor import execute_story_run_task
 from server.story_authoring.runtime import RunPhase, RunState, RunStateStore, set_phase
 from server.story_authoring.service import StoryAuthoringService
@@ -864,9 +864,11 @@ def _list_fallbacks(host: Host, *models: str, local: bool = True) -> None:
     host.projects.update_project("project", write)
 
 
-async def _stop(host: Host, task_id: str) -> None:
+async def _stop(
+    host: Host, task_id: str, *, phase: RunPhase = RunPhase.MODEL_UNAVAILABLE, reason: str = "429 quota exhausted"
+) -> None:
     store = RunStateStore(host.sessions, task_id=task_id)
-    await store.apply(lambda s: (set_phase(s, RunPhase.MODEL_UNAVAILABLE, reason="429 quota exhausted"), None))
+    await store.apply(lambda s: (set_phase(s, phase, reason=reason), None))
     async with host.sessions() as session, session.begin():
         await session.execute(sa.update(Task).where(Task.task_id == task_id).values(status="succeeded"))
 
@@ -912,6 +914,48 @@ async def test_a_story_whose_writer_failed_goes_on_with_the_fallback_writer_in_t
     assert {node_id: node.head_revision_id for node_id, node in after.nodes.items() if node_id in heads} == heads
     offered = await _tick(host)
     assert (offered.stage, offered.status) == (RunStage.STORY_COMMIT, RunStatus.RUNNING)
+
+
+@pytest.mark.parametrize("story_policy", [_writer_fallback], indirect=True)
+async def test_a_writer_that_cannot_pass_a_step_hands_the_story_to_the_next_writer(story_host: Host):
+    """A step that spent its call cap without an acceptable output moves to the next writer, whose output meets the
+    same checks; the step's cap starts again for it."""
+    host = story_host
+    _list_fallbacks(host, FALLBACK)
+    await _tick(host)
+    await _tick(host)
+    task_id = await _story_task(host)
+    store = RunStateStore(host.sessions, task_id=task_id)
+    before = await store.load()
+    await _stop(
+        host,
+        task_id,
+        phase=RunPhase.BLOCKED_QUALITY,
+        reason=f"story_bible: call cap 3 {CAP_EXHAUSTED}",
+    )
+
+    reworked = await _tick(host)
+    assert (reworked.stage, reworked.status) == (RunStage.STORY, RunStatus.RUNNING)
+    await _tick(host)
+    assert (await _brief(host, task_id)).selection.model_id == FALLBACK
+    moved = await store.load()
+    assert moved.phase is RunPhase.RUNNING
+    assert moved.retries == before.retries + 1
+
+
+@pytest.mark.parametrize("story_policy", [_writer_fallback], indirect=True)
+async def test_a_story_blocked_on_its_content_does_not_change_writer(story_host: Host):
+    host = story_host
+    _list_fallbacks(host, FALLBACK)
+    await _tick(host)
+    await _tick(host)
+    task_id = await _story_task(host)
+    await _stop(host, task_id, phase=RunPhase.BLOCKED_QUALITY, reason="outline: the ending answers no question")
+
+    stopped = await _tick(host)
+    assert stopped.stage is RunStage.STORY
+    assert stopped.status not in (RunStatus.RUNNING, RunStatus.WAITING_TASK)
+    assert (await _brief(host, task_id)).selection.model_id == MODEL
 
 
 @pytest.mark.parametrize("story_policy", [_writer_fallback], indirect=True)

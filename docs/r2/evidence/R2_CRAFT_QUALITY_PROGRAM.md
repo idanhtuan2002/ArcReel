@@ -59,3 +59,9 @@ All items are done, measured, deferred with reasons or blocked on the Human. Rem
 - Launch qualification: recording a configuration that was recorded before (switching the writer back) was skipped as already stored, so readiness kept `LAUNCH_QUALIFICATION_CHANGED`; re-recording now moves that record forward (test `test_recording_an_earlier_configuration_again_makes_it_current`, SQLite + PG).
 - No migration. Deploy (Human): `sudo ~/arcreel-v2-staging/m8e-review-stop.sh`, `sudo ~/arcreel-v2-staging/v2-deploy.sh r2-v2.5.20`, `sudo ~/arcreel-v2-staging/v2-release-start.sh`.
 - After deploy: writer of `san-xuat-tu-ong-7fb4ef4b` = `ernie-5.5-flash-preview:free` (fallbacks particle-1 → deepseek-v4-1-flash → ling-3.2-flash → gemma-4-31b → local qwen3.5-vimax:9b); start the trial again.
+
+## Release r2-v2.5.21 (2026-11-15)
+- r2-v2.5.20 deployed 2026-11-15 by the Human; launch re-record fix verified on prod (readiness ready right after recording).
+- Trial 3 (writer `ernie`): seed passed with the reasoning allowance, then `story_bible` spent 16,384 tokens on three draws → `BLOCKED_QUALITY`. Reproduced 6 draws: ernie reasoning 12k–51k chars, `reasoning.effort=low` does not bound it. Writer switched to `particle-1` (ernie kept as fallback). Trial 4 started 10:23:35 and passed seed → outline (one outline draw truncated at 16,384).
+- ADR-0154: a step that spends its call cap without an acceptable output moves the story to the next writer (same rules as ADR-0139, same checks). Tests: story adapter (22, PG), story_authoring + production_run unit/integration + automation transitions (775 passed, PG); static gates clean.
+- No migration. Deploy (Human) when convenient: the deploy parks running tasks and resumes them (ADR-0130). `sudo ~/arcreel-v2-staging/m8e-review-stop.sh`, `sudo ~/arcreel-v2-staging/v2-deploy.sh r2-v2.5.21`, `sudo ~/arcreel-v2-staging/v2-release-start.sh`.

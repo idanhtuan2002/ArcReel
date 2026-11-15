@@ -95,6 +95,7 @@ from server.story_authoring.service import (
     StoryAuthoringService,
     StoryRunRef,
     brief_idea,
+    needs_next_writer,
     run_id_for,
 )
 
@@ -635,7 +636,7 @@ class StoryAdapter:
 
     async def inspect(self, *, intent: DispatchIntent, receipt: OwnerReceipt) -> StageOutcome:
         state = await self._state(receipt)
-        if state.phase is RunPhase.MODEL_UNAVAILABLE:
+        if needs_next_writer(state):
             run = await current_run(self._sessions, intent)
             ref, _ = await self._stories.get(
                 user_id=run.user_id, project_name=run.project_name, run_id=receipt.receipt_ref.partition("#")[0]
@@ -816,7 +817,7 @@ class StoryAdapter:
             ref, state = await self._stories.get(user_id=user_id, project_name=project_name, run_id=story_run_id)
         except StoryActionRefused:
             return None
-        return (ref, state) if state.phase is RunPhase.MODEL_UNAVAILABLE else None
+        return (ref, state) if needs_next_writer(state) else None
 
     async def _unavailable_story(
         self, run: RunSnapshot, greenlight: OwnerReceipt

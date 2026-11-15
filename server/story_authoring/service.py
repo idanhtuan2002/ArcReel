@@ -59,6 +59,7 @@ from server.story_authoring.contracts import (
     StoryScope,
 )
 from server.story_authoring.driver import (
+    CAP_EXHAUSTED,
     CHAPTERS,
     NODE_CAPS,
     StoryBasis,
@@ -173,6 +174,14 @@ def is_continuation(brief: StoryBrief) -> bool:
     if brief.book is not None:
         return brief.book.part > 1
     return brief.prior is not None and brief.prior.mode == "continuation"
+
+
+def needs_next_writer(state: RunState) -> bool:
+    """Whether the story stopped on its writer and the next one may take it over: the model failed (ADR-0139), or a
+    step spent its call cap without an acceptable output (ADR-0154). A story blocked on its content does not move."""
+    return state.phase is RunPhase.MODEL_UNAVAILABLE or (
+        state.phase is RunPhase.BLOCKED_QUALITY and CAP_EXHAUSTED in (state.block_reason or "")
+    )
 
 
 def rebasable(state: RunState) -> bool:
@@ -1021,7 +1030,7 @@ class StoryAuthoringService:
         brief: StoryBrief,
         limits: StoryLimits,
     ) -> RunState:
-        """ADR-0139: a story stopped because its model failed goes on, in the same run, on ``brief`` (the story on a
+        """ADR-0139/0154: a story stopped on its writer goes on, in the same run, on ``brief`` (the story on a
         fallback route) under ``limits``; what was written stays (``brief.basis``). Recorded as a top-up of
         ``caller_ref``; a replay with the same brief finishes an interrupted move and changes nothing else."""
         ref, _before = await self.get(user_id=user_id, project_name=project_name, run_id=run_id)
@@ -1030,13 +1039,13 @@ class StoryAuthoringService:
         def change(current: RunState) -> tuple[RunState, bool]:
             if any(t.caller_ref == caller_ref for t in current.top_ups):
                 return current, True
-            if current.phase is not RunPhase.MODEL_UNAVAILABLE:
+            if not needs_next_writer(current):
                 return current, False
             moved = top_up(
                 current,
                 caller_ref=caller_ref,
                 limits=limits,
-                phases=frozenset({RunPhase.MODEL_UNAVAILABLE}),
+                phases=frozenset({current.phase}),
                 grow=False,
                 reroute=True,
             )

@@ -204,6 +204,9 @@ ENDING_NOTE = AUTO_NOTE + (
     "biên tập viên thấy cảnh này chưa khép lại xung đột trung tâm. Viết lại để kết thúc giải quyết trọn vẹn xung đột, "
     "trả lời câu hỏi mở đầu và dừng ở hình ảnh cuối đã định trong dàn ý."
 )
+#: The block reason of a step that spent its call cap without an acceptable output; the next writer may take the
+#: story over (ADR-0154).
+CAP_EXHAUSTED = "reached without an acceptable output"
 RETRYABLE = frozenset(
     {
         StoryFailureCode.OUTPUT_INVALID,
@@ -525,7 +528,7 @@ class StoryRunDriver:
             prefix = step_prefix(state, node)
             used = sum(1 for a in state.attempts if a.kind is AttemptKind.GENERATE and a.step_id.startswith(prefix))
             if used >= cap:
-                raise Blocked(RunPhase.BLOCKED_QUALITY, f"{node}: call cap {cap} reached without an acceptable output")
+                raise Blocked(RunPhase.BLOCKED_QUALITY, f"{node}: call cap {cap} {CAP_EXHAUSTED}")
             step_id = f"{prefix}{used + 1}"
             try:
                 gateway = self._judge_gateway if judge else self._gateway
