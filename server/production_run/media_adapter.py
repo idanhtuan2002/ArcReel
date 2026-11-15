@@ -31,10 +31,12 @@ from __future__ import annotations
 import asyncio
 import json
 from collections.abc import Awaitable, Callable, Mapping
+from functools import partial
 from pathlib import Path
 from typing import Any
 
 from lib.asset_derivatives import DERIVATIVE_ASSET_TYPE, DERIVATIVE_TASK_TYPE
+from lib.character_voice import character_speech_delivery
 from lib.config.resolver import ConfigResolver
 from lib.db.repositories.production_runs import ProductionRunRepository
 from lib.face_identity import FACE_JUDGE_IDENTITY, FaceIdentityService
@@ -43,8 +45,10 @@ from lib.narration_delivery import USE_TTS
 from lib.project_manager import ProjectManager
 from lib.reference_catalog import DERIVATIVE_SEPARATOR
 from lib.scene_looks import kept_look, scene_starts
+from lib.script_skeleton import resolve_script_kind
 from lib.storyboard_sequence import get_storyboard_items
 from lib.version_manager import VersionManager
+from lib.voice_cast import record_voices, speakers_to_cast
 from lib.workflow_plan import WorkflowPlan, WorkflowPlanRequest
 from lib.workflow_state import WorkflowActionType
 from r2.automation.assessment import ModelAssessment
@@ -75,14 +79,15 @@ from server.production_run.owner_support import (
     script_revision,
     step_intent,
 )
-from server.production_run.owner_tasks import attempt_window_tasks, tasks_usage
+from server.production_run.owner_tasks import ACTIVE, attempt_window_tasks, find_task, submit_task, tasks_usage
 from server.production_run.ports import StepPlan
+from server.production_run.project_writes import update_run_project
 from server.production_run.text_adapter import episode_number, receipt_revision, revision_receipt
 from server.production_run.unit_checks import look_outliers, look_stats, narration_problem, storyboard_problem
 from server.routers.versions import restore_resource_version
 from server.services.automation_grants import RunAutomationAuthority
 from server.services.workflow_planner import WorkflowPlanner
-from server.tool_runtime import CallerContext, ToolOutcome
+from server.tool_runtime import TEXT_VOICE_CAST, CallerContext, ToolOutcome
 
 type MediaTool = Callable[[ToolContext, dict[str, Any]], Awaitable[ToolOutcome[Any]]]
 
@@ -112,6 +117,10 @@ _UPSTREAM = frozenset(
         A.GENERATE_SCRIPT,
     }
 )
+
+
+#: Voice cast tasks one media step may send for one set of speakers before it blocks.
+VOICE_CAST_ATTEMPTS = 3
 
 
 class MediaAdapter:
@@ -192,6 +201,8 @@ class MediaAdapter:
                 if not confirmed:
                     raise OwnerBlocked("WORKFLOW_CONFIRM_REQUEST_DURATION")
                 plan = await self._plan(intent.scope.user_id, intent.scope.project_name, episode, confirmed)
+            if await self._cast_voices(intent, receipt.digest, plan):
+                return outcome(intent, "WAIT", owner_state="VOICES_CASTING")
             if plan.next_action.type is not A.WAIT_FOR_TASK:
                 if await self._redo_reworked_segments(intent, receipt.digest, plan, episode):
                     return outcome(intent, "WAIT", owner_state="REWORK_REGENERATING")
@@ -705,6 +716,72 @@ class MediaAdapter:
         except (FileNotFoundError, ValueError, KeyError):
             return [], ""
         return [i for i in items if isinstance(i, dict)], id_field
+
+    async def _cast_voices(self, intent: DispatchIntent, subject_digest: str, plan: WorkflowPlan) -> bool:
+        """Cast the voices of the episode's speaking characters that have none for the audio route (ADR-0166), when
+        the project voices its characters by TTS; ``True`` while a cast task runs or right after its voices were
+        recorded (the plan is read again). The voices are written through the run's guarded project write."""
+        name = intent.scope.project_name
+        try:
+            project = await asyncio.to_thread(self._projects.load_project, name)
+        except (FileNotFoundError, ValueError):
+            return False
+        target = plan.status.target
+        if character_speech_delivery(project) != "tts" or target is None:
+            return False
+        try:
+            script = await asyncio.to_thread(self._projects.load_script, name, target.script_filename)
+            items, *_ = get_storyboard_items(script)
+            kind = resolve_script_kind(script)
+        except (FileNotFoundError, ValueError, KeyError):
+            return False
+        resolved = await self._resolver.resolve_audio_backend(project, None)
+        route = f"{resolved.provider_id}/{resolved.model_id}"
+        characters = project.get("characters")
+        speakers = speakers_to_cast(
+            kind,
+            [i for i in items if isinstance(i, dict)],
+            characters if isinstance(characters, dict) else {},
+            route=route,
+        )
+        if not speakers:
+            return False
+        names = digest_value("r2.voice-cast.v1", ensure_json_value([route, *sorted(s.name for s in speakers)]))
+        sub_key = "voice-cast:" + names.removeprefix("sha256:")[:24]
+        for attempt in range(1, VOICE_CAST_ATTEMPTS + 1):
+            key = sub_key if attempt == 1 else f"{sub_key}#attempt-{attempt}"
+            task = await find_task(self._sessions, intent, key)
+            if task is None:
+                await submit_task(
+                    self._sessions,
+                    self._authority,
+                    intent,
+                    sub_key=key,
+                    task_type=TEXT_VOICE_CAST,
+                    resource_id="voice-cast",
+                    payload={
+                        "route": route,
+                        "speakers": [
+                            {"name": s.name, "description": s.description, "lines": s.lines} for s in speakers
+                        ],
+                        "projects_root": str(self._projects.projects_root),
+                    },
+                    subject_digest=subject_digest,
+                )
+                return True
+            if task["status"] in ACTIVE:
+                return True
+            if task["status"] == "succeeded":
+                result = task.get("result") or {}
+                voices = result.get("voices") if result.get("route") == route else None
+                if not isinstance(voices, dict) or not voices:
+                    raise OwnerBlocked("VOICE_CAST_FAILED")
+                cast = {str(character): str(voice) for character, voice in voices.items()}
+                await asyncio.to_thread(
+                    update_run_project, self._projects, name, partial(record_voices, voices=cast, route=route)
+                )
+                return True
+        raise OwnerBlocked("VOICE_CAST_FAILED")
 
     async def _run(self, intent: DispatchIntent) -> RunSnapshot | None:
         async with self._sessions() as session:

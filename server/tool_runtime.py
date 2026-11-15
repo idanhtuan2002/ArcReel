@@ -419,6 +419,7 @@ _TEXT_EPISODE_PLAN = "text_episode_plan"
 TEXT_ASSET_INVENTORY = "text_asset_inventory"
 TEXT_EPISODE_ADAPTATION = "text_episode_adaptation"
 TEXT_STORY_TRANSLATION = "text_story_translation"
+TEXT_VOICE_CAST = "text_voice_cast"
 _TEXT_TASK_SERVICES: dict[str, Services] = {}
 
 
@@ -1973,6 +1974,8 @@ async def execute_queued_text_task(
         return await _execute_episode_adaptation(task, scope, services)
     if task_type == TEXT_STORY_TRANSLATION:
         return await _execute_story_translation(task, scope, services)
+    if task_type == TEXT_VOICE_CAST:
+        return await _execute_voice_cast(task, scope, services)
     if task_type == _TEXT_EPISODE_PLAN:
         cancellation_receipts: list[FormalWriteReceipt] = []
         outcome = await _execute_plan_episodes(
@@ -2036,6 +2039,46 @@ async def _execute_episode_adaptation(task: dict[str, Any], scope: ProjectScope,
         problem = ToolProblem("adaptation_failed", str(exc), action=GenerationAction.RETRY.value)
         raise RuntimeError(encode_generation_problem(_queued_generation_problem(problem))) from exc
     return AdaptEpisodeResult.model_validate(result).model_dump(mode="json")
+
+
+async def _execute_voice_cast(task: dict[str, Any], scope: ProjectScope, services: Services) -> dict[str, Any]:
+    """Cast a voice from the audio route's catalog for each speaker of the payload (ADR-0166) with the project's script
+    text model. The task only answers; the caller records the voices. A route other than the payload's fails."""
+    from lib.narration_delivery import character_route
+    from lib.voice_cast import Speaker, VoiceCastError, assign_voices
+    from lib.voice_registers import route_cast_catalog
+    from server.services.generation_context import AudioLaneRequest, resolve_generation_context
+
+    payload = task.get("payload") or {}
+    if problem := await migration_gate(scope, services):
+        raise RuntimeError(encode_generation_problem(_queued_generation_problem(problem)))
+    user_id = str(task.get("user_id") or DEFAULT_USER_ID)
+    project_path = services.projects.get_project_path(scope.project_name)
+    project = await asyncio.to_thread(services.projects.load_project, scope.project_name)
+    context = await resolve_generation_context(
+        scope.project_name, None, project=project, project_path=project_path, user_id=user_id, audio=AudioLaneRequest()
+    )
+    lane = context.audio_lane
+    if lane is None:
+        raise RuntimeError("voice cast resolved no audio lane")
+    route = character_route(lane.provider_model.provider_id, lane.backend_model)
+    if route != payload.get("route"):
+        problem = ToolProblem("voice_route_moved", f"audio route is {route}", action=GenerationAction.RETRY.value)
+        raise RuntimeError(encode_generation_problem(_queued_generation_problem(problem)))
+    speakers = [Speaker(str(s["name"]), str(s.get("description") or ""), int(s["lines"])) for s in payload["speakers"]]
+    generator = await TextGenerator.create(TextTaskType.SCRIPT, scope.project_name)
+
+    async def generate(request: BackendTextGenerationRequest) -> BackendTextGenerationResult:
+        return await generator.generate(request, scope.project_name, user_id=user_id)
+
+    try:
+        voices = await assign_voices(
+            speakers, route_cast_catalog(lane.voices), narrator=lane.narration_voice, generate=generate
+        )
+    except VoiceCastError as exc:
+        problem = ToolProblem("voice_cast_failed", str(exc), action=GenerationAction.RETRY.value)
+        raise RuntimeError(encode_generation_problem(_queued_generation_problem(problem))) from exc
+    return {"route": route, "voices": voices}
 
 
 async def _execute_story_translation(task: dict[str, Any], scope: ProjectScope, services: Services) -> dict[str, Any]:

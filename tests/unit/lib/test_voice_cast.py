@@ -85,3 +85,28 @@ def test_speakers_are_the_characters_with_dialogue_lines():
     ]
     found = speakers_of(units, {"Hòa": {"description": "cô gái"}})
     assert [(s.name, s.lines, s.description) for s in found] == [("Hòa", 2, "cô gái"), ("Ông Bảy", 1, "")]
+
+
+def test_the_speakers_to_cast_are_the_characters_of_spoken_scenes_without_a_voice_for_the_route():
+    from lib.voice_cast import record_voices, speakers_to_cast
+
+    scenes = [
+        {"scene_id": "E1S01", "utterances": [{"kind": "dialogue", "speaker": "Hòa", "text": "Bác ơi!"}]},
+        {"scene_id": "E1S02", "video_prompt": {"dialogue": [{"speaker": "Ông Ba", "line": "Chuyến cuối."}]}},
+        {"scene_id": "E1S03", "utterances": [{"kind": "dialogue", "speaker": "Hòa", "text": "Cháu đi."}]},
+    ]
+    characters = {
+        "Hòa": {"description": "cô gái", "tts_voice": "Leda", "tts_voice_route": "custom-2/old-tts"},
+        "Ông Ba": {"description": "lão lái đò", "tts_voice": "Puck", "tts_voice_route": "custom-7/gemini-tts"},
+    }
+    missing = speakers_to_cast("scenes", scenes, characters, route="custom-7/gemini-tts")
+    assert missing == [Speaker("Hòa", "cô gái", 2)]
+
+    project = {"characters": characters}
+    record_voices(project, {"Hòa": "Kore"}, route="custom-7/gemini-tts")
+    assert project["characters"]["Hòa"] == {
+        "description": "cô gái",
+        "tts_voice": "Kore",
+        "tts_voice_route": "custom-7/gemini-tts",
+    }
+    assert speakers_to_cast("scenes", scenes, project["characters"], route="custom-7/gemini-tts") == []

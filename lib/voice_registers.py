@@ -34,4 +34,16 @@ def cast_catalog(endpoint: str, voices: Sequence[VoiceOption]) -> list[CastVoice
     return out
 
 
-__all__ = ["REGISTRY_PATH", "SPLIT_HZ", "cast_catalog"]
+def route_cast_catalog(voices: Sequence[VoiceOption]) -> list[CastVoice]:
+    """The route's voices with the registers of the measured endpoint that holds most of them (voice ids name an
+    endpoint's catalog); every register is ``unknown`` when no endpoint holds at least half of them."""
+    ids = {voice.id for voice in voices}
+    best, held = "", 0
+    for endpoint, measured in _registry().items():
+        count = len(ids & measured.keys())
+        if count > held:
+            best, held = endpoint, count
+    return cast_catalog(best if ids and held * 2 >= len(ids) else "", voices)
+
+
+__all__ = ["REGISTRY_PATH", "SPLIT_HZ", "cast_catalog", "route_cast_catalog"]

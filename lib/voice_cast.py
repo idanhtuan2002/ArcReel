@@ -155,6 +155,45 @@ def speakers_of(
     ]
 
 
+def speakers_to_cast(
+    skeleton_kind: str,
+    units: Sequence[Mapping[str, object]],
+    characters: Mapping[str, object],
+    *,
+    route: str,
+) -> list[Speaker]:
+    """The characters who speak in the units, as speech admission reads them, and have no voice for ``route``
+    (``<provider_id>/<model_id>``), most lines first; each with its description and number of lines."""
+    from lib.speech_composition import SpeechMode, SpeechOwner, admit_script_unit
+
+    counts: dict[str, int] = {}
+    for unit in units:
+        admission = admit_script_unit(skeleton_kind, unit)
+        if admission.mode is not SpeechMode.CHARACTER_SPEECH:
+            continue
+        for utterance in admission.preparation.utterances:
+            if utterance.owner is SpeechOwner.CHARACTER and utterance.speaker and utterance.text.strip():
+                counts[utterance.speaker] = counts.get(utterance.speaker, 0) + 1
+    speakers: list[Speaker] = []
+    for name, lines in sorted(counts.items(), key=lambda item: (-item[1], item[0])):
+        entry = characters.get(name)
+        entry = entry if isinstance(entry, Mapping) else {}
+        voice = entry.get("tts_voice")
+        if isinstance(voice, str) and voice.strip() and entry.get("tts_voice_route") == route:
+            continue
+        speakers.append(Speaker(name, str(entry.get("description") or ""), lines))
+    return speakers
+
+
+def record_voices(project: dict, voices: Mapping[str, str], *, route: str) -> None:
+    """Write each cast voice on its character as ``tts_voice`` with the ``route`` it was chosen for."""
+    characters = project.setdefault("characters", {})
+    for name, voice in voices.items():
+        entry = characters.setdefault(name, {})
+        entry["tts_voice"] = voice
+        entry["tts_voice_route"] = route
+
+
 __all__ = [
     "CastVoice",
     "Speaker",
@@ -163,5 +202,7 @@ __all__ = [
     "VoicePick",
     "assign_voices",
     "cast_problems",
+    "record_voices",
     "speakers_of",
+    "speakers_to_cast",
 ]

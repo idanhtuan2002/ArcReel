@@ -130,7 +130,7 @@ async def _language_unchanged(_project_name: str) -> None:
 
 
 #: Block reasons of a step whose owner tasks all failed; nothing of the step is pending or of unknown outcome.
-_SPENT_TASK_ATTEMPTS = frozenset({"OWNER_TASK_FAILED", "ADAPTATION_FAILED"})
+_SPENT_TASK_ATTEMPTS = frozenset({"OWNER_TASK_FAILED", "ADAPTATION_FAILED", "VOICE_CAST_FAILED"})
 
 
 class ProductionRunService:
