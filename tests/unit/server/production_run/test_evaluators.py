@@ -343,3 +343,36 @@ def test_a_vietnamese_review_keeps_its_digests_and_an_english_review_has_its_own
     assert "tiếng Việt" not in frames + watch
     with pytest.raises(ValueError, match="no review prompt"):
         review_prompts("fr")
+
+
+def test_a_drama_review_asks_about_characters_lines_and_voices_with_its_own_digest():
+    from server.production_run.evaluators import match_question, review_prompts
+
+    frames, watch = review_prompts("vi", "drama")
+    for prompt in (frames, watch):
+        assert "lời thoại" in prompt
+        assert "giọng" in prompt
+        assert "kể chuyện" not in prompt
+    assert "Spoken line" in match_question("drama")
+    assert "Narration line" in match_question("narration")
+    for method in (QUESTIONS, PROBABILITIES, WATCH):
+        assert prompt_digest(method, "vi", "drama") != prompt_digest(method, "vi")
+    assert prompt_digest(QUESTIONS, "vi", "narration") == prompt_digest(QUESTIONS)
+    with pytest.raises(ValueError, match="no drama review prompt"):
+        review_prompts("en", "drama")
+
+
+def test_the_review_form_follows_the_launch_profile():
+    from r2.automation.profiles import review_form
+
+    assert review_form("fiction_drama_vi_v2") == "drama"
+    assert review_form("fiction_narration_vi_v1") == "narration"
+
+
+def test_a_drama_reviewer_is_qualified_on_its_own_corpus():
+    from server.production_run.qualification_jobs import corpus_env
+
+    assert corpus_env("vi") == "ARCREEL_REVIEWER_CORPUS"
+    assert corpus_env("en") == "ARCREEL_REVIEWER_CORPUS_EN"
+    assert corpus_env("vi", "drama") == "ARCREEL_REVIEWER_CORPUS_DRAMA"
+    assert corpus_env("en", "drama") == "ARCREEL_REVIEWER_CORPUS_EN_DRAMA"

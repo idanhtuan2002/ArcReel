@@ -20,6 +20,7 @@ from lib.db.repositories.reviewer_qualifications import ReviewerQualificationRep
 from lib.project_manager import ProjectManager
 from r2.automation.assessment import AssessmentVerdict, ModelAssessment, combine
 from r2.automation.identity import digest_value
+from r2.automation.profiles import review_form
 from r2.contracts.automation import (
     BudgetReservation,
     DispatchIntent,
@@ -246,6 +247,7 @@ class QualityAdapter:
                 segments=final_segments(final, episode),
                 target_seconds=run.policy.target_duration_seconds,
                 language=run.policy.language,
+                form=review_form(run.policy.launch_profile_id),
             )
         return targets
 

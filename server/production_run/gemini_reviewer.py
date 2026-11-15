@@ -75,7 +75,7 @@ class GeminiReviewer:
         base = {
             "reviewer_route_digest": route_digest(route),
             "model_identity": route.model_identity,
-            "prompt_digest": prompt_digest(WATCH, evidence.language),
+            "prompt_digest": prompt_digest(WATCH, evidence.language, evidence.form),
             "subject_digest": evidence.subject_digest,
             "evidence_digest": evidence_digest(evidence),
         }
@@ -104,7 +104,7 @@ class GeminiReviewer:
                                 }
                             },
                             {
-                                "text": review_prompts(evidence.language)[1].format(
+                                "text": review_prompts(evidence.language, evidence.form)[1].format(
                                     subtitles=subtitles[:6000], narration=evidence.narration_text[:6000]
                                 )
                             },

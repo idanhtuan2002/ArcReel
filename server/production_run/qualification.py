@@ -16,7 +16,7 @@ from pathlib import Path
 from lib.config.resolver import ConfigResolver
 from lib.project_manager import ProjectManager
 from r2.automation.assessment import ModelAssessment
-from r2.automation.profiles import resolve_launch_profile
+from r2.automation.profiles import resolve_launch_profile, review_form
 from r2.contracts.automation import (
     AutomationMode,
     LaunchQualification,
@@ -40,7 +40,7 @@ def _digest(path: Path) -> str:
     return "sha256:" + hashlib.sha256(path.read_bytes()).hexdigest()
 
 
-def _evidence(corpus: Path, output: Path, language: str) -> list[tuple[dict, FinalEvidence]]:
+def _evidence(corpus: Path, output: Path, language: str, form: str = "narration") -> list[tuple[dict, FinalEvidence]]:
     manifest = json.loads(corpus.read_text(encoding="utf-8"))
     root = corpus.parent
     output.mkdir(parents=True, exist_ok=True)
@@ -57,6 +57,7 @@ def _evidence(corpus: Path, output: Path, language: str) -> list[tuple[dict, Fin
                     narration_text=(root / case["narration"]).read_text(encoding="utf-8"),
                     subject_digest=_digest(final),
                     language=language,
+                    form=form,
                 ),
             )
         )
@@ -117,8 +118,9 @@ async def qualify(
     """The reviewer's record over the corpus; with ``stop_early`` it ends at the first answer that rules it out.
     ``progress`` is told the cases reviewed so far and the corpus size after every case."""
     cases: list[QualificationCase] = []
-    method_digest = prompt_digest(review_method(route, protocol), language)
-    prepared = _evidence(corpus, output, language)
+    form = review_form(launch_profile_id)
+    method_digest = prompt_digest(review_method(route, protocol), language, form)
+    prepared = _evidence(corpus, output, language, form)
     clean_totals: dict[str, int] = {}
     for case, _ in prepared:
         if case["label"] == "CLEAN":

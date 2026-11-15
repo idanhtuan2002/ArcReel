@@ -53,6 +53,10 @@ MATCH_QUESTION = (
     "Narration line: «{cue}». Does this picture illustrate that narration line (same characters, setting or event)? "
     "Answer with exactly one English word: yes or no."
 )
+DRAMA_MATCH_QUESTION = (
+    "Spoken line: «{cue}». Does this picture show the scene where that line is spoken (same characters, setting or "
+    "event)? Answer with exactly one English word: yes or no."
+)
 BROKEN_QUESTION = (
     "Is this picture broken: mostly black or blank, random noise or corruption, or a color-bar test pattern? "
     "Answer with exactly one English word: yes or no."
@@ -155,17 +159,71 @@ NARRATION:
 {narration}
 """
 
+DRAMA_PROMPT = """Bạn là người duyệt chất lượng phim ngắn tiếng Việt dạng kịch, có lời thoại nhân vật (9:16, 30–60 giây).
+Bạn nhận {frame_count} khung hình lấy đều theo thứ tự thời gian, phụ đề và lời thoại. Bạn không nghe được âm thanh.
+Mỗi khung đi kèm câu phụ đề đang hiện (hoặc gần nhất) lúc đó:
+{frame_cues}
+
+Bước 1 — chấm điểm 1–5 cho story, visual, audio, continuity, pacing theo mốc:
+5 xuất sắc; 4 đạt chất lượng phát hành, chỉ có điểm chưa hoàn hảo nhỏ; 3 có lỗi rõ làm người xem khó chịu;
+2 lỗi nặng; 1 hỏng. "audio" chấm lời thoại qua văn bản: tiếng Việt tự nhiên, đúng chính tả, mỗi câu đúng nhân vật
+đang nói, khớp phụ đề và hình; giọng các nhân vật được chấm khi nghe được.
+Không trừ điểm vì phong cách ảnh AI, ánh sáng, chi tiết nhân vật hơi khác giữa các cảnh, hình tĩnh không mấp máy môi,
+hay câu chuyện đơn giản. Phim hình ảnh bình thường, lời thoại đúng người, đúng cảnh và mạch lạc thì chấm 4 hoặc 5.
+
+Bước 2 — "findings": chỉ ghi lỗi thật, mỗi lỗi có code, severity (CRITICAL/MAJOR/MINOR), repair_stage
+(SCRIPT_PLAN, SCRIPT, MEDIA, RENDER hoặc null) và detail ngắn. "language" là mã ngôn ngữ của lời thoại (ví dụ "vi").
+
+PHỤ ĐỀ:
+{subtitles}
+
+LỜI THOẠI:
+{narration}
+"""
+
+DRAMA_WATCH_PROMPT = """Bạn là người duyệt chất lượng phim ngắn tiếng Việt dạng kịch, có lời thoại nhân vật (9:16, 30–60 giây).
+Bạn được xem toàn bộ video kèm âm thanh, cùng phụ đề và văn bản lời thoại bên dưới.
+
+Bước 1 — chấm điểm 1–5 cho story, visual, audio, continuity, pacing theo mốc:
+5 xuất sắc; 4 đạt chất lượng phát hành, chỉ có điểm chưa hoàn hảo nhỏ; 3 có lỗi rõ làm người xem khó chịu;
+2 lỗi nặng; 1 hỏng. "audio" chấm lời thoại nghe được: tiếng Việt tự nhiên, rõ; mỗi nhân vật một giọng riêng, hợp giới
+tính, tuổi và tính cách, dễ phân biệt các nhân vật chính; câu thoại khớp phụ đề và cảnh.
+Không trừ điểm vì phong cách ảnh AI, ánh sáng, chi tiết nhân vật hơi khác giữa các cảnh, hình tĩnh không mấp máy môi,
+hay câu chuyện đơn giản. Phim hình ảnh bình thường, giọng đúng nhân vật và mạch lạc thì chấm 4 hoặc 5.
+
+Bước 2 — "findings": chỉ ghi lỗi thật nhìn hoặc nghe thấy được (hình đen, nhiễu, lộn ngược, sai câu chuyện, sai
+ngôn ngữ, phụ đề hỏng, hai nhân vật cùng giọng, giọng sai giới tính, tiếng lệch hình...), mỗi lỗi có code, severity
+(CRITICAL/MAJOR/MINOR), repair_stage (SCRIPT_PLAN, SCRIPT, MEDIA, RENDER hoặc null) và detail ngắn. "language" là mã
+ngôn ngữ của lời thoại (ví dụ "vi").
+
+PHỤ ĐỀ:
+{subtitles}
+
+LỜI THOẠI:
+{narration}
+"""
+
 #: The frame label in the review prompt's per-frame cue lines, by narration language.
 _FRAME_WORD = {"vi": "Khung", "en": "Frame"}
 
 
-def review_prompts(language: str) -> tuple[str, str]:
-    """The (frames, watch) review prompts for films narrated in ``language``; other languages have no reviewer."""
+def review_prompts(language: str, form: str = "narration") -> tuple[str, str]:
+    """The (frames, watch) review prompts for films of ``form`` (``narration`` or ``drama``, ADR-0166) in
+    ``language``; other pairs have no reviewer."""
+    if form == "drama":
+        if language == "vi":
+            return DRAMA_PROMPT, DRAMA_WATCH_PROMPT
+        raise ValueError(f"no drama review prompt for language {language!r}")
     if language == "vi":
         return PROMPT, WATCH_PROMPT
     if language == "en":
         return EN_PROMPT, EN_WATCH_PROMPT
     raise ValueError(f"no review prompt for language {language!r}")
+
+
+def match_question(form: str = "narration") -> str:
+    """The per-frame question whether a picture shows its line: a narration line, or a drama's spoken line."""
+    return DRAMA_MATCH_QUESTION if form == "drama" else MATCH_QUESTION
 
 
 SCHEMA = {
@@ -391,6 +449,8 @@ class FinalEvidence:
     target_seconds: float | None = None
     #: The narration language the review prompt is written for (``RunPolicy.language``).
     language: str = "vi"
+    #: The film's form the review prompt is written for (``review_form`` of the run's launch profile).
+    form: str = "narration"
 
 
 class QualifiedEvaluator(Protocol):
@@ -401,20 +461,22 @@ def _min_flipped(method: str) -> int:
     return MIN_FLIPPED_FRAMES_QUESTIONS if method == QUESTIONS else MIN_FLIPPED_FRAMES
 
 
-def prompt_digest(method: str = QUESTIONS, language: str = "vi") -> str:
+def prompt_digest(method: str = QUESTIONS, language: str = "vi", form: str = "narration") -> str:
     """The digest of everything a reviewer of ``method`` is asked for a film narrated in ``language`` and the fixed
     rules applied to its answers (a Vietnamese review hashes as it did before other languages existed)."""
-    frames_prompt, watch_prompt = review_prompts(language)
-    scope = {} if language == "vi" else {"language": language}
+    frames_prompt, watch_prompt = review_prompts(language, form)
+    scope: dict[str, str] = {} if language == "vi" else {"language": language}
+    if form != "narration":
+        scope["form"] = form
     if method == WATCH:
         return digest_value(
             "r2.production-review-prompt.v9",
             ensure_json_value({"method": method, "prompt": watch_prompt, "schema": SCHEMA, **scope}),
         )
     questions = (
-        [BROKEN_QUESTION, ORIENTATION_QUESTION, MATCH_QUESTION]
+        [BROKEN_QUESTION, ORIENTATION_QUESTION, match_question(form)]
         if method == PROBABILITIES
-        else [BROKEN_QUESTION, UPRIGHT_QUESTION, ORIENTATION_QUESTION, MATCH_QUESTION]
+        else [BROKEN_QUESTION, UPRIGHT_QUESTION, ORIENTATION_QUESTION, match_question(form)]
     )
     return digest_value(
         "r2.production-review-prompt.v9",
@@ -528,7 +590,7 @@ class FrameReviewer:
                 f"«{cue_at(subtitles, seconds) or '—'}»"
                 for index, seconds in enumerate(frame_times(duration, len(frames)))
             )
-            prompt = review_prompts(evidence.language)[0].format(
+            prompt = review_prompts(evidence.language, evidence.form)[0].format(
                 frame_count=len(frames),
                 frame_cues=cues,
                 subtitles=subtitles[:6000],
@@ -565,13 +627,17 @@ class FrameReviewer:
                         flipped.append(above(await probability(ORIENTATION_QUESTION, pair, "B", "A")))
                         broken.append(above(await probability(BROKEN_QUESTION, frame, "yes", "no")))
                         cue = cue_at(subtitles, seconds) or "—"
-                        illustrating.append(await probability(MATCH_QUESTION.format(cue=cue), frame, "yes", "no"))
+                        illustrating.append(
+                            await probability(match_question(evidence.form).format(cue=cue), frame, "yes", "no")
+                        )
                         continue
                     compared = await ask(ORIENTATION_QUESTION, pair, upright_letter)
                     broken.append(await ask(BROKEN_QUESTION, frame))
                     alone = await ask(UPRIGHT_QUESTION, frame)
                     flipped.append(True if True in (alone, compared) else None if None in (alone, compared) else False)
-                    illustrates.append(await ask(MATCH_QUESTION.format(cue=cue_at(subtitles, seconds) or "—"), frame))
+                    illustrates.append(
+                        await ask(match_question(evidence.form).format(cue=cue_at(subtitles, seconds) or "—"), frame)
+                    )
                 final = await chat.ask(
                     prompt, frames, schema=SCHEMA, context_tokens=CONTEXT_TOKENS, think=None, shift=False
                 )
@@ -590,7 +656,7 @@ class FrameReviewer:
             return ModelAssessment.model_validate(
                 {
                     **base,
-                    "prompt_digest": prompt_digest(method, evidence.language),
+                    "prompt_digest": prompt_digest(method, evidence.language, evidence.form),
                     "outcome": "COMPLETED",
                     "language": str(answer["language"]).strip().lower()[:8],
                     "scores": answer["scores"],
@@ -611,7 +677,7 @@ class FrameReviewer:
             )
         except (httpx.HTTPError, KeyError, TypeError, ValueError, subprocess.SubprocessError):
             return ModelAssessment.model_validate(
-                {**base, "prompt_digest": prompt_digest(method, evidence.language), "outcome": "FAILED"}
+                {**base, "prompt_digest": prompt_digest(method, evidence.language, evidence.form), "outcome": "FAILED"}
             )
 
 

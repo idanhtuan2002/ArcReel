@@ -91,6 +91,11 @@ def resolve_launch_profile(profile_id: str) -> LaunchProfile:
     return LaunchProfile.model_validate_json(path.read_bytes())
 
 
+def review_form(profile_id: str) -> Literal["narration", "drama"]:
+    """The form a final of ``profile_id`` is reviewed as: a drama for a drama profile, else a narrated story."""
+    return "drama" if resolve_launch_profile(profile_id).content_mode == "fiction_drama" else "narration"
+
+
 def route_digest(route: ModelRoute) -> str:
     route = ModelRoute.model_validate(route)
     return digest_value("r2.production-model-route.v1", ensure_json_value(route.model_dump(mode="json")))

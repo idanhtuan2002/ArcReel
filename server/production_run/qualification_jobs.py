@@ -25,7 +25,7 @@ from lib.config.resolver import ConfigResolver
 from lib.db.repositories.launch_qualifications import LaunchQualificationRepository
 from lib.db.repositories.reviewer_qualifications import ReviewerQualificationRepository
 from lib.project_manager import ProjectManager
-from r2.automation.profiles import resolve_launch_profile, reviewer_is_qualified, route_digest
+from r2.automation.profiles import resolve_launch_profile, review_form, reviewer_is_qualified, route_digest
 from r2.contracts.automation import ModelRoute
 from server.production_run.composition import ProjectPolicyResolver
 from server.production_run.evaluators import (
@@ -43,9 +43,10 @@ EVIDENCE_ENV = "ARCREEL_LAUNCH_EVIDENCE"
 REVIEWER_ROLES = ("reviewer_a", "reviewer_b")
 
 
-def corpus_env(language: str) -> str:
-    """The host setting naming the reviewer corpus of films narrated in ``language``."""
-    return CORPUS_ENV if language == "vi" else f"{CORPUS_ENV}_{language.upper()}"
+def corpus_env(language: str, form: str = "narration") -> str:
+    """The host setting naming the reviewer corpus of films of ``form`` in ``language``."""
+    name = CORPUS_ENV if language == "vi" else f"{CORPUS_ENV}_{language.upper()}"
+    return name if form == "narration" else f"{name}_{form.upper()}"
 
 
 def _language(launch_profile_id: str) -> str:
@@ -146,7 +147,11 @@ class QualificationJobs:
                 )
             launch_recorded = launch is not None and launch.profile_digest == digest
             for route in routes:
-                method = prompt_digest(review_method(route, await self._protocol(route)), _language(launch_profile_id))
+                method = prompt_digest(
+                    review_method(route, await self._protocol(route)),
+                    _language(launch_profile_id),
+                    review_form(launch_profile_id),
+                )
                 job = self._jobs.get((user_id, project_name, route.role))
                 reviewers.append(
                     {
@@ -159,7 +164,8 @@ class QualificationJobs:
                     }
                 )
         return {
-            "corpus_configured": _path(corpus_env(_language(launch_profile_id))) is not None
+            "corpus_configured": _path(corpus_env(_language(launch_profile_id), review_form(launch_profile_id)))
+            is not None
             and _path(RECEIPTS_ENV) is not None,
             "evidence_configured": _path(EVIDENCE_ENV) is not None,
             "reviewers": reviewers,
@@ -263,7 +269,7 @@ class QualificationJobs:
     async def start_reviewers(self, *, user_id: str, project_name: str) -> dict[str, Any]:
         profile_digest, launch_profile_id = self._scope(project_name)
         language = _language(launch_profile_id)
-        corpus, receipts = _path(corpus_env(language)), _path(RECEIPTS_ENV)
+        corpus, receipts = _path(corpus_env(language, review_form(launch_profile_id))), _path(RECEIPTS_ENV)
         if corpus is None or receipts is None or not corpus.is_file():
             raise QualificationRefused("QUALIFICATION_CORPUS_NOT_CONFIGURED")
         if language != "vi":
