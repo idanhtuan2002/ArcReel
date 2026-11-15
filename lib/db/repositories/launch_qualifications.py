@@ -27,7 +27,17 @@ class LaunchQualificationRepository:
     async def record(self, record: LaunchQualification, *, at: datetime | None = None) -> str:
         record = LaunchQualification.model_validate(record)
         digest = launch_qualification_digest(record)
-        if await self.session.get(LaunchQualificationModel, digest) is None:
+        stored = await self.session.get(LaunchQualificationModel, digest)
+        if stored is not None:
+            # Recording a configuration again makes it the scope's current record (a return to an earlier one).
+            moment = at or datetime.now(UTC)
+            stored_at = stored.created_at
+            if stored_at.tzinfo is None:  # SQLite returns naive UTC timestamps
+                stored_at = stored_at.replace(tzinfo=UTC)
+            if stored_at < moment:
+                stored.created_at = moment
+                await self.session.flush()
+        else:
             self.session.add(
                 LaunchQualificationModel(
                     qualification_digest=digest,

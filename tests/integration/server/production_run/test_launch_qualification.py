@@ -61,6 +61,21 @@ async def test_the_newest_intact_record_of_the_scope_is_current(session_factory)
         assert await LaunchQualificationRepository(session).current(**scope) is None
 
 
+async def test_recording_an_earlier_configuration_again_makes_it_current(session_factory) -> None:
+    # A Showrunner who switches back to a configuration recorded before re-qualifies it; the same record is moved
+    # forward instead of being skipped as already stored.
+    first, second = _record(), _record(required_gpu_bytes=6 * 1024**3)
+    now = datetime.now(UTC)
+    scope = {"user_id": "default", "project_name": "project", "launch_profile_id": "fiction_narration_vi_v1"}
+    async with session_factory() as session, session.begin():
+        repository = LaunchQualificationRepository(session)
+        await repository.record(first, at=now - timedelta(hours=2))
+        await repository.record(second, at=now - timedelta(hours=1))
+        await repository.record(first, at=now)
+    async with session_factory() as session:
+        assert await LaunchQualificationRepository(session).current(**scope) == first
+
+
 class _Witness:
     async def digest(self, *, user_id: str, project_name: str) -> str:
         del user_id, project_name
