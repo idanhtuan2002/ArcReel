@@ -81,7 +81,7 @@ Status: ✅ shipped and run · 🟡 parts exist, not run end to end · ❌ missi
 | V10 | Trailer – teaser | ❌ (F6) | OM cinematic |
 | V11 | Explainer có đồ họa tất định / explainer with charts, diagrams, kinetic text | ❌ (F7) | OM animation, Remotion |
 | V12 | Documentary montage (stock + narration) | ❌ | OM documentary-montage |
-| V13 | Remake / recap / tóm tắt video người khác thành biến thể (cốt truyện, lời kể, giọng mới) | ❌ | OM video analysis + clip-factory, Topview recast, DC canvas analysis |
+| V13 | Remake / recap / tóm tắt video người khác thành biến thể (cốt truyện, lời kể, giọng mới) | 🟡 video → story source ✅ (ADR-0161), variant + film via ADR-0115 path; footage-cut recap ❌ | OM video analysis + clip-factory, Topview recast, DC canvas analysis |
 | V14 | Review – reaction có bình luận / review, reaction with commentary | ❌ | OM |
 | V15 | Lồng tiếng – dịch video / dub, localization | ❌ | OM localization-dub |
 | V16 | Podcast video – audiogram / podcast repurpose | ❌ | OM |

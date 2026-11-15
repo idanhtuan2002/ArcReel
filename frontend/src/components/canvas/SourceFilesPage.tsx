@@ -11,6 +11,7 @@ import {
   isSupportedSourceFile,
 } from "@/utils/source-files";
 import { ConflictModal, type ConflictResolution } from "./ConflictModal";
+import { VideoSourceImport } from "@/features/story-authoring/ui/VideoSourceImport";
 
 interface SourceFile {
   name: string;
@@ -284,6 +285,7 @@ export function SourceFilesPage({ projectName }: SourceFilesPageProps) {
       </div>
 
       <div className="flex-1 px-6 py-5">
+        <VideoSourceImport projectName={projectName} />
         {loading ? (
           <div
             className="py-16 text-center text-[12px]"

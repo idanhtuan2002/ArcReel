@@ -280,6 +280,28 @@ export async function exportRun(projectName: string, runId: string, options: Cal
   return response.blob();
 }
 
+export interface VideoSourceJob {
+  url: string;
+  state: "running" | "done" | "failed";
+  step: "download" | "transcribe" | "write";
+  error: string | null;
+  source: string | null;
+  title: string | null;
+}
+
+/** ADR-0161: a video's transcript becomes a story source of the project, for a transformed variant. */
+export function startVideoSource(projectName: string, url: string, options: CallOptions = {}): Promise<VideoSourceJob> {
+  return post(`/projects/${encodeURIComponent(projectName)}/video-sources`, { url }, options);
+}
+
+export async function listVideoSources(projectName: string, options: CallOptions = {}): Promise<VideoSourceJob[]> {
+  const body = await API.request<{ jobs?: VideoSourceJob[] } | undefined>(
+    `/projects/${encodeURIComponent(projectName)}/video-sources`,
+    { signal: options.signal },
+  );
+  return Array.isArray(body?.jobs) ? body.jobs : [];
+}
+
 export type AudiobookPreset = "standard" | "sleep";
 export type AudiobookFileKind = "m4b" | "mp3" | "mp4" | "chapters";
 

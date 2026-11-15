@@ -16,6 +16,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from lib.config.resolver import ConfigResolver
 from lib.db import async_session_factory
 from lib.project_manager import get_project_manager
+from lib.video_ingest import IngestRefused
 from r2.narrative_lifecycle.errors import NarrativeDecisionAuthorizationError
 from server.auth import CurrentUser, InteractiveUser
 from server.services import workflow_planner
@@ -23,6 +24,7 @@ from server.services.audiobook_jobs import FILES as AUDIOBOOK_FILES
 from server.services.audiobook_jobs import AudiobookJobs, AudiobookRefused, output_dir
 from server.services.story_sync import StorySyncRefused
 from server.services.story_sync import sync_linked_story as sync_story_text
+from server.services.video_sources import VideoSourceJobs
 from server.story_authoring.authority import GrantNarrativeShowrunnerAuthority
 from server.story_authoring.book import BookSpec
 from server.story_authoring.commit import CommitRefused
@@ -335,6 +337,37 @@ async def audiobook_file(project_name: str, run_id: str, preset: str, kind: str,
         raise HTTPException(status_code=404, detail={"code": "OUTPUT_NOT_FOUND", "reasons": []})
     media = {"m4b": "audio/mp4", "mp3": "audio/mpeg", "mp4": "video/mp4", "chapters": "text/plain; charset=utf-8"}
     return FileResponse(path, media_type=media[kind], filename=f"{run_id}-{preset}-{name}")
+
+
+_VIDEO_SOURCES: VideoSourceJobs | None = None
+
+
+def _video_sources() -> VideoSourceJobs:
+    global _VIDEO_SOURCES
+    if _VIDEO_SOURCES is None:
+        _VIDEO_SOURCES = VideoSourceJobs(get_project_manager(), async_session_factory)
+    return _VIDEO_SOURCES
+
+
+class VideoSourceRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    url: str = Field(min_length=8, max_length=2048)
+
+
+@router.post("/projects/{project_name}/video-sources")
+async def start_video_source(project_name: str, req: VideoSourceRequest, user: InteractiveUser) -> dict:
+    """ADR-0161: a video's transcript becomes a story source of the project, for a transformed variant."""
+    del user
+    try:
+        return await _video_sources().start(project_name=project_name, url=req.url)
+    except IngestRefused as refused:
+        raise HTTPException(status_code=422, detail={"code": str(refused), "reasons": []}) from None
+
+
+@router.get("/projects/{project_name}/video-sources")
+async def video_source_status(project_name: str, user: CurrentUser) -> dict:
+    del user
+    return {"jobs": _video_sources().status(project_name)}
 
 
 @router.post("/projects/{project_name}/story-runs/{run_id}/approve")
