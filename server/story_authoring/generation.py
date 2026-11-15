@@ -16,6 +16,7 @@ are separate, counted steps decided by the caller.
 from __future__ import annotations
 
 import copy
+import math
 import time
 from typing import Any, Protocol
 
@@ -332,6 +333,21 @@ class AuthoringTextGateway:
         return validate_story_content(request, response.content)
 
 
+#: The local grammar holds a prose step to its planned shape exactly; a cloud writer is only asked for it. A reply is
+#: accepted within this share of the planned paragraph count and ceiling (the scene's own length window still checks
+#: its length), and refused for a fragment paragraph under ``FRAGMENT_CHARS`` (ADR-0155).
+SHAPE_TOLERANCE = 0.25
+FRAGMENT_CHARS = 120
+
+
+def shape_bounds(min_paragraphs: int, max_paragraphs: int) -> tuple[int, int]:
+    """The paragraph counts a prose reply is accepted with."""
+    return (
+        max(1, min_paragraphs - math.floor(min_paragraphs * SHAPE_TOLERANCE)),
+        max_paragraphs + math.floor(max_paragraphs * SHAPE_TOLERANCE),
+    )
+
+
 def validate_story_content(request: StoryStepRequest, content: str) -> tuple[StoryFailureCode | None, str, str]:
     """Apply the same strict shape, prose-length and Unicode policy on every transport."""
     hits = find_cjk(content)
@@ -341,11 +357,17 @@ def validate_story_content(request: StoryStepRequest, content: str) -> tuple[Sto
     try:
         if request.output_mode is OutputMode.PROSE:
             paragraphs = [p.strip() for p in ProseParagraphs.model_validate_json(content, strict=True).paragraphs]
-            if not request.min_paragraphs <= len(paragraphs) <= request.max_paragraphs:
-                return StoryFailureCode.OUTPUT_INVALID, f"{len(paragraphs)} paragraphs", ""
+            low, high = shape_bounds(request.min_paragraphs, request.max_paragraphs)
+            if not low <= len(paragraphs) <= high:
+                return StoryFailureCode.OUTPUT_INVALID, f"{len(paragraphs)} paragraphs outside {low}-{high}", ""
+            floor = min(request.min_paragraph_chars, FRAGMENT_CHARS)
             ceiling = request.max_paragraph_chars
-            if any(len(p) < request.min_paragraph_chars or (ceiling and len(p) > ceiling) for p in paragraphs):
-                return StoryFailureCode.OUTPUT_INVALID, "a paragraph is empty or too short", ""
+            ceiling = math.ceil(ceiling * (1 + SHAPE_TOLERANCE)) if ceiling else None
+            for paragraph in paragraphs:
+                if len(paragraph) < floor:
+                    return StoryFailureCode.OUTPUT_INVALID, f"a paragraph of {len(paragraph)} chars < {floor}", ""
+                if ceiling and len(paragraph) > ceiling:
+                    return StoryFailureCode.OUTPUT_INVALID, f"a paragraph of {len(paragraph)} chars > {ceiling}", ""
             return None, "", "\n\n".join(paragraphs)
         assert request.response_model is not None
         request.response_model.model_validate_json(content, strict=True)

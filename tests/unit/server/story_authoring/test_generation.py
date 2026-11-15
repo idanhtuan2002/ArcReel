@@ -276,7 +276,7 @@ async def test_a_paragraph_count_outside_the_bounds_is_invalid(min_paragraphs, m
         server, _Sink(), StoryFailureCode.OUTPUT_INVALID, min_paragraphs=min_paragraphs, max_paragraphs=max_paragraphs
     )
 
-    assert error.detail == f"{given} paragraphs"
+    assert error.detail == f"{given} paragraphs outside {min_paragraphs}-{max_paragraphs}"
 
 
 @pytest.mark.parametrize(
@@ -342,3 +342,22 @@ def test_a_string_length_ceiling_moves_into_the_pattern():
         {"type": "object", "properties": {"q": {"type": "string", "minLength": 1, "maxLength": 9}}}
     )
     assert schema["properties"]["q"]["pattern"] == no_cjk_pattern(min_chars=1, max_chars=9)
+
+
+def _scene(lengths: list[int]) -> str:
+    sentence = "“Đò nghỉ rồi cô ạ,” ông nói, không ngẩng lên nhìn khách. "
+    return json.dumps({"paragraphs": [(sentence * 20)[:n].strip() + "." for n in lengths]}, ensure_ascii=False)
+
+
+def test_a_scene_in_natural_paragraphs_is_accepted_and_a_fragment_is_not():
+    """A cloud writer is not held by the local grammar: a scene of dialogue paragraphs slightly off the planned shape
+    is accepted (its length is checked by the scene's own window); a fragment paragraph or a far-off count is not."""
+    from server.story_authoring.generation import validate_story_content
+
+    request = _step(min_paragraphs=8, max_paragraphs=8, min_paragraph_chars=280, max_paragraph_chars=700)
+    accepted, _detail, text = validate_story_content(request, _scene([325, 217, 282, 275, 296, 294, 263, 302, 307]))
+    assert accepted is None
+    assert text.count("\n\n") == 8
+    assert validate_story_content(request, _scene([300] * 7 + [60]))[0] is StoryFailureCode.OUTPUT_INVALID
+    assert validate_story_content(request, _scene([300] * 12))[0] is StoryFailureCode.OUTPUT_INVALID
+    assert validate_story_content(request, _scene([300] * 7 + [900]))[0] is StoryFailureCode.OUTPUT_INVALID
