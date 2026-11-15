@@ -74,3 +74,30 @@ def test_a_seed_whose_brief_names_no_pack_chooses_one_from_the_menu_and_a_named_
     named = seed_prompt(idea="Một vụ mất tích.", genre="Trinh thám")
     assert "- genre: Trinh thám." in named
     assert genre_menu() not in named
+
+
+def test_a_specific_genre_takes_its_own_pack_over_a_general_one():
+    from server.story_authoring.film_looks import film_look
+
+    cases = {
+        "Võ hiệp": "wuxia",
+        "tiên hiệp": "xianxia",
+        "Ngược luyến": "angst",
+        "Tổng tài – hào môn": "ceo",
+        "Báo thù – vả mặt": "revenge",
+        "Xuyên không": "rebirth",
+        "Hệ thống – game": "system",
+        "Mạt thế": "apocalypse",
+        "Truyện ngủ ngon": "bedtime",
+        "Cổ tích": "kids",
+        "Chuyện có thật – đời thường": "storytime",
+        "Tâm lý – gia đình": "family",
+        "Ngôn tình": "romance",
+        "Kinh dị": "horror",
+    }
+    for genre, pack_id in cases.items():
+        pack = pack_for(genre)
+        assert pack is not None, genre
+        assert pack.pack_id == pack_id, genre
+    # Every pack has a film look on a known style template.
+    assert all(film_look(pack.pack_id) is not None for pack in PACKS)

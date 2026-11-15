@@ -25,24 +25,24 @@ Status: ✅ shipped and run · 🟡 parts exist, not run end to end · ❌ missi
 | G8 | Hài / comedy | ✅ `comedy` | SB 轻喜剧 |
 | G9 | Lịch sử – cổ trang / historical | ✅ `historical` | HH 历史 (planned), DC palace looks |
 | G10 | Học đường – thanh xuân / school, youth | ✅ `school` | HH 校园 |
-| G11 | Báo thù – vả mặt / revenge, face-slapping | ❌ | HH 爽文 serial pulse, SB highpoint |
-| G12 | Ngược luyến / angst romance | ❌ | HH 虐恋 |
-| G13 | Tổng tài – hào môn / CEO, rich-family romance | ❌ | DC urban_romance looks |
-| G14 | Tu tiên – tiên hiệp / xianxia, cultivation | ❌ | HH 仙侠, SB power-system |
-| G15 | Võ hiệp – kiếm hiệp / wuxia | ❌ | HH 武侠 |
-| G16 | Xuyên không – trọng sinh / transmigration, rebirth | ❌ | HH 穿越 |
-| G17 | Hệ thống – game / system, LitRPG | ❌ | HH 游戏 |
-| G18 | Mạt thế – sinh tồn / apocalypse, survival | ❌ | HH 末世 |
-| G19 | Dị năng – siêu năng lực / superpowers | ❌ | HH 异能 |
-| G20 | Đô thị / urban | ❌ | HH 都市 (planned) |
-| G21 | Quan trường – thương chiến / office, business politics | ❌ | HH 官场 |
-| G22 | Gián điệp / spy, espionage | ❌ | HH 谍战 |
-| G23 | Trừ tà – tâm linh / exorcism, spiritual | ❌ | HH 驱魔 |
-| G24 | Điền văn – làm giàu / slow life, farming | ❌ | HH 种田 |
-| G25 | Não động – twist / high-concept, twist ending | ❌ | HH 脑洞 |
-| G26 | Thiếu nhi – cổ tích – ngụ ngôn / children's, fairy tale, fable | ❌ | VM audience adaptation |
-| G27 | Truyện ngủ ngon / bedtime, sleep stories | ❌ | — |
-| G28 | Truyện có thật – đời thường (storytime) / real-life storytime, slice of life | ❌ | TikTok Next 2026 "Reali-TEA" |
+| G11 | Báo thù – vả mặt / revenge, face-slapping | ✅ pack (ADR-0158), not yet run | HH 爽文 serial pulse, SB highpoint |
+| G12 | Ngược luyến / angst romance | ✅ pack (ADR-0158), not yet run | HH 虐恋 |
+| G13 | Tổng tài – hào môn / CEO, rich-family romance | ✅ pack (ADR-0158), not yet run | DC urban_romance looks |
+| G14 | Tu tiên – tiên hiệp / xianxia, cultivation | ✅ pack (ADR-0158), not yet run | HH 仙侠, SB power-system |
+| G15 | Võ hiệp – kiếm hiệp / wuxia | ✅ pack (ADR-0158), not yet run | HH 武侠 |
+| G16 | Xuyên không – trọng sinh / transmigration, rebirth | ✅ pack (ADR-0158), not yet run | HH 穿越 |
+| G17 | Hệ thống – game / system, LitRPG | ✅ pack (ADR-0158), not yet run | HH 游戏 |
+| G18 | Mạt thế – sinh tồn / apocalypse, survival | ✅ pack (ADR-0158), not yet run | HH 末世 |
+| G19 | Dị năng – siêu năng lực / superpowers | ✅ pack (ADR-0158), not yet run | HH 异能 |
+| G20 | Đô thị / urban | ✅ pack (ADR-0158), not yet run | HH 都市 (planned) |
+| G21 | Quan trường – thương chiến / office, business politics | ✅ pack (ADR-0158), not yet run | HH 官场 |
+| G22 | Gián điệp / spy, espionage | ✅ pack (ADR-0158), not yet run | HH 谍战 |
+| G23 | Trừ tà – tâm linh / exorcism, spiritual | ✅ pack (ADR-0158), not yet run | HH 驱魔 |
+| G24 | Điền văn – làm giàu / slow life, farming | ✅ pack (ADR-0158), not yet run | HH 种田 |
+| G25 | Não động – twist / high-concept, twist ending | ✅ pack (ADR-0158), not yet run | HH 脑洞 |
+| G26 | Thiếu nhi – cổ tích – ngụ ngôn / children's, fairy tale, fable | ✅ pack (ADR-0158), not yet run | VM audience adaptation |
+| G27 | Truyện ngủ ngon / bedtime, sleep stories | ✅ pack (ADR-0158), not yet run | — |
+| G28 | Truyện có thật – đời thường (storytime) / real-life storytime, slice of life | ✅ pack (ADR-0158), not yet run | TikTok Next 2026 "Reali-TEA" |
 | G29 | Tình cảm gia đình – cảm động / tearjerker, wholesome | 🟡 via `family` | — |
 | G30 | Hài – chế / parody | ❌ | — |
 | G31 | Fanfic / spinoff of an existing work | 🟡 variants of own stories | SB review-fanfic/spinoff |
