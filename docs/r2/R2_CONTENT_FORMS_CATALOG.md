@@ -71,7 +71,7 @@ Status: ✅ shipped and run · 🟡 parts exist, not run end to end · ❌ missi
 |---|---|---|---|
 | V1 | Truyện chữ / novel, serial text | ✅ | HH, SB, NS |
 | V2 | Phim kể chuyện ảnh + chuyển động máy / narrated motion comic | ✅ `fiction_narration_vi_v1` | HH, OM, DC |
-| V3 | Sách nói / audiobook (chapters, music) | ❌ (F1) | — |
+| V3 | Sách nói / audiobook (chapters, music) | ✅ ADR-0159 (`standard`) | — |
 | V4 | Phim drama có thoại, giọng riêng nhân vật / dialogue drama | 🟡 `fiction_drama_vi_v1` (F3) | HH, DC, VM |
 | V5 | Phim trộn ảnh + video AI / hybrid motion | ❌ (F4) | OM, VGA, HH |
 | V6 | Phim ngắn dọc nhiều tập / vertical micro-drama series | 🟡 episodes ✅, motion ❌ | DC, HH |
@@ -89,7 +89,7 @@ Status: ✅ shipped and run · 🟡 parts exist, not run end to end · ❌ missi
 | V18 | Cắt clip ngắn từ video dài / clip factory | ❌ | OM |
 | V19 | Quay màn hình – demo / screen demo | ❌ | OM |
 | V20 | Nhạc – MV lời / music video, lyric video | ❌ | OM (music tools only) |
-| V21 | ASMR – thư giãn – nhạc ngủ / ambience, sleep, relaxation | 🟡 ambience + music engines exist | — |
+| V21 | ASMR – thư giãn – nhạc ngủ / ambience, sleep, relaxation | 🟡 sleep story ✅ ADR-0159 (`sleep`); ASMR/music-only ❌ | — |
 | V22 | Slideshow ảnh có lời / photo story | 🟡 (= V2 without moves; YouTube "slideshow" risk) | HH |
 
 Formats per platform: 9:16 Shorts/TikTok/Reels ✅, 16:9 YouTube ✅, 1:1, 4:5, 21:9 🟡 (aspect parsed generically; not run).

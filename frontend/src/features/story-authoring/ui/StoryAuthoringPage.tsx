@@ -42,6 +42,7 @@ import {
   type StoryRun,
 } from "../api/storyClient";
 import { TranslateStory } from "./TranslateStory";
+import { AudiobookPanel } from "./AudiobookPanel";
 import { DraftReader } from "./DraftReader";
 import { StorySourcePicker, type StorySource } from "@/features/production-run/ui/StorySourcePicker";
 import {
@@ -1387,6 +1388,7 @@ function Approved({
           {confirmWithdraw ? t("story_confirm_withdraw") : t("story_action_withdraw")}
         </button>
       </div>
+      <AudiobookPanel projectName={projectName} runId={run.run_id} title={title} />
       {confirmWithdraw && handedOff ? (
         <p className="mt-2 text-[11px] text-text-3">{t("story_withdraw_video_note")}</p>
       ) : null}

@@ -10,7 +10,7 @@ import asyncio
 from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Request
-from fastapi.responses import Response
+from fastapi.responses import FileResponse, Response
 from pydantic import BaseModel, ConfigDict, Field
 
 from lib.config.resolver import ConfigResolver
@@ -19,6 +19,8 @@ from lib.project_manager import get_project_manager
 from r2.narrative_lifecycle.errors import NarrativeDecisionAuthorizationError
 from server.auth import CurrentUser, InteractiveUser
 from server.services import workflow_planner
+from server.services.audiobook_jobs import FILES as AUDIOBOOK_FILES
+from server.services.audiobook_jobs import AudiobookJobs, AudiobookRefused, output_dir
 from server.services.story_sync import StorySyncRefused
 from server.services.story_sync import sync_linked_story as sync_story_text
 from server.story_authoring.authority import GrantNarrativeShowrunnerAuthority
@@ -284,6 +286,55 @@ async def export_run(project_name: str, run_id: str, user: CurrentUser, service:
     except REFUSALS as error:
         raise _refusal(error) from error
     return Response(content=data, media_type="text/markdown; charset=utf-8")
+
+
+_AUDIOBOOKS: AudiobookJobs | None = None
+
+
+def _audiobooks() -> AudiobookJobs:
+    global _AUDIOBOOKS
+    if _AUDIOBOOKS is None:
+        _AUDIOBOOKS = AudiobookJobs(get_project_manager(), async_session_factory)
+    return _AUDIOBOOKS
+
+
+class AudiobookRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    preset: Literal["standard", "sleep"] = "standard"
+
+
+@router.post("/projects/{project_name}/story-runs/{run_id}/audiobook")
+async def start_audiobook(
+    project_name: str, run_id: str, req: AudiobookRequest, user: InteractiveUser, service: Service
+) -> dict:
+    """ADR-0159: speak the committed story into an audiobook (``standard``) or a sleep story (``sleep``)."""
+    try:
+        manuscript = await service.export(user_id=user.id, project_name=project_name, run_id=run_id)
+        return await _audiobooks().start(
+            user_id=user.id, project_name=project_name, run_id=run_id, preset=req.preset, manuscript=manuscript
+        )
+    except REFUSALS as error:
+        raise _refusal(error) from error
+    except AudiobookRefused as refused:
+        raise HTTPException(status_code=409, detail={"code": str(refused), "reasons": []}) from None
+
+
+@router.get("/projects/{project_name}/story-runs/{run_id}/audiobook")
+async def audiobook_status(project_name: str, run_id: str, user: CurrentUser) -> dict:
+    return {"jobs": await asyncio.to_thread(_audiobooks().status, user.id, project_name, run_id)}
+
+
+@router.get("/projects/{project_name}/story-runs/{run_id}/audiobook/{preset}/{kind}")
+async def audiobook_file(project_name: str, run_id: str, preset: str, kind: str, user: CurrentUser) -> FileResponse:
+    del user
+    name = AUDIOBOOK_FILES.get(kind)
+    if name is None or preset not in ("standard", "sleep") or "/" in run_id or ".." in run_id:
+        raise HTTPException(status_code=404, detail={"code": "OUTPUT_NOT_FOUND", "reasons": []})
+    path = output_dir(get_project_manager(), project_name, run_id, preset) / name
+    if not path.is_file():
+        raise HTTPException(status_code=404, detail={"code": "OUTPUT_NOT_FOUND", "reasons": []})
+    media = {"m4b": "audio/mp4", "mp3": "audio/mpeg", "mp4": "video/mp4", "chapters": "text/plain; charset=utf-8"}
+    return FileResponse(path, media_type=media[kind], filename=f"{run_id}-{preset}-{name}")
 
 
 @router.post("/projects/{project_name}/story-runs/{run_id}/approve")

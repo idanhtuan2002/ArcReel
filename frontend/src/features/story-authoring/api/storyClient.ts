@@ -280,6 +280,56 @@ export async function exportRun(projectName: string, runId: string, options: Cal
   return response.blob();
 }
 
+export type AudiobookPreset = "standard" | "sleep";
+export type AudiobookFileKind = "m4b" | "mp3" | "mp4" | "chapters";
+
+export interface AudiobookJob {
+  run_id: string;
+  preset: AudiobookPreset;
+  state: "running" | "done" | "failed";
+  done: number;
+  total: number;
+  error: string | null;
+  duration: number | null;
+  files: AudiobookFileKind[];
+}
+
+/** ADR-0159: speak the committed story into an audiobook or a sleep story with the project's narration voice. */
+export function startAudiobook(
+  projectName: string,
+  runId: string,
+  preset: AudiobookPreset,
+  options: CallOptions = {},
+): Promise<AudiobookJob> {
+  return post(`${base(projectName)}/${encodeURIComponent(runId)}/audiobook`, { preset }, options);
+}
+
+export async function listAudiobooks(
+  projectName: string,
+  runId: string,
+  options: CallOptions = {},
+): Promise<AudiobookJob[]> {
+  const body = await API.request<{ jobs?: AudiobookJob[] } | undefined>(
+    `${base(projectName)}/${encodeURIComponent(runId)}/audiobook`,
+    { signal: options.signal },
+  );
+  return Array.isArray(body?.jobs) ? body.jobs : [];
+}
+
+export async function downloadAudiobook(
+  projectName: string,
+  runId: string,
+  preset: AudiobookPreset,
+  kind: AudiobookFileKind,
+  options: CallOptions = {},
+): Promise<Blob> {
+  const response = await API.requestBinary(
+    `${base(projectName)}/${encodeURIComponent(runId)}/audiobook/${preset}/${kind}`,
+    { signal: options.signal },
+  );
+  return response.blob();
+}
+
 export function sendToVideo(
   projectName: string,
   runId: string,
