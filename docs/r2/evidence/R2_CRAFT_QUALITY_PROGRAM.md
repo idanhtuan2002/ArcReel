@@ -113,3 +113,13 @@ Catalog `docs/r2/R2_CONTENT_FORMS_CATALOG.md`; gap analysis `docs/research/2026-
   - **r2-v2.5.38** `cfb031347`: RESUME after spent task attempts (`OWNER_TASK_FAILED` / `ADAPTATION_FAILED`) retries the stage in a new lineage. Before this, every RESUME re-read the same failed tasks.
   - Tests: production_run unit+integration on PG, 3241 passed. One failure was already there before these changes: the `test_text_adapter` inventory fixture still uses the old character fields.
   - Trial 7's episode plan is still the Chinese, character-counted one. A clean trial needs the episode planning reset after deploying 2.5.38.
+- 2026-11-16, **r2-v2.5.40** = `acadfbcda`:
+  - `f00bf75e9` (r2-v2.5.39, deployed): a missing story language is recorded only at run start. On RESUME it moved the pinned source revision, and trial 7's lineage was lost.
+  - `e3f54cdb5`: `update_run_project` refuses any run-owned write that would move a pinned input (`RUN_WRITE_WOULD_MOVE_INPUT`). A source-scan test keeps other direct writes out of `server/production_run`.
+  - `53d17ee29`: an adaptation `source_excerpt` that is cut short ("...") or runs on past its sentence is anchored to the source sentence its start (at least 24 letters, matching one place only) begins. Trial 7's new run (`454e9a8f`) failed three tasks on this.
+  - ADR-0166 phase C:
+    - `12a9ac53a`: `fiction_drama_vi_v2` profile, preflight `CHARACTER_SPEECH_DELIVERY_MISMATCH`, drama voice availability, the setting witnessed and carried by the autopilot template.
+    - `39035a697`: MEDIA casts voices through the `text_voice_cast` task. Writes are guarded; `VOICE_CAST_FAILED` is retried on resume.
+    - `acadfbcda`: drama reviewer prompts, with narration digests unchanged; corpus `ARCREEL_REVIEWER_CORPUS_DRAMA`.
+  - Tests: production_run unit and integration on PG, 3205 passed. One failure was already there before these changes (the `test_text_adapter` inventory fixture).
+  - Remaining for phase C, on the host: a drama reviewer corpus, reviewer qualification for `fiction_drama_vi_v2`, and a two-character smoke run.
