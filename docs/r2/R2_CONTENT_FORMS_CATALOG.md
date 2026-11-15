@@ -103,6 +103,8 @@ Formats per platform: 9:16 Shorts/TikTok/Reels ✅, 16:9 YouTube ✅, 1:1, 4:5, 
 | L2a | Chinese film via the translation path (Gemini TTS speaks Chinese) | 🟡 | S–M | After L1a |
 | L2b | Native Chinese authoring with genre packs `zh` from huohuo's skills (near verbatim) | ❌ | L | After L1b |
 
+Re-ranked 2026-11-15 on measured cost: local i2v (Wan 2.2 5B GGUF, RTX 2070) takes ≈ 250 s for 49 frames (≈ 2 s of video) (`docs/r2/evidence/media-local-2026-10-30/wan-2.2/timing-summary.json`), so a whole episode in motion costs hours and still gives 2 s moves; Seedance free quota is ≈ 18 clips once and its adapter is `UNQUALIFIED`. Ranks 4–5 (hybrid motion, dialogue drama, both need generated video) move after ranks 6–11, which need no video model; the first motion step is a short motion insert on 1–3 key shots per episode. Per-shot motion also needs a queue/worker design (`docs/r2/evidence/R2_CRAFT_QUALITY_PROGRAM.md` "Catalog progress").
+
 ## D. Popular now on TikTok and YouTube (evidence)
 
 - TikTok Next 2026 (official, `ads.tiktok.com/business/library/TikTok_Next_2026_Trend_Report.pdf`, 17 pp.): theme "Irreplaceable Instinct"; signals **Reali-TEA** (relatable real-life stories, "chaotic trip lore", #storytimes), **Curiosity Detours** (search-led discovery, "new rabbit holes", educational answers), **Emotional ROI** (purchase with a reason). INFER: storytime, curiosity/explainer and reason-to-buy product videos.
