@@ -129,6 +129,10 @@ async def _language_unchanged(_project_name: str) -> None:
     return None
 
 
+#: Block reasons of a step whose owner tasks all failed; nothing of the step is pending or of unknown outcome.
+_SPENT_TASK_ATTEMPTS = frozenset({"OWNER_TASK_FAILED", "ADAPTATION_FAILED"})
+
+
 class ProductionRunService:
     def __init__(
         self,
@@ -636,6 +640,12 @@ class ProductionRunService:
             raise ProductionRunRefused("STALE_PRODUCTION_RUN")
         if not rebind:
             self._bound(run, command)
+            if run.status is RunStatus.BLOCKED_CONFIGURATION and run.reason in _SPENT_TASK_ATTEMPTS:
+                # The stage's step spent its task attempts, and a step keeps its failed tasks: the resume retries the
+                # stage as a new lineage (earlier stages' receipts stay current at a higher generation).
+                return _changed(
+                    run, status=RunStatus.RUNNING, reason=None, pending_review=None, generation=run.generation + 1
+                )
             return _changed(run, status=RunStatus.RUNNING, reason=None, pending_review=None)
         if run.status is not RunStatus.BLOCKED_INPUT_CHANGED:
             raise ProductionRunRefused("STALE_PRODUCTION_RUN")

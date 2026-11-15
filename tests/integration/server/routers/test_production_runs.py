@@ -305,7 +305,7 @@ async def test_a_run_from_the_projects_story_needs_no_idea_and_starts_at_asset_a
     assert (missing.status_code, missing.json()["detail"]["code"]) == (409, "PROJECT_SOURCE_MISSING")
     SETTLED.clear()
     started = await host.http.post(BASE, json=body, headers=host.headers)
-    assert SETTLED == [started.json()["project_name"]]  # the story's language is recorded before the run
+    assert [started.json()["project_name"]] == SETTLED  # the story's language is recorded before the run
     assert started.status_code == 200, started.text
     assert started.json()["stage"] == "ASSET_ANALYSIS"
 
@@ -770,3 +770,48 @@ async def test_a_queued_task_of_a_run_executes_only_while_the_run_may_still_act(
                 await require_run_task_authorized(session, queued)
     finally:
         configure_run_task_authority(None)
+
+
+@pytest.mark.parametrize("reason", ["ADAPTATION_FAILED", "OWNER_TASK_FAILED"])
+async def test_a_run_blocked_by_spent_task_attempts_retries_its_stage_in_a_new_lineage_on_resume(host, reason):
+    from server.production_run.owner_support import OwnerBlocked
+
+    run = (await host.start()).json()
+    original = host.owner.inspect
+
+    async def failing(*, intent, receipt):
+        raise OwnerBlocked(reason)
+
+    host.owner.inspect = failing
+    await host.scheduler.scan_once()
+    blocked = await host.read(run)
+    assert (blocked["status"], blocked["reason"]) == ("BLOCKED_CONFIGURATION", reason)
+    submitted = host.owner.provider_submit_count
+
+    host.owner.inspect = original
+    resumed = await host.command(blocked, "resume", command_id="resume-after-fix")
+    assert resumed.status_code == 200, resumed.text
+    view = resumed.json()
+    assert (view["status"], view["stage"], view["generation"]) == (
+        "RUNNING",
+        blocked["stage"],
+        blocked["generation"] + 1,
+    )
+    await host.scheduler.scan_once()
+    assert host.owner.provider_submit_count == submitted + 1  # the stage is dispatched again, not re-read
+
+
+async def test_a_run_blocked_for_another_reason_resumes_in_its_lineage(host):
+    from server.production_run.owner_support import OwnerBlocked
+
+    run = (await host.start()).json()
+
+    async def failing(*, intent, receipt):
+        raise OwnerBlocked("MISSING_MODEL_ROLE")
+
+    host.owner.inspect = failing
+    await host.scheduler.scan_once()
+    blocked = await host.read(run)
+    resumed = await host.command(blocked, "resume", command_id="resume-same-lineage")
+    assert resumed.status_code == 200, resumed.text
+    assert resumed.json()["generation"] == blocked["generation"]
