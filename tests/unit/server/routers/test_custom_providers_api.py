@@ -198,6 +198,7 @@ class TestEndpointCatalog:
             "newapi-video",
             "v2-video-generations",
             "ark-seedance",
+            "ark-seedream",
             "vidu-video",
             "dashscope-image",
             "dashscope-async-video",
@@ -209,6 +210,7 @@ class TestEndpointCatalog:
             "kling-image",
             "kling-video",
             "openai-tts",
+            "gemini-tts",
         }
 
     def test_descriptor_shape(self, custom_providers_client: TestClient):

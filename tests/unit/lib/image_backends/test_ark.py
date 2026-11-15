@@ -179,6 +179,8 @@ class TestArkImageBackendGenerate:
         # 部分兼容网关即便吃 response_format 仍返回 url，所以请求端不再传该参数
         assert "response_format" not in call_kwargs
         assert "image" not in call_kwargs
+        # Seedream 默认加 AI 水印（官方 watermark 默认 true），成片素材须显式关闭
+        assert call_kwargs["watermark"] is False
 
         # Result
         assert isinstance(result, ImageGenerationResult)

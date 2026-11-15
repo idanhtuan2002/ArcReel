@@ -1092,6 +1092,7 @@ export default {
   'endpoint_gemini_image_display': 'Ảnh Google Gemini',
   'endpoint_openai_video_display': 'OpenAI Video (Sora)',
   'endpoint_ark_seedance_display': 'Volcengine Ark (Seedance)',
+  'endpoint_ark_seedream_display': 'BytePlus / Volcengine Ark (Seedream)',
   'endpoint_vidu_video_display': 'Vidu Video',
   'endpoint_dashscope_image_display': 'Alibaba Model Studio (Ảnh)',
   'endpoint_dashscope_async_video_display': 'Alibaba Model Studio (Video bất đồng bộ)',
@@ -1099,6 +1100,7 @@ export default {
   'endpoint_kling_image_display': 'Kling (Ảnh)',
   'endpoint_kling_video_display': 'Kling (Video)',
   'endpoint_openai_tts_display': 'OpenAI Giọng nói (TTS)',
+  'endpoint_gemini_tts_display': 'Google Gemini TTS',
   'endpoint_catalog_loading': 'Đang tải danh mục endpoint…',
   // Image Capability
   'image_capability_t2i': 'T2I',

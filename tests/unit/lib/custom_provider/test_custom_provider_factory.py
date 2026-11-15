@@ -23,6 +23,8 @@ from lib.custom_provider.factory import create_custom_backend
 
 # endpoints 模块里被 build_backend 闭包直接构造的全部后端类。
 _ENDPOINT_BACKEND_CLASSES = (
+    "ArkImageBackend",
+    "GeminiAudioBackend",
     "ArkVideoBackend",
     "DashScopeImageBackend",
     "DashScopeVideoBackend",
@@ -166,6 +168,20 @@ class TestEndpointDispatch:
             },
         }
 
+    def test_ark_seedream(self):
+        provider = _make_provider(base_url="https://ark.ap-southeast.bytepluses.com")
+        result, built = _built(provider, "seedream-4-5-251128", "ark-seedream")
+        assert isinstance(result, CustomImageBackend)
+        # 仅 host → 补全 ark 协议挂载路径 /api/v3（BytePlus 与火山方舟同一协议）
+        assert built == {
+            "backend": "ArkImageBackend",
+            "kwargs": {
+                "api_key": "sk-test",
+                "base_url": "https://ark.ap-southeast.bytepluses.com/api/v3",
+                "model": "seedream-4-5-251128",
+            },
+        }
+
     def test_vidu_video(self):
         provider = _make_provider(base_url="https://relay.example.com")
         result, built = _built(provider, "viduq3-turbo", "vidu-video")
@@ -177,6 +193,20 @@ class TestEndpointDispatch:
                 "api_key": "sk-test",
                 "base_url": "https://relay.example.com/ent/v2",
                 "model": "viduq3-turbo",
+            },
+        }
+
+    def test_gemini_tts(self):
+        provider = _make_provider(base_url="https://generativelanguage.googleapis.com")
+        result, built = _built(provider, "gemini-3.8-flash-tts", "gemini-tts")
+        assert isinstance(result, CustomAudioBackend)
+        assert built == {
+            "backend": "GeminiAudioBackend",
+            "kwargs": {
+                "api_key": "sk-test",
+                "base_url": "https://generativelanguage.googleapis.com/",
+                "model": "gemini-3.8-flash-tts",
+                "provider_name": provider.provider_id,
             },
         }
 

@@ -18,6 +18,7 @@ from typing import TYPE_CHECKING, Any, Literal
 from urllib.parse import urlsplit
 
 from lib.aspect_size import IMAGE_TIER_SHORT_EDGE, VIDEO_TIER_SHORT_EDGE, short_edge_to_resolution
+from lib.audio_backends.gemini import GeminiAudioBackend
 from lib.audio_backends.openai import OpenAIAudioBackend
 from lib.config.url_utils import ensure_google_base_url, ensure_openai_base_url
 from lib.custom_provider import is_custom_endpoint
@@ -48,6 +49,7 @@ from lib.custom_provider.comfyui_backend import ComfyuiVideoBackend, binding_vid
 from lib.custom_provider.comfyui_image_backend import ComfyuiImageBackend, binding_image_capabilities
 from lib.custom_provider.declarative_backend import DeclarativeVideoBackend, request_urls
 from lib.custom_provider.endpoint_definition.kinds import COMFYUI_KIND
+from lib.image_backends.ark import ArkImageBackend
 from lib.image_backends.base import ImageCapability
 from lib.image_backends.dashscope import DashScopeImageBackend
 from lib.image_backends.gemini import GeminiImageBackend
@@ -267,6 +269,17 @@ def _build_gemini_image(provider, model_id: str) -> CustomImageBackend:
     return CustomImageBackend(provider_id=provider.provider_id, delegate=delegate, model=model_id)
 
 
+def _build_gemini_tts(provider, model_id: str) -> CustomAudioBackend:
+    base_url = ensure_google_base_url(provider.base_url) or None
+    delegate = GeminiAudioBackend(
+        api_key=provider.api_key,
+        base_url=base_url,
+        model=model_id,
+        provider_name=provider.provider_id,
+    )
+    return CustomAudioBackend(provider_id=provider.provider_id, delegate=delegate, model=model_id)
+
+
 def _build_openai_tts(provider, model_id: str) -> CustomAudioBackend:
     base_url = ensure_openai_base_url(provider.base_url)
     # provider_name 让 delegate 日志与 AudioSynthesisResult.provider 归因到真实 provider，
@@ -306,6 +319,12 @@ def _build_ark_seedance(provider, model_id: str) -> CustomVideoBackend:
     base_url = _ensure_url_path_suffix(provider.base_url, "/api/v3")
     delegate = ArkVideoBackend(api_key=provider.api_key, base_url=base_url, model=model_id)
     return CustomVideoBackend(provider_id=provider.provider_id, delegate=delegate, model=model_id)
+
+
+def _build_ark_seedream(provider, model_id: str) -> CustomImageBackend:
+    base_url = _ensure_url_path_suffix(provider.base_url, "/api/v3")
+    delegate = ArkImageBackend(api_key=provider.api_key, base_url=base_url, model=model_id)
+    return CustomImageBackend(provider_id=provider.provider_id, delegate=delegate, model=model_id)
 
 
 def _build_vidu_video(provider, model_id: str) -> CustomVideoBackend:
@@ -408,6 +427,17 @@ ENDPOINT_REGISTRY: dict[str, EndpointSpec] = {
         image_capabilities=frozenset({ImageCapability.IMAGE_TO_IMAGE}),
         build_backend=_build_openai_images_edits,
     ),
+    "ark-seedream": EndpointSpec(
+        key="ark-seedream",
+        media_type="image",
+        family="ark",
+        display_name_key="endpoint_ark_seedream_display",
+        request_method="POST",
+        # Seedream 参考图走 /images/generations 的 image 字段（非 OpenAI /edits 多部件）
+        request_path_template="/api/v3/images/generations",
+        image_capabilities=frozenset({ImageCapability.TEXT_TO_IMAGE, ImageCapability.IMAGE_TO_IMAGE}),
+        build_backend=_build_ark_seedream,
+    ),
     "gemini-image": EndpointSpec(
         key="gemini-image",
         media_type="image",
@@ -471,6 +501,15 @@ ENDPOINT_REGISTRY: dict[str, EndpointSpec] = {
         request_method="POST",
         request_path_template="/v1/audio/speech",
         build_backend=_build_openai_tts,
+    ),
+    "gemini-tts": EndpointSpec(
+        key="gemini-tts",
+        media_type="audio",
+        family="google",
+        display_name_key="endpoint_gemini_tts_display",
+        request_method="POST",
+        request_path_template="/v1beta/models/{model}:generateContent",
+        build_backend=_build_gemini_tts,
     ),
     "dashscope-async-video": EndpointSpec(
         key="dashscope-async-video",
@@ -885,11 +924,11 @@ def infer_endpoint(model_id: str, discovery_format: str) -> str:
        _VIDEO_PATTERN，须先于通用 is_video 拦截，否则视频会落到 openai-video；v3-omni 图像/视频同名
        默认归视频、图像手动选。
     3) imagen → "gemini-image"（图像，不论 discovery_format）
-    4) gemini 原生模型（非 video）→ image 形态走 "gemini-image"，否则文本走 "gemini-generate"
+    4) gemini 原生模型（非 video）→ TTS 形态走 "gemini-tts"，image 形态走 "gemini-image"，否则文本走 "gemini-generate"
     5) 视频家族 → seedance→"ark-seedance"、viduq3→"vidu-video"、否则 "openai-video"
     6) 图像家族 → discovery_format=google 走 "gemini-image" 否则 "openai-images"
-    7) TTS 家族（tts/speech/cosyvoice）→ "openai-tts"（audio 仅 OpenAI 兼容一条端点，
-       不分 discovery_format；precedence 在 text 默认之前）
+    7) TTS 家族（tts/speech/cosyvoice）→ discovery_format=google 走 "gemini-tts" 否则 "openai-tts"
+       （precedence 在 text 默认之前）
     8) 默认（文本）→ discovery_format=google 走 "gemini-generate" 否则 "openai-chat"
     """
     lowered = model_id.lower()
@@ -985,6 +1024,8 @@ def infer_endpoint(model_id: str, discovery_format: str) -> str:
     if "imagen" in lowered:
         return "gemini-image"
     if "gemini" in lowered and not is_video:
+        if _AUDIO_PATTERN.search(model_id) and not _ASR_PATTERN.search(model_id):
+            return "gemini-tts"
         return "gemini-image" if is_image else "gemini-generate"
     if is_video:
         if "seedance" in lowered:
@@ -995,5 +1036,5 @@ def infer_endpoint(model_id: str, discovery_format: str) -> str:
     if is_image:
         return "gemini-image" if discovery_format == "google" else "openai-images"
     if _AUDIO_PATTERN.search(model_id) and not _ASR_PATTERN.search(model_id):
-        return "openai-tts"
+        return "gemini-tts" if discovery_format == "google" else "openai-tts"
     return "gemini-generate" if discovery_format == "google" else "openai-chat"

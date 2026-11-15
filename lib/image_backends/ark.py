@@ -99,6 +99,8 @@ class ArkImageBackend:
         kwargs: dict = {
             "model": self._model,
             "prompt": request.prompt,
+            # 官方 watermark 默认 true（右下角 AI 生成标识），成片素材显式关闭
+            "watermark": False,
         }
 
         # Seedream 不显式传 size 时默认输出 1:1（4.x/5.x: 2048x2048；3.0-t2i: 1024x1024），

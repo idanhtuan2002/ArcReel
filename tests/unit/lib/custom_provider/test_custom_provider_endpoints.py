@@ -30,6 +30,7 @@ class TestRegistry:
             "newapi-video",
             "v2-video-generations",
             "ark-seedance",
+            "ark-seedream",
             "vidu-video",
             "dashscope-image",
             "dashscope-async-video",
@@ -41,6 +42,7 @@ class TestRegistry:
             "kling-image",
             "kling-video",
             "openai-tts",
+            "gemini-tts",
         }
 
     def test_each_spec_has_required_fields(self):
@@ -241,13 +243,14 @@ class TestRegistry:
         image_keys = {s.key for s in ENDPOINT_REGISTRY.values() if s.media_type == "image"}
         video_keys = {s.key for s in ENDPOINT_REGISTRY.values() if s.media_type == "video"}
         audio_keys = {s.key for s in ENDPOINT_REGISTRY.values() if s.media_type == "audio"}
-        assert audio_keys == {"openai-tts"}
+        assert audio_keys == {"openai-tts", "gemini-tts"}
         assert text_keys == {"openai-chat", "ollama-chat", "gemini-generate"}
         assert image_keys == {
             "openai-images",
             "openai-images-generations",
             "openai-images-edits",
             "gemini-image",
+            "ark-seedream",
             "dashscope-image",
             "minimax-image",
             "kling-image",
@@ -475,9 +478,11 @@ class TestInferEndpoint:
             ("gpt-4o-mini-tts", "openai", "openai-tts"),
             ("vidu-tts", "openai", "openai-tts"),  # tts 尾缀优先于 text 默认
             ("speech-1.5", "openai", "openai-tts"),  # Fish Audio 风格 id
+            ("gemini-3.8-flash-tts", "google", "gemini-tts"),
+            ("gemini-2.5-flash-preview-tts", "google", "gemini-tts"),
             ("cosyvoice-v2", "openai", "openai-tts"),
-            # audio endpoint 仅 OpenAI 兼容一条，google 发现格式同样归 openai-tts
-            ("tts-1", "google", "openai-tts"),
+            # google 发现格式的 TTS 走 Gemini 原生 generateContent 音频端点
+            ("tts-1", "google", "gemini-tts"),
             # 不应误伤：含 audio 字样的 chat 模型、ASR（语音转文字）、视频/图像家族仍按原分支
             ("gpt-4o-audio-preview", "openai", "openai-chat"),
             ("whisper-1", "openai", "openai-chat"),
@@ -512,6 +517,7 @@ def test_image_endpoint_registry_entries():
         "openai-images-generations",
         "openai-images-edits",
         "gemini-image",
+        "ark-seedream",
         "dashscope-image",
         "minimax-image",
         "kling-image",

@@ -3,10 +3,12 @@
 文件名与 `lib.custom_provider.endpoints.ENDPOINT_REGISTRY` 的 endpoint id 一致。Endpoint 是协议端口，不是 provider 身份。
 
 - [ark-seedance](ark-seedance.md)
+- [ark-seedream](ark-seedream.md)
 - [dashscope-async-video](dashscope-async-video.md)
 - [dashscope-image](dashscope-image.md)
 - [gemini-generate](gemini-generate.md)
 - [gemini-image](gemini-image.md)
+- [gemini-tts](gemini-tts.md)
 - [kling-image](kling-image.md)
 - [kling-video](kling-video.md)
 - [minimax-h3](minimax-h3.md)

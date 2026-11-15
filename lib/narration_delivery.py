@@ -301,9 +301,24 @@ DELIVERY_CUES: dict[str, str] = {"sigh": "thở dài", "laugh": "cười", "clea
 CUE_VOICING_MODELS = frozenset({"vieneu-tts-v3-turbo", "vieneu-tts-v3-nano"})
 
 
+#: Gemini TTS voices inline audio tags (``<sigh>``, ``<laugh>``; official speech-generation guide); a cue without a
+#: Gemini tag is dropped.
+GEMINI_CUE_TAGS: dict[str, str] = {"sigh": "<sigh>", "laugh": "<laugh>"}
+
+
+def _gemini_tts(model_id: str | None) -> bool:
+    return bool(model_id) and str(model_id).startswith("gemini-") and "tts" in str(model_id)
+
+
 def synthesis_text(text: str, model_id: str | None) -> str:
-    """The canonical narration text as sent to ``model_id``: cue tags kept for a model that voices them."""
+    """The canonical narration text as sent to ``model_id``: cue tags kept for a model that voices them, rewritten as
+    audio tags for Gemini TTS, dropped otherwise."""
     if model_id in CUE_VOICING_MODELS:
+        return text
+    if _gemini_tts(model_id):
+        for cue, tag in DELIVERY_CUES.items():
+            spoken = GEMINI_CUE_TAGS.get(cue)
+            text = text.replace(f"[{tag}]", spoken) if spoken else text.replace(f"[{tag}] ", "").replace(f"[{tag}]", "")
         return text
     for tag in DELIVERY_CUES.values():
         text = text.replace(f"[{tag}] ", "").replace(f"[{tag}]", "")

@@ -1156,6 +1156,7 @@ export default {
   'endpoint_gemini_image_display': 'Gemini 图片',
   'endpoint_openai_video_display': 'OpenAI 视频 (Sora)',
   'endpoint_ark_seedance_display': '火山方舟 (Seedance)',
+  'endpoint_ark_seedream_display': '火山方舟 / BytePlus (Seedream)',
   'endpoint_vidu_video_display': 'Vidu 视频',
   'endpoint_dashscope_image_display': '阿里百炼（图片）',
   'endpoint_dashscope_async_video_display': '阿里百炼（异步视频）',
@@ -1163,6 +1164,7 @@ export default {
   'endpoint_kling_image_display': '可灵 Kling（图片）',
   'endpoint_kling_video_display': '可灵 Kling（视频）',
   'endpoint_openai_tts_display': 'OpenAI 语音合成 (TTS)',
+  'endpoint_gemini_tts_display': 'Google Gemini TTS',
   'endpoint_catalog_loading': '加载端点目录…',
   // Image Capability
   'image_capability_t2i': '文生图',
