@@ -46,6 +46,7 @@ from server.story_authoring.cloud import (
     OPENAI_ENDPOINT,
     OPENAI_MAX_INPUT_BOUND,
     CloudStoryGateway,
+    output_per_call,
     story_cloud_client,
 )
 from server.story_authoring.commit import CANON_BASE_MOVED, ManuscriptCommitter, load_offered_manifest
@@ -194,7 +195,7 @@ def book_limits(limits: StoryLimits, part: books.BookPart) -> StoryLimits:
             "generate_calls_max": calls,
             "count_calls_max": calls,
             "input_tokens_max": calls * limits.max_input_tokens,
-            "output_tokens_max": calls * limits.max_output_tokens,
+            "output_tokens_max": calls * output_per_call(limits),
             "wall_clock_max_seconds": calls * SECONDS_PER_CALL,
         }
     )
@@ -355,6 +356,7 @@ class StoryAuthoringService:
         )
         selection, judge, craft_judge, profiles = routes.selection, routes.judge, routes.craft_judge, routes.profiles
         limits = StoryLimits.model_validate({**DEFAULT_LIMITS.model_dump(), **routes.limit_fields})
+        limits = limits.model_copy(update={"output_tokens_max": limits.generate_calls_max * output_per_call(limits)})
         part: books.BookPart | None = None
         if book is not None:
             if prior_mode is not None:
@@ -401,7 +403,7 @@ class StoryAuthoringService:
                     "generate_calls_max": limits.generate_calls_max + extra_calls,
                     "count_calls_max": limits.count_calls_max + extra_calls,
                     "input_tokens_max": limits.input_tokens_max + extra_calls * limits.max_input_tokens,
-                    "output_tokens_max": limits.output_tokens_max + extra_calls * limits.max_output_tokens,
+                    "output_tokens_max": limits.output_tokens_max + extra_calls * output_per_call(limits),
                     "wall_clock_max_seconds": limits.wall_clock_max_seconds + extra_calls * SECONDS_PER_CALL,
                 }
             )
@@ -416,7 +418,7 @@ class StoryAuthoringService:
                     "generate_calls_max": limits.generate_calls_max + extra,
                     "count_calls_max": limits.count_calls_max + extra,
                     "input_tokens_max": limits.input_tokens_max + extra * limits.max_input_tokens,
-                    "output_tokens_max": limits.output_tokens_max + extra * limits.max_output_tokens,
+                    "output_tokens_max": limits.output_tokens_max + extra * output_per_call(limits),
                     "wall_clock_max_seconds": limits.wall_clock_max_seconds + extra * SECONDS_PER_CALL,
                 }
             )

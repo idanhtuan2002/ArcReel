@@ -7,7 +7,7 @@ import pytest
 
 from lib.config.service import ConfigService
 from r2.host_hardening.paid_routes import PaidRouteUnqualifiedError, set_qualification_lookup
-from server.story_authoring.cloud import OPENAI_MAX_INPUT_BOUND
+from server.story_authoring.cloud import OPENAI_MAX_INPUT_BOUND, REASONING_ALLOWANCE
 from server.story_authoring.contracts import CloudPriceBounds
 from server.story_authoring.driver import StoryBrief
 from server.story_authoring.routes import resolve_cloud_route, story_routes, validate_cloud_brief
@@ -282,6 +282,10 @@ async def test_a_priced_custom_cloud_model_is_a_story_route_without_code_changes
     assert brief.limits.currency == "USD"
     assert brief.cloud_profiles[0].adapter_version == "openai-story-v1"
     assert brief.limits.max_input_tokens == OPENAI_MAX_INPUT_BOUND
+    # A cloud model's reasoning tokens are output tokens too: the run's output budget covers them.
+    assert brief.limits.output_tokens_max == brief.limits.generate_calls_max * (
+        brief.limits.max_output_tokens + REASONING_ALLOWANCE // 2
+    )
     await validate_cloud_brief(db_factory, brief)
 
 

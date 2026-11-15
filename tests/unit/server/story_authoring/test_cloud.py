@@ -7,7 +7,12 @@ from decimal import Decimal
 import httpx
 import pytest
 
-from server.story_authoring.cloud import CloudStoryGateway, GeminiStoryClient, story_cloud_client
+from server.story_authoring.cloud import (
+    REASONING_ALLOWANCE,
+    CloudStoryGateway,
+    GeminiStoryClient,
+    story_cloud_client,
+)
 from server.story_authoring.contracts import AttemptKind, CloudPriceBounds, StoryLimits, StoryModelSelection
 from server.story_authoring.generation import StoryStepError
 from server.story_authoring.runtime import BudgetExhausted, new_run_state, reserve
@@ -91,7 +96,7 @@ async def test_sdk_count_and_generate_are_single_calls_and_thoughts_are_charged(
     assert result.output_tokens == 25
     assert "quiet village" in result.text
     payload = json.loads(generate.calls[0].request.content)
-    assert payload["generationConfig"]["maxOutputTokens"] == _step().max_output_tokens
+    assert payload["generationConfig"]["maxOutputTokens"] == _step().max_output_tokens + REASONING_ALLOWANCE
     assert payload["systemInstruction"]
     count_payload = json.loads(count.calls[0].request.content)["generateContentRequest"]
     assert count_payload["contents"] == payload["contents"]
@@ -256,7 +261,7 @@ async def test_an_openai_compatible_route_needs_no_model_list_and_counts_locally
     assert "quiet village" in result.text
     payload = json.loads(generate.calls[0].request.content)
     assert payload["model"] == "any-new-model"
-    assert payload["max_tokens"] == request.max_output_tokens
+    assert payload["max_tokens"] == request.max_output_tokens + REASONING_ALLOWANCE
     assert payload["response_format"]["type"] == "json_schema"
     assert [m["role"] for m in payload["messages"]] == ["system", "user"]
     assert generate.calls[0].request.headers["authorization"] == "Bearer fixture-openai-key"
@@ -299,3 +304,19 @@ def test_an_input_over_the_local_bound_stops_the_run_instead_of_retrying():
     assert StoryFailureCode.INPUT_OVER_LIMIT not in RETRYABLE | TRANSPORT
     assert story_cloud_client(OPENAI_SELECTION, api_key="k").exact_count is False
     assert story_cloud_client(SELECTION, api_key="k").exact_count is True
+
+
+async def test_a_reasoning_model_may_think_past_the_steps_visible_cap(respx_mock):
+    # Reasoning tokens count against the provider's output limit, so the call reserves and sends an allowance on top
+    # of the step's cap; a reply that stops normally inside that budget is accepted.
+    request = _step().model_copy(update={"selection": OPENAI_SELECTION})
+    used = request.max_output_tokens + 3000
+    reply = _openai_reply()
+    body = json.loads(reply.content)
+    body["usage"] = {"prompt_tokens": 90, "completion_tokens": used, "total_tokens": 90 + used}
+    respx_mock.post(f"{OPENAI_SELECTION.base_url}/chat/completions").mock(return_value=httpx.Response(200, json=body))
+    sink = _Sink()
+    result = await _openai_gateway(sink).generate(scope=SCOPE, request=request)
+    assert result.output_tokens == used
+    reserves = [e for e in sink.events if e[0] == "reserve" and e[2] is AttemptKind.GENERATE]
+    assert [e[4] for e in reserves] == [request.max_output_tokens + REASONING_ALLOWANCE]

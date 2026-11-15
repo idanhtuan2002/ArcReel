@@ -65,6 +65,7 @@ from server.production_run.ports import StepPlan
 from server.services.automation_grants import RunAutomationAuthority
 from server.story_authoring.artifacts import BlobStoreError, StoryBlobStore
 from server.story_authoring.book import BookSpec
+from server.story_authoring.cloud import output_per_call
 from server.story_authoring.commit import CANON_BASE_MOVED, CommitRefused, load_offered_manifest
 from server.story_authoring.contracts import StoryLimits, StoryScope
 from server.story_authoring.driver import StoryBrief, run_call_bound
@@ -147,7 +148,7 @@ TOP_UP_LIMIT = 2
 
 
 def _grown(limits: StoryLimits, *, calls: int, seconds: int) -> StoryLimits:
-    per_call_in, per_call_out = limits.max_input_tokens, limits.max_output_tokens
+    per_call_in, per_call_out = limits.max_input_tokens, output_per_call(limits)
     return limits.model_copy(
         update={
             "generate_calls_max": limits.generate_calls_max + calls,
@@ -724,7 +725,7 @@ class StoryAdapter:
                     "generate_calls_max": used.generate_calls + calls,
                     "count_calls_max": used.count_calls + calls,
                     "input_tokens_max": used.input_tokens + calls * routed.max_input_tokens,
-                    "output_tokens_max": used.output_tokens + calls * routed.max_output_tokens,
+                    "output_tokens_max": used.output_tokens + calls * output_per_call(routed),
                     "wall_clock_max_seconds": used.model_milliseconds // 1000 + intent.estimated_runtime_seconds,
                 }
             )

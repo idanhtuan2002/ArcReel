@@ -100,6 +100,22 @@ class StoryCloudClient(Protocol):
     async def close(self) -> None: ...
 
 
+#: Output tokens a cloud call may spend on reasoning on top of the step's cap. Providers count reasoning ("thinking")
+#: tokens against the request's output limit, so a reasoning model given only the step's cap stops mid-answer; the
+#: call sends and reserves the cap plus this allowance, and the visible answer is still checked as before.
+REASONING_ALLOWANCE = 12288
+
+
+def output_per_call(limits: StoryLimits) -> int:
+    """The output tokens a run budgets per call: the step cap, plus half the reasoning allowance on a cloud route."""
+    return limits.max_output_tokens + (REASONING_ALLOWANCE // 2 if limits.cloud_prices is not None else 0)
+
+
+def output_budget(request: StoryStepRequest) -> int:
+    """The output tokens a cloud call is sent and reserved with: the step's cap plus the reasoning allowance."""
+    return request.max_output_tokens + REASONING_ALLOWANCE
+
+
 class GeminiStoryClient:
     adapter_version = CLOUD_ADAPTERS[CLOUD_ENDPOINT]
     exact_count = True
@@ -121,7 +137,7 @@ class GeminiStoryClient:
             system_instruction=request.system_prompt,
             response_mime_type="application/json",
             response_schema=_schema(request),
-            max_output_tokens=request.max_output_tokens,
+            max_output_tokens=output_budget(request),
             temperature=request.decoding.temperature,
             top_p=request.decoding.top_p,
             top_k=request.decoding.top_k,
@@ -215,7 +231,7 @@ class OpenAIStoryClient:
                 "type": "json_schema",
                 "json_schema": {"name": "story_step", "strict": False, "schema": _schema(request, gemini=False)},
             },
-            self._token_param: request.max_output_tokens,
+            self._token_param: output_budget(request),
             "temperature": request.decoding.temperature,
             "top_p": request.decoding.top_p,
             "seed": request.decoding.seed,
@@ -345,7 +361,7 @@ class CloudStoryGateway(AuthoringTextGateway):
             kind=AttemptKind.GENERATE,
             request_digest=digest,
             reserved_input_tokens=bound,
-            reserved_output_tokens=request.max_output_tokens,
+            reserved_output_tokens=output_budget(request),
         )
         response, duration = await self._send_cloud(attempt, request, count=False)
         code = None
@@ -354,7 +370,7 @@ class CloudStoryGateway(AuthoringTextGateway):
         if response.input_tokens > bound and not self._cloud_client.exact_count:
             # The local input bound did not hold for this server: stop rather than pay for it again.
             code, detail = StoryFailureCode.INPUT_OVER_LIMIT, "reported input exceeds the local byte bound"
-        elif response.input_tokens > bound or response.output_tokens > request.max_output_tokens:
+        elif response.input_tokens > bound or response.output_tokens > output_budget(request):
             code, detail = StoryFailureCode.COUNT_MISMATCH, "reported usage exceeds the reserved token bound"
         elif response.finish_reason == "MAX_TOKENS":
             code, detail = StoryFailureCode.OUTPUT_TRUNCATED, "cloud output was truncated"
