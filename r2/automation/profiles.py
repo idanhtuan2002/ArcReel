@@ -49,7 +49,7 @@ class LaunchProfile(AutomationContract):
     profile_id: ExactIdentity
     content_mode: Literal["fiction_narration", "fiction_drama"]
     generation_mode: Literal["storyboard"]
-    language: Literal["vi"]
+    language: Literal["vi", "en"]
     width: Literal[576]
     height: Literal[1024]
     fps: Literal[24]
@@ -77,7 +77,7 @@ class LaunchProfile(AutomationContract):
 
 
 def resolve_launch_profile(profile_id: str) -> LaunchProfile:
-    if profile_id not in {"fiction_narration_vi_v1", "fiction_drama_vi_v1"}:
+    if profile_id not in {"fiction_narration_vi_v1", "fiction_drama_vi_v1", "fiction_narration_en_v1"}:
         raise ValueError("UNSUPPORTED_LAUNCH_PROFILE")
     path = Path(__file__).parent / "launch_profiles" / (profile_id + ".json")
     return LaunchProfile.model_validate_json(path.read_bytes())

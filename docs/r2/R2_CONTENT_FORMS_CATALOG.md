@@ -98,7 +98,7 @@ Formats per platform: 9:16 Shorts/TikTok/Reels ✅, 16:9 YouTube ✅, 1:1, 4:5, 
 
 | # | Language axis | Status | Effort | Note |
 |---|---|---|---|---|
-| L1a | English film via the translation path: story (vi) → translation (ADR-0120) → English narration (Gemini TTS) → English subtitles and packaging | 🟡 translation ✅, English TTS route ✅ (ADR-0156), film path not run in English | S–M | First English products |
+| L1a | English film via the translation path: story (vi) → translation (ADR-0120) → English narration (Gemini TTS) → English subtitles and packaging | 🟡 translation ✅, English TTS route ✅ (ADR-0156), launch profile + English reviewer prompts ✅ (ADR-0165); English reviewer corpus pending | S–M | First English products |
 | L1b | Native English story authoring: prompts, checks (word counts, pronouns, names), genre packs `en`, English voices | ❌ | L | Quality beyond translation |
 | L2a | Chinese film via the translation path (Gemini TTS speaks Chinese) | 🟡 | S–M | After L1a |
 | L2b | Native Chinese authoring with genre packs `zh` from huohuo's skills (near verbatim) | ❌ | L | After L1b |

@@ -40,7 +40,7 @@ def _digest(path: Path) -> str:
     return "sha256:" + hashlib.sha256(path.read_bytes()).hexdigest()
 
 
-def _evidence(corpus: Path, output: Path) -> list[tuple[dict, FinalEvidence]]:
+def _evidence(corpus: Path, output: Path, language: str) -> list[tuple[dict, FinalEvidence]]:
     manifest = json.loads(corpus.read_text(encoding="utf-8"))
     root = corpus.parent
     output.mkdir(parents=True, exist_ok=True)
@@ -56,6 +56,7 @@ def _evidence(corpus: Path, output: Path) -> list[tuple[dict, FinalEvidence]]:
                     subtitle_path=root / case["subtitles"],
                     narration_text=(root / case["narration"]).read_text(encoding="utf-8"),
                     subject_digest=_digest(final),
+                    language=language,
                 ),
             )
         )
@@ -116,8 +117,8 @@ async def qualify(
     """The reviewer's record over the corpus; with ``stop_early`` it ends at the first answer that rules it out.
     ``progress`` is told the cases reviewed so far and the corpus size after every case."""
     cases: list[QualificationCase] = []
-    method_digest = prompt_digest(review_method(route, protocol))
-    prepared = _evidence(corpus, output)
+    method_digest = prompt_digest(review_method(route, protocol), language)
+    prepared = _evidence(corpus, output, language)
     clean_totals: dict[str, int] = {}
     for case, _ in prepared:
         if case["label"] == "CLEAN":

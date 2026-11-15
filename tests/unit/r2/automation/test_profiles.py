@@ -39,6 +39,20 @@ def test_launch_profiles_pin_output_and_candidate_media_routes():
     assert drama.support_status == "CANDIDATE"
 
 
+def test_the_english_narration_profile_keeps_the_pictures_and_speaks_english():
+    from r2.automation.profiles import resolve_launch_profile
+
+    vietnamese = resolve_launch_profile("fiction_narration_vi_v1")
+    english = resolve_launch_profile("fiction_narration_en_v1")
+    assert english.language == "en"
+    assert english.audio_route == ("custom-7", "gemini-3.8-flash-tts")
+    assert (english.image_route, english.video_route, english.image_selection) == (
+        vietnamese.image_route,
+        vietnamese.video_route,
+        vietnamese.image_selection,
+    )
+
+
 @pytest.mark.parametrize("identity", ["unknown", "../fiction_narration_vi_v1", "*", ""])
 def test_registry_refuses_unregistered_profile(identity):
     from r2.automation.profiles import resolve_launch_profile

@@ -15,6 +15,7 @@ from server.production_run.evaluators import (
     FRAME_COUNT,
     PROBABILITIES,
     QUESTIONS,
+    WATCH,
     FinalEvidence,
     OllamaReviewer,
     cue_at,
@@ -24,6 +25,7 @@ from server.production_run.evaluators import (
     illustration_findings,
     prompt_digest,
     review_method,
+    review_prompts,
     segment_keys,
     upright_letter,
     yes_no,
@@ -326,3 +328,18 @@ def test_a_finals_segments_come_from_its_render_manifest_in_play_order(tmp_path)
 
     assert final_segments(final, 1) == (("E1S01", 9.041667), ("E1S02", 17.083334))
     assert final_segments(tmp_path / "missing" / "episode_1.mp4", 1) == ()
+
+
+def test_a_vietnamese_review_keeps_its_digests_and_an_english_review_has_its_own():
+    # Digests of the Vietnamese prompts that the recorded reviewer qualifications are bound to.
+    assert prompt_digest(QUESTIONS) == "sha256:a5725a1a4409793150536c0d63058871f87b39c392c8d2f83653da954a1abcdd"
+    assert prompt_digest(PROBABILITIES) == "sha256:27f3c064a6cbce298a3fe1cae3e91bd6bde0a5e095d3494f0e40ac3ca9758fe4"
+    assert prompt_digest(WATCH) == "sha256:5535b808a20f1a42e6eda898bec340b7be2baa44ed0c9c056a596efa626c5a38"
+    for method in (QUESTIONS, PROBABILITIES, WATCH):
+        assert prompt_digest(method, "en") != prompt_digest(method, "vi")
+    frames, watch = review_prompts("en")
+    assert "English" in frames
+    assert "English" in watch
+    assert "tiếng Việt" not in frames + watch
+    with pytest.raises(ValueError, match="no review prompt"):
+        review_prompts("fr")

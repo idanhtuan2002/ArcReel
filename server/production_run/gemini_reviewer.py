@@ -25,7 +25,6 @@ from r2.contracts.automation import ModelRoute, RunStage
 from server.production_run.evaluators import (
     SCHEMA,
     WATCH,
-    WATCH_PROMPT,
     FinalEvidence,
     FrameReviewer,
     QualifiedEvaluator,
@@ -33,6 +32,7 @@ from server.production_run.evaluators import (
     final_duration,
     prompt_digest,
     review_method,
+    review_prompts,
 )
 from server.production_run.final_checks import (
     length_findings,
@@ -75,7 +75,7 @@ class GeminiReviewer:
         base = {
             "reviewer_route_digest": route_digest(route),
             "model_identity": route.model_identity,
-            "prompt_digest": prompt_digest(WATCH),
+            "prompt_digest": prompt_digest(WATCH, evidence.language),
             "subject_digest": evidence.subject_digest,
             "evidence_digest": evidence_digest(evidence),
         }
@@ -104,7 +104,7 @@ class GeminiReviewer:
                                 }
                             },
                             {
-                                "text": WATCH_PROMPT.format(
+                                "text": review_prompts(evidence.language)[1].format(
                                     subtitles=subtitles[:6000], narration=evidence.narration_text[:6000]
                                 )
                             },

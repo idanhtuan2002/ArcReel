@@ -245,6 +245,7 @@ class QualityAdapter:
                 subject_digest=master.digest,
                 segments=final_segments(final, episode),
                 target_seconds=run.policy.target_duration_seconds,
+                language=run.policy.language,
             )
         return targets
 

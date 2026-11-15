@@ -109,6 +109,65 @@ LỜI KỂ:
 {narration}
 """
 
+EN_PROMPT = """You review the quality of a short English narrated story film (9:16, 30–60 seconds).
+You receive {frame_count} frames sampled evenly in time order, the subtitles and the narration. You cannot hear the sound.
+Each frame comes with the subtitle line shown at that moment (or the nearest one):
+{frame_cues}
+
+Step 1 — score story, visual, audio, continuity, pacing from 1 to 5:
+5 excellent; 4 release quality, only small imperfections; 3 clear faults that bother the viewer;
+2 severe faults; 1 broken. "audio" scores the narration through its text: natural, correctly spelled English that
+matches the subtitles and the pictures.
+Do not take points off for an AI image style, lighting, small differences in a character's details between scenes,
+or a simple story. A film with normal pictures that match the narration and tell it coherently scores 4 or 5.
+
+Step 2 — "findings": only real faults, each with a code, severity (CRITICAL/MAJOR/MINOR), repair_stage
+(SCRIPT_PLAN, SCRIPT, MEDIA, RENDER or null) and a short detail. "language" is the language code of the narration
+(for example "en").
+
+SUBTITLES:
+{subtitles}
+
+NARRATION:
+{narration}
+"""
+
+EN_WATCH_PROMPT = """You review the quality of a short English narrated story film (9:16, 30–60 seconds).
+You watch the whole video with its narration audio, with the subtitles and the narration text below.
+
+Step 1 — score story, visual, audio, continuity, pacing from 1 to 5:
+5 excellent; 4 release quality, only small imperfections; 3 clear faults that bother the viewer;
+2 severe faults; 1 broken. "audio" scores the voice you hear: natural, clear English that matches the subtitles
+and the pictures.
+Do not take points off for an AI image style, lighting, small differences in a character's details between scenes,
+still pictures with little motion, or a simple story. A film with normal pictures that match the narration and tell
+it coherently scores 4 or 5.
+
+Step 2 — "findings": only real faults you can see or hear (black picture, noise, upside down, wrong story, wrong
+language, broken subtitles, sound out of sync...), each with a code, severity (CRITICAL/MAJOR/MINOR), repair_stage
+(SCRIPT_PLAN, SCRIPT, MEDIA, RENDER or null) and a short detail. "language" is the language code of the narration
+(for example "en").
+
+SUBTITLES:
+{subtitles}
+
+NARRATION:
+{narration}
+"""
+
+#: The frame label in the review prompt's per-frame cue lines, by narration language.
+_FRAME_WORD = {"vi": "Khung", "en": "Frame"}
+
+
+def review_prompts(language: str) -> tuple[str, str]:
+    """The (frames, watch) review prompts for films narrated in ``language``; other languages have no reviewer."""
+    if language == "vi":
+        return PROMPT, WATCH_PROMPT
+    if language == "en":
+        return EN_PROMPT, EN_WATCH_PROMPT
+    raise ValueError(f"no review prompt for language {language!r}")
+
+
 SCHEMA = {
     "type": "object",
     "required": ["language", "scores", "findings"],
@@ -330,6 +389,8 @@ class FinalEvidence:
     segments: tuple[tuple[str, float], ...] = ()
     #: The run's episode target in seconds (``RunPolicy.target_duration_seconds``); ``None`` when the project has none.
     target_seconds: float | None = None
+    #: The narration language the review prompt is written for (``RunPolicy.language``).
+    language: str = "vi"
 
 
 class QualifiedEvaluator(Protocol):
@@ -340,12 +401,15 @@ def _min_flipped(method: str) -> int:
     return MIN_FLIPPED_FRAMES_QUESTIONS if method == QUESTIONS else MIN_FLIPPED_FRAMES
 
 
-def prompt_digest(method: str = QUESTIONS) -> str:
-    """The digest of everything a reviewer of ``method`` is asked and the fixed rules applied to its answers."""
+def prompt_digest(method: str = QUESTIONS, language: str = "vi") -> str:
+    """The digest of everything a reviewer of ``method`` is asked for a film narrated in ``language`` and the fixed
+    rules applied to its answers (a Vietnamese review hashes as it did before other languages existed)."""
+    frames_prompt, watch_prompt = review_prompts(language)
+    scope = {} if language == "vi" else {"language": language}
     if method == WATCH:
         return digest_value(
             "r2.production-review-prompt.v9",
-            ensure_json_value({"method": method, "prompt": WATCH_PROMPT, "schema": SCHEMA}),
+            ensure_json_value({"method": method, "prompt": watch_prompt, "schema": SCHEMA, **scope}),
         )
     questions = (
         [BROKEN_QUESTION, ORIENTATION_QUESTION, MATCH_QUESTION]
@@ -357,12 +421,13 @@ def prompt_digest(method: str = QUESTIONS) -> str:
         ensure_json_value(
             {
                 "method": method,
-                "prompt": PROMPT,
+                "prompt": frames_prompt,
                 "schema": SCHEMA,
                 "questions": questions,
                 "thresholds": [MIN_BROKEN_FRAMES, _min_flipped(method), MIN_MISMATCHED_FRAMES],
                 "probabilities": [PROBABILITY_CUT, MAX_MEAN_ILLUSTRATES] if method == PROBABILITIES else None,
                 "frames": [FRAME_COUNT, FRAME_WIDTH],
+                **scope,
             }
         ),
     )
@@ -459,10 +524,11 @@ class FrameReviewer:
             checks += await asyncio.to_thread(sound_findings, evidence.final_path, unit_key=evidence.unit_key)
             checks += length_findings(duration, evidence.target_seconds, unit_key=evidence.unit_key)
             cues = "\n".join(
-                f"Khung {index + 1} ({seconds:.1f}s): «{cue_at(subtitles, seconds) or '—'}»"
+                f"{_FRAME_WORD.get(evidence.language, 'Frame')} {index + 1} ({seconds:.1f}s): "
+                f"«{cue_at(subtitles, seconds) or '—'}»"
                 for index, seconds in enumerate(frame_times(duration, len(frames)))
             )
-            prompt = PROMPT.format(
+            prompt = review_prompts(evidence.language)[0].format(
                 frame_count=len(frames),
                 frame_cues=cues,
                 subtitles=subtitles[:6000],
@@ -524,7 +590,7 @@ class FrameReviewer:
             return ModelAssessment.model_validate(
                 {
                     **base,
-                    "prompt_digest": prompt_digest(method),
+                    "prompt_digest": prompt_digest(method, evidence.language),
                     "outcome": "COMPLETED",
                     "language": str(answer["language"]).strip().lower()[:8],
                     "scores": answer["scores"],
@@ -544,7 +610,9 @@ class FrameReviewer:
                 }
             )
         except (httpx.HTTPError, KeyError, TypeError, ValueError, subprocess.SubprocessError):
-            return ModelAssessment.model_validate({**base, "prompt_digest": prompt_digest(method), "outcome": "FAILED"})
+            return ModelAssessment.model_validate(
+                {**base, "prompt_digest": prompt_digest(method, evidence.language), "outcome": "FAILED"}
+            )
 
 
 class OllamaReviewer(FrameReviewer):

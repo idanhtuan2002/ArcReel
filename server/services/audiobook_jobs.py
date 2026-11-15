@@ -26,6 +26,8 @@ logger = logging.getLogger(__name__)
 #: Files a finished job offers, by kind.
 FILES = {"m4b": "audiobook.m4b", "mp3": "audiobook.mp3", "mp4": "audiobook.mp4", "chapters": "chapters.txt"}
 _BED_SECONDS = 180.0
+#: The synthesis language name some audio backends take, by the project's source language.
+LANGUAGE_NAMES = {"vi": "Vietnamese", "en": "English", "zh": "Chinese"}
 _BED_BPM = {"standard": 72, "sleep": 56}
 
 
@@ -113,7 +115,10 @@ class AudiobookJobs:
             async def speak(text: str, path: Path) -> None:
                 await backend.synthesize(
                     AudioSynthesisRequest(
-                        text=synthesis_text(text, model_id), output_path=path, voice=voice, language_type="Vietnamese"
+                        text=synthesis_text(text, model_id),
+                        output_path=path,
+                        voice=voice,
+                        language_type=LANGUAGE_NAMES.get(str(project.get("source_language") or "vi"), "Vietnamese"),
                     )
                 )
 

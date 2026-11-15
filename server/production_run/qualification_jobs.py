@@ -1,7 +1,9 @@
 """Reviewer and launch qualification started from the run panel and run on this host.
 
 The corpus, the receipt directory and the launch evidence are host settings (``ARCREEL_REVIEWER_CORPUS``,
-``ARCREEL_REVIEWER_RECEIPTS``, ``ARCREEL_LAUNCH_EVIDENCE``), never request input. A reviewer job reviews the corpus
+``ARCREEL_REVIEWER_RECEIPTS``, ``ARCREEL_LAUNCH_EVIDENCE``), never request input; a launch profile in another
+language than Vietnamese reads its corpus from ``ARCREEL_REVIEWER_CORPUS_<LANGUAGE>`` (for example ``_EN``) and keeps
+its receipts under ``<receipts>/<language>/``. A reviewer job reviews the corpus
 with the project's reviewer route exactly as a run would freeze it, reusing stored reviews of the same model, method
 and case, and records the result only when it qualifies. Jobs run in this process; a restart ends a running job,
 whose stored receipts make the next start fast. Status is read from the recorded qualifications, not from the job.
@@ -39,7 +41,16 @@ from server.production_run.vision_chat import model_access
 CORPUS_ENV = "ARCREEL_REVIEWER_CORPUS"
 EVIDENCE_ENV = "ARCREEL_LAUNCH_EVIDENCE"
 REVIEWER_ROLES = ("reviewer_a", "reviewer_b")
-LANGUAGE = "vi"
+
+
+def corpus_env(language: str) -> str:
+    """The host setting naming the reviewer corpus of films narrated in ``language``."""
+    return CORPUS_ENV if language == "vi" else f"{CORPUS_ENV}_{language.upper()}"
+
+
+def _language(launch_profile_id: str) -> str:
+    return resolve_launch_profile(launch_profile_id).language
+
 
 type Sessions = async_sessionmaker[AsyncSession]
 
@@ -123,7 +134,9 @@ class QualificationJobs:
             async with self._sessions() as session:
                 records = (
                     await ReviewerQualificationRepository(session).qualified(
-                        profile_digest=str(digest), launch_profile_id=launch_profile_id, language=LANGUAGE
+                        profile_digest=str(digest),
+                        launch_profile_id=launch_profile_id,
+                        language=_language(launch_profile_id),
                     )
                     if digest
                     else ()
@@ -133,7 +146,7 @@ class QualificationJobs:
                 )
             launch_recorded = launch is not None and launch.profile_digest == digest
             for route in routes:
-                method = prompt_digest(review_method(route, await self._protocol(route)))
+                method = prompt_digest(review_method(route, await self._protocol(route)), _language(launch_profile_id))
                 job = self._jobs.get((user_id, project_name, route.role))
                 reviewers.append(
                     {
@@ -146,7 +159,8 @@ class QualificationJobs:
                     }
                 )
         return {
-            "corpus_configured": _path(CORPUS_ENV) is not None and _path(RECEIPTS_ENV) is not None,
+            "corpus_configured": _path(corpus_env(_language(launch_profile_id))) is not None
+            and _path(RECEIPTS_ENV) is not None,
             "evidence_configured": _path(EVIDENCE_ENV) is not None,
             "reviewers": reviewers,
             "launch_recorded": launch_recorded,
@@ -247,10 +261,13 @@ class QualificationJobs:
         return await self.status(user_id=user_id, project_name=project_name)
 
     async def start_reviewers(self, *, user_id: str, project_name: str) -> dict[str, Any]:
-        corpus, receipts = _path(CORPUS_ENV), _path(RECEIPTS_ENV)
+        profile_digest, launch_profile_id = self._scope(project_name)
+        language = _language(launch_profile_id)
+        corpus, receipts = _path(corpus_env(language)), _path(RECEIPTS_ENV)
         if corpus is None or receipts is None or not corpus.is_file():
             raise QualificationRefused("QUALIFICATION_CORPUS_NOT_CONFIGURED")
-        profile_digest, launch_profile_id = self._scope(project_name)
+        if language != "vi":
+            receipts = receipts / language
         routes = await self._routes(project_name)
         if len(routes) != len(REVIEWER_ROLES):
             raise QualificationRefused("MISSING_MODEL_ROLE")
@@ -295,7 +312,7 @@ class QualificationJobs:
                 output=output,
                 profile_digest=profile_digest,
                 launch_profile_id=launch_profile_id,
-                language=LANGUAGE,
+                language=_language(launch_profile_id),
                 stop_early=True,
                 progress=progress,
                 protocol=await self._protocol(route),
