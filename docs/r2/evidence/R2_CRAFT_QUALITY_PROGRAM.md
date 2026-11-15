@@ -80,3 +80,7 @@ All items are done, measured, deferred with reasons or blocked on the Human. Rem
 - r2-v2.5.23 deployed; provider `custom-7` "Gemini TTS" added by the sponsor (TTS models only enabled, default `gemini-3.8-flash-tts`); BytePlus Seedream 4.5/4.0 switched to `ark-seedream`. Smoke through the app's builders: Gemini TTS WAV 24 kHz 6.2 s; Seedream with one reference keeps the ferryman's face, hat and clothes, 1600x2848, no watermark.
 - ADR-0157: a plan finding is span-patched in the round's first cycle; rewrite and replan only when it survives. Trigger: trial 4 chapter 1 replanned twice (one note a pronoun slip), 61 review calls. Tests: story_authoring unit + integration + story adapter 485 passed (PG); static gates clean.
 - Deploy (Human): the agent stops its DB watchers first.
+
+## Release r2-v2.5.25 (2026-11-15)
+- r2-v2.5.24 deployed 13:09. Trial 4's production run had already ended `FAILED_QUALITY` at 12:41: chapter 1's review was truncated on three judgments after three replans (220 calls), and the raw `OUTPUT_TRUNCATED` block carried no `CAP_EXHAUSTED` marker, so ADR-0154 did not move the story.
+- Fix (ADR-0154 amendment): an exhausted judgment blocks with the marker. Test `test_a_review_the_writer_cannot_finish_hands_the_story_on`; story_authoring + story adapter 486 passed (PG).

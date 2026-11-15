@@ -1955,8 +1955,13 @@ class StoryRunDriver:
                     await self._outage(error)
                     continue
                 attempt += 1
-                if error.code not in RETRYABLE or attempt == JUDGE_ATTEMPTS:
+                if error.code not in RETRYABLE:
                     raise
+                if attempt == JUDGE_ATTEMPTS:
+                    # The route could not give an acceptable judgment: a step it cannot pass (ADR-0154).
+                    raise Blocked(
+                        RunPhase.BLOCKED_QUALITY, f"{node}: {attempt} judgments {CAP_EXHAUSTED} ({error})"
+                    ) from error
 
     async def _outage(self, error: StoryStepError) -> None:
         """Shenbi's dispatch rule: a transport failure is retried after a pause, at most ``len(retry_delays)`` times

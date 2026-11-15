@@ -267,6 +267,7 @@ class ScriptedModel:
         self.fail_at: dict[str, int] = {}
         self.fail_from: dict[str, int] = {}
         self.truncate_at: dict[str, int] = {}
+        self.truncate_from: dict[str, int] = {}
         self.before: dict[tuple[str, int], Callable[[], Awaitable[None]]] = {}
         ScriptedModel._instances += 1
         self._sentence = ScriptedModel._instances * 100_000
@@ -368,7 +369,9 @@ class ScriptedModel:
                 await hook()
             if self.fail_at.get(kind) == self.calls[kind] or self.calls[kind] >= self.fail_from.get(kind, 10**9):
                 return httpx.Response(500, json={"error": "model crashed"})
-            if self.truncate_at.get(kind) == self.calls[kind]:
+            if self.truncate_at.get(kind) == self.calls[kind] or self.calls[kind] >= self.truncate_from.get(
+                kind, 10**9
+            ):
                 return httpx.Response(
                     200,
                     json={
@@ -1048,6 +1051,24 @@ async def test_a_truncated_audit_is_retried_under_a_new_step(concurrent_session_
 
     assert state.phase is RunPhase.READY_FOR_APPROVAL, state.block_reason
     assert model.calls["issues"] == 19
+
+
+async def test_a_review_the_writer_cannot_finish_hands_the_story_on(concurrent_session_factory: Factory, tmp_path):
+    """A judgment truncated on every attempt is a step the writer cannot pass (ADR-0154): the block names the
+    exhausted node, so the production run moves the story to the next writer."""
+    from server.story_authoring.driver import CAP_EXHAUSTED
+    from server.story_authoring.service import needs_next_writer
+
+    store = await _store(concurrent_session_factory)
+    model = ScriptedModel()
+    model.truncate_from["issues"] = 2
+
+    state = await _driver(concurrent_session_factory, store, model, StoryBlobStore(tmp_path)).run()
+
+    assert state.phase is RunPhase.BLOCKED_QUALITY
+    assert CAP_EXHAUSTED in (state.block_reason or "")
+    assert "OUTPUT_TRUNCATED" in (state.block_reason or "")
+    assert needs_next_writer(state)
 
 
 JUDGE = StoryModelSelection.create(
