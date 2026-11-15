@@ -41,10 +41,24 @@ def character_voice_binding(project: Mapping[str, object] | None) -> CharacterVo
     return DEFAULT_CHARACTER_VOICE_BINDING
 
 
+#: Who speaks a drama's character lines (ADR-0166): the video model (``video``, default) or TTS (``tts``).
+CharacterSpeechDelivery = Literal["video", "tts"]
+SPEECH_DELIVERY_FIELD = "character_speech_delivery"
+
+
+def character_speech_delivery(project: Mapping[str, object] | None) -> CharacterSpeechDelivery:
+    """The project's character speech delivery; anything but ``tts`` reads as ``video``."""
+    raw = project.get(SPEECH_DELIVERY_FIELD) if project is not None else None
+    return "tts" if raw == "tts" else "video"
+
+
 __all__ = [
     "DEFAULT_CHARACTER_VOICE_BINDING",
     "PROJECT_FIELD",
+    "SPEECH_DELIVERY_FIELD",
     "VALID_CHARACTER_VOICE_BINDINGS",
+    "CharacterSpeechDelivery",
     "CharacterVoiceBinding",
+    "character_speech_delivery",
     "character_voice_binding",
 ]

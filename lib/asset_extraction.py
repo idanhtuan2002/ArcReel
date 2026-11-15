@@ -27,6 +27,10 @@ from lib.text_backends.base import TextGenerationRequest, TextGenerationResult
 MAX_PER_BUCKET = 12
 MAX_STATES = 4
 MAX_SOURCE_CHARS = 60_000
+#: A longer source (a book of several parts) is read in chunks of at most this size, cut at paragraph breaks.
+CHUNK_CHARS = 50_000
+#: The most chunks one inventory reads (about 400 000 characters).
+MAX_CHUNKS = 8
 
 type Generate = Callable[[TextGenerationRequest], Awaitable[TextGenerationResult]]
 
@@ -161,6 +165,46 @@ def _entries(extraction: AssetExtraction, project: dict[str, Any], source: str) 
     return buckets
 
 
+def source_chunks(source: str, size: int = CHUNK_CHARS) -> list[str]:
+    """The source cut at paragraph breaks into chunks of at most ``size`` characters (a longer paragraph alone)."""
+    chunks: list[str] = []
+    current = ""
+    for paragraph in source.split("\n\n"):
+        if current and len(current) + 2 + len(paragraph) > size:
+            chunks.append(current)
+            current = paragraph
+        else:
+            current = f"{current}\n\n{paragraph}" if current else paragraph
+    if current:
+        chunks.append(current)
+    return chunks
+
+
+def merge_entries(
+    parts: list[dict[str, dict[str, dict[str, Any]]]], source: str
+) -> dict[str, dict[str, dict[str, Any]]]:
+    """Chunk inventories as one: an entry keeps its first description and voice, gains the states later chunks
+    attest (up to ``MAX_STATES``), and each list keeps the ``MAX_PER_BUCKET`` entries the whole source names most."""
+    text = _normalized(source)
+    merged: dict[str, dict[str, dict[str, Any]]] = {}
+    for bucket in ("characters", "scenes", "props"):
+        chosen: dict[str, dict[str, Any]] = {}
+        for part in parts:
+            for name, entry in part.get(bucket, {}).items():
+                key = resolve_asset_key(chosen, name)
+                if key is None:
+                    chosen[name] = {k: (dict(v) if isinstance(v, dict) else v) for k, v in entry.items()}
+                    continue
+                states = chosen[key].setdefault(DERIVATIVES_FIELD, {}) if DERIVATIVES_FIELD in entry else None
+                if states is not None:
+                    for state, change in entry[DERIVATIVES_FIELD].items():
+                        if state not in states and len(states) < MAX_STATES:
+                            states[state] = change
+        ranked = sorted(chosen, key=lambda name: -text.count(_normalized(name)))
+        merged[bucket] = {name: chosen[name] for name in ranked[:MAX_PER_BUCKET]}
+    return merged
+
+
 async def extract_asset_inventory(
     projects: ProjectManager,
     project_name: str,
@@ -179,19 +223,23 @@ async def extract_asset_inventory(
     source = "\n\n".join(doc.text for doc in revision.documents).strip()
     if not source:
         raise AssetExtractionError("source text is empty")
-    if len(source) > MAX_SOURCE_CHARS:
+    chunks = [source] if len(source) <= MAX_SOURCE_CHARS else source_chunks(source)
+    if len(chunks) > MAX_CHUNKS:
         raise AssetExtractionError("source text exceeds the extraction bound")
-    result = await generate(
-        TextGenerationRequest(
-            prompt=PROMPT.format(limit=MAX_PER_BUCKET, states=MAX_STATES, source=source),
-            response_schema=AssetExtraction,
+    parts: list[dict[str, dict[str, dict[str, Any]]]] = []
+    for chunk in chunks:
+        result = await generate(
+            TextGenerationRequest(
+                prompt=PROMPT.format(limit=MAX_PER_BUCKET, states=MAX_STATES, source=chunk),
+                response_schema=AssetExtraction,
+            )
         )
-    )
-    try:
-        extraction = AssetExtraction.model_validate(json.loads(result.text))
-    except (ValueError, ValidationError) as error:
-        raise AssetExtractionError(f"extraction response is invalid: {error}") from None
-    entries = _entries(extraction, project, source)
+        try:
+            extraction = AssetExtraction.model_validate(json.loads(result.text))
+        except (ValueError, ValidationError) as error:
+            raise AssetExtractionError(f"extraction response is invalid: {error}") from None
+        parts.append(_entries(extraction, project, chunk))
+    entries = parts[0] if len(parts) == 1 else merge_entries(parts, source)
     existing_characters = project.get("characters") if isinstance(project.get("characters"), dict) else {}
     if not entries["characters"] and not existing_characters:
         raise AssetExtractionError("extraction found no character")
@@ -200,4 +248,4 @@ async def extract_asset_inventory(
     )
 
 
-__all__ = ["AssetExtraction", "AssetExtractionError", "extract_asset_inventory"]
+__all__ = ["AssetExtraction", "AssetExtractionError", "extract_asset_inventory", "merge_entries", "source_chunks"]

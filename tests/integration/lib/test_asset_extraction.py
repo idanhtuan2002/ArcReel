@@ -146,3 +146,35 @@ async def test_a_state_the_source_shows_becomes_a_derivative_and_an_invented_one
     assert list(lan["derivatives"]) == ["về làng"]
     assert lan["derivatives"]["về làng"]["description"] == "đeo vòng bạc của mẹ; phần còn lại giữ nguyên"
     assert "states:" in seen[0].prompt
+
+
+async def test_a_long_book_is_read_in_chunks_and_merged_by_name(tmp_path: Path):
+    pm = ProjectManager(tmp_path / "projects")
+    pm.create_project("demo")
+    pm.create_project_metadata("demo", "Demo", "", "narration")
+    part_one = "\n\n".join(["Lan về làng, mang theo chiếc vòng bạc của mẹ."] * 700)
+    part_two = "\n\n".join(["Lan gặp Minh ở bến đò. Lan mặc áo cưới trắng."] * 700)
+    (pm.get_project_path("demo") / "source" / "a.txt").write_text(part_one, encoding="utf-8")
+    (pm.get_project_path("demo") / "source" / "b.txt").write_text(part_two, encoding="utf-8")
+    revision = compute_source_revision(pm.get_project_path("demo"), pm.load_project("demo"), ALL).revision or ""
+    minh = {**EXTRACTED["characters"][0], "name": "Minh", "voice_style": "trầm"}
+    wedding = {"name": "áo cưới", "change": "mặc áo cưới trắng #F5F1E8", "evidence": "Lan mặc áo cưới trắng."}
+    answers = [
+        EXTRACTED,
+        {**EXTRACTED, "characters": [{**EXTRACTED["characters"][0], "voice_style": "khác", "states": [wedding]}, minh]},
+    ]
+    prompts: list[str] = []
+
+    async def generate(request: TextGenerationRequest) -> TextGenerationResult:
+        prompts.append(request.prompt)
+        answer = answers[min(len(prompts) - 1, 1)]
+        return TextGenerationResult(text=json.dumps(answer), provider="fake", model="fake")
+
+    await extract_asset_inventory(pm, "demo", scope=ALL, expected_source_revision=revision, generate=generate)
+
+    characters = pm.load_project("demo")["characters"]
+    assert len(prompts) >= 2
+    assert all(len(p) < 60_000 for p in prompts)
+    assert list(characters) == ["Lan", "Minh"]
+    assert characters["Lan"]["voice_style"] == "nhỏ nhẹ"
+    assert list(characters["Lan"]["derivatives"]) == ["áo cưới"]

@@ -84,7 +84,14 @@ ASSET_SPECS: dict[str, AssetSpec] = {
         namespace_priority=0,
         reference_list_fields=("characters_in_segment", "characters_in_scene", "characters_in_shot"),
         original_image_fields=("reference_image",),
-        extra_string_fields=("voice_style", "reference_image", "reference_audio", "voice_notice_dismissed_at"),
+        extra_string_fields=(
+            "voice_style",
+            "reference_image",
+            "reference_audio",
+            "voice_notice_dismissed_at",
+            "tts_voice",
+            "tts_voice_route",
+        ),
         # voice_style 是 LLM 生成的角色配音风格，agent 可改；reference_image / reference_audio
         # 是用户上传的文件路径（系统级），不进 agent 白名单——更新分别走
         # update_character_reference_image / update_character_reference_audio。
@@ -93,6 +100,8 @@ ASSET_SPECS: dict[str, AssetSpec] = {
         # 与之比较的 voice_updated_at 不在此列——只由系统在 reference_audio 实际变更时机械戳写
         # （update_character_reference_audio 与全局资产库导入），不开放任意 PATCH 覆写
         # （否则该比较可被客户端绕过）。
+        # tts_voice 是该角色台词的 TTS 音色 id，tts_voice_route 是选出它的音频路由
+        # （"<provider_id>/<model_id>"）；由系统分配（ADR-0166），用户可在 PATCH 中改，agent 不写。
         agent_editable_extra_fields=("voice_style",),
         supports_derivatives=True,
     ),
