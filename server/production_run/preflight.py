@@ -53,6 +53,8 @@ class ProductionPreflight:
                 reasons.append("UNSUPPORTED_OUTPUT_CONTRACT")
             if launch.requires_lip_sync:
                 reasons.append("DRAMA_ROUTE_NOT_QUALIFIED")
+            if snapshot.character_speech_delivery != launch.character_speech_delivery:
+                reasons.append("CHARACTER_SPEECH_DELIVERY_MISMATCH")
         roles = {route.role: route for route in snapshot.routes}
         if launch is not None:
             for role, expected in (

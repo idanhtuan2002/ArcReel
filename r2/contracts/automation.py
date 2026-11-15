@@ -568,6 +568,8 @@ class PreflightSnapshot(AutomationContract):
     #: Route digests of image, video and audio routes whose host media probe passed (``media_probe``).
     media_route_probes: frozenset[Digest] = frozenset()
     voice_available: StrictBool
+    #: The project's ``character_speech_delivery`` (ADR-0166); a project without the setting reads ``video``.
+    character_speech_delivery: Literal["video", "tts"] = "video"
     disk_free_bytes: NonnegativeInt
     required_disk_bytes: NonnegativeInt
     gpu_free_bytes: NonnegativeInt

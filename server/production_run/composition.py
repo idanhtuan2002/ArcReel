@@ -18,6 +18,7 @@ from pathlib import Path
 
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from lib.character_voice import character_speech_delivery
 from lib.config.resolver import ConfigResolver
 from lib.db.models.quality import QualityProfileHeadModel
 from lib.db.repositories.launch_qualifications import LaunchQualificationRepository
@@ -144,13 +145,16 @@ class ProjectPolicyResolver:
         return tuple(routes)
 
     async def voice_available(self, project_name: str) -> bool:
-        """A narration project with an audio route and a resolvable narration voice; drama needs character voices."""
+        """An audio route, and for a narration project a resolvable narration voice. A drama has a voice only when it
+        voices its characters by TTS (ADR-0166): their voices are cast from the audio route's catalog during MEDIA."""
         project = self._projects.load_project(project_name)
         settings = project.get("automation")
         routes = settings.get("routes") if isinstance(settings, dict) else None
-        if project.get("content_mode") != "narration" or not any(
-            isinstance(route, dict) and route.get("role") == "audio" for route in routes or []
-        ):
+        if not any(isinstance(route, dict) and route.get("role") == "audio" for route in routes or []):
+            return False
+        if project.get("content_mode") == "drama":
+            return character_speech_delivery(project) == "tts"
+        if project.get("content_mode") != "narration":
             return False
         return bool((await self._resolver.resolve_narration_voice(project)).strip())
 
@@ -281,6 +285,7 @@ class HostPreflightReader:
             launch_qualification=launch,
             media_route_probes=passed_probes(receipts_dir(), routes),
             voice_available=await self._policies.voice_available(project_name),
+            character_speech_delivery=character_speech_delivery(project),
             disk_free_bytes=shutil.disk_usage(self._projects.projects_root).free,
             required_disk_bytes=launch_profile.required_disk_bytes,
             gpu_free_bytes=self._gpu_free(),

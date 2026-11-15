@@ -223,3 +223,21 @@ def test_fallback_routes_are_text_routes_that_repeat_nothing(policy_data):
     for bad in ([{**spare, "role": "image"}], [writer], [spare, spare]):
         with pytest.raises(ValidationError):
             RunPolicy.model_validate({**policy_data, "fallback_routes": bad})
+
+
+def test_the_drama_on_stills_profile_voices_characters_by_tts_over_the_narration_pictures():
+    from r2.automation.profiles import resolve_launch_profile
+
+    narration = resolve_launch_profile("fiction_narration_vi_v1")
+    drama = resolve_launch_profile("fiction_drama_vi_v2")
+    assert (drama.content_mode, drama.requires_lip_sync, drama.character_speech_delivery) == (
+        "fiction_drama",
+        False,
+        "tts",
+    )
+    assert (drama.image_route, drama.video_route, drama.audio_route) == (
+        narration.image_route,
+        narration.video_route,
+        narration.audio_route,
+    )
+    assert resolve_launch_profile("fiction_drama_vi_v1").character_speech_delivery == "video"

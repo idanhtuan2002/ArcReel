@@ -59,3 +59,13 @@ async def test_a_project_story_without_a_language_gets_the_language_of_its_text(
     projects.update_project("demo", lambda project: project.update(source_language="en"))
     await witness.settle_source_language("demo")
     assert projects.load_project("demo")["source_language"] == "en"  # a recorded language is kept
+
+
+async def test_who_speaks_the_characters_is_a_witnessed_setting_once_set(tmp_path: Path):
+    projects = ProjectManager(tmp_path / "projects")
+    projects.create_project("demo")
+    projects.create_project_metadata("demo", "Demo", "", "drama")
+    witness = ProjectInputWitness(None, projects=projects)
+    unset = witness._digest("demo", frozenset())
+    projects.update_project("demo", lambda project: project.update(character_speech_delivery="tts"))
+    assert witness._digest("demo", frozenset()) != unset

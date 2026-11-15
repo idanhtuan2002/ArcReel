@@ -63,6 +63,9 @@ class LaunchProfile(AutomationContract):
     video_route: tuple[ExactIdentity, ExactIdentity]
     audio_route: tuple[ExactIdentity, ExactIdentity]
     requires_lip_sync: bool
+    #: Who speaks the characters' lines (ADR-0166): the video model (``video``) or TTS over silent pictures (``tts``);
+    #: a run of a ``tts`` profile needs a project that voices its characters by TTS.
+    character_speech_delivery: Literal["video", "tts"] = "video"
     support_status: Literal["CANDIDATE"]
     #: ``enforce`` exports only a final both reviewers pass; ``record`` (local plumbing profiles, whose models do not
     #: reach release quality) records the quality verdict as the final's disposition and still exports it.
@@ -77,7 +80,12 @@ class LaunchProfile(AutomationContract):
 
 
 def resolve_launch_profile(profile_id: str) -> LaunchProfile:
-    if profile_id not in {"fiction_narration_vi_v1", "fiction_drama_vi_v1", "fiction_narration_en_v1"}:
+    if profile_id not in {
+        "fiction_narration_vi_v1",
+        "fiction_drama_vi_v1",
+        "fiction_drama_vi_v2",
+        "fiction_narration_en_v1",
+    }:
         raise ValueError("UNSUPPORTED_LAUNCH_PROFILE")
     path = Path(__file__).parent / "launch_profiles" / (profile_id + ".json")
     return LaunchProfile.model_validate_json(path.read_bytes())

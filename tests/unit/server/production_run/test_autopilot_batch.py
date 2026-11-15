@@ -196,3 +196,14 @@ async def test_each_new_film_is_launch_qualified_before_its_autopilot_starts(tmp
     film = result.created[0]["film"]
     assert order == [f"qualify:{film}", f"enable:{film}"]
     assert result.created[0]["launch_reasons"] == ["DISK_SPACE_LOW"]
+
+
+async def test_a_film_voices_its_characters_as_its_template_does(tmp_path):
+    pm = ProjectManager(tmp_path)
+    extras: dict = {"automation": {"routes": []}, "character_speech_delivery": "tts"}
+    _project(pm, "tpl", extras=extras, created="2026-01-01T00:00:00")
+    _project(pm, "story", extras={"project_kind": "story"}, created="2026-02-01T00:00:00", text="Hết.")
+
+    result, _ = await _run(pm)
+
+    assert pm.load_project(result.created[0]["film"])["character_speech_delivery"] == "tts"

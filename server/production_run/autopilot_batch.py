@@ -34,6 +34,7 @@ TEMPLATE_FIELDS = (
     "automation",
     "speech_rate_units_per_second",
     "episode_adaptation",
+    "character_speech_delivery",
     "video_backend",
     "video_provider_i2v",
     "video_provider_r2v",

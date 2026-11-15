@@ -459,3 +459,20 @@ async def test_a_continuity_judge_needs_the_launch_profiles_pinned_qualified_jud
     assert await blocked(judged, None, True) is True
     assert await blocked(judged, check.model_copy(update={"judge_model_identity": "other"}), True) is True
     assert await blocked(frozen, None, False) is False
+
+
+@pytest.mark.parametrize(("delivery", "mismatch"), [("tts", False), ("video", True)])
+async def test_a_drama_on_stills_needs_no_lip_sync_but_its_project_must_voice_characters_by_tts(delivery, mismatch):
+    from server.production_run.preflight import ProductionPreflight
+
+    frozen, snapshot = complete_snapshot()
+    frozen = frozen.model_copy(update={"launch_profile_id": "fiction_drama_vi_v2"})
+    reader = SnapshotReader(
+        snapshot.model_copy(update={"content_mode": "fiction_drama", "character_speech_delivery": delivery})
+    )
+    report = await ProductionPreflight(reader).check(
+        user_id=snapshot.user_id, project_name=snapshot.project_name, policy=frozen
+    )
+    assert "DRAMA_ROUTE_NOT_QUALIFIED" not in report.blocking_reasons
+    assert "UNSUPPORTED_LAUNCH_PROFILE" not in report.blocking_reasons
+    assert ("CHARACTER_SPEECH_DELIVERY_MISMATCH" in report.blocking_reasons) is mismatch

@@ -14,6 +14,7 @@ from typing import Any
 
 from sqlalchemy import select
 
+from lib.character_voice import SPEECH_DELIVERY_FIELD
 from lib.db.models.production_run import ProductionStepModel
 from lib.episode_adaptation import SETTING as ADAPTATION_SETTING
 from lib.episode_ledger import normalize_source_text
@@ -30,7 +31,7 @@ from server.story_authoring.artifacts import StoryBlobStore
 from server.story_authoring.handoff import narration_source
 
 #: Witnessed only when present (ADR-0114's ``episode_adaptation``).
-LATER_WITNESSED_SETTINGS = (ADAPTATION_SETTING,)
+LATER_WITNESSED_SETTINGS = (ADAPTATION_SETTING, SPEECH_DELIVERY_FIELD)
 # Production settings the user owns; a run reads them and never writes them.
 WITNESSED_SETTINGS = (
     "content_mode",
