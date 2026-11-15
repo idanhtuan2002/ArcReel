@@ -28,6 +28,7 @@ import { AutomationReadiness } from "./AutomationReadiness";
 import { AutomationSettingsEditor } from "./AutomationSettingsEditor";
 import { RunMediaStrip } from "./RunMediaStrip";
 import { RunReportDetails } from "./RunReportDetails";
+import { TrailerPanel } from "./TrailerPanel";
 import { StorySourcePicker, type StorySource } from "./StorySourcePicker";
 import {
   BookContinuationNote,
@@ -679,6 +680,7 @@ export function ProductionRunPanel({ projectName }: Props) {
             </div>
           )}
           <RunReportDetails projectName={projectName} runId={run.run_id} version={run.version} />
+          {run.status === "SUCCEEDED" && <TrailerPanel projectName={projectName} runId={run.run_id} />}
           {run.status === "SUCCEEDED" && (
             <ul className="m-0 list-none space-y-1 p-0">
               {run.completed_targets.map((output) => {

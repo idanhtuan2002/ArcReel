@@ -216,3 +216,28 @@ export async function downloadProductionOutput(
   );
   return response.blob();
 }
+
+export interface TrailerJob {
+  run_id: string;
+  state: "running" | "done" | "failed";
+  error: string | null;
+  duration: number | null;
+  started_at: string;
+}
+
+/** ADR-0164: the trailer cut from a succeeded run's finals; `null` when none was made. */
+export async function getTrailer(projectName: string, runId: string, options: CallOptions = {}): Promise<TrailerJob | null> {
+  const body = await API.request<{ job: TrailerJob | null }>(`${base(projectName)}/${encodeURIComponent(runId)}/trailer`, {
+    signal: options.signal,
+  });
+  return body.job;
+}
+
+export function startTrailer(projectName: string, runId: string): Promise<TrailerJob> {
+  return API.request<TrailerJob>(`${base(projectName)}/${encodeURIComponent(runId)}/trailer`, { method: "POST" });
+}
+
+export async function downloadTrailer(projectName: string, runId: string): Promise<Blob> {
+  const response = await API.requestBinary(`${base(projectName)}/${encodeURIComponent(runId)}/trailer/file`);
+  return response.blob();
+}

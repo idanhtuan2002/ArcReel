@@ -78,7 +78,7 @@ Status: ✅ shipped and run · 🟡 parts exist, not run end to end · ❌ missi
 | V7 | Hoạt hình / anime, cartoon, chibi | 🟡 18 anim styles; motion ❌ | HH, OM, DC |
 | V8 | Người thật – điện ảnh / live-action cinematic | 🟡 18 live styles; motion ❌ | HH, DC |
 | V9 | Quảng cáo sản phẩm / product ad, UGC-style ad | 🟡 `content_mode=ad` (F5) | OM, AIVPE, Topview |
-| V10 | Trailer – teaser | ❌ (F6) | OM cinematic |
+| V10 | Trailer – teaser | ✅ cut from the finished film (ADR-0164) | OM cinematic |
 | V11 | Explainer có đồ họa tất định / explainer with charts, diagrams, kinetic text | ❌ (F7) | OM animation, Remotion |
 | V12 | Documentary montage (stock + narration) | ❌ | OM documentary-montage |
 | V13 | Remake / recap / tóm tắt video người khác thành biến thể (cốt truyện, lời kể, giọng mới) | 🟡 video → story source ✅ (ADR-0161), variant + film via ADR-0115 path; footage-cut recap ❌ | OM video analysis + clip-factory, Topview recast, DC canvas analysis |

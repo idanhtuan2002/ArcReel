@@ -37,6 +37,7 @@ from server.production_run.service import (
 )
 from server.production_run.settings import SettingsRefused, SettingsUpdate, save_settings, settings_options
 from server.services.governance_startup import GovernanceStartupUnavailable
+from server.services.trailer_jobs import TrailerJobs, TrailerRefused
 
 router = APIRouter()
 
@@ -617,3 +618,38 @@ async def films_for_finished_stories_route(
         raise HTTPException(status_code=422, detail={"code": refused.code, "reasons": []}) from None
     scheduler.wake()
     return {"created": result.created, "skipped": result.skipped}
+
+
+_TRAILERS: TrailerJobs | None = None
+
+
+def _trailers() -> TrailerJobs:
+    global _TRAILERS
+    if _TRAILERS is None:
+        _TRAILERS = TrailerJobs(get_project_manager(), async_session_factory)
+    return _TRAILERS
+
+
+@router.post("/projects/{project_name}/production-runs/{run_id}/trailer")
+async def start_trailer(project_name: str, run_id: str, user: InteractiveUser) -> dict[str, Any]:
+    """ADR-0164: cut a trailer from the succeeded run's verified finals."""
+    try:
+        return await _trailers().start(user_id=user.id, project_name=project_name, run_id=run_id)
+    except TrailerRefused as error:
+        status = 404 if str(error) == "RUN_NOT_FOUND" else 409
+        raise HTTPException(status_code=status, detail={"code": str(error), "reasons": []}) from error
+
+
+@router.get("/projects/{project_name}/production-runs/{run_id}/trailer")
+async def trailer_status(project_name: str, run_id: str, user: CurrentUser) -> dict[str, Any]:
+    return {"job": _trailers().status(user.id, project_name, run_id)}
+
+
+@router.get("/projects/{project_name}/production-runs/{run_id}/trailer/file")
+async def trailer_file(project_name: str, run_id: str, user: CurrentUser) -> FileResponse:
+    async with async_session_factory() as session:
+        run = await ProductionRunRepository(session).get(user_id=user.id, project_name=project_name, run_id=run_id)
+    path = _trailers().file(project_name, run_id) if run is not None else None
+    if path is None:
+        raise HTTPException(status_code=404, detail={"code": "TRAILER_NOT_FOUND", "reasons": []})
+    return FileResponse(path, media_type="video/mp4", filename=f"{project_name}-trailer.mp4")
