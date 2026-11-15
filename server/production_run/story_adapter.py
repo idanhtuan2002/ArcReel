@@ -641,15 +641,22 @@ class StoryAdapter:
             ref, _ = await self._stories.get(
                 user_id=run.user_id, project_name=run.project_name, run_id=receipt.receipt_ref.partition("#")[0]
             )
-            reworks = sum(r.count for r in run.repair_counts if r.stage is RunStage.STORY)
-            if self._fallback_writer(run, ref.brief) is not None and reworks < run.policy.unit_repair_limit:
-                # ADR-0139: the step settles what the story spent; the story stage runs again on the next writer.
-                # Moves count as STORY repairs; past the run's repair limit the story stays stopped for a Human.
+            following = self._fallback_writer(run, ref.brief)
+            if following is not None and run.policy.unit_repair_limit > 0:
+                # ADR-0139/0154: the step settles what the story spent; the story stage runs again on the next writer.
+                # Each move is its own repair unit (the writer it goes to), so the moves are bounded by the writer
+                # list, which only moves forward; a run allowed no repairs keeps the story stopped for a Human.
                 passing = outcome(intent, "PASS", receipts=(receipt,), owner_state=state.phase.value).model_dump(
                     mode="python"
                 )
                 return StageOutcome.model_validate(
-                    {**passing, "kind": "REWORK", "reason": "STORY_MODEL_FALLBACK", "repair_stage": RunStage.STORY}
+                    {
+                        **passing,
+                        "kind": "REWORK",
+                        "reason": "STORY_MODEL_FALLBACK",
+                        "repair_stage": RunStage.STORY,
+                        "unit_key": f"story:writer:{following[0]}/{following[1]}",
+                    }
                 )
         if state.phase is RunPhase.BLOCKED_BUDGET:
             run = await current_run(self._sessions, intent)

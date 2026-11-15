@@ -103,7 +103,7 @@ class StoryCloudClient(Protocol):
 #: Output tokens a cloud call may spend on reasoning on top of the step's cap. Providers count reasoning ("thinking")
 #: tokens against the request's output limit, so a reasoning model given only the step's cap stops mid-answer; the
 #: call sends and reserves the cap plus this allowance, and the visible answer is still checked as before.
-REASONING_ALLOWANCE = 12288
+REASONING_ALLOWANCE = 28672
 
 
 def output_per_call(limits: StoryLimits) -> int:

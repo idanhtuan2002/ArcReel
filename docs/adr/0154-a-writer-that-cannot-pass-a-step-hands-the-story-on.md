@@ -13,3 +13,5 @@ ADR-0139 moves a story to the project's next writer only when its model fails (`
 3. One predicate, `needs_next_writer`, decides for both the reroute and the production run's story adapter.
 
 Amended 2026-11-15 (trial 4): a judgment (chapter review, outline review, any `_judge` node) whose three attempts all fail with a retryable code (`OUTPUT_TRUNCATED`, `OUTPUT_INVALID`, …) now blocks with the same `CAP_EXHAUSTED` marker. Before, the raw step error (`OUTPUT_TRUNCATED at chapter_review[1]@r0.0.3#14`) stopped the run without the marker, so the story did not move although the reviewer was the writer's own route. A story with a separate judge route still moves its writer only; the judge is qualified separately.
+
+Amended 2026-11-15 (trial 5): a move is its own repair unit, `story:writer:<provider>/<model>` of the writer it goes to, so the moves are bounded by the writer list (which only moves forward) instead of the run's `unit_repair_limit`. Trial 5 moved particle-1 → deepseek-v4-1-flash → ernie and then failed `REPAIR_LIMIT` with three writers left. A run whose `unit_repair_limit` is 0 still keeps the story stopped for a Human.

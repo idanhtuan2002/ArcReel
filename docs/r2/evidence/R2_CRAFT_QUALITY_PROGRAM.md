@@ -84,3 +84,7 @@ All items are done, measured, deferred with reasons or blocked on the Human. Rem
 ## Release r2-v2.5.25 (2026-11-15)
 - r2-v2.5.24 deployed 13:09. Trial 4's production run had already ended `FAILED_QUALITY` at 12:41: chapter 1's review was truncated on three judgments after three replans (220 calls), and the raw `OUTPUT_TRUNCATED` block carried no `CAP_EXHAUSTED` marker, so ADR-0154 did not move the story.
 - Fix (ADR-0154 amendment): an exhausted judgment blocks with the marker. Test `test_a_review_the_writer_cannot_finish_hands_the_story_on`; story_authoring + story adapter 486 passed (PG).
+
+## Release r2-v2.5.26 (2026-11-15)
+- Trial 5 (r2-v2.5.25, started 13:24:58, adopted trial 4's story): chapter 1 sealed, chapter 2 drafted; ADR-0154 moved the writer particle-1 → deepseek-v4-1-flash → ernie, then the run failed `REPAIR_LIMIT` (unit_repair_limit 2) at 14:22; `chapter_review[2]` truncated at 14,336 output tokens on all three writers (finished draws 7–8.6k).
+- ADR-0153 amended: `REASONING_ALLOWANCE` 28,672 (gemma-4's 32,768 completion cap is the tightest listed writer). ADR-0154 amended: each move is its own repair unit `story:writer:<provider>/<model>`. Tests: story_authoring + story adapter + crash recovery + automation transitions 596 passed (PG); static gates clean.

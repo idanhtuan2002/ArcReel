@@ -13,3 +13,5 @@ The story steps cap visible output at 4,096 tokens, and a cloud call was sent an
 3. Money stays bounded by the brief's USD cap and route prices; the free routes are priced at 0.
 
 Not changed: a writer that returns output the checks reject still does not move to the next fallback writer (ADR-0139 moves on route failure or quota).
+
+Amended 2026-11-15 (trial 5): the allowance is 28,672. With 12,288 the chapter review (2,048 visible + 12,288) was truncated on every free writer in turn: `chapter_review[2]` used 7–8.6k output tokens when it finished and ran past 14,336 on three of four draws of particle-1, deepseek-v4-1-flash and ernie alike. The free models allow at least 131k output tokens and are priced at 0, so the larger budget costs time, not money.

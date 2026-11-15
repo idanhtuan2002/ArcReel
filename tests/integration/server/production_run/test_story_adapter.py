@@ -1003,6 +1003,51 @@ async def test_the_fallback_list_is_read_when_needed_and_held_to_the_runs_rules(
     assert adapter._writer_order(run)[1:] == [(host.run.policy.fallback_routes[0].provider_id, FALLBACK)]
 
 
+async def _writer_fallback_one_repair(sessions) -> dict:
+    return {**await _writer_fallback(sessions), "unit_repair_limit": 1}
+
+
+@pytest.mark.parametrize("story_policy", [_writer_fallback_one_repair], indirect=True)
+async def test_each_listed_writer_gets_its_turn_whatever_the_repair_limit(story_host: Host):
+    """A move is bounded by the writer list, not by the run's repair limit: each move is its own repair unit, so a
+    repair limit of one still lets the story reach the third writer."""
+    host = story_host
+    third = await _provider(host.sessions, model="writer-three")
+    [spare] = host.run.policy.fallback_routes
+    entries = [
+        {
+            "role": "writer",
+            "provider_id": spare.provider_id,
+            "model_id": FALLBACK,
+            "model_identity": FALLBACK,
+            "local": True,
+        },
+        {
+            "role": "writer",
+            "provider_id": third,
+            "model_id": "writer-three",
+            "model_identity": "writer-three",
+            "local": True,
+        },
+    ]
+    host.projects.update_project(
+        "project", lambda project: project.setdefault("automation", {}).update({"fallbacks": entries})
+    )
+    await _tick(host)
+    await _tick(host)
+    task_id = await _story_task(host)
+    await _stop(host, task_id)
+    assert (await _tick(host)).stage is RunStage.STORY
+    await _tick(host)
+    assert (await _brief(host, task_id)).selection.model_id == FALLBACK
+    await _stop(host, task_id, phase=RunPhase.BLOCKED_QUALITY, reason=f"chapter_review[2]: 3 judgments {CAP_EXHAUSTED}")
+
+    moved = await _tick(host)
+    assert (moved.stage, moved.status) == (RunStage.STORY, RunStatus.RUNNING)
+    await _tick(host)
+    assert (await _brief(host, task_id)).selection.model_id == "writer-three"
+
+
 async def _writer_fallback_without_repairs(sessions) -> dict:
     return {**await _writer_fallback(sessions), "unit_repair_limit": 0}
 
