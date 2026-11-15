@@ -6,7 +6,7 @@ Owner: sponsor. Created 2026-11-15. Update in place when a form or genre is adde
 1. The goal is coverage of **every known genre and form**, including **remakes, recaps and summaries of other people's videos turned into a variant** of that video.
 2. Order of work: first the genres and formats popular on **TikTok and YouTube now**, by value per effort; then the rest.
 3. Quality first; free tiers; licence out of scope (`CLAUDE.md`).
-4. Languages: products in several languages, Vietnamese is one of them; **English first, then Chinese** (2026-11-15). Genre packs keep one id with content per language: `vi` adapted, `zh` close to huohuo's original skills, `en` rewritten for that market; a story uses the pack content of its own language, never another language's prompt (prompt language pulls the output language).
+4. Languages: products in several languages, Vietnamese is one of them; priority **Vietnamese first, then English, then Chinese** (2026-11-15). Genre packs keep one id with content per language: `vi` adapted, `zh` close to huohuo's original skills, `en` rewritten for that market; a story uses the pack content of its own language, never another language's prompt (prompt language pulls the output language).
 
 Design constraint from the platforms (not a block): YouTube monetizes reused content only when "viewers can tell that there's a meaningful difference"; allowed examples include "Edited footage from other creators where you add a storyline and commentary" and "A scene from a movie where you've rewritten the dialog and changed the voiceover"; not allowed: clips "with little or no narrative", "readings of other materials you did not originally create", "Image slideshows, templated storylines, or scrolling text with minimal or no narrative" ([YouTube channel monetization policies](https://support.google.com/youtube/answer/1311392), read 2026-11-15). So every remake/recap form here produces a **transformed** work: a new storyline, rewritten narration or dialogue, new voice; never a re-upload or a verbatim reading.
 
@@ -115,7 +115,6 @@ Formats per platform: 9:16 Shorts/TikTok/Reels ✅, 16:9 YouTube ✅, 1:1, 4:5, 
 |---|---|---|---|---|
 | 1 | Genre packs for the popular fiction: báo thù–vả mặt, ngược luyến, tổng tài–hào môn, xuyên không–trọng sinh, tu tiên, hệ thống, mạt thế, đô thị, truyện có thật–storytime, thiếu nhi–cổ tích, truyện ngủ ngon, não động–twist (+ film look each) | G11–G28 | S | The most uploaded faceless story types; runs on the shipped narration path now |
 | 2 | Audiobook + sleep-story output | V3, G27, V21 | S | All parts exist; evergreen sleep/relax niche |
-| 2b | English film via translation (L1a) | L1a | S–M | Opens the international YouTube/TikTok audience with the shipped story path |
 | 3 | Micro-drama series polish: cliffhanger per episode, hook in the first 2 s, series packaging | V6 | S–M | Short-drama growth; episodes already exist |
 | 4 | Hybrid motion (stills + selective i2v) | V5, V7, V8 | M | Lifts every fiction form above "slideshow" (policy and retention) |
 | 5 | Dialogue drama end to end with per-character voices | V4 | M | AI drama is the next fiction tier |
@@ -125,4 +124,5 @@ Formats per platform: 9:16 Shorts/TikTok/Reels ✅, 16:9 YouTube ✅, 1:1, 4:5, 
 | 9 | Top list / trivia / quiz | N6 | M | Popular; template risk managed by narrative |
 | 10 | Product ad (reason-to-buy) | V9 | M | TikTok "Emotional ROI" |
 | 11 | Trailer / teaser | V10 | S–M | Packaging for every story/film |
-| 12 | Dub / localization; clip factory; podcast; avatar presenter; screen demo; music video; news commentary; motivation; parody; interactive | V15–V20, N9–N11, G30, G32 | L | Breadth after the above |
+| 12 | Languages, in order: English (L1a translation path, then L1b native), then Chinese (L2a, L2b) | C2 | S–M, then L | Vietnamese forms come first (sponsor priority) |
+| 13 | Dub / localization; clip factory; podcast; avatar presenter; screen demo; music video; news commentary; motivation; parody; interactive | V15–V20, N9–N11, G30, G32 | L | Breadth after the above |
