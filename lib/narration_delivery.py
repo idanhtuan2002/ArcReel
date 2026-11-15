@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import math
 import unicodedata
-from collections.abc import Awaitable, Callable, Sequence
+from collections.abc import Awaitable, Callable, Mapping, Sequence
 from dataclasses import dataclass, replace
 from enum import StrEnum
 from pathlib import Path
@@ -25,6 +25,7 @@ from lib.artifact_manifest import (
     ProjectArtifactManifestAdapter,
 )
 from lib.audio_utils import probe_existing_audio_duration_seconds
+from lib.character_voice import character_speech_delivery
 from lib.path_safety import safe_join
 from lib.reference_video.duration_slots import (
     Adjustment,
@@ -109,6 +110,9 @@ class TtsSynthesisSettings:
     model_id: str
     voice: str
     speed: float | None
+    #: Each speaking character's voice, ``(name, voice)`` sorted by name, when the project has its character lines
+    #: spoken by TTS (ADR-0166); ``None`` when the characters speak through the video model.
+    character_voices: tuple[tuple[str, str], ...] | None = None
 
     def __post_init__(self) -> None:
         if not self.provider_id.strip():
@@ -342,14 +346,126 @@ def canonical_narration_text(preparation: SpeechPreparation) -> str:
     return f"[{cue}] {text}" if cue and text else text
 
 
+#: Silence between two character lines of one unit (ADR-0166).
+LINE_GAP_SECONDS = 0.25
+
+
+def character_route(provider_id: str, model_id: str) -> str:
+    """The audio route a character's ``tts_voice`` was chosen for, as stored in ``tts_voice_route``."""
+    return f"{provider_id}/{model_id}"
+
+
+def with_character_voices(settings: TtsSynthesisSettings, project: Mapping[str, object]) -> TtsSynthesisSettings:
+    """The settings with the project's character voices when its character lines are spoken by TTS (ADR-0166): each
+    character whose ``tts_voice`` was chosen for this audio route; a voice of another route does not count."""
+    if character_speech_delivery(project) != "tts":
+        return replace(settings, character_voices=None)
+    route = character_route(settings.provider_id, settings.model_id)
+    characters = project.get("characters")
+    voices = []
+    if isinstance(characters, Mapping):
+        for name, entry in characters.items():
+            if not isinstance(entry, Mapping):
+                continue
+            voice = entry.get("tts_voice")
+            if isinstance(voice, str) and voice.strip() and entry.get("tts_voice_route") == route:
+                voices.append((str(name), voice.strip()))
+    return replace(settings, character_voices=tuple(sorted(voices)))
+
+
+def tts_spoken(mode: SpeechMode | None, project: Mapping[str, object] | None) -> bool:
+    """Whether a unit of ``mode`` gets its speech from TTS in ``project``: narrator units always; character units when
+    the project voices its characters by TTS (ADR-0166)."""
+    if mode is SpeechMode.NARRATOR_VOICEOVER:
+        return True
+    return mode is SpeechMode.CHARACTER_SPEECH and character_speech_delivery(project) == "tts"
+
+
+def speaks_by_tts(preparation: SpeechPreparation, settings: TtsSynthesisSettings | None) -> bool:
+    """Whether TTS speaks this unit: a narrator unit, or a character unit of a project whose characters are voiced."""
+    if preparation.mode is SpeechMode.NARRATOR_VOICEOVER:
+        return True
+    return (
+        preparation.mode is SpeechMode.CHARACTER_SPEECH
+        and settings is not None
+        and settings.character_voices is not None
+    )
+
+
+def character_lines(preparation: SpeechPreparation, settings: TtsSynthesisSettings) -> list[tuple[str, str, str]]:
+    """A character unit's lines in order as ``(speaker, voice, text)``; raises ``ValueError`` when a speaker has no
+    voice for the current route."""
+    if preparation.mode is not SpeechMode.CHARACTER_SPEECH or settings.character_voices is None:
+        raise ValueError("character lines require a character unit of a project with voiced characters")
+    voices = dict(settings.character_voices)
+    lines: list[tuple[str, str, str]] = []
+    for utterance in preparation.utterances:
+        text = unicodedata.normalize("NFC", utterance.text.replace("\r\n", "\n").replace("\r", "\n")).strip()
+        if not text:
+            continue
+        speaker = utterance.speaker or ""
+        voice = voices.get(speaker)
+        if voice is None:
+            raise ValueError(f"character {speaker!r} has no voice for this audio route")
+        lines.append((speaker, voice, text))
+    if not lines:
+        raise ValueError("character unit has no spoken line")
+    return lines
+
+
+def canonical_speech_text(preparation: SpeechPreparation, settings: TtsSynthesisSettings | None) -> str:
+    """The unit's spoken text as recorded with its audio: the narrator text, or ``speaker: line`` per character line."""
+    if (
+        preparation.mode is SpeechMode.CHARACTER_SPEECH
+        and settings is not None
+        and settings.character_voices is not None
+    ):
+        return "\n".join(f"{speaker}: {text}" for speaker, _voice, text in character_lines(preparation, settings))
+    return canonical_narration_text(preparation)
+
+
+def _character_basis(lines: Sequence[tuple[str, str, str]], settings: TtsSynthesisSettings) -> ArtifactBasis:
+    return ArtifactBasis.build(
+        "narration-delivery/tts-audio",
+        kind_version=2,
+        inputs={
+            "lines": [{"speaker": speaker, "voice": voice, "text": text} for speaker, voice, text in lines],
+            "gap_seconds": LINE_GAP_SECONDS,
+            "provider_id": settings.provider_id,
+            "model_id": settings.model_id,
+            "speed": settings.speed,
+        },
+    )
+
+
+def build_character_audio_basis_from_canonical_text(text: str, settings: TtsSynthesisSettings) -> ArtifactBasis:
+    """The kind-version-2 basis of a voiced character unit from its recorded ``speaker: line`` text and the
+    settings' character voices (version restore); raises ``ValueError`` when a line or a voice is missing."""
+    if settings.character_voices is None:
+        raise ValueError("character audio basis requires character voices")
+    voices = dict(settings.character_voices)
+    lines: list[tuple[str, str, str]] = []
+    for row in text.split("\n"):
+        speaker, separator, line = row.partition(": ")
+        if not separator or not line or speaker not in voices:
+            raise ValueError("recorded character line does not match the character voices")
+        lines.append((speaker, voices[speaker], line))
+    if not lines:
+        raise ValueError("character audio basis requires a line")
+    return _character_basis(lines, settings)
+
+
 def build_narration_audio_basis(
     preparation: SpeechPreparation,
     settings: TtsSynthesisSettings,
 ) -> ArtifactBasis:
-    """Build the minimum formal basis for one unit's paid TTS artifact."""
+    """Build the minimum formal basis for one unit's paid TTS artifact: a narrator unit's text and voice (kind
+    version 1), or a voiced character unit's lines with their voices (kind version 2, ADR-0166)."""
 
     if preparation.problems:
         raise ValueError("cannot build narration audio basis from blocked speech preparation")
+    if preparation.mode is SpeechMode.CHARACTER_SPEECH and settings.character_voices is not None:
+        return _character_basis(character_lines(preparation, settings), settings)
     if preparation.mode is not SpeechMode.NARRATOR_VOICEOVER:
         raise ValueError("narration audio basis requires narrator voiceover")
     text = canonical_narration_text(preparation)
@@ -430,7 +546,7 @@ def prepare_narration_delivery(
     basis_digest: str | None = None
     actual_duration: float | None = None
 
-    if preparation.mode is not SpeechMode.NARRATOR_VOICEOVER:
+    if preparation.mode is not SpeechMode.NARRATOR_VOICEOVER and not speaks_by_tts(preparation, settings):
         status = NarrationTtsStatus.NOT_APPLICABLE
         if delivery == USE_TTS and not problems:
             problems.append(
@@ -696,9 +812,9 @@ async def resolve_tts_synthesis_settings(
     project: dict,
     resolver: TtsSettingsResolver,
 ) -> TtsSynthesisSettings:
-    """Resolve the effective provider/model, voice, and speed for a paid TTS call."""
+    """Resolve the effective provider/model, voice, speed and character voices for a paid TTS call."""
 
-    return await resolver.resolve_tts_synthesis_settings(project)
+    return with_character_voices(await resolver.resolve_tts_synthesis_settings(project), project)
 
 
 async def prepare_current_narration_delivery(
@@ -727,7 +843,8 @@ async def prepare_current_narration_delivery(
             settings=None,
             evidence=None,
         )
-    if preparation.problems or preparation.mode is not SpeechMode.NARRATOR_VOICEOVER:
+    voiced_characters = preparation.mode is SpeechMode.CHARACTER_SPEECH and character_speech_delivery(project) == "tts"
+    if preparation.problems or (preparation.mode is not SpeechMode.NARRATOR_VOICEOVER and not voiced_characters):
         return prepare_narration_delivery(
             delivery=delivery,
             preparation=preparation,
@@ -737,6 +854,8 @@ async def prepare_current_narration_delivery(
         )
     try:
         settings = await resolve_tts_synthesis_settings(project, resolver)
+        if voiced_characters:
+            character_lines(preparation, settings)
     except ValueError:
         return prepare_narration_delivery(
             delivery=delivery,
@@ -844,6 +963,7 @@ def register_narration_audio_transactionally(
 
 
 __all__ = [
+    "LINE_GAP_SECONDS",
     "POST_PRODUCTION",
     "USE_TTS",
     "NarratedVideoDurationBlockedError",
@@ -858,9 +978,13 @@ __all__ = [
     "TtsSettingsResolver",
     "TtsSynthesisSettings",
     "VideoRequestCostFacts",
+    "build_character_audio_basis_from_canonical_text",
     "build_narration_audio_basis",
     "build_narration_audio_basis_from_canonical_text",
     "canonical_narration_text",
+    "canonical_speech_text",
+    "character_lines",
+    "character_route",
     "prepare_current_narrated_video_duration",
     "prepare_current_narration_delivery",
     "prepare_narrated_video_duration",
@@ -868,4 +992,7 @@ __all__ = [
     "prepare_narration_delivery",
     "register_narration_audio_transactionally",
     "resolve_tts_synthesis_settings",
+    "speaks_by_tts",
+    "tts_spoken",
+    "with_character_voices",
 ]

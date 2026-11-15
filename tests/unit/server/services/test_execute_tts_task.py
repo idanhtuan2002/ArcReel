@@ -634,6 +634,62 @@ class TestExecuteTtsTask:
         assert gen.version_records[-1]["tts_voice"] == "Cherry"
         assert adapter.get_entry(ArtifactKey.episode_audio(1, "E1S01")) == prior_entry
 
+    async def test_a_voiced_drama_scene_is_spoken_line_by_line_in_its_characters_voices(self, tts_env):
+        pm, gen = tts_env
+        route = "dashscope/qwen3-tts-flash"
+        pm.project.update(
+            {
+                "content_mode": "drama",
+                "character_speech_delivery": "tts",
+                "characters": {
+                    "Hòa": {"description": "cô gái", "tts_voice": "Serena", "tts_voice_route": route},
+                    "Ông Bảy": {"description": "lão lái đò", "tts_voice": "Ethan", "tts_voice_route": route},
+                },
+            }
+        )
+        pm.script = {
+            "episode": 1,
+            "content_mode": "drama",
+            "scenes": [
+                {
+                    "scene_id": "E1S01",
+                    "utterances": [
+                        {"kind": "dialogue", "speaker": "Hòa", "text": "Bác ơi, còn đò không?"},
+                        {"kind": "dialogue", "speaker": "Ông Bảy", "text": "Chuyến cuối."},
+                    ],
+                    "video_prompt": {},
+                }
+            ],
+        }
+
+        result = await generation_tasks.execute_tts_task("demo", "E1S01", {"script_file": "episode_1.json"})
+
+        call = gen.audio_calls[0]
+        assert call["lines"] == [("Serena", "Bác ơi, còn đò không?"), ("Ethan", "Chuyến cuối.")]
+        assert call["text"] == "Hòa: Bác ơi, còn đò không?\nÔng Bảy: Chuyến cuối."
+        assert gen.version_records[-1]["tts_character_voices"] == [["Hòa", "Serena"], ["Ông Bảy", "Ethan"]]
+        assert gen.version_records[-1]["artifact_audio_basis"]["kind_version"] == 2
+        assert pm.script["scenes"][0]["generated_assets"]["narration_audio"] == "audio/segment_E1S01.wav"
+        assert isinstance(result["tts_basis_digest"], str)
+
+    async def test_a_drama_scene_whose_speaker_has_no_voice_is_refused_before_the_provider(self, tts_env):
+        pm, gen = tts_env
+        pm.project.update({"content_mode": "drama", "character_speech_delivery": "tts", "characters": {}})
+        pm.script = {
+            "episode": 1,
+            "content_mode": "drama",
+            "scenes": [
+                {
+                    "scene_id": "E1S01",
+                    "utterances": [{"kind": "dialogue", "speaker": "Hòa", "text": "Bác ơi"}],
+                    "video_prompt": {},
+                }
+            ],
+        }
+        with pytest.raises(ValueError, match="has no voice"):
+            await generation_tasks.execute_tts_task("demo", "E1S01", {"script_file": "episode_1.json"})
+        assert gen.audio_calls == []
+
     async def test_reference_video_unit_uses_its_own_narrator_text_and_manifest_key(self, tts_env):
         pm, gen = tts_env
         pm.project.update({"content_mode": "ad", "generation_mode": "reference_video"})

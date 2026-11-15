@@ -57,6 +57,7 @@ from lib.audio_utils import (
     probe_audio_duration_seconds,
     probe_existing_audio_duration_seconds,
 )
+from lib.character_voice import character_speech_delivery
 from lib.config.registry import PROVIDER_REGISTRY
 from lib.config.resolver import constrain_durations, video_bucket_for_generation_mode
 from lib.config.service import DEFAULT_VIDEO_POLL_TIMEOUT_SECONDS
@@ -71,16 +72,20 @@ from lib.generation_queue import (
 )
 from lib.image_reference_snapshot import FrozenImageReferences, freeze_image_references
 from lib.narration_delivery import (
+    LINE_GAP_SECONDS,
     USE_TTS,
     NarratedVideoDurationBlockedError,
     NarrationDeliveryRequestOptions,
     TtsSynthesisSettings,
     build_narration_audio_basis,
     canonical_narration_text,
+    canonical_speech_text,
+    character_lines,
     prepare_current_narrated_video_duration,
     prepare_narrated_video_duration,
     register_narration_audio_transactionally,
     synthesis_text,
+    with_character_voices,
 )
 from lib.path_safety import safe_exists, safe_join, try_safe_join
 from lib.project_change_hints import build_change_label, emit_project_change_batch, project_change_source
@@ -117,7 +122,7 @@ from lib.script_editor import resolve_items
 from lib.script_models import resolve_content_mode
 from lib.script_skeleton import SKELETON_ENTITY_TYPES, SKELETON_ITEM_LABEL_KEYS, resolve_script_kind
 from lib.speech_artifact_provenance import build_video_duration_basis
-from lib.speech_composition import SpeechAdmissionError, admit_script_unit
+from lib.speech_composition import SpeechAdmissionError, SpeechMode, admit_script_unit
 from lib.storyboard_sequence import (
     build_previous_storyboard_reference,
     find_storyboard_item,
@@ -1860,12 +1865,18 @@ async def execute_tts_task(
             if item is None:
                 raise ValueError(f"segment not found: {resource_id}")
             admission = admit_script_unit(kind, item)
-            text = canonical_narration_text(admission.preparation)
+            # A character unit of a project whose characters are voiced by TTS (ADR-0166) is spoken line by line
+            # once the audio route's character voices are known.
+            voiced = (
+                admission.preparation.mode is SpeechMode.CHARACTER_SPEECH
+                and character_speech_delivery(current_project) == "tts"
+            )
+            text = "" if voiced else canonical_narration_text(admission.preparation)
             if not admission.allowed:
-                if not text:
+                if not text and not voiced:
                     raise ValueError(f"segment {resource_id} 无可合成的旁白文本")
                 raise SpeechAdmissionError(admission)
-            if not text:
+            if not text and not voiced:
                 raise ValueError(f"segment {resource_id} 无可合成的旁白文本")
             return (
                 current_project,
@@ -1910,12 +1921,20 @@ async def execute_tts_task(
     generator = ctx.generator
     voice = ctx.audio.narration_voice
     speed = ctx.audio.narration_speed
-    settings = TtsSynthesisSettings(
-        provider_id=ctx.audio.provider_model.provider_id,
-        model_id=ctx.audio.backend_model,
-        voice=voice,
-        speed=speed,
+    settings = with_character_voices(
+        TtsSynthesisSettings(
+            provider_id=ctx.audio.provider_model.provider_id,
+            model_id=ctx.audio.backend_model,
+            voice=voice,
+            speed=speed,
+        ),
+        project,
     )
+    lines: list[tuple[str, str]] | None = None
+    if preparation is not None and preparation.mode is SpeechMode.CHARACTER_SPEECH:
+        spoken = character_lines(preparation, settings)
+        text = canonical_speech_text(preparation, settings)
+        lines = [(line_voice, synthesis_text(line, settings.model_id)) for _speaker, line_voice, line in spoken]
     basis = build_narration_audio_basis(preparation, settings) if preparation is not None else None
 
     audio_rel = resource_relative_path("audio", resource_id)
@@ -1976,6 +1995,11 @@ async def execute_tts_task(
             "tts_model_id": settings.model_id,
             "tts_voice": settings.voice,
             "tts_speed": settings.speed,
+            "tts_character_voices": (
+                [list(pair) for pair in settings.character_voices]
+                if lines is not None and settings.character_voices is not None
+                else None
+            ),
             "tts_basis_digest": committed_basis.digest,
             "artifact_episode": committed_episode,
             "artifact_audio_basis": ArtifactBasisDescriptor.from_basis(committed_basis).to_dict(),
@@ -2124,6 +2148,8 @@ async def execute_tts_task(
         before_submit=_before_submit,
         before_commit=_measure_staged,
         commit_staged=_commit_staged,
+        lines=lines,
+        line_gap_seconds=LINE_GAP_SECONDS,
         tts_provider_id=settings.provider_id,
         tts_model_id=settings.model_id,
         tts_voice=settings.voice,

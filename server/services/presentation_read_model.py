@@ -24,13 +24,15 @@ from lib.narration_delivery import (
     TtsSettingsResolver,
     TtsSynthesisSettings,
     build_narration_audio_basis,
+    tts_spoken,
+    with_character_voices,
 )
 from lib.path_safety import safe_join
 from lib.project_manager import ProjectManager
 from lib.resource_paths import resource_relative_path
 from lib.script_editor import resolve_items
 from lib.speech_artifact_provenance import RenditionVariant, SelectedMediaEvidence, media_content_digest
-from lib.speech_composition import SpeechMode, admit_script_unit
+from lib.speech_composition import admit_script_unit
 from lib.speech_presentation import (
     MediaCurrency,
     MediaSelection,
@@ -227,8 +229,8 @@ class PresentationReadModelService:
         admission = admit_script_unit(kind, item)
         if not admission.allowed or admission.mode is None:
             raise PresentationUnavailableError(f"unit speech is not presentable: {resource_id}")
-        if variant == USE_TTS and admission.mode is not SpeechMode.NARRATOR_VOICEOVER:
-            raise PresentationUnavailableError("use_tts presentation requires narrator voiceover")
+        if variant == USE_TTS and not tts_spoken(admission.mode, project):
+            raise PresentationUnavailableError("use_tts presentation requires speech spoken by TTS")
 
         settings = await self._resolve_settings(project_name, project_path, project)
         video_currency = await asyncio.to_thread(
@@ -375,7 +377,7 @@ class PresentationReadModelService:
             audio_version = await asyncio.to_thread(versions.get_current_version, "audio", resource_id)
             effective_variant = (
                 USE_TTS
-                if variant == USE_TTS and admission.mode is SpeechMode.NARRATOR_VOICEOVER and audio_version > 0
+                if variant == USE_TTS and tts_spoken(admission.mode, snapshot.project) and audio_version > 0
                 else POST_PRODUCTION
             )
             version_info = await asyncio.to_thread(versions.get_versions, resource_type, resource_id)
@@ -588,7 +590,7 @@ class PresentationReadModelService:
     ) -> TtsSynthesisSettings | None:
         resolver = self._settings_resolver_factory(project_name, project_path)
         try:
-            return await resolver.resolve_tts_synthesis_settings(project)
+            return with_character_voices(await resolver.resolve_tts_synthesis_settings(project), project)
         except ValueError:
             return None
 

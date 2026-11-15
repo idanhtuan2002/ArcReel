@@ -160,18 +160,28 @@ def test_webvtt_projection_collapses_blank_paragraphs_without_changing_canonical
     assert presentation.subtitles_webvtt() == ("WEBVTT\n\n1\n00:00:00.000 --> 00:00:05.000\n第一段\n第二段\n")
 
 
-def test_use_tts_rejects_non_narrator_and_audio_longer_than_video_without_clipping() -> None:
+def test_use_tts_rejects_silent_units_and_audio_longer_than_video_without_clipping() -> None:
     video = _media("versions/videos/E1U01_v1.mp4", kind="v", duration=5.0)
     audio = _media("versions/audio/E1U01_v1.wav", kind="a", duration=5.1)
+    short_audio = _media("versions/audio/E1U01_v2.wav", kind="a", duration=4.0)
 
-    with pytest.raises(ValueError, match="narrator voiceover"):
+    with pytest.raises(ValueError, match="requires speech"):
         materialize_speech_presentation(
-            _speech(SpeechMode.CHARACTER_SPEECH, ("阿离", "快走")),
+            _speech(SpeechMode.SILENT),
             variant=USE_TTS,
             video=video,
             narration_audio=audio,
-            provider_audio_enabled=True,
+            provider_audio_enabled=False,
         )
+    voiced = materialize_speech_presentation(
+        _speech(SpeechMode.CHARACTER_SPEECH, ("阿离", "快走")),
+        variant=USE_TTS,
+        video=video,
+        narration_audio=short_audio,
+        provider_audio_enabled=False,
+    )
+    assert voiced.narration_audio is not None
+    assert [cue.text for cue in voiced.subtitles] == ["快走"]
     with pytest.raises(PresentationBoundaryError, match="exceeds video boundary"):
         materialize_speech_presentation(
             _speech(SpeechMode.NARRATOR_VOICEOVER, (None, "旁白")),

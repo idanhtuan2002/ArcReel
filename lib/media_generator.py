@@ -14,11 +14,12 @@ MediaGenerator 中间层
 """
 
 import asyncio
+import dataclasses
 import hashlib
 import logging
 import os
 import tempfile
-from collections.abc import Awaitable, Callable, Mapping
+from collections.abc import Awaitable, Callable, Mapping, Sequence
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Optional, cast
@@ -715,10 +716,16 @@ class MediaGenerator:
         before_submit: Callable[[], Awaitable[None]] | None = None,
         before_commit: Callable[[Path], Awaitable[None]] | None = None,
         commit_staged: Callable[[Path, Path], int | PaidVersionCommit] | None = None,
+        lines: Sequence[tuple[str, str]] | None = None,
+        line_gap_seconds: float = 0.25,
         **version_metadata,
     ) -> tuple[Path, int]:
         """
         异步合成语音（带自动版本管理）
+
+        ``lines``: character lines of one unit as ``(voice, text)`` (ADR-0166). Each line is synthesized with its own
+        voice and its own ledger record, then joined with ``line_gap_seconds`` of silence into the staged file;
+        ``text`` and ``voice`` stay the version record's prompt and voice.
 
         与图片/视频不同，TTS 后端是同步调用（无 submit-poll-resume），逻辑最简。
 
@@ -768,16 +775,23 @@ class MediaGenerator:
                 segment_id=segment_id_for("audio", resource_type, resource_id),
                 output_path=str(output_path),
             ) as call:
-                request = AudioSynthesisRequest(
-                    text=text,
-                    output_path=staged_path,
-                    voice=voice,
-                    language_type=language_type,
-                    speed=speed,
-                )
-                if before_submit is not None:
-                    await before_submit()
-                result = await self._audio_backend.synthesize(request)
+                if lines is None:
+                    request = AudioSynthesisRequest(
+                        text=text,
+                        output_path=staged_path,
+                        voice=voice,
+                        language_type=language_type,
+                        speed=speed,
+                    )
+                    if before_submit is not None:
+                        await before_submit()
+                    result = await self._audio_backend.synthesize(request)
+                else:
+                    if before_submit is not None:
+                        await before_submit()
+                    result = await self._synthesize_lines(
+                        lines, staged_path, resource_id, language_type, speed, line_gap_seconds
+                    )
                 if not staged_path.is_file():  # noqa: ASYNC240 -- staging 产物存在性检查，本地元数据
                     raise RuntimeError("audio backend completed without a regular output file")
                 call.success(result)
@@ -807,6 +821,44 @@ class MediaGenerator:
             return output_path, version
         finally:
             staged_path.unlink(missing_ok=True)  # noqa: ASYNC240 -- 收尾删除 staging 文件，本地元数据
+
+    async def _synthesize_lines(
+        self,
+        lines: Sequence[tuple[str, str]],
+        staged_path: Path,
+        resource_id: str,
+        language_type: str,
+        speed: float | None,
+        gap_seconds: float,
+    ) -> Any:
+        """Each line in its voice into a part beside ``staged_path``, then the parts joined into it; returns the last
+        backend result with the characters of every line."""
+        from lib.audio_backends.base import AudioSynthesisRequest
+        from lib.audio_join import join_with_gaps
+
+        assert self._audio_backend is not None
+        parts: list[Path] = []
+        total_characters = 0
+        result: Any = None
+        try:
+            for index, (line_voice, line_text) in enumerate(lines):
+                part = staged_path.with_name(f"{staged_path.stem}.line{index}{staged_path.suffix}")
+                parts.append(part)
+                result = await self._audio_backend.synthesize(
+                    AudioSynthesisRequest(
+                        text=line_text, output_path=part, voice=line_voice, language_type=language_type, speed=speed
+                    )
+                )
+                if not part.is_file():
+                    raise RuntimeError(f"audio backend produced no file for line {index} of {resource_id}")
+                total_characters += int(getattr(result, "characters", 0) or len(line_text))
+            await join_with_gaps(parts, staged_path, gap_seconds=gap_seconds)
+        finally:
+            for part in parts:
+                part.unlink(missing_ok=True)
+        if dataclasses.is_dataclass(result) and not isinstance(result, type) and hasattr(result, "characters"):
+            result = dataclasses.replace(result, characters=total_characters)
+        return result
 
     def generate_video(
         self,

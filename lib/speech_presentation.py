@@ -389,8 +389,8 @@ def materialize_speech_presentation(
         raise ValueError("presentation requires an admitted speech preparation")
     if variant not in {POST_PRODUCTION, USE_TTS}:
         raise ValueError(f"unsupported rendition variant: {variant!r}")
-    if variant == USE_TTS and preparation.mode is not SpeechMode.NARRATOR_VOICEOVER:
-        raise ValueError("use_tts presentation requires narrator voiceover")
+    if variant == USE_TTS and preparation.mode not in (SpeechMode.NARRATOR_VOICEOVER, SpeechMode.CHARACTER_SPEECH):
+        raise ValueError("use_tts presentation requires speech")
     if variant == USE_TTS and narration_audio is None:
         raise ValueError("use_tts presentation requires narration audio")
     if variant == POST_PRODUCTION and narration_audio is not None:

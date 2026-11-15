@@ -8,6 +8,7 @@ missing-only 选择只服务于用户显式要求生成旁白配音的这个入�
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from typing import Any
 
 from lib.artifact_activation import (
@@ -30,7 +31,7 @@ from lib.generation_result import (
     record_batch_outcomes,
     select_generation_targets,
 )
-from lib.narration_delivery import canonical_narration_text
+from lib.narration_delivery import canonical_narration_text, tts_spoken
 from lib.resource_paths import resource_relative_path
 from lib.script_editor import resolve_items
 from lib.script_models import get_generated_assets, resolve_content_mode
@@ -50,8 +51,9 @@ from server.tool_runtime import ToolOutcome, submit_media_generation
 _OPERATION = "generate_narration_audio"
 
 
-def _tts_admission_problem(admission: SpeechAdmission) -> GenerationProblem | None:
-    """Classify why one unit cannot receive narrator TTS, if it cannot."""
+def _tts_admission_problem(admission: SpeechAdmission, project: Mapping[str, Any]) -> GenerationProblem | None:
+    """Classify why one unit cannot receive TTS, if it cannot: narrator units, and character units of a project that
+    voices its characters by TTS (ADR-0166)."""
 
     if not admission.allowed:
         first = admission.problems[0]
@@ -63,12 +65,14 @@ def _tts_admission_problem(admission: SpeechAdmission) -> GenerationProblem | No
             ),
             params={"speech_action": first.action.value},
         )
-    if admission.mode is not SpeechMode.NARRATOR_VOICEOVER:
+    if not tts_spoken(admission.mode, project):
         return GenerationProblem(
             code="tts_not_applicable",
             detail=f"unit {admission.unit_id} 的发声不属于叙述旁白，不产出 TTS",
             action=GenerationAction.NONE,
         )
+    if admission.mode is SpeechMode.CHARACTER_SPEECH:
+        return None
     if not canonical_narration_text(admission.preparation):
         return GenerationProblem(
             code=GenerationProblemCode.UNIT_REQUEST_INVALID,
@@ -86,6 +90,7 @@ def _candidates(
     episode: int,
     resolver: ArtifactCurrencyResolver,
     explicit: bool,
+    project: Mapping[str, Any],
 ) -> tuple[list[GenerationCandidate], dict[str, GenerationProblem]]:
     """Build the addressable TTS units plus the reasons some cannot be generated.
 
@@ -99,7 +104,7 @@ def _candidates(
         resource_id = item.get(id_field)
         if not isinstance(resource_id, str) or not resource_id:
             continue
-        problem = _tts_admission_problem(admit_script_unit(kind, item))
+        problem = _tts_admission_problem(admit_script_unit(kind, item), project)
         if problem is not None:
             if not explicit:
                 continue
@@ -144,6 +149,7 @@ async def handle_generate_narration_audio(ctx: ToolContext, args: dict[str, Any]
             episode=episode,
             resolver=resolver,
             explicit=segment_ids is not None,
+            project=project,
         )
         selection = select_generation_targets(
             candidates=candidates,

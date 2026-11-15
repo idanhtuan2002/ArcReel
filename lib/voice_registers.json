@@ -1,0 +1,32 @@
+{
+  "gemini-tts": {
+    "Aoede": {
+      "median_hz": 168.4,
+      "register": "high"
+    },
+    "Autonoe": {
+      "median_hz": 183.9,
+      "register": "high"
+    },
+    "Charon": {
+      "median_hz": 105.3,
+      "register": "low"
+    },
+    "Fenrir": {
+      "median_hz": 129.6,
+      "register": "low"
+    },
+    "Kore": {
+      "median_hz": 172.0,
+      "register": "high"
+    },
+    "Puck": {
+      "median_hz": 130.1,
+      "register": "low"
+    },
+    "Zephyr": {
+      "median_hz": 175.8,
+      "register": "high"
+    }
+  }
+}

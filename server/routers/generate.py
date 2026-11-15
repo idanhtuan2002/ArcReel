@@ -39,6 +39,7 @@ from lib.narration_delivery import (
     NarrationDelivery,
     NarrationDeliveryRequestOptions,
     canonical_narration_text,
+    tts_spoken,
     video_request_cost_unavailable_problem,
     video_request_requires_exact_quote,
     video_request_reuses_current_visual,
@@ -508,12 +509,13 @@ async def generate_tts(
             raise NotFoundError("segment_not_found", id=segment_id)
         item = resolved[0]
         admission = admit_script_unit(kind, item)
+        voiced = admission.mode is SpeechMode.CHARACTER_SPEECH and tts_spoken(admission.mode, _project)
         narration_text = canonical_narration_text(admission.preparation)
         if not admission.allowed:
-            if not narration_text:
+            if not narration_text and not voiced:
                 raise BadRequestError("tts_narration_text_missing", segment_id=segment_id)
             raise HTTPException(status_code=409, detail=admission.to_dict())
-        if admission.mode is not SpeechMode.NARRATOR_VOICEOVER or not narration_text:
+        if not tts_spoken(admission.mode, _project) or not (narration_text or voiced):
             raise BadRequestError("tts_not_applicable", segment_id=segment_id)
         return _project, item
 
@@ -565,9 +567,9 @@ async def generate_tts_batch(
         missing: list[str] = []
         for item in items:
             admission = admit_script_unit(kind, item)
-            if not admission.allowed or admission.mode is not SpeechMode.NARRATOR_VOICEOVER:
+            if not admission.allowed or not tts_spoken(admission.mode, _project):
                 continue
-            if not canonical_narration_text(admission.preparation):
+            if admission.mode is SpeechMode.NARRATOR_VOICEOVER and not canonical_narration_text(admission.preparation):
                 continue
             seg_id = item.get(id_field)
             if seg_id and not artifact_is_usable(

@@ -16,7 +16,11 @@ from typing import Any
 from lib.artifact_manifest import ArtifactBasis, ArtifactBasisDescriptor
 from lib.asset_derivatives import DERIVATIVE_ASSET_TYPE
 from lib.asset_types import ASSET_SPECS, normalize_asset_name
-from lib.narration_delivery import TtsSynthesisSettings, build_narration_audio_basis_from_canonical_text
+from lib.narration_delivery import (
+    TtsSynthesisSettings,
+    build_character_audio_basis_from_canonical_text,
+    build_narration_audio_basis_from_canonical_text,
+)
 from lib.resource_paths import CHARACTER_DERIVATIVE_RESOURCE_TYPE
 from lib.video_artifact_facts import VIDEO_ARTIFACT_RESTORE_BLOCKER_FIELD, VideoArtifactCurrencyFacts
 
@@ -170,7 +174,13 @@ def _validated_audio_basis(record: Mapping[str, Any]) -> ArtifactBasisDescriptor
     ):
         raise ValueError("version does not contain complete typed artifact metadata")
     settings = _audio_settings(record)
-    expected = ArtifactBasisDescriptor.from_basis(build_narration_audio_basis_from_canonical_text(text, settings))
+    if basis.kind_version == 2 and settings.character_voices is None:
+        raise ValueError("version does not contain complete typed artifact metadata")
+    if basis.kind_version == 2:
+        rebuilt = build_character_audio_basis_from_canonical_text(text, settings)
+    else:
+        rebuilt = build_narration_audio_basis_from_canonical_text(text, settings)
+    expected = ArtifactBasisDescriptor.from_basis(rebuilt)
     if basis != expected or record.get("tts_basis_digest") != expected.digest:
         raise ValueError("version does not contain complete typed artifact metadata")
     return basis
@@ -196,11 +206,21 @@ def _audio_settings(record: Mapping[str, Any]) -> TtsSynthesisSettings:
         )
     ):
         raise ValueError("version does not contain complete typed artifact metadata")
+    voices = record.get("tts_character_voices")
+    if voices is not None and (
+        not isinstance(voices, list)
+        or not all(
+            isinstance(pair, list) and len(pair) == 2 and all(isinstance(v, str) and v.strip() for v in pair)
+            for pair in voices
+        )
+    ):
+        raise ValueError("version does not contain complete typed artifact metadata")
     return TtsSynthesisSettings(
         provider_id=provider_id,
         model_id=model_id,
         voice=voice,
         speed=speed,
+        character_voices=None if voices is None else tuple((pair[0], pair[1]) for pair in voices),
     )
 
 

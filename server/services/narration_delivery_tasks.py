@@ -39,6 +39,7 @@ from lib.narration_delivery import (
     prepare_current_narration_delivery,
     prepare_narrated_video_duration,
     prepare_narrated_video_output,
+    with_character_voices,
 )
 from lib.path_safety import try_safe_join
 from lib.project_manager import ProjectManager, get_project_manager
@@ -91,8 +92,7 @@ class ResolvedTtsSettingsResolver:
         )
 
     async def resolve_tts_synthesis_settings(self, project: dict) -> TtsSynthesisSettings:
-        del project
-        return self.settings
+        return with_character_voices(self.settings, project)
 
 
 class CurrentTtsSettingsResolver:
@@ -124,7 +124,7 @@ class CurrentTtsSettingsResolver:
             None,
             **context_kwargs,
         )
-        return ResolvedTtsSettingsResolver.from_audio_lane(ctx.audio).settings
+        return with_character_voices(ResolvedTtsSettingsResolver.from_audio_lane(ctx.audio).settings, project)
 
 
 def _selected_current_video_record(

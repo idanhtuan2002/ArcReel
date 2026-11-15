@@ -188,7 +188,44 @@ def _build_generator(tmp_path: Path) -> MediaGenerator:
     return gen
 
 
+class _ToneAudioBackend(_FakeAudioBackend):
+    """Writes a real one-second tone per request, so lines can be joined."""
+
+    async def synthesize(self, request):
+        import subprocess
+
+        self.calls.append(request)
+        tone = ["ffmpeg", "-y", "-v", "error", "-f", "lavfi", "-i", "sine=frequency=220:sample_rate=24000"]
+        await asyncio.to_thread(subprocess.run, [*tone, "-t", "1", str(request.output_path)], check=True)
+        return AudioSynthesisResult(
+            provider=self.name, model=self.model, characters=len(request.text), output_path=request.output_path
+        )
+
+
 class TestGenerateAudioAsync:
+    async def test_character_lines_are_spoken_in_their_voices_and_joined(self, tmp_path: Path):
+        import shutil
+        import subprocess
+
+        if shutil.which("ffmpeg") is None:
+            pytest.skip("ffmpeg is not installed")
+        gen = _build_generator(tmp_path)
+        gen._audio_backend = _ToneAudioBackend()
+        output_path, _version = await gen.generate_audio_async(
+            text="Hòa: Bác ơi\nÔng Bảy: Ừ",
+            resource_id="E1S02",
+            voice="Charon",
+            lines=[("Leda", "Bác ơi"), ("Puck", "Ừ")],
+            line_gap_seconds=0.25,
+        )
+        assert [(c.voice, c.text) for c in gen._audio_backend.calls] == [("Leda", "Bác ơi"), ("Puck", "Ừ")]
+        probe = ["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", str(output_path)]
+        done = await asyncio.to_thread(subprocess.run, probe, capture_output=True, text=True, check=True)
+        seconds = float(done.stdout)
+        assert abs(seconds - 2.25) < 0.08
+        assert gen.ledger.outcomes[0]["result"].characters == len("Bác ơi") + len("Ừ")
+        assert not list(output_path.parent.glob("*.line*"))
+
     async def test_success(self, tmp_path: Path):
         gen = _build_generator(tmp_path)
         output_path, version = await gen.generate_audio_async(text="你好世界", resource_id="E1S01", voice="Cherry")

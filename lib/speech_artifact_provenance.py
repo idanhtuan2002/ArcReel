@@ -258,10 +258,13 @@ def build_mechanical_subtitle_basis(
     mode = _require_prepared_speech(preparation)
     normalized_variant = _variant(variant)
 
-    narrator_uses_tts = mode is SpeechMode.NARRATOR_VOICEOVER and normalized_variant == USE_TTS
-    if narrator_uses_tts and narration_audio is None:
-        raise ValueError("use_tts narrator subtitle basis requires narration audio")
-    boundary = narration_audio if narrator_uses_tts else video
+    # A use_tts unit speaks through its TTS audio: the narrator's, or a voiced character unit's lines (ADR-0166).
+    speech_uses_tts = (
+        mode in (SpeechMode.NARRATOR_VOICEOVER, SpeechMode.CHARACTER_SPEECH) and normalized_variant == USE_TTS
+    )
+    if speech_uses_tts and narration_audio is None:
+        raise ValueError("use_tts subtitle basis requires narration audio")
+    boundary = narration_audio if speech_uses_tts else video
     assert boundary is not None
 
     return ArtifactBasis.build(
