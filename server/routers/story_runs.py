@@ -22,6 +22,7 @@ from server.auth import CurrentUser, InteractiveUser
 from server.services import workflow_planner
 from server.services.audiobook_jobs import FILES as AUDIOBOOK_FILES
 from server.services.audiobook_jobs import AudiobookJobs, AudiobookRefused, output_dir
+from server.services.documentary_jobs import DocumentaryJobs
 from server.services.story_sync import StorySyncRefused
 from server.services.story_sync import sync_linked_story as sync_story_text
 from server.services.video_sources import VideoSourceJobs
@@ -368,6 +369,36 @@ async def start_video_source(project_name: str, req: VideoSourceRequest, user: I
 async def video_source_status(project_name: str, user: CurrentUser) -> dict:
     del user
     return {"jobs": _video_sources().status(project_name)}
+
+
+_DOCUMENTARIES: DocumentaryJobs | None = None
+
+
+def _documentaries() -> DocumentaryJobs:
+    global _DOCUMENTARIES
+    if _DOCUMENTARIES is None:
+        _DOCUMENTARIES = DocumentaryJobs(get_project_manager())
+    return _DOCUMENTARIES
+
+
+class DocumentaryRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    topic: str = Field(min_length=2, max_length=200)
+    language: Literal["vi", "en", "zh"] = "vi"
+
+
+@router.post("/projects/{project_name}/documentaries")
+async def start_documentary(project_name: str, req: DocumentaryRequest, user: InteractiveUser) -> dict:
+    """ADR-0162: research a topic and write a cited documentary narration as a story source."""
+    return await _documentaries().start(
+        project_name=project_name, topic=req.topic, language=req.language, user_id=user.id
+    )
+
+
+@router.get("/projects/{project_name}/documentaries")
+async def documentary_status(project_name: str, user: CurrentUser) -> dict:
+    del user
+    return {"jobs": _documentaries().status(project_name)}
 
 
 @router.post("/projects/{project_name}/story-runs/{run_id}/approve")

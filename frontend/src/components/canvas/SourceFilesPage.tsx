@@ -12,6 +12,7 @@ import {
 } from "@/utils/source-files";
 import { ConflictModal, type ConflictResolution } from "./ConflictModal";
 import { VideoSourceImport } from "@/features/story-authoring/ui/VideoSourceImport";
+import { DocumentaryImport } from "@/features/story-authoring/ui/DocumentaryImport";
 
 interface SourceFile {
   name: string;
@@ -285,6 +286,7 @@ export function SourceFilesPage({ projectName }: SourceFilesPageProps) {
       </div>
 
       <div className="flex-1 px-6 py-5">
+        <DocumentaryImport projectName={projectName} />
         <VideoSourceImport projectName={projectName} />
         {loading ? (
           <div

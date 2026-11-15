@@ -302,6 +302,34 @@ export async function listVideoSources(projectName: string, options: CallOptions
   return Array.isArray(body?.jobs) ? body.jobs : [];
 }
 
+export interface DocumentaryJob {
+  topic: string;
+  language: "vi" | "en" | "zh";
+  state: "running" | "done" | "failed";
+  error: string | null;
+  source: string | null;
+  title: string | null;
+  claims: number;
+}
+
+/** ADR-0162: research a topic on public references and write a cited documentary narration as a story source. */
+export function startDocumentary(
+  projectName: string,
+  topic: string,
+  language: DocumentaryJob["language"],
+  options: CallOptions = {},
+): Promise<DocumentaryJob> {
+  return post(`/projects/${encodeURIComponent(projectName)}/documentaries`, { topic, language }, options);
+}
+
+export async function listDocumentaries(projectName: string, options: CallOptions = {}): Promise<DocumentaryJob[]> {
+  const body = await API.request<{ jobs?: DocumentaryJob[] } | undefined>(
+    `/projects/${encodeURIComponent(projectName)}/documentaries`,
+    { signal: options.signal },
+  );
+  return Array.isArray(body?.jobs) ? body.jobs : [];
+}
+
 export type AudiobookPreset = "standard" | "sleep";
 export type AudiobookFileKind = "m4b" | "mp3" | "mp4" | "chapters";
 
