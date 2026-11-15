@@ -281,7 +281,8 @@ async def test_a_narrator_quotes_a_line_without_a_speaker_as_narration(tmp_path:
     result = await adapt_episode(project_path, _project(), 1, generate=model)
     assert result["attempts"] == 1
     script = (project_path / "adaptations" / "episode_1.txt").read_text(encoding="utf-8")
-    assert "\nHôm nay phải trả." in script and ": “Hôm nay phải trả.”" not in script
+    assert "\nHôm nay phải trả." in script
+    assert ": “Hôm nay phải trả.”" not in script
 
 
 def test_a_drama_line_without_a_speaker_is_quoted_for_the_retry(tmp_path: Path):
@@ -292,3 +293,36 @@ def test_a_drama_line_without_a_speaker_is_quoted_for_the_retry(tmp_path: Path):
         EpisodeAdaptationDraft.model_validate(draft), read_inputs(project_path, _project("drama"), 1)
     )
     assert any("needs its speaker" in p and "Minh... là ai?" in p for p in problems)
+
+
+def test_an_excerpt_cut_short_or_run_on_is_anchored_to_the_source_sentence_it_starts():
+    from lib.episode_adaptation import anchor_excerpts
+
+    draft = EpisodeAdaptationDraft.model_validate(
+        _narration(
+            scenes=[
+                {
+                    **_narration()["scenes"][0],
+                    "source_excerpt": "Một người lạ đội nón lá đứng chờ dưới hiên... phong thư niêm sáp đỏ",
+                },
+                {
+                    **_narration()["scenes"][1],
+                    "source_excerpt": "Khi cô ngẩng lên, người lạ đã biến mất, và Lan bật khóc.",
+                },
+            ]
+        )
+    )
+    anchored = anchor_excerpts(draft, SOURCE)
+    assert [scene.source_excerpt for scene in anchored.scenes] == [
+        "Một người lạ đội nón lá đứng chờ dưới hiên, tay cầm phong thư niêm sáp đỏ.",
+        "Khi cô ngẩng lên, người lạ đã biến mất, phong thư nằm trên quầy.",
+    ]
+
+
+def test_an_excerpt_whose_start_is_not_in_the_source_once_is_left_for_the_check():
+    from lib.episode_adaptation import anchor_excerpts
+
+    invented = {**_narration()["scenes"][0], "source_excerpt": "Trời mưa tầm tã suốt đêm qua trên bến sông."}
+    short = {**_narration()["scenes"][1], "source_excerpt": "Lan không tin... gì cả"}
+    draft = EpisodeAdaptationDraft.model_validate(_narration(scenes=[invented, short]))
+    assert anchor_excerpts(draft, SOURCE) == draft

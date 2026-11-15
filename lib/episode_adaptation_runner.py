@@ -17,6 +17,7 @@ from lib.episode_adaptation import (
     EpisodeAdaptationDraft,
     adaptation_record_relpath,
     adaptation_text_relpath,
+    anchor_excerpts,
     build_prompt,
     check_adaptation,
     read_inputs,
@@ -43,6 +44,7 @@ async def adapt_episode(project_path: Path, project: Mapping[str, Any], episode:
         )
         try:
             draft = settle_speakers(EpisodeAdaptationDraft.model_validate(json.loads(result.text)), inputs.mode)
+            draft = anchor_excerpts(draft, inputs.source)
         except (ValueError, ValidationError) as error:
             problems = [f"the answer is not valid JSON for the schema: {str(error)[:300]}"]
             attempts.append({"attempt": attempt, "problems": problems})

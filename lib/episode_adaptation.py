@@ -22,6 +22,8 @@ from __future__ import annotations
 import hashlib
 import itertools
 import json
+import re
+import unicodedata
 from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
@@ -44,6 +46,8 @@ PROMPT_VERSION = "episode-adaptation.v1"
 MAX_ATTEMPTS = 3
 #: Mechanical bounds (ADR-0114 §4).
 EXCERPT_MIN_SKELETON = 8
+#: Letters and digits an excerpt's start must share with exactly one place of the source to be anchored there.
+ANCHOR_MIN_SKELETON = 24
 FIRST_EXCERPT_MAX = 0.35
 LAST_EXCERPT_MIN = 0.65
 HOOK_MAX_SECONDS = 4.0
@@ -212,6 +216,47 @@ def screen_seconds(draft: EpisodeAdaptationDraft, inputs: AdaptationInputs) -> f
     since an action takes about as long to show as to read)."""
     kinds = SPOKEN | ({"action"} if inputs.mode == "drama" else set())
     return sum(inputs.seconds(line.text) for scene in draft.scenes for line in scene.lines if line.kind in kinds)
+
+
+_ELISION = re.compile(r"\.\.\.|…")
+_SENTENCE_END = re.compile(r"[.!?…\n]")
+_CLOSING = "”\"’'»)"
+
+
+def anchor_excerpts(draft: EpisodeAdaptationDraft, source: str) -> EpisodeAdaptationDraft:
+    """The draft with each excerpt that is not in the source replaced by the source sentence it starts: the text
+    before an elision ("...") is matched letter by letter, and its longest start of at least
+    ``ANCHOR_MIN_SKELETON`` letters found exactly once in the source anchors the scene there. An excerpt only places
+    its scene in the source, so its words come from the source; one whose start is absent or ambiguous is kept for
+    the check to refuse."""
+    text = unicodedata.normalize("NFC", source)
+    source_skeleton, offsets = skeleton(text)
+    scenes = []
+    for scene in draft.scenes:
+        excerpt, _ = skeleton(scene.source_excerpt)
+        if len(excerpt) >= EXCERPT_MIN_SKELETON and excerpt in source_skeleton:
+            scenes.append(scene)
+            continue
+        head, _ = skeleton(_ELISION.split(scene.source_excerpt, maxsplit=1)[0])
+        found: tuple[int, int] | None = None
+        for length in range(len(head), ANCHOR_MIN_SKELETON - 1, -1):
+            at = source_skeleton.find(head[:length])
+            if at < 0:
+                continue
+            if source_skeleton.find(head[:length], at + 1) < 0:
+                found = (at, length)
+            break
+        if found is None:
+            scenes.append(scene)
+            continue
+        start = offsets[found[0]]
+        end_match = _SENTENCE_END.search(text, offsets[found[0] + found[1] - 1] + 1)
+        end = end_match.end() if end_match else len(text)
+        while end < len(text) and text[end] in _CLOSING:
+            end += 1
+        anchored = text[start:end].strip()[:400]
+        scenes.append(scene.model_copy(update={"source_excerpt": anchored}))
+    return draft.model_copy(update={"scenes": scenes})
 
 
 def settle_speakers(draft: EpisodeAdaptationDraft, mode: str) -> EpisodeAdaptationDraft:
