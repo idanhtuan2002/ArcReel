@@ -20,18 +20,18 @@ from lib.episode_adaptation import adaptation_record_relpath
 
 SCHEMA = "r2.publish-metadata.v1"
 THUMBNAIL_SECOND = 1.0
-_EPISODE_WORD = {"vi": "Tập {n}", "zh": "第{n}集", "en": "Episode {n}"}
+EPISODE_WORD = {"vi": "Tập {n}", "zh": "第{n}集", "en": "Episode {n}"}
 MAX_HASHTAGS = 3
 
 
-def _entry(project: Mapping[str, Any], episode: int) -> Mapping[str, Any]:
+def episode_entry(project: Mapping[str, Any], episode: int) -> Mapping[str, Any]:
     for item in project.get("episodes") or []:
         if isinstance(item, Mapping) and item.get("episode") == episode:
             return item
     return {}
 
 
-def _adaptation(project_path: Path, episode: int) -> Mapping[str, Any]:
+def episode_adaptation(project_path: Path, episode: int) -> Mapping[str, Any]:
     try:
         record = json.loads((project_path / adaptation_record_relpath(episode)).read_text(encoding="utf-8"))
     except (OSError, ValueError):
@@ -68,11 +68,11 @@ def publish_metadata(
     project: Mapping[str, Any], project_path: Path, episode: int, *, duration_seconds: float
 ) -> dict[str, Any]:
     language = _text(project.get("source_language")) or "vi"
-    entry = _entry(project, episode)
+    entry = episode_entry(project, episode)
     raw_overview = project.get("overview")
     overview: Mapping[str, Any] = raw_overview if isinstance(raw_overview, Mapping) else {}
-    adaptation = _adaptation(project_path, episode)
-    label = _EPISODE_WORD.get(language, _EPISODE_WORD["en"]).format(n=episode)
+    adaptation = episode_adaptation(project_path, episode)
+    label = EPISODE_WORD.get(language, EPISODE_WORD["en"]).format(n=episode)
     title = " – ".join(part for part in (_text(project.get("title")), label, _text(entry.get("title"))) if part)
     lines = [
         _text(adaptation.get("logline")) or _text(entry.get("hook")),
@@ -155,4 +155,12 @@ def thumbnail_frame(final: Path, *, ffmpeg: str = "ffmpeg") -> bytes:
     return first.stdout
 
 
-__all__ = ["SCHEMA", "hashtag", "publish_metadata", "thumbnail_frame"]
+__all__ = [
+    "EPISODE_WORD",
+    "SCHEMA",
+    "episode_adaptation",
+    "episode_entry",
+    "hashtag",
+    "publish_metadata",
+    "thumbnail_frame",
+]

@@ -74,7 +74,7 @@ Status: ✅ shipped and run · 🟡 parts exist, not run end to end · ❌ missi
 | V3 | Sách nói / audiobook (chapters, music) | ✅ ADR-0159 (`standard`) | — |
 | V4 | Phim drama có thoại, giọng riêng nhân vật / dialogue drama | 🟡 `fiction_drama_vi_v1` (F3) | HH, DC, VM |
 | V5 | Phim trộn ảnh + video AI / hybrid motion | ❌ (F4) | OM, VGA, HH |
-| V6 | Phim ngắn dọc nhiều tập / vertical micro-drama series | 🟡 episodes ✅, motion ❌ | DC, HH |
+| V6 | Phim ngắn dọc nhiều tập / vertical micro-drama series | 🟡 episodes, hook < 4 s, burned captions, title and next-episode cards ✅ (ADR-0160); motion ❌ | DC, HH |
 | V7 | Hoạt hình / anime, cartoon, chibi | 🟡 18 anim styles; motion ❌ | HH, OM, DC |
 | V8 | Người thật – điện ảnh / live-action cinematic | 🟡 18 live styles; motion ❌ | HH, DC |
 | V9 | Quảng cáo sản phẩm / product ad, UGC-style ad | 🟡 `content_mode=ad` (F5) | OM, AIVPE, Topview |

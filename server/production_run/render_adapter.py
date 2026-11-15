@@ -36,6 +36,7 @@ from lib.presentation_renderer import (
     sha256_file,
 )
 from lib.project_manager import ProjectManager
+from lib.publish_metadata import EPISODE_WORD, episode_adaptation, episode_entry
 from lib.scene_ambience import AmbienceService, scene_windows
 from lib.script_editor import resolve_items
 from lib.speech_presentation import SpeechPresentation
@@ -143,7 +144,35 @@ def render_input(project_path: Path, episode: int, materialized: MaterializedEpi
                 motion=moves.get(presentation.unit_id, "static"),
             )
         )
-    return RenderInput(episode=episode, units=tuple(units), grade=film_grade(materialized.project_snapshot))
+    title_card, end_card = episode_cards(materialized.project_snapshot, project_path, episode)
+    return RenderInput(
+        episode=episode,
+        units=tuple(units),
+        grade=film_grade(materialized.project_snapshot),
+        captions=True,
+        title_card=title_card,
+        end_card=end_card,
+    )
+
+
+_NEXT_WORD = {"vi": "Tập sau", "zh": "下集", "en": "Next"}
+
+
+def episode_cards(project: Mapping[str, Any], project_path: Path, episode: int) -> tuple[str | None, str | None]:
+    """ADR-0160: the title card ("Tập 2 · <title>") and, when another episode follows, the next-episode card naming
+    the question this episode leaves (its adaptation's cliffhanger)."""
+    language = str(project.get("source_language") or "vi")
+    entry = episode_entry(project, episode)
+    label = EPISODE_WORD.get(language, EPISODE_WORD["en"]).format(n=episode)
+    name = str(entry.get("title") or "").strip()
+    title_card = f"{label} · {name}" if name else label
+    later = any(
+        isinstance(item, Mapping) and isinstance(item.get("episode"), int) and item["episode"] > episode
+        for item in project.get("episodes") or []
+    )
+    cliffhanger = str(episode_adaptation(project_path, episode).get("cliffhanger") or "").strip()
+    end_card = f"{_NEXT_WORD.get(language, _NEXT_WORD['en'])}: {cliffhanger}" if later and cliffhanger else None
+    return title_card, end_card
 
 
 class RenderAdapter:

@@ -26,6 +26,7 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
 from lib.film_finish import DEFAULT_GRADE_INTENSITY, GRADES, MOVES, grade_filter, motion_filter
+from lib.screen_text import TimedText, ass_script, caption_screens
 
 MICROSECONDS = 1_000_000
 DURATION_TOLERANCE_SECONDS = 0.12
@@ -112,6 +113,12 @@ class RenderInput:
     music_path: Path | None = None
     #: Per-scene ambience laid low under everything.
     ambience: tuple[RenderAmbience, ...] = ()
+    #: Burn the narration into the picture as captions (ADR-0160).
+    captions: bool = False
+    #: The episode's title card, shown at the top for the first seconds.
+    title_card: str | None = None
+    #: The next-episode card, shown over the last seconds.
+    end_card: str | None = None
 
 
 @dataclass(frozen=True)
@@ -484,6 +491,74 @@ def _subtitles(episode: RenderInput) -> str:
     return "\n".join(lines)
 
 
+def _screen_cues(episode: RenderInput) -> list[TimedText]:
+    cues: list[TimedText] = []
+    offset = 0
+    for unit in episode.units:
+        for cue in unit.cues:
+            cues.extend(
+                caption_screens(
+                    (offset + cue.start_us) / MICROSECONDS, (offset + cue.end_us) / MICROSECONDS, cue.text.strip()
+                )
+            )
+        offset += unit.duration_us
+    return cues
+
+
+def _burn_text(
+    final: Path, episode: RenderInput, contract: RenderContract, output: Path, *, seconds: float, ffmpeg: str
+) -> dict[str, object]:
+    """Captions and cards burned into the picture (ADR-0160); the sound is copied."""
+    script = ass_script(
+        width=contract.width,
+        height=contract.height,
+        duration=seconds,
+        cues=_screen_cues(episode) if episode.captions else [],
+        title_card=episode.title_card,
+        end_card=episode.end_card,
+    )
+    ass = output.with_suffix(".ass")
+    ass.write_text(script, encoding="utf-8")
+    escaped = str(ass).replace("\\", "/").replace(":", "\\:").replace("'", "\\'")
+    try:
+        _run(
+            [
+                ffmpeg,
+                "-nostdin",
+                "-hide_banner",
+                "-loglevel",
+                "error",
+                "-y",
+                "-i",
+                str(final),
+                "-vf",
+                f"ass='{escaped}'",
+                "-c:v",
+                "libx264",
+                "-preset",
+                "medium",
+                "-crf",
+                "18",
+                "-pix_fmt",
+                "yuv420p",
+                "-c:a",
+                "copy",
+                "-movflags",
+                "+faststart",
+                str(output),
+            ],
+            timeout=max(300.0, seconds * 10),
+        )
+    except RenderRefused as refused:
+        return {"skipped": refused.code}
+    return {
+        "captions": episode.captions,
+        "title_card": episode.title_card,
+        "end_card": episode.end_card,
+        "sha256": hashlib.sha256(script.encode("utf-8")).hexdigest(),
+    }
+
+
 def _sources(episode: RenderInput) -> dict[str, str]:
     hashes: dict[str, str] = {}
     for unit in episode.units:
@@ -670,6 +745,12 @@ def render_presentations(
         )
         music = None
         seconds = sum(unit.duration_us for unit in episode.units) / MICROSECONDS
+        screen_text: dict[str, object] | None = None
+        if episode.captions or episode.title_card or episode.end_card:
+            texted = staging / f"texted_{episode.episode}.mp4"
+            screen_text = _burn_text(final, episode, contract, texted, seconds=seconds, ffmpeg=ffmpeg)
+            if "skipped" not in screen_text:
+                os.replace(texted, final)
         ambience: list[dict[str, float | str]] = []
         if episode.ambience:
             roomed = staging / f"ambience_{episode.episode}.mp4"
@@ -707,6 +788,7 @@ def render_presentations(
             "loudness": loudness,
             "music": music,
             "ambience": ambience,
+            "screen_text": screen_text,
             "grade": None if episode.grade is None else {"name": episode.grade, "intensity": episode.grade_intensity},
             "subtitle_sha256": sha256_file(subtitle),
             "units": [

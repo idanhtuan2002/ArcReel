@@ -231,6 +231,34 @@ def test_the_film_grade_is_applied_and_recorded(clips, tmp_path: Path):
     assert abs(graded.duration_seconds - 3.0) <= 0.12
 
 
+def test_captions_and_cards_are_burned_into_the_picture_and_recorded(clips, tmp_path: Path):
+    plain = render_presentations(
+        episode=RenderInput(episode=1, units=(_unit(clips),)), output_dir=tmp_path / "plain", contract=CONTRACT
+    )
+    texted = render_presentations(
+        episode=RenderInput(
+            episode=1,
+            units=(_unit(clips),),
+            captions=True,
+            title_card="Tập 1 · Về làng",
+            end_card="Tập sau: ai đợi Lan?",
+        ),
+        output_dir=tmp_path / "texted",
+        contract=CONTRACT,
+    )
+
+    manifest = json.loads(texted.manifest_path.read_text(encoding="utf-8"))
+    assert manifest["screen_text"]["captions"] is True
+    assert manifest["screen_text"]["title_card"] == "Tập 1 · Về làng"
+    assert manifest["screen_text"]["end_card"] == "Tập sau: ai đợi Lan?"
+    assert json.loads(plain.manifest_path.read_text(encoding="utf-8"))["screen_text"] is None
+    # The title card is on the first frames, the caption in the middle, the end card on the last.
+    assert _frame_md5(texted.final_path, 5) != _frame_md5(plain.final_path, 5)
+    assert _frame_md5(texted.final_path, 30) != _frame_md5(plain.final_path, 30)
+    assert _frame_md5(texted.final_path, 68) != _frame_md5(plain.final_path, 68)
+    assert abs(texted.duration_seconds - 3.0) <= 0.12
+
+
 @pytest.mark.parametrize(
     ("episode_fields", "unit_fields", "code"),
     [({"grade": "sepia"}, {}, "UNKNOWN_GRADE"), ({}, {"motion": "whip_pan"}, "UNKNOWN_MOTION")],

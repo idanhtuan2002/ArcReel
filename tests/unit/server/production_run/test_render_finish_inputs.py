@@ -81,3 +81,19 @@ async def test_a_music_failure_renders_without_music(tmp_path: Path):
 
     assert (await adapter._with_music(tmp_path, PROJECT, SNAPSHOT)).music_path is None
     assert (await adapter._with_music(tmp_path, {}, SNAPSHOT)).music_path is None
+
+
+def test_an_episode_has_a_title_card_and_a_next_card_only_when_another_episode_follows(tmp_path):
+    import json
+
+    from lib.episode_adaptation import adaptation_record_relpath
+    from server.production_run.render_adapter import episode_cards
+
+    project = {"source_language": "vi", "episodes": [{"episode": 1, "title": "Bến sông"}, {"episode": 2}]}
+    record = tmp_path / adaptation_record_relpath(1)
+    record.parent.mkdir(parents=True, exist_ok=True)
+    record.write_text(json.dumps({"draft": {"cliffhanger": "Vị khách cuối là ai?"}}), encoding="utf-8")
+
+    assert episode_cards(project, tmp_path, 1) == ("Tập 1 · Bến sông", "Tập sau: Vị khách cuối là ai?")
+    assert episode_cards(project, tmp_path, 2) == ("Tập 2", None)
+    assert episode_cards({**project, "source_language": "en"}, tmp_path, 1)[0] == "Episode 1 · Bến sông"
