@@ -88,3 +88,12 @@ All items are done, measured, deferred with reasons or blocked on the Human. Rem
 ## Release r2-v2.5.26 (2026-11-15)
 - Trial 5 (r2-v2.5.25, started 13:24:58, adopted trial 4's story): chapter 1 sealed, chapter 2 drafted; ADR-0154 moved the writer particle-1 → deepseek-v4-1-flash → ernie, then the run failed `REPAIR_LIMIT` (unit_repair_limit 2) at 14:22; `chapter_review[2]` truncated at 14,336 output tokens on all three writers (finished draws 7–8.6k).
 - ADR-0153 amended: `REASONING_ALLOWANCE` 28,672 (gemma-4's 32,768 completion cap is the tightest listed writer). ADR-0154 amended: each move is its own repair unit `story:writer:<provider>/<model>`. Tests: story_authoring + story adapter + crash recovery + automation transitions 596 passed (PG); static gates clean.
+
+## Catalog progress (2026-11-15, sponsor: "tiếp tục đến khi xong")
+Catalog `docs/r2/R2_CONTENT_FORMS_CATALOG.md`; gap analysis `docs/research/2026-11-15-r2-forms-genres-video-types-vs-vision.md`.
+- Rank 1 genre packs: **r2-v2.5.27** (ADR-0158), 28 packs. Not deployed yet.
+- Rank 2 audiobook + sleep story: **r2-v2.5.28** (ADR-0159). Smoke on VieNeu: 35.5 s rendered in 19.2 s, M4B chapters correct. Not deployed yet.
+- Rank 3 micro-drama polish: **r2-v2.5.29** (ADR-0160): burned captions, title and next-episode cards, hook < 4 s. Not deployed yet.
+- Rank 4 hybrid motion (next): findings — the queue strips any caller-given video identity (`lib/generation_queue.py:161` `without_video_execution_identity`) and the worker materializes one per task from the project route (`lib/config/resolver.py:923` `resolve_video_backend`, payload bucket keys `video_provider_i2v`); media currency compares against the project's route. Per-shot motion needs a design across queue, worker and currency (an ADR first): which shots, which route per shot, how the planner expects a per-shot identity. Local i2v route exists in `fiction_drama_vi_v1` (`custom-3` `wan2.2-ti2v-5b-gguf`); cloud video adapters stay `UNQUALIFIED`.
+- Trial 6 (r2-v2.5.26, started 15:24:27) still in STORY at the time of writing.
+- Deploy needed for 2.5.27–2.5.29 (one deploy of `r2-v2.5.29` carries all three); stop the agent's DB watcher first.
