@@ -271,3 +271,24 @@ def test_a_punctuation_only_cast_name_is_never_attested(tmp_path: Path):
         draft = _narration(cast=["Lan", "!!!"])
         problems = check_adaptation(EpisodeAdaptationDraft.model_validate(draft), inputs)
         assert any("'!!!'" in p for p in problems)
+
+
+async def test_a_narrator_quotes_a_line_without_a_speaker_as_narration(tmp_path: Path):
+    project_path = _write(tmp_path)
+    draft = _narration()
+    draft["scenes"][0]["lines"].append({"kind": "dialogue", "speaker": " ", "text": "Hôm nay phải trả."})
+    model = _Model(draft)
+    result = await adapt_episode(project_path, _project(), 1, generate=model)
+    assert result["attempts"] == 1
+    script = (project_path / "adaptations" / "episode_1.txt").read_text(encoding="utf-8")
+    assert "\nHôm nay phải trả." in script and ": “Hôm nay phải trả.”" not in script
+
+
+def test_a_drama_line_without_a_speaker_is_quoted_for_the_retry(tmp_path: Path):
+    project_path = _write(tmp_path)
+    draft = _drama()
+    draft["scenes"][1]["lines"][1]["speaker"] = ""
+    problems = check_adaptation(
+        EpisodeAdaptationDraft.model_validate(draft), read_inputs(project_path, _project("drama"), 1)
+    )
+    assert any("needs its speaker" in p and "Minh... là ai?" in p for p in problems)

@@ -214,6 +214,27 @@ def screen_seconds(draft: EpisodeAdaptationDraft, inputs: AdaptationInputs) -> f
     return sum(inputs.seconds(line.text) for scene in draft.scenes for line in scene.lines if line.kind in kinds)
 
 
+def settle_speakers(draft: EpisodeAdaptationDraft, mode: str) -> EpisodeAdaptationDraft:
+    """The draft with each speakerless dialogue or voiceover line read by the narrator, in narration mode only: the
+    narrator speaks every line there, so the line keeps its words. A drama line still needs its speaker."""
+    if mode == "drama":
+        return draft
+    scenes = [
+        scene.model_copy(
+            update={
+                "lines": [
+                    line.model_copy(update={"kind": "narration", "speaker": ""})
+                    if line.kind in {"dialogue", "voiceover"} and not line.speaker.strip()
+                    else line
+                    for line in scene.lines
+                ]
+            }
+        )
+        for scene in draft.scenes
+    ]
+    return draft.model_copy(update={"scenes": scenes})
+
+
 def check_adaptation(draft: EpisodeAdaptationDraft, inputs: AdaptationInputs) -> list[str]:
     """The checks a draft fails, as sentences the model can act on; empty when it is accepted."""
     problems: list[str] = []
@@ -250,7 +271,9 @@ def check_adaptation(draft: EpisodeAdaptationDraft, inputs: AdaptationInputs) ->
         for line in scene.lines:
             if line.kind in {"dialogue", "voiceover"}:
                 if not line.speaker.strip():
-                    problems.append(f"scene {number}: every {line.kind} line needs its speaker")
+                    problems.append(
+                        f"scene {number}: every {line.kind} line needs its speaker; give one to {line.text[:80]!r}"
+                    )
                 elif line.speaker.strip() not in cast:
                     problems.append(f"scene {number}: speaker {line.speaker!r} is not in the cast")
     spoken = spoken_text(draft)
@@ -450,4 +473,5 @@ __all__ = [
     "read_inputs",
     "render_script",
     "script_source_relpath",
+    "settle_speakers",
 ]

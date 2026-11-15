@@ -22,6 +22,7 @@ from lib.episode_adaptation import (
     read_inputs,
     render_script,
     screen_seconds,
+    settle_speakers,
 )
 from lib.episode_paths import episode_source_relpath
 from lib.json_io import atomic_write_bytes, atomic_write_json
@@ -41,7 +42,7 @@ async def adapt_episode(project_path: Path, project: Mapping[str, Any], episode:
             TextGenerationRequest(prompt=build_prompt(inputs, problems), response_schema=EpisodeAdaptationDraft)
         )
         try:
-            draft = EpisodeAdaptationDraft.model_validate(json.loads(result.text))
+            draft = settle_speakers(EpisodeAdaptationDraft.model_validate(json.loads(result.text)), inputs.mode)
         except (ValueError, ValidationError) as error:
             problems = [f"the answer is not valid JSON for the schema: {str(error)[:300]}"]
             attempts.append({"attempt": attempt, "problems": problems})
