@@ -302,9 +302,12 @@ export async function listVideoSources(projectName: string, options: CallOptions
   return Array.isArray(body?.jobs) ? body.jobs : [];
 }
 
+export type DocumentaryForm = "story" | "top_list" | "quiz" | "explainer";
+
 export interface DocumentaryJob {
   topic: string;
   language: "vi" | "en" | "zh";
+  form: DocumentaryForm;
   state: "running" | "done" | "failed";
   error: string | null;
   source: string | null;
@@ -317,9 +320,10 @@ export function startDocumentary(
   projectName: string,
   topic: string,
   language: DocumentaryJob["language"],
+  form: DocumentaryForm = "story",
   options: CallOptions = {},
 ): Promise<DocumentaryJob> {
-  return post(`/projects/${encodeURIComponent(projectName)}/documentaries`, { topic, language }, options);
+  return post(`/projects/${encodeURIComponent(projectName)}/documentaries`, { topic, language, form }, options);
 }
 
 export async function listDocumentaries(projectName: string, options: CallOptions = {}): Promise<DocumentaryJob[]> {

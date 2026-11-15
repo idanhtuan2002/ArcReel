@@ -385,13 +385,14 @@ class DocumentaryRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
     topic: str = Field(min_length=2, max_length=200)
     language: Literal["vi", "en", "zh"] = "vi"
+    form: Literal["story", "top_list", "quiz", "explainer"] = "story"
 
 
 @router.post("/projects/{project_name}/documentaries")
 async def start_documentary(project_name: str, req: DocumentaryRequest, user: InteractiveUser) -> dict:
     """ADR-0162: research a topic and write a cited documentary narration as a story source."""
     return await _documentaries().start(
-        project_name=project_name, topic=req.topic, language=req.language, user_id=user.id
+        project_name=project_name, topic=req.topic, language=req.language, user_id=user.id, form=req.form
     )
 
 

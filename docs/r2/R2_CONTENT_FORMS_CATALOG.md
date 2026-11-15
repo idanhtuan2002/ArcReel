@@ -55,12 +55,12 @@ Status: ✅ shipped and run · 🟡 parts exist, not run end to end · ❌ missi
 |---|---|---|---|
 | N1 | Lịch sử kể chuyện / history narration, documentary | ✅ ADR-0162 (sourced narration → film path) | OM documentary-montage |
 | N2 | Án có thật / true crime | ✅ ADR-0162 | OM documentary |
-| N3 | Giải thích – giáo dục / explainer, educational, "curiosity" | ❌ | OM animated-explainer, animation |
-| N4 | Khoa học – vũ trụ / science, space | ❌ | OM |
+| N3 | Giải thích – giáo dục / explainer, educational, "curiosity" | 🟡 narration (ADR-0163); charts pending | OM animated-explainer, animation |
+| N4 | Khoa học – vũ trụ / science, space | 🟡 via explainer form (ADR-0163) | OM |
 | N5 | Bí ẩn – thuyết âm mưu – sự thật thú vị / mysteries, fun facts | ✅ ADR-0162 (facts only from sources) | OM |
-| N6 | Top list / xếp hạng, trivia, quiz | ❌ | OM |
+| N6 | Top list / xếp hạng, trivia, quiz | ✅ top_list + quiz forms (ADR-0163) | OM |
 | N7 | Tiểu sử / biography | ✅ ADR-0162 | OM explainer |
-| N8 | Tài chính – công nghệ (giải thích, không tư vấn) / finance, tech explainers | ❌ | OM |
+| N8 | Tài chính – công nghệ (giải thích, không tư vấn) / finance, tech explainers | 🟡 via explainer form (ADR-0163) | OM |
 | N9 | Tin tức – bình luận / news commentary | ❌ | — |
 | N10 | Động lực – trích dẫn / motivation, quotes | ❌ | — (YouTube "templated" risk) |
 | N11 | Hướng dẫn – mẹo / how-to, tips, cooking hacks | ❌ | OM screen-demo |

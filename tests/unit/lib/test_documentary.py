@@ -108,3 +108,18 @@ def test_a_topic_with_too_few_verified_claims_is_refused():
 
     with pytest.raises(DocumentaryError, match="TOO_FEW_VERIFIED_CLAIMS"):
         asyncio.run(make_documentary("cầu Long Biên", language="vi", fetch=fetch, generate=generate))
+
+
+def test_a_form_shapes_the_narration_prompt_and_an_unknown_form_is_refused():
+    answers = [_result(CLAIMS), _result(_draft([["C1", "C2"], ["C3"]]))]
+    prompts: list[TextGenerationRequest] = []
+
+    async def generate(request: TextGenerationRequest) -> TextGenerationResult:
+        prompts.append(request)
+        return answers.pop(0)
+
+    doc = asyncio.run(make_documentary("cầu Long Biên", language="vi", fetch=fetch, generate=generate, form="top_list"))
+    assert "A countdown list" in prompts[1].prompt
+    assert doc.research_pack.provenance["form"] == "top_list"
+    with pytest.raises(DocumentaryError, match="UNKNOWN_FORM"):
+        asyncio.run(make_documentary("x", language="vi", fetch=fetch, generate=generate, form="poem"))

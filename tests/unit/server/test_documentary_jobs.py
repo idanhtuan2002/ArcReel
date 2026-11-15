@@ -50,8 +50,11 @@ def test_a_job_writes_the_research_and_a_narration_source(tmp_path: Path, monkey
     async def create(_task, _project):
         return _Generator()
 
-    async def make(topic, *, language, fetch, generate):
+    forms: list[str] = []
+
+    async def make(topic, *, language, fetch, generate, form):
         del topic, language, fetch, generate
+        forms.append(form)
         return doc
 
     monkeypatch.setattr(documentary_jobs.TextGenerator, "create", create)
@@ -59,12 +62,13 @@ def test_a_job_writes_the_research_and_a_narration_source(tmp_path: Path, monkey
     jobs = DocumentaryJobs(_Projects(tmp_path))
 
     async def scenario() -> list[dict]:
-        await jobs.start(project_name="p", topic="cầu Long Biên", language="vi", user_id="u")
+        await jobs.start(project_name="p", topic="cầu Long Biên", language="vi", user_id="u", form="top_list")
         await asyncio.gather(*list(jobs._tasks))
         return jobs.status("p")
 
     [job] = asyncio.run(scenario())
     assert job["state"] == "done", job["error"]
+    assert forms == ["top_list"]
     assert job["source"] == "source/cay-cau-tram-tuoi.txt"
     narration = (tmp_path / "p" / "source" / "cay-cau-tram-tuoi.txt").read_text(encoding="utf-8")
     assert narration.startswith("Cây cầu trăm tuổi\n\nVì sao?")

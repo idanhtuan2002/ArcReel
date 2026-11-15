@@ -27,9 +27,13 @@ beforeEach(() => {
   vi.spyOn(globalThis, "fetch").mockImplementation((input, init) => {
     const url = String(input);
     if ((init?.method ?? "GET") === "POST" && url.endsWith("/projects/demo/documentaries")) {
-      const body = JSON.parse(String(init?.body)) as { topic: string; language: DocumentaryJob["language"] };
+      const body = JSON.parse(String(init?.body)) as {
+        topic: string;
+        language: DocumentaryJob["language"];
+        form: DocumentaryJob["form"];
+      };
       posts.push(body);
-      jobs = [{ topic: body.topic, language: body.language, state: "done", error: null, source: "source/x.txt", title: "Cây cầu", claims: 40 }];
+      jobs = [{ topic: body.topic, language: body.language, form: body.form, state: "done", error: null, source: "source/x.txt", title: "Cây cầu", claims: 40 }];
       return Promise.resolve(json(jobs[0]));
     }
     if (url.endsWith("/projects/demo/documentaries")) return Promise.resolve(json({ jobs }));
@@ -47,9 +51,10 @@ describe("documentary import", () => {
 
     fireEvent.change(screen.getByPlaceholderText("e.g. Long Bien Bridge"), { target: { value: "Cầu Long Biên" } });
     fireEvent.change(screen.getByLabelText("Language"), { target: { value: "en" } });
+    fireEvent.change(screen.getByLabelText("Form"), { target: { value: "quiz" } });
     fireEvent.click(screen.getByRole("button", { name: "Write narration" }));
 
-    await waitFor(() => expect(posts).toEqual([{ topic: "Cầu Long Biên", language: "en" }]));
+    await waitFor(() => expect(posts).toEqual([{ topic: "Cầu Long Biên", language: "en", form: "quiz" }]));
     expect(await screen.findByText("Cây cầu: added to sources (40 sourced facts)")).toBeInTheDocument();
   });
 });

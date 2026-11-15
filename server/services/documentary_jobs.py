@@ -35,6 +35,7 @@ USER_AGENT = "ArcReel-documentary/1.0 (automated research client)"
 class DocumentaryJob:
     topic: str
     language: str
+    form: str = "story"
     state: str = "running"
     error: str | None = None
     source: str | None = None
@@ -59,12 +60,14 @@ class DocumentaryJobs:
     def status(self, project_name: str) -> list[dict[str, Any]]:
         return [asdict(job) for (name, _topic), job in self._jobs.items() if name == project_name]
 
-    async def start(self, *, project_name: str, topic: str, language: str, user_id: str) -> dict[str, Any]:
+    async def start(
+        self, *, project_name: str, topic: str, language: str, user_id: str, form: str = "story"
+    ) -> dict[str, Any]:
         key = (project_name, topic.strip())
         current = self._jobs.get(key)
         if current is not None and current.state == "running":
             return asdict(current)
-        job = DocumentaryJob(topic=topic.strip(), language=language)
+        job = DocumentaryJob(topic=topic.strip(), language=language, form=form)
         self._jobs[key] = job
         task = asyncio.create_task(self._run(job, project_name, user_id))
         self._tasks.add(task)
@@ -78,7 +81,9 @@ class DocumentaryJobs:
             async def generate(request: TextGenerationRequest) -> TextGenerationResult:
                 return await generator.generate(request, project_name, user_id=user_id)
 
-            doc = await make_documentary(job.topic, language=job.language, fetch=wiki_fetch, generate=generate)
+            doc = await make_documentary(
+                job.topic, language=job.language, fetch=wiki_fetch, generate=generate, form=job.form
+            )
             job.title, job.claims = doc.title, len(doc.ledger.claims)
             job.source = await asyncio.to_thread(self._write, project_name, doc)
             job.state = "done"

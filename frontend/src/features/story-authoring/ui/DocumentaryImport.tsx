@@ -1,10 +1,11 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { useTranslation } from "react-i18next";
 import { useAppStore } from "@/stores/app-store";
-import { listDocumentaries, startDocumentary, type DocumentaryJob } from "../api/storyClient";
+import { listDocumentaries, startDocumentary, type DocumentaryForm, type DocumentaryJob } from "../api/storyClient";
 
 const POLL_MS = 5_000;
 const LANGUAGES: DocumentaryJob["language"][] = ["vi", "en", "zh"];
+const FORMS: DocumentaryForm[] = ["story", "top_list", "quiz", "explainer"];
 
 /** ADR-0162: a topic researched on public references becomes a cited documentary narration (a story source). */
 export function DocumentaryImport({ projectName }: { projectName: string }) {
@@ -12,6 +13,7 @@ export function DocumentaryImport({ projectName }: { projectName: string }) {
   const invalidateSourceFiles = useAppStore((s) => s.invalidateSourceFiles);
   const [topic, setTopic] = useState("");
   const [language, setLanguage] = useState<DocumentaryJob["language"]>("vi");
+  const [form, setForm] = useState<DocumentaryForm>("story");
   const [jobs, setJobs] = useState<DocumentaryJob[]>([]);
   const [tick, setTick] = useState(0);
   const [failed, setFailed] = useState(false);
@@ -49,7 +51,7 @@ export function DocumentaryImport({ projectName }: { projectName: string }) {
     setSending(true);
     setFailed(false);
     try {
-      await startDocumentary(projectName, topic.trim(), language);
+      await startDocumentary(projectName, topic.trim(), language, form);
       setTopic("");
       setTick((n) => n + 1);
     } catch {
@@ -79,6 +81,18 @@ export function DocumentaryImport({ projectName }: { projectName: string }) {
             {LANGUAGES.map((code) => (
               <option key={code} value={code}>
                 {t(`story_language_${code}`)}
+              </option>
+            ))}
+          </select>
+          <select
+            className="sa-input w-auto"
+            aria-label={t("documentary_form")}
+            value={form}
+            onChange={(event) => setForm(event.target.value as DocumentaryForm)}
+          >
+            {FORMS.map((code) => (
+              <option key={code} value={code}>
+                {t(`documentary_form_${code}`)}
               </option>
             ))}
           </select>

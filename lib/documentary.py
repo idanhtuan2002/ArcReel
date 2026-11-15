@@ -32,6 +32,29 @@ MAX_EVIDENCE = 60
 MIN_EVIDENCE_CHARS = 80
 MAX_ATTEMPTS = 3
 
+#: How the facts are told (ADR-0163): each form keeps the rule that every paragraph cites its claims.
+FORMATS: dict[str, str] = {
+    "story": (
+        "A hook line first (a question or the most striking fact), then 2–6 chapters that tell it as a story: "
+        "setting, people, events in order, turning point, outcome, what is still unknown."
+    ),
+    "top_list": (
+        "A countdown list: the hook names how many items and why they matter; then 3–6 chapters, one item each, "
+        "titled with its rank and name (for example '#5 ...'), counted down to the most surprising item last; "
+        "each item opens on its most concrete detail."
+    ),
+    "quiz": (
+        "A quiz: the hook invites the viewer to play; then 3–6 chapters, one question each, titled 'Question N'; "
+        "each chapter's first paragraph asks the question and ends with a short pause cue in words ('Think for a "
+        "second...'), its second paragraph gives the answer and the fact behind it."
+    ),
+    "explainer": (
+        "An explainer: the hook asks the question the topic answers; then 2–5 chapters that build the answer step by "
+        "step from what the viewer already knows (what it is, how it works, why it matters, what is still debated), "
+        "each step with one concrete example; the last chapter sums up in two sentences."
+    ),
+}
+
 
 class DocumentaryError(RuntimeError):
     """The topic could not be researched or written; the message names why."""
@@ -177,16 +200,17 @@ def _claims_prompt(topic: str, evidence: Sequence[Evidence], language: str) -> s
     )
 
 
-def _writing_prompt(topic: str, claims: Sequence[tuple[str, _ClaimItem]], language: str, problems: list[str]) -> str:
+def _writing_prompt(
+    topic: str, claims: Sequence[tuple[str, _ClaimItem]], language: str, problems: list[str], form: str = "story"
+) -> str:
     listing = "\n".join(f"[{cid}] {item.statement}" for cid, item in claims)
     fix = ("\n\nThe previous draft had these problems; fix them:\n- " + "\n- ".join(problems)) if problems else ""
     return (
-        f"Write a narrated documentary about: {topic}\nLanguage: {language}\n\n"
+        f"Write a narrated documentary about: {topic}\nLanguage: {language}\nForm: {form}\n\n"
         "Rules:\n"
         "- State only the claims listed below; never add a fact, date, name or number that is not in them.\n"
         "- Every paragraph lists in `claims` the ids of the claims it states.\n"
-        "- A hook line first (a question or the most striking fact), then 2–6 chapters that tell it as a story: "
-        "setting, people, events in order, turning point, outcome, what is still unknown.\n"
+        f"- {FORMATS[form]}\n"
         "- Narration voice: vivid and concrete, spoken sentences of varied length, no lists, no headings inside "
         "paragraphs; where the claims disagree, say so.\n"
         "- Never name the structure (no 'chapter one', 'in this section', 'the story begins'); open each chapter "
@@ -207,9 +231,13 @@ class Documentary:
     evidence: list[EvidenceRecord]
 
 
-async def make_documentary(topic: str, *, language: str, fetch: Fetch, generate: Generate) -> Documentary:
+async def make_documentary(
+    topic: str, *, language: str, fetch: Fetch, generate: Generate, form: str = "story"
+) -> Documentary:
     """Research ``topic``, extract verified claims and write the cited narration; raises
     :class:`DocumentaryError` when no source, no verified claim or no passing draft is found."""
+    if form not in FORMATS:
+        raise DocumentaryError("UNKNOWN_FORM")
     languages = [language] + (["en"] if language != "en" else [])
     pages = await research_pages(topic, languages, fetch)
     evidence = evidence_from(pages)
@@ -232,7 +260,7 @@ async def make_documentary(topic: str, *, language: str, fetch: Fetch, generate:
     for _attempt in range(MAX_ATTEMPTS):
         result = await generate(
             TextGenerationRequest(
-                prompt=_writing_prompt(topic, claims, language, problems), response_schema=DocumentaryDraft
+                prompt=_writing_prompt(topic, claims, language, problems, form), response_schema=DocumentaryDraft
             )
         )
         try:
@@ -296,7 +324,7 @@ async def make_documentary(topic: str, *, language: str, fetch: Fetch, generate:
         synthesis=draft.hook,
         uncertainties=list(claims_draft.uncertainties),
         open_questions=[],
-        provenance={"pages": [p.url for p in pages]},
+        provenance={"pages": [p.url for p in pages], "form": form},
     )
     ledger = ClaimLedger(id=f"ledger-{digest}", version=1, research_pack_ref=pack.id, claims=ledger_claims)
     lines = [f"# {draft.title}", "", draft.hook, ""]
@@ -322,6 +350,7 @@ async def make_documentary(topic: str, *, language: str, fetch: Fetch, generate:
 
 
 __all__ = [
+    "FORMATS",
     "ClaimsDraft",
     "Documentary",
     "DocumentaryDraft",
