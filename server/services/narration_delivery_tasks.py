@@ -112,6 +112,11 @@ class CurrentTtsSettingsResolver:
         self._context_resolver = context_resolver or resolve_generation_context
 
     async def resolve_tts_synthesis_settings(self, project: dict) -> TtsSynthesisSettings:
+        return with_character_voices(await self.resolve_audio_lane_settings(project), project)
+
+    async def resolve_audio_lane_settings(self, project: dict) -> TtsSynthesisSettings:
+        """The audio lane's synthesis settings without the project's character voices, which a caller holding the
+        project lock applies to its own snapshot (:func:`lib.narration_delivery.with_character_voices`)."""
         context_kwargs: dict[str, Any] = {
             "project": project,
             "user_id": self._user_id,
@@ -124,7 +129,7 @@ class CurrentTtsSettingsResolver:
             None,
             **context_kwargs,
         )
-        return with_character_voices(ResolvedTtsSettingsResolver.from_audio_lane(ctx.audio).settings, project)
+        return ResolvedTtsSettingsResolver.from_audio_lane(ctx.audio).settings
 
 
 def _selected_current_video_record(

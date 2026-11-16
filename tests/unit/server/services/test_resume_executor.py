@@ -39,6 +39,9 @@ class _FakeProjectManager:
     def load_project(self, _project_name: str) -> dict[str, Any]:
         return self.project
 
+    def load_project_readonly(self, _project_name: str) -> dict[str, Any]:
+        return self.project
+
     def get_project_path(self, _project_name: str) -> Path:
         return self.project_path
 

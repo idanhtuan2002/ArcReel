@@ -356,7 +356,7 @@ async def test_formal_selection_validates_frozen_tts_when_current_tts_changes(
 
 
 @pytest.mark.asyncio
-async def test_formal_selection_reloads_current_tts_settings_for_currency_check(
+async def test_formal_selection_resolves_current_tts_before_it_takes_the_locks(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -377,6 +377,10 @@ async def test_formal_selection_reloads_current_tts_settings_for_currency_check(
         def load_project(_name):
             return {}
 
+        @staticmethod
+        def load_project_readonly(_name):
+            return {}
+
         @contextmanager
         def locked_project_script_snapshot(self, *_args):
             nonlocal selection_guard_active
@@ -393,13 +397,15 @@ async def test_formal_selection_reloads_current_tts_settings_for_currency_check(
     )
 
     async def _resolve_settings(_project):
-        assert selection_guard_active
+        # Waiting on the event loop under the script and project locks deadlocked the app (2026-11-17): the audio
+        # lane is resolved before the selection takes them.
+        assert not selection_guard_active
         return current_settings
 
     resolve_settings = AsyncMock(side_effect=_resolve_settings)
     monkeypatch.setattr(
         video_artifact_currency.CurrentTtsSettingsResolver,
-        "resolve_tts_synthesis_settings",
+        "resolve_audio_lane_settings",
         resolve_settings,
     )
 
@@ -430,7 +436,7 @@ async def test_formal_selection_reloads_current_tts_settings_for_currency_check(
     }
 
     await committer.prepare_selection(staged, 8, metadata)
-    resolve_settings.assert_not_awaited()
+    resolve_settings.assert_awaited_once_with({})
     outcome = await asyncio.to_thread(committer, staged, current, 8, metadata)
 
     assert outcome.selected is False
@@ -455,6 +461,10 @@ async def test_failed_formal_selection_validation_archives_paid_video_without_cu
     class _PM:
         @staticmethod
         def load_project(_name):
+            return {}
+
+        @staticmethod
+        def load_project_readonly(_name):
             return {}
 
         @contextmanager

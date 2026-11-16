@@ -93,6 +93,9 @@ class _FakePM:
     def load_project(self, project_name):
         return self.project
 
+    def load_project_readonly(self, project_name):
+        return self.project
+
     def get_project_path(self, project_name):
         return self.project_path
 
@@ -614,7 +617,9 @@ class TestExecuteTtsTask:
             nonlocal calls
             calls += 1
             if calls == 2:
-                assert pm.episode_lock_active
+                # The current settings are resolved after synthesis and before the commit takes the script and
+                # project locks: waiting on the event loop under them deadlocked the app (2026-11-17).
+                assert not pm.episode_lock_active
                 assert kwargs["project_path"] == pm.project_path
             resolver = initial_resolver if calls == 1 else changed_resolver
             return await resolver(*args, **kwargs)

@@ -49,7 +49,7 @@ from lib.asset_types import (
     resolve_asset_key,
     validate_asset_name,
 )
-from lib.async_thread import EventLoopBridge, run_noninterruptible_sync
+from lib.async_thread import run_noninterruptible_sync
 from lib.audio_utils import (
     AUDIO_REFERENCE_MAX_BYTES,
     AUDIO_REFERENCE_MAX_SECONDS,
@@ -1941,7 +1941,10 @@ async def execute_tts_task(
     duration_seconds: float | None = None
     # 选片依据的解析失败在回调里发生、在外层消费，用单元素信箱传递而非 nonlocal 哨兵。
     tts_selection_errors: list[BaseException] = []
-    tts_settings_bridge = EventLoopBridge.capture()
+    # The audio lane's current settings, resolved on the event loop after synthesis and before the commit takes the
+    # script and project locks; inside them only the snapshot's character voices are applied. Waiting on the event
+    # loop while holding those locks deadlocks the app whenever a coroutine there asks for the project lock.
+    current_lane: list[TtsSynthesisSettings] = []
     selected_current = True
     missing_narration_audio = object()
     prior_narration_audio: object = missing_narration_audio
@@ -1962,6 +1965,18 @@ async def execute_tts_task(
             tts_selection_errors.append(RuntimeError("generated narration audio duration is unavailable"))
             return
         duration_seconds = float(measured_duration)
+        try:
+            current_project = await asyncio.to_thread(get_project_manager().load_project_readonly, project_name)
+            current_lane.append(
+                await CurrentTtsSettingsResolver(
+                    project_name,
+                    user_id=user_id,
+                    project_path=project_path,
+                    context_resolver=resolve_generation_context,
+                ).resolve_audio_lane_settings(current_project)
+            )
+        except (Exception, asyncio.CancelledError) as exc:
+            tts_selection_errors.append(exc)
 
     def _commit_staged(staged_path: Path, output_path: Path) -> int | PaidVersionCommit:
         nonlocal prior_narration_audio, selected_current
@@ -2068,18 +2083,11 @@ async def execute_tts_task(
             ) as current_script:
                 if not guarded_project:
                     raise RuntimeError("TTS commit guard did not expose the current project")
-                try:
-                    current_commit_settings = tts_settings_bridge.run(
-                        CurrentTtsSettingsResolver(
-                            project_name,
-                            user_id=user_id,
-                            project_path=project_path,
-                            context_resolver=resolve_generation_context,
-                        ).resolve_tts_synthesis_settings(guarded_project[-1])
-                    )
-                except (Exception, asyncio.CancelledError) as exc:
-                    tts_selection_errors.append(exc)
-                    raise _TtsSelectionResolutionFailed from exc
+                if not current_lane:
+                    error = RuntimeError("current TTS settings were not resolved before the commit")
+                    tts_selection_errors.append(error)
+                    raise _TtsSelectionResolutionFailed from error
+                current_commit_settings = with_character_voices(current_lane[-1], guarded_project[-1])
                 items, id_field, current_kind = _resolve_tts_task_items(
                     current_script,
                     reference_video_route=reference_video_route,

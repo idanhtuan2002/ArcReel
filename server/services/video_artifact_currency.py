@@ -18,12 +18,12 @@ from lib.artifact_manifest import (
     ProjectArtifactManifestAdapter,
 )
 from lib.asset_types import asset_name_comparison_key
-from lib.async_thread import EventLoopBridge, run_noninterruptible_async
+from lib.async_thread import run_noninterruptible_async
 from lib.generation_admission import generation_admission_lock, generation_admission_lock_sync
 from lib.generation_queue import CompensableGenerationResult
 from lib.json_io import atomic_write_bytes
 from lib.media_artifact_currency import build_current_video_artifact_basis
-from lib.narration_delivery import TtsSynthesisSettings
+from lib.narration_delivery import TtsSynthesisSettings, with_character_voices
 from lib.project_manager import ProjectManager, resolve_episode_script_binding
 from lib.reference_video.execution_checkpoint import NarrationExecutionFacts
 from lib.script_editor import resolve_items
@@ -119,7 +119,10 @@ class VideoArtifactCommitter:
         self._prior_thumbnail: tuple[Path, bool, bytes | None] | None = None
         self._current_tts_settings: TtsSynthesisSettings | None = None
         self._current_tts_basis_resolved = False
-        self._tts_settings_bridge: EventLoopBridge | None = None
+        #: The audio lane's settings, resolved on the event loop before any lock is taken; ``_lane_resolved`` tells
+        #: a lane with no TTS configured (``None``) from one not resolved.
+        self._lane_tts_settings: TtsSynthesisSettings | None = None
+        self._lane_resolved = False
         self._restore_blocker: str | None = None
         self._admission_guard: AbstractAsyncContextManager[None] | None = None
 
@@ -152,7 +155,21 @@ class VideoArtifactCommitter:
         raw_narration = version_metadata.get("execution_narration")
         if not isinstance(raw_narration, Mapping) or raw_narration.get("delivery") != "use_tts":
             return
-        self._tts_settings_bridge = EventLoopBridge.capture()
+        try:
+            # Resolved here, on the event loop and before the selection takes the script and project locks: waiting
+            # on the event loop while holding them deadlocked the app when a coroutine there asked for the project
+            # lock (trial 7, 2026-11-17). Inside the locks only the character voices of the snapshot are applied.
+            project = await asyncio.to_thread(self._project_manager.load_project_readonly, self._project_name)
+            self._lane_tts_settings = await CurrentTtsSettingsResolver(
+                self._project_name, project_path=self._project_path
+            ).resolve_audio_lane_settings(project)
+        except ValueError:
+            # No configured current TTS means there is no fresh duration that can invalidate the frozen video tier.
+            self._lane_tts_settings = None
+        except (Exception, asyncio.CancelledError) as exc:
+            self.selection_error = exc
+            return
+        self._lane_resolved = True
         try:
             narration = NarrationExecutionFacts.from_dict(dict(raw_narration))
             if narration.actual_duration_seconds is None:
@@ -223,24 +240,11 @@ class VideoArtifactCommitter:
                 and narration.get("delivery") == "use_tts"
                 and not self._current_tts_basis_resolved
             ):
-                bridge = self._tts_settings_bridge
-                if bridge is None:
+                if not self._lane_resolved:
                     self.selection_error = RuntimeError("current TTS selection was not prepared on an event loop")
                     return None
-                try:
-                    self._current_tts_settings = bridge.run(
-                        CurrentTtsSettingsResolver(
-                            self._project_name,
-                            project_path=self._project_path,
-                        ).resolve_tts_synthesis_settings(project)
-                    )
-                except ValueError:
-                    # No configured current TTS means there is no fresh duration
-                    # that can invalidate the execution-frozen video tier.
-                    self._current_tts_settings = None
-                except (Exception, asyncio.CancelledError) as exc:
-                    self.selection_error = exc
-                    return None
+                lane = self._lane_tts_settings
+                self._current_tts_settings = with_character_voices(lane, project) if lane is not None else None
                 self._current_tts_basis_resolved = True
             return build_current_video_artifact_basis(
                 project_path=self._project_path,
