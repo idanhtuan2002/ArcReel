@@ -123,3 +123,16 @@ Catalog `docs/r2/R2_CONTENT_FORMS_CATALOG.md`; gap analysis `docs/research/2026-
     - `acadfbcda`: drama reviewer prompts, with narration digests unchanged; corpus `ARCREEL_REVIEWER_CORPUS_DRAMA`.
   - Tests: production_run unit and integration on PG, 3205 passed. One failure was already there before these changes (the `test_text_adapter` inventory fixture).
   - Remaining for phase C, on the host: a drama reviewer corpus, reviewer qualification for `fiction_drama_vi_v2`, and a two-character smoke run.
+- 2026-11-16, **r2-v2.5.42**. Trial 7 blocked twice at SCRIPT with EXTERNAL_INPUT_CHANGED. In both cases a later step of the run had changed the adaptation basis:
+  - The script step registered "Chú Tư". Fixed in `4201b5f37`: added characters keep the adaptation current.
+  - Saving the script renamed the episode to "第1集". Fixed in `239dca4f3` and `e3d4b79d1`: a missing script title falls back to the planned title, and a title-only change keeps the adaptation current.
+  - An independent read-only audit (Opus agent) of pinned inputs against later writers led to `f8323e7c9` (remote MCP tool parity, stale tests) and the resume fixes in this release:
+    - an input-changed block with an unmoved witness retries the stage;
+    - MEDIA, RENDER and QUALITY attempt-limit blocks retry on resume;
+    - a stale script with current media still completes an episode;
+    - a busy resource blocks as RESOURCE_UNAVAILABLE;
+    - voice casting never registers a character.
+  - Open LOW findings: a version-restore error in storyboard selection crashes one tick and loses that unit's pick. EXPORT compares the re-extracted JPEG thumbnail byte for byte, which ffmpeg may not reproduce exactly.
+  - Tests:
+    - production_run, router, adaptation, voice, MCP and tts on PG: all pass.
+    - script_generator and project_manager: 251 pass without PG. Their PG-only failures also occur at r2-v2.5.41.
