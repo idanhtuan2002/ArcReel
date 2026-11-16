@@ -91,6 +91,10 @@ class _Policies:
         del project_name
         return True
 
+    async def media_lanes(self, project_name: str) -> dict[str, tuple[str, str]]:
+        del project_name
+        return {}
+
 
 async def test_preflight_reads_the_launch_record_and_reports_an_unpublished_profile(session_factory, tmp_path) -> None:
     projects = ProjectManager(tmp_path / "projects")

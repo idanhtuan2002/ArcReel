@@ -568,6 +568,9 @@ class PreflightSnapshot(AutomationContract):
     #: Route digests of image, video and audio routes whose host media probe passed (``media_probe``).
     media_route_probes: frozenset[Digest] = frozenset()
     voice_available: StrictBool
+    #: The media backends the project's own settings resolve to, as (provider_id, model_id) per lane (``image_t2i``,
+    #: ``image_i2i``, ``video``, ``audio``) — what media generation will use; empty when the reader resolves none.
+    media_lanes: dict[str, tuple[ExactIdentity, ExactIdentity]] = Field(default_factory=dict)
     #: The project's ``character_speech_delivery`` (ADR-0166); a project without the setting reads ``video``.
     character_speech_delivery: Literal["video", "tts"] = "video"
     disk_free_bytes: NonnegativeInt

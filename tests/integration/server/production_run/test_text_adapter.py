@@ -167,7 +167,7 @@ async def test_another_actors_active_task_on_the_resource_blocks_instead_of_adop
 
     blocked = await _tick(host, _controller(host))
 
-    assert (blocked.status, blocked.reason) == (RunStatus.BLOCKED_INPUT_CHANGED, "EXTERNAL_INPUT_CHANGED")
+    assert (blocked.status, blocked.reason) == (RunStatus.BLOCKED_RESOURCE, "RESOURCE_UNAVAILABLE")
     assert len(await _tasks(host, "text_asset_inventory")) == 1
 
 

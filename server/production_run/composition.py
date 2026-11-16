@@ -19,7 +19,7 @@ from pathlib import Path
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from lib.character_voice import character_speech_delivery
-from lib.config.resolver import ConfigResolver
+from lib.config.resolver import ConfigResolver, video_bucket_for_generation_mode
 from lib.db.models.quality import QualityProfileHeadModel
 from lib.db.repositories.launch_qualifications import LaunchQualificationRepository
 from lib.db.repositories.quality import QualityProfileRepository
@@ -143,6 +143,27 @@ class ProjectPolicyResolver:
                         "AUTOMATION_NOT_CONFIGURED", 409, ("PINNED_MODEL_UNAVAILABLE",)
                     ) from None
         return tuple(routes)
+
+    async def media_lanes(self, project_name: str) -> dict[str, tuple[str, str]]:
+        """The (provider_id, model_id) each media lane resolves to from the project's own settings, as media
+        generation resolves it; a lane that does not resolve is left out (the preflight then names it)."""
+        project = self._projects.load_project(project_name)
+        resolvers = {
+            "image_t2i": lambda: self._resolver.resolve_image_backend(project, None, capability="t2i"),
+            "image_i2i": lambda: self._resolver.resolve_image_backend(project, None, capability="i2i"),
+            "video": lambda: self._resolver.resolve_video_backend(
+                project, None, capability=video_bucket_for_generation_mode(project.get("generation_mode"))
+            ),
+            "audio": lambda: self._resolver.resolve_audio_backend(project, None),
+        }
+        lanes: dict[str, tuple[str, str]] = {}
+        for lane, resolve in resolvers.items():
+            try:
+                resolved = await resolve()
+            except (ValueError, LookupError, RuntimeError):
+                continue
+            lanes[lane] = (resolved.provider_id, resolved.model_id)
+        return lanes
 
     async def voice_available(self, project_name: str) -> bool:
         """An audio route, and for a narration project a resolvable narration voice. A drama has a voice only when it
@@ -286,6 +307,7 @@ class HostPreflightReader:
             media_route_probes=passed_probes(receipts_dir(), routes),
             voice_available=await self._policies.voice_available(project_name),
             character_speech_delivery=character_speech_delivery(project),
+            media_lanes=await self._policies.media_lanes(project_name),
             disk_free_bytes=shutil.disk_usage(self._projects.projects_root).free,
             required_disk_bytes=launch_profile.required_disk_bytes,
             gpu_free_bytes=self._gpu_free(),

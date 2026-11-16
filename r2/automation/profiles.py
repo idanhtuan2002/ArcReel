@@ -60,6 +60,9 @@ class LaunchProfile(AutomationContract):
     #: autopilot makes on this profile so their planned length is spoken at the voice's real pace.
     speech_rate_units_per_second: Annotated[float, Field(gt=0, le=20)] | None = None
     image_route: tuple[ExactIdentity, ExactIdentity]
+    #: The image model storyboards that carry reference sheets are drawn with (the project's ``image_provider_i2i``);
+    #: absent: the image route draws them too.
+    image_reference_route: tuple[ExactIdentity, ExactIdentity] | None = None
     video_route: tuple[ExactIdentity, ExactIdentity]
     audio_route: tuple[ExactIdentity, ExactIdentity]
     requires_lip_sync: bool

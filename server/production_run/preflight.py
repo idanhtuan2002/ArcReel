@@ -70,6 +70,19 @@ class ProductionPreflight:
                     and route_digest(route) not in snapshot.media_route_probes
                 ):
                     reasons.append("MEDIA_ROUTE_NOT_QUALIFIED")
+        if launch is not None and snapshot.media_lanes:
+            image = roles.get("image")
+            expected = {
+                "image_t2i": (image.provider_id, image.model_id) if image is not None else None,
+                "image_i2i": launch.image_reference_route
+                or ((image.provider_id, image.model_id) if image is not None else None),
+                "video": (roles["video"].provider_id, roles["video"].model_id) if "video" in roles else None,
+                "audio": (roles["audio"].provider_id, roles["audio"].model_id) if "audio" in roles else None,
+            }
+            for lane, want in expected.items():
+                got = snapshot.media_lanes.get(lane)
+                if want is not None and (got is None or tuple(got) != tuple(want)):
+                    reasons.append(f"PROJECT_{lane.upper()}_BACKEND_MISMATCH")
         if len(roles) != len(snapshot.routes) or not roles.keys() >= _REQUIRED_ROLES:
             reasons.append("MISSING_MODEL_ROLE")
         actual = tuple(route_digest(route) for route in snapshot.routes)

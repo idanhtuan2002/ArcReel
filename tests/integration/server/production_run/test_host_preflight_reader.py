@@ -32,6 +32,9 @@ class Policies(ProjectPolicyResolver):
     async def routes(self, project_name: str):
         return ()
 
+    async def media_lanes(self, project_name: str) -> dict[str, tuple[str, str]]:
+        return {}
+
 
 class Witness:
     async def digest(self, *, user_id: str, project_name: str) -> str:

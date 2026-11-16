@@ -14,6 +14,10 @@
     "custom-3",
     "flux2-klein-4b-gguf"
   ],
+  "image_reference_route": [
+    "custom-3",
+    "flux2-klein-4b-ref-gguf"
+  ],
   "video_route": [
     "custom-3",
     "still-clip-local"

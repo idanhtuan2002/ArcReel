@@ -476,3 +476,48 @@ async def test_a_drama_on_stills_needs_no_lip_sync_but_its_project_must_voice_ch
     assert "DRAMA_ROUTE_NOT_QUALIFIED" not in report.blocking_reasons
     assert "UNSUPPORTED_LAUNCH_PROFILE" not in report.blocking_reasons
     assert ("CHARACTER_SPEECH_DELIVERY_MISMATCH" in report.blocking_reasons) is mismatch
+
+
+@pytest.mark.parametrize(
+    ("lanes", "reason"),
+    [
+        ({}, None),  # a reader that resolves no lanes checks nothing
+        (
+            {
+                "image_t2i": ("custom-3", "flux2-klein-4b-gguf"),
+                "image_i2i": ("custom-3", "flux2-klein-4b-ref-gguf"),
+                "video": ("custom-3", "still-clip-local"),
+                "audio": ("custom-2", "vieneu-tts-v3-turbo"),
+            },
+            None,
+        ),
+        (
+            {
+                "image_t2i": ("custom-3", "flux2-klein-4b-gguf"),
+                "image_i2i": ("custom-3", "flux2-klein-4b-gguf"),
+                "video": ("custom-3", "still-clip-local"),
+                "audio": ("custom-2", "vieneu-tts-v3-turbo"),
+            },
+            "PROJECT_IMAGE_I2I_BACKEND_MISMATCH",
+        ),
+        (
+            {
+                "image_t2i": ("custom-3", "flux2-klein-4b-gguf"),
+                "image_i2i": ("custom-3", "flux2-klein-4b-ref-gguf"),
+                "video": ("gemini-aistudio", "veo-3.1"),
+                "audio": ("custom-2", "vieneu-tts-v3-turbo"),
+            },
+            "PROJECT_VIDEO_BACKEND_MISMATCH",
+        ),
+    ],
+)
+async def test_the_projects_own_media_backends_must_be_the_runs_routes(lanes, reason):
+    from server.production_run.preflight import ProductionPreflight
+
+    frozen, snapshot = complete_snapshot()
+    reader = SnapshotReader(snapshot.model_copy(update={"media_lanes": lanes}))
+    report = await ProductionPreflight(reader).check(
+        user_id=snapshot.user_id, project_name=snapshot.project_name, policy=frozen
+    )
+    mismatches = [r for r in report.blocking_reasons if r.endswith("_BACKEND_MISMATCH")]
+    assert mismatches == ([reason] if reason else [])
