@@ -310,6 +310,13 @@ class MediaAdapter:
             for item in items
             if item.get(id_field) and (item.get("generated_assets") or {}).get("storyboard_image")
         ]
+        # A unit an earlier lineage of this run already chose for, still on the kept version, is not drawn or
+        # judged again (a resumed run starts a new lineage).
+        root = self._projects.get_project_path(intent.scope.project_name)
+        versions = VersionManager(root)
+        current = {unit: versions.get_versions("storyboards", unit)["current_version"] for unit in units}
+        kept = await asyncio.to_thread(self._kept_units, root, run.run_id, episode, current)
+        units = [unit for unit in units if unit not in kept]
         for candidate in range(2, run.policy.image_candidates + 1):
             pending = [unit for unit in units if not await self._attempts(intent, f"select:{unit}:v{candidate}")]
             if pending:
@@ -427,6 +434,42 @@ class MediaAdapter:
                 )
             if restore and isinstance(chosen, int):
                 await self._restore(run.project_name, "storyboards", unit, chosen)
+            kept = versions.get_versions("storyboards", unit)["current_version"]
+            await asyncio.to_thread(
+                self._record_choice,
+                evidence,
+                run,
+                unit,
+                {**decision, "restore_requested": restore, "kept_version": kept},
+            )
+
+    async def _kept_storyboards(
+        self, intent: DispatchIntent, items: list[dict[str, Any]], id_field: str, episode: int | None
+    ) -> set[str]:
+        if episode is None:
+            return set()
+        root = self._projects.get_project_path(intent.scope.project_name)
+        versions = VersionManager(root)
+        units = [str(item[id_field]) for item in items if item.get(id_field)]
+        current = {unit: versions.get_versions("storyboards", unit)["current_version"] for unit in units}
+        return await asyncio.to_thread(self._kept_units, root, intent.scope.run_id, episode, current)
+
+    @staticmethod
+    def _kept_units(root: Path, run_id: str, episode: int, current: Mapping[str, int]) -> set[str]:
+        """The units a selection of this run already settled: an earlier lineage's ``image_selection.json`` records
+        the version it kept, and that version is still the unit's current storyboard. A unit drawn again since is
+        not settled."""
+        kept: set[str] = set()
+        for path in (root / "production" / "automation" / run_id).glob(f"g*/episode_{episode}/image_selection.json"):
+            try:
+                segments = json.loads(path.read_text(encoding="utf-8")).get("segments") or {}
+            except (OSError, ValueError, AttributeError):
+                continue
+            for unit, decision in segments.items():
+                version = decision.get("kept_version") if isinstance(decision, dict) else None
+                if isinstance(version, int) and current.get(unit) == version:
+                    kept.add(unit)
+        return kept
 
     @staticmethod
     def _record_choice(evidence: Path, run: RunSnapshot, unit: str, decision: dict[str, Any]) -> None:
@@ -667,11 +710,14 @@ class MediaAdapter:
                 if self._unit_problem(root / path, field, portrait) is not None:
                     failing.append(unit)
             if not failing and collection == "storyboards":
-                # A storyboard the selection judge already chose keeps the judge's pick (ADR-0151 over ADR-0145).
+                # A storyboard the selection judge already chose keeps the judge's pick (ADR-0151 over ADR-0145),
+                # in this lineage or, still on the kept version, in an earlier one of the run.
+                kept = await self._kept_storyboards(intent, items, id_field, target.episode)
                 failing = [
                     unit
                     for unit in self._look_outliers(root, items, id_field)
-                    if not await self._attempts(intent, f"unit:{collection}:{unit}")
+                    if unit not in kept
+                    and not await self._attempts(intent, f"unit:{collection}:{unit}")
                     and not await self._attempts(intent, f"select:{unit}:chosen")
                 ]
             if failing:

@@ -576,6 +576,7 @@ async def test_extra_storyboard_versions_are_made_judged_and_the_winner_restored
     assert evidence["segments"]["E1S01"] == {
         "candidates": [1, 2],
         "chosen_version": 1,
+        "kept_version": 2,  # the current version after the restore (the test's restore keeps the history as it is)
         "restore_requested": True,
         "scores": [0.9, 0.1],
     }

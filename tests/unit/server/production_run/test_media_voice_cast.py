@@ -162,3 +162,19 @@ async def test_videos_made_stale_by_new_storyboards_are_made_again_once_the_work
     assert await adapter._refresh_stale_videos(intent, "d", plan_with(collection)) is False
     missing_board = {**collection, "missing_ids": ["E1S03"]}
     assert await adapter._refresh_stale_videos(intent, "d", plan_with(stale, missing_board)) is False
+
+
+def test_a_unit_whose_kept_choice_is_still_current_is_not_selected_again(tmp_path: Path):
+    root = tmp_path
+    run_dir = root / "production" / "automation" / "run-1"
+    for generation, segments in (
+        ("g4", {"E1S01": {"chosen_version": 1, "kept_version": 3}, "E1S02": {"chosen_version": 2}}),
+        ("g5", {"E1S03": {"chosen_version": 1, "kept_version": 2}}),
+    ):
+        path = run_dir / generation / "episode_1" / "image_selection.json"
+        path.parent.mkdir(parents=True)
+        path.write_text(json.dumps({"segments": segments}), encoding="utf-8")
+    current = {"E1S01": 3, "E1S02": 2, "E1S03": 5, "E1S04": 1}
+    kept = MediaAdapter._kept_units(root, "run-1", 1, current)
+    # E1S02 recorded no kept version; E1S03 was drawn again since its choice; E1S04 was never chosen.
+    assert kept == {"E1S01"}
