@@ -355,6 +355,8 @@ export default {
   'default_image_model': 'Mô hình ảnh mặc định',
   'no_image_providers_hint': 'Không có nhà cung cấp ảnh khả dụng, vui lòng cấu hình khóa API tại "Nhà cung cấp" trước.',
   'text_models': 'Mô hình văn bản',
+  'image_models': 'Mô hình ảnh',
+  'video_models': 'Mô hình video',
   'text_models_desc': 'Cấu hình mô hình văn bản theo bậc tác vụ; để trống để quay về mô hình mặc định.',
   'no_text_providers_hint': 'Không có nhà cung cấp văn bản khả dụng, vui lòng cấu hình khóa API tại "Nhà cung cấp" trước.',
   'media_config_saved': 'Đã lưu cấu hình mô hình media',

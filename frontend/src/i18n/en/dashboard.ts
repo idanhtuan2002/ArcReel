@@ -352,6 +352,8 @@ export default {
   'default_image_model': 'Default Image Model',
   'no_image_providers_hint': 'No image providers available, please configure API keys in "Providers" first.',
   'text_models': 'Text Models',
+  'image_models': 'Image Models',
+  'video_models': 'Video Models',
   'text_models_desc': 'Configure text models by task tier; leave empty to fall back to the default model.',
   'no_text_providers_hint': 'No text providers available, please configure API keys in "Providers" first.',
   'media_config_saved': 'Media model configuration saved',

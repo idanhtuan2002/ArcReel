@@ -255,7 +255,7 @@ export function AssetSidebar({ className }: AssetSidebarProps) {
           // eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- the window splitter takes focus to be resized by keyboard
           tabIndex={0}
           title={t("dashboard:sidebar_resize")}
-          className="absolute inset-y-0 right-0 z-10 w-1.5 cursor-col-resize hover:bg-[var(--color-accent-soft)] focus-visible:bg-[var(--color-accent-soft)] focus-visible:outline-none"
+          className="absolute inset-y-0 right-0 z-10 w-2.5 cursor-col-resize hover:bg-[var(--color-accent-soft)] focus-visible:bg-[var(--color-accent-soft)] focus-visible:outline-none"
           onPointerDown={(event) => {
             event.preventDefault();
             const startX = event.clientX;
