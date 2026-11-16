@@ -392,6 +392,14 @@ class _AnchorHit:
     hint: str | None = None  # 落空时原文中最接近的片段
 
 
+def _before_cjk(text: str) -> str:
+    """``text`` up to its first Han character or CJK punctuation (a note the model appended to a copied anchor)."""
+    for index, char in enumerate(text):
+        if contains_cjk(char):
+            return text[:index]
+    return text
+
+
 class _AnchorLocator:
     """在一个窗口内定位 end_anchor，逐层放宽，首个命中（≥1 处）的层决定结果。
 
@@ -441,6 +449,14 @@ class _AnchorLocator:
         hit = self._locate_text(anchor)
         if hit.count:
             return hit
+        # 源文不含汉字而锚含汉字：模型在逐字摘抄后附了注释（如「原文中此处为……」），取首个汉字之前的摘抄再定位
+        if not contains_cjk(self.window) and contains_cjk(anchor):
+            head = _before_cjk(anchor)
+            if len(_skeleton(head)[0]) >= _MIN_SKELETON_LEN:
+                hit = self.locate(head)
+                if hit.count:
+                    hit.tolerant = True
+                    return hit
         normalized = normalize_source_text(anchor)
         fuzzy_target = normalized
         segments = _ELLIPSIS_RE.split(normalized)

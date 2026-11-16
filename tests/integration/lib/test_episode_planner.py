@@ -209,6 +209,14 @@ class TestResolveBoundariesTolerance:
         window = "Một câu dài không có dấu chấm\nĐoạn mới bắt đầu. Hết chuyện."
         assert _ends(window, "không có dấu") == [window.index("\n")]
 
+    def test_a_note_the_model_appended_to_a_copied_anchor_is_dropped_in_a_latin_source(self):
+        # trial 7, 2026-11-16: the local writer quoted the sentence and appended a Chinese note to the anchor
+        window = (
+            "Ông cúi xuống. Ánh đèn hắt xuống, soi một quãng sông dài, chỗ sáng chỗ tối, như có ai vẽ vội. Hải đứng đó."
+        )
+        anchor = "'Ánh đèn hắt xuống, soi một quãng sông dài,' 原文中此处为 'như có ai vẽ vội'"
+        assert _ends(window, anchor) == [_end_after(window, "vẽ vội.")]
+
     def test_two_anchors_inside_one_sentence_reject_the_later_one(self):
         window = "Gió thổi qua bản, mưa rơi trên mái, trời tối dần. Đêm xuống."
         with pytest.raises(_DraftRejected) as exc_info:
