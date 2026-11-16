@@ -178,3 +178,30 @@ def test_a_unit_whose_kept_choice_is_still_current_is_not_selected_again(tmp_pat
     kept = MediaAdapter._kept_units(root, "run-1", 1, current)
     # E1S02 recorded no kept version; E1S03 was drawn again since its choice; E1S04 was never chosen.
     assert kept == {"E1S01"}
+
+
+def test_a_tool_call_that_queued_nothing_and_refused_units_names_their_problem():
+    from lib.generation_result import (
+        GenerationAction,
+        GenerationBatchResult,
+        GenerationItemResult,
+        GenerationItemState,
+        GenerationProblem,
+        GenerationSelectionMode,
+    )
+    from server.tool_runtime import ToolOutcome
+
+    problem = GenerationProblem(code="video_shorter_than_tts", detail="x", action=GenerationAction.REGENERATE_TTS)
+    refused = GenerationBatchResult(
+        operation="generate_videos",
+        selection=GenerationSelectionMode.EXPLICIT,
+        requested=["E1S01"],
+        succeeded=[],
+        failed=[],
+        blocked=["E1S01"],
+        items=[GenerationItemResult(unit_id="E1S01", state=GenerationItemState.BLOCKED, problem=problem)],
+    )
+    assert MediaAdapter._refusal_reason(ToolOutcome(value={"generation_result": refused})) == (
+        "MEDIA_VIDEO_SHORTER_THAN_TTS"
+    )
+    assert MediaAdapter._refusal_reason(ToolOutcome(value={"summary": "queued"})) is None

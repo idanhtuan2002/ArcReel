@@ -41,6 +41,7 @@ from lib.config.resolver import ConfigResolver
 from lib.db.repositories.production_runs import ProductionRunRepository
 from lib.face_identity import FACE_JUDGE_IDENTITY, FaceIdentityService
 from lib.generation_queue import GenerationQueue, get_generation_queue
+from lib.generation_result import GenerationBatchResult
 from lib.narration_delivery import USE_TTS
 from lib.project_manager import ProjectManager
 from lib.reference_catalog import DERIVATIVE_SEPARATOR
@@ -895,6 +896,23 @@ class MediaAdapter:
         submitted = await self._tools[action](self._context(intent), args)
         if submitted.problem is not None:
             raise OwnerBlocked("MEDIA_" + submitted.problem.code.upper())
+        if (refusal := self._refusal_reason(submitted)) is not None:
+            raise OwnerBlocked(refusal)
+
+    @staticmethod
+    def _refusal_reason(submitted: ToolOutcome[Any]) -> str | None:
+        """``MEDIA_<CODE>`` of the first refused unit when a tool call queued nothing and refused units, else
+        ``None``: sending the same call again would only spend the step's attempts on the same refusal."""
+        value = submitted.value
+        result = (
+            value.get("generation_result") if isinstance(value, Mapping) else getattr(value, "generation_result", None)
+        )
+        if not isinstance(result, GenerationBatchResult) or not result.blocked:
+            return None
+        if any(item.task_id for item in result.items) or getattr(value, "members", None):
+            return None
+        refused = next((item for item in result.items if item.unit_id in result.blocked and item.problem), None)
+        return "MEDIA_" + str(refused.problem.code).upper() if refused is not None and refused.problem else None
 
     def _context(self, intent: DispatchIntent) -> ToolContext:
         return ToolContext(
@@ -950,6 +968,8 @@ class MediaAdapter:
             submitted = await self._tools[action.type](self._context(intent), args)
             if submitted.problem is not None:
                 raise OwnerBlocked("MEDIA_" + submitted.problem.code.upper())
+            if (refusal := self._refusal_reason(submitted)) is not None:
+                raise OwnerBlocked(refusal)
 
     @staticmethod
     def _episode_media_current(plan: WorkflowPlan) -> bool:
