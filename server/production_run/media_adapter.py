@@ -213,6 +213,10 @@ class MediaAdapter:
                 if await self._check_continuity(intent, receipt.digest, plan, episode):
                     return outcome(intent, "WAIT", owner_state="STORYBOARDS_CONTINUITY")
             action = plan.next_action
+            if action.type in (A.EXPORT, A.PLAN_EPISODES) and await self._refresh_stale_videos(
+                intent, receipt.digest, plan
+            ):
+                return outcome(intent, "WAIT", owner_state="VIDEOS_REFRESHING")
             if action.type is A.EXPORT or (action.type is A.PLAN_EPISODES and self._episode_media_current(plan)):
                 artifacts = digest_value("r2.production-media-artifacts.v1", ensure_json_value(plan.status.artifacts))
                 evidence.append(revision_receipt(self.owner, f"episode:{episode}:media", artifacts))
@@ -600,6 +604,34 @@ class MediaAdapter:
                 await self._restore(run.project_name, "storyboards", unit, restore)
 
     # --- unit checks ---------------------------------------------------------------------------------
+
+    async def _refresh_stale_videos(self, intent: DispatchIntent, subject_digest: str, plan: WorkflowPlan) -> bool:
+        """Make again the videos that went stale after they were made (a storyboard drawn again after a sheet
+        changed), once no storyboard is missing; ``True`` when a regeneration was submitted. The workflow only asks
+        for missing videos, and the episode's output must be current. Each unit has its own attempt budget."""
+        target = plan.status.target
+        artifacts = plan.status.artifacts
+        storyboards, videos = artifacts.get("storyboards"), artifacts.get("videos")
+        if target is None or not isinstance(storyboards, dict) or not isinstance(videos, dict):
+            return False
+        stale = sorted(str(unit) for unit in videos.get("stale_ids") or [])
+        if not stale or storyboards.get("missing_ids") or videos.get("missing_ids"):
+            return False
+        args: dict[str, Any] = {
+            "script": target.script_filename,
+            "target": {"scope": "selected", "ids": stale},
+            "narration_delivery": USE_TTS,
+            "force": True,
+        }
+        await self._send(
+            intent,
+            subject_digest,
+            [f"stale:videos:{unit}" for unit in stale],
+            A.GENERATE_VIDEOS,
+            args,
+            "MEDIA_RETRY_LIMIT",
+        )
+        return True
 
     async def _redo_failing_units(self, intent: DispatchIntent, subject_digest: str, plan: WorkflowPlan) -> bool:
         """Regenerate the episode's units that fail their check, then the clips of units made again; ``True`` when a

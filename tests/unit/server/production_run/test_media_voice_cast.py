@@ -133,3 +133,32 @@ def test_a_storyboard_its_neighbours_selection_moved_does_not_hold_back_an_episo
     }
     plan = SimpleNamespace(status=SimpleNamespace(artifacts=artifacts))
     assert MediaAdapter._episode_media_current(plan) is complete
+
+
+async def test_videos_made_stale_by_new_storyboards_are_made_again_once_the_workflow_has_nothing_left(drama_media):
+    _projects, _tasks, adapter, _plan, intent = drama_media
+    sent: list[tuple] = []
+
+    async def send(intent, subject_digest, sub_keys, action, args, limit_reason):
+        sent.append((sub_keys, action, args, limit_reason))
+
+    adapter._send = send
+    collection = {"current_ids": ["E1S01"], "missing_ids": [], "stale_ids": []}
+
+    def plan_with(videos, storyboards=collection):
+        artifacts = {"storyboards": storyboards, "videos": videos, "audio": collection}
+        return SimpleNamespace(
+            status=SimpleNamespace(artifacts=artifacts, target=SimpleNamespace(script_filename="episode_1.json"))
+        )
+
+    stale = {"current_ids": [], "missing_ids": [], "stale_ids": ["E1S02", "E1S01"]}
+    assert await adapter._refresh_stale_videos(intent, "d", plan_with(stale)) is True
+    [(sub_keys, action, args, reason)] = sent
+    assert sub_keys == ["stale:videos:E1S01", "stale:videos:E1S02"]
+    assert (action.value, reason) == ("generate_videos", "MEDIA_RETRY_LIMIT")
+    assert args["target"] == {"scope": "selected", "ids": ["E1S01", "E1S02"]}
+    assert args["force"] is True
+
+    assert await adapter._refresh_stale_videos(intent, "d", plan_with(collection)) is False
+    missing_board = {**collection, "missing_ids": ["E1S03"]}
+    assert await adapter._refresh_stale_videos(intent, "d", plan_with(stale, missing_board)) is False
