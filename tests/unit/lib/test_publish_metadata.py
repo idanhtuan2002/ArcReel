@@ -38,6 +38,19 @@ def test_an_adapted_episode_describes_its_logline_and_cliffhanger(tmp_path: Path
     assert data["description"].startswith("Lan tìm Minh.\n\nMinh đã chết?\n\n#")
 
 
+def test_texts_not_in_the_films_language_are_left_out(tmp_path: Path):
+    project = _project()
+    project["episodes"] = [{"episode": 2, "title": "最后的一趟渡河", "hook": "Một cái tên trong sổ"}]
+    project["overview"]["genre"] = "悬疑"
+    data = publish_metadata(project, tmp_path, 2, duration_seconds=45)
+    assert data["title"] == "Phong thư đỏ – Tập 2"
+    assert data["tags"] == ["Gia đình"]
+    assert "最" not in json.dumps(data, ensure_ascii=False)
+
+    project["source_language"] = "zh"
+    assert publish_metadata(project, tmp_path, 2, duration_seconds=45)["title"].endswith("最后的一趟渡河")
+
+
 def test_hashtags_join_words_of_any_script_and_drop_punctuation():
     assert hashtag("Lá thư trong chai!") == "#LáThưTrongChai"
     assert hashtag("第一集") == "#第一集"

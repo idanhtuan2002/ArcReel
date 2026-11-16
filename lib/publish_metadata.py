@@ -17,11 +17,14 @@ from pathlib import Path
 from typing import Any
 
 from lib.episode_adaptation import adaptation_record_relpath
+from lib.text_attestation import has_cjk
 
 SCHEMA = "r2.publish-metadata.v1"
 THUMBNAIL_SECOND = 1.0
 EPISODE_WORD = {"vi": "Tập {n}", "zh": "第{n}集", "en": "Episode {n}"}
 MAX_HASHTAGS = 3
+#: Languages written with Han characters; in any other language a text that has them is left out of the metadata.
+CJK_LANGUAGES = frozenset({"zh", "ja", "ko"})
 
 
 def episode_entry(project: Mapping[str, Any], episode: int) -> Mapping[str, Any]:
@@ -64,14 +67,23 @@ def _episode_count(project: Mapping[str, Any]) -> int:
     return sum(1 for item in project.get("episodes") or [] if isinstance(item, Mapping))
 
 
+def _in_language(record: Mapping[str, Any], language: str) -> Mapping[str, Any]:
+    """``record`` without the texts that are not in ``language``: a Vietnamese film's metadata never carries a title
+    an older planner wrote in Chinese."""
+    if language.split("-")[0] in CJK_LANGUAGES:
+        return record
+    return {key: value for key, value in record.items() if not (isinstance(value, str) and has_cjk(value))}
+
+
 def publish_metadata(
     project: Mapping[str, Any], project_path: Path, episode: int, *, duration_seconds: float
 ) -> dict[str, Any]:
     language = _text(project.get("source_language")) or "vi"
-    entry = episode_entry(project, episode)
+    entry = _in_language(episode_entry(project, episode), language)
     raw_overview = project.get("overview")
-    overview: Mapping[str, Any] = raw_overview if isinstance(raw_overview, Mapping) else {}
-    adaptation = episode_adaptation(project_path, episode)
+    overview: Mapping[str, Any] = _in_language(raw_overview, language) if isinstance(raw_overview, Mapping) else {}
+    adaptation = _in_language(episode_adaptation(project_path, episode), language)
+    project = _in_language(project, language)
     label = EPISODE_WORD.get(language, EPISODE_WORD["en"]).format(n=episode)
     title = " – ".join(part for part in (_text(project.get("title")), label, _text(entry.get("title"))) if part)
     lines = [
