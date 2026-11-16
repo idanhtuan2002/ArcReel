@@ -111,3 +111,25 @@ def test_an_episode_whose_media_are_current_is_complete_even_if_assets_moved_its
     }
     plan = SimpleNamespace(status=SimpleNamespace(artifacts=artifacts))
     assert MediaAdapter._episode_media_current(plan) is complete
+
+
+@pytest.mark.parametrize(
+    ("storyboards", "videos", "complete"),
+    [
+        ({"missing_ids": [], "stale_ids": ["E1S05"]}, {"missing_ids": [], "stale_ids": []}, True),
+        ({"missing_ids": ["E1S05"], "stale_ids": []}, {"missing_ids": [], "stale_ids": []}, False),
+        ({"missing_ids": [], "stale_ids": []}, {"missing_ids": [], "stale_ids": ["E1S05"]}, False),
+    ],
+)
+def test_a_storyboard_its_neighbours_selection_moved_does_not_hold_back_an_episode_whose_videos_are_current(
+    storyboards, videos, complete
+):
+    current = {"current_ids": ["E1S01"]}
+    artifacts = {
+        "script": {"state": "current"},
+        "storyboards": {**current, **storyboards},
+        "videos": {**current, **videos},
+        "audio": {**current, "missing_ids": [], "stale_ids": []},
+    }
+    plan = SimpleNamespace(status=SimpleNamespace(artifacts=artifacts))
+    assert MediaAdapter._episode_media_current(plan) is complete

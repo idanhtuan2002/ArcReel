@@ -887,9 +887,12 @@ class MediaAdapter:
             return False
         for kind in ("storyboards", "videos", "audio"):
             collection = artifacts.get(kind)
-            if not isinstance(collection, dict) or not collection.get("current_ids"):
+            if not isinstance(collection, dict) or collection.get("missing_ids"):
                 return False
-            if collection.get("missing_ids") or collection.get("stale_ids"):
+            # A storyboard is the source of its video. One made stale after its video (a neighbour's chosen version
+            # moved the previous-frame reference) does not hold back the episode, as the workflow itself treats it;
+            # the videos and the audio, the episode's output, must be current.
+            if kind != "storyboards" and (not collection.get("current_ids") or collection.get("stale_ids")):
                 return False
         return True
 
