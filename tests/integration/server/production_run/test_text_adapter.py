@@ -24,7 +24,9 @@ from tests.integration.server.production_run.test_story_adapter import story_sta
 from tests.integration.server.story_authoring.test_driver import MODEL
 
 EXTRACTED = {
-    "characters": [{"name": "Lan", "description": "Cô gái gầy, tóc dài, áo bà ba nâu.", "voice_style": "nhỏ nhẹ"}],
+    "characters": [
+        {"name": "Lan", "identity": "Cô gái gầy, tóc dài.", "outfit": "Áo bà ba nâu.", "voice_style": "nhỏ nhẹ"}
+    ],
     "scenes": [{"name": "Làng ven sông", "description": "Đường đất, hàng tre."}],
     "props": [],
 }

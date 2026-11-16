@@ -52,6 +52,7 @@ from server.media_tools.videos import generate_videos_tool
 from server.services import workflow_planner
 from server.text_generation import TextGenerationRequest
 from server.tool_runtime import (
+    AdaptEpisodeRequest,
     CallerContext,
     CompleteAssetInventoryRequest,
     CompleteScriptPlanRebuildRequest,
@@ -70,7 +71,9 @@ from server.tool_runtime import (
     ToolOutcome,
     ToolProblem,
     ToolRequest,
+    TranslateStoryRequest,
     UploadSourceRequest,
+    adapt_episode,
     cancel_generation_batch,
     complete_asset_inventory,
     complete_script_plan_rebuild,
@@ -102,6 +105,7 @@ from server.tool_runtime import (
     rename_asset,
     reset_episode_planning,
     retry_project_migration,
+    translate_story,
     upload_source,
 )
 
@@ -706,6 +710,30 @@ def build_remote_mcp_server(
             return _to_mcp_result("episode_plan", ToolOutcome(problem=ToolProblem("invalid_request", str(exc))))
         return _to_long_task_result(
             "episode_plan", await plan_episodes(ToolRequest(request), scope, _authenticated_caller(), services)
+        )
+
+    @server.tool(name="adapt_episode", structured_output=False)
+    async def remote_adapt_episode(project: str, episode: int) -> CallToolResult:  # pyright: ignore[reportUnusedFunction]
+        """Adapt one planned episode of one explicit project into its screen script."""
+        try:
+            scope = _project_scope(project, projects)
+            request = AdaptEpisodeRequest(episode=episode)
+        except (FileNotFoundError, ValueError) as exc:
+            return _to_mcp_result("episode_adaptation", ToolOutcome(problem=ToolProblem("invalid_request", str(exc))))
+        return _to_long_task_result(
+            "episode_adaptation", await adapt_episode(ToolRequest(request), scope, _authenticated_caller(), services)
+        )
+
+    @server.tool(name="translate_story", structured_output=False)
+    async def remote_translate_story(project: str, target_language: str) -> CallToolResult:  # pyright: ignore[reportUnusedFunction]
+        """Translate the story of one explicit project into another language."""
+        try:
+            scope = _project_scope(project, projects)
+            request = TranslateStoryRequest.model_validate({"target_language": target_language})
+        except (FileNotFoundError, ValueError) as exc:
+            return _to_mcp_result("story_translation", ToolOutcome(problem=ToolProblem("invalid_request", str(exc))))
+        return _to_long_task_result(
+            "story_translation", await translate_story(ToolRequest(request), scope, _authenticated_caller(), services)
         )
 
     @server.tool(name="reset_episode_planning", structured_output=False)

@@ -538,6 +538,12 @@ class TestOrphanAudioRestartLost:
             async def mark_task_cancelled(self, task_id, cancelled_by="user"):
                 self.cancelled.append(task_id)
 
+            async def unpark_tasks(self):
+                return 0
+
+            async def requeue_free_restart_lost(self, task_id, *, media_role):
+                return False  # a paid route: the orphan is failed, never queued again
+
         q = _Q()
         w = GenerationWorker(
             queue=q,
