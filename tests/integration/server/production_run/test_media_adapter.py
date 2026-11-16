@@ -280,6 +280,39 @@ async def test_a_proposed_duration_tier_is_confirmed_and_sent_with_the_videos(me
     )
 
 
+async def test_a_batch_withheld_for_one_units_duration_tier_is_confirmed_and_sent(media_host):
+    # trial 7, 2026-11-16: E2S02's voice ran 7.68 s on a 6 s shot; the planner withheld the whole video batch (RETRY)
+    sessions, controller, run, planner, tools, _ = media_host
+    tier = {
+        "unit_id": "E1S01",
+        "request_duration_seconds": 8,
+        "problems": [{"code": "reference_duration_confirmation_required", "action": "confirm_request_duration"}],
+    }
+    withheld = {
+        "unit_id": "E1S02",
+        "request_duration_seconds": 4,
+        "problems": [{"code": "generation_batch_admission_withheld", "action": "retry"}],
+    }
+    retry = _plan(A.RETRY, ["E1S01", "E1S02"], args={"admission": {"units": [tier, withheld]}})
+    planner.plans = [retry, retry, _plan(A.GENERATE_VIDEOS, ["E1S01", "E1S02"])]
+
+    await _tick(sessions, controller, run)
+
+    assert [r.confirmed_request_durations for r in planner.requests][-2:] == [{}, {"E1S01": 8}]
+    assert tools.calls[-1][0] is A.GENERATE_VIDEOS
+    assert tools.calls[-1][1]["confirmed_request_durations"] == {"E1S01": 8}
+
+
+async def test_a_retry_with_no_tier_to_confirm_still_blocks(media_host):
+    sessions, controller, run, planner, tools, _ = media_host
+    planner.plans = [_plan(A.RETRY, ["E1S01"])]
+
+    blocked = await _tick(sessions, controller, run)
+
+    assert (blocked.status, blocked.reason) == (RunStatus.BLOCKED_CONFIGURATION, "WORKFLOW_RETRY")
+    assert tools.calls == []
+
+
 def _episode_media(*, missing_video: bool = False) -> dict:
     done = {"current_ids": ["E1S01"], "missing_ids": [], "stale_ids": []}
     return {

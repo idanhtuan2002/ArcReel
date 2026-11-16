@@ -196,12 +196,15 @@ class MediaAdapter:
             if self._script_fingerprint(intent.scope.project_name, plan) != receipt_revision(pin):
                 raise OwnerBlocked("EXTERNAL_INPUT_CHANGED")
             confirmed: dict[str, int] = {}
-            if plan.next_action.type is A.CONFIRM_REQUEST_DURATION:
+            if plan.next_action.type in (A.CONFIRM_REQUEST_DURATION, A.RETRY):
                 # The automatic owner takes the tier the planner proposes for each unit, as a Human confirming it would.
+                # A batch the planner withholds (RETRY) because one unit's tier needs confirming is the same question:
+                # its other units wait only for that unit (trial 7, a TTS line 7.68 s on a 6 s shot).
                 confirmed = self._proposed_durations(plan)
-                if not confirmed:
+                if confirmed:
+                    plan = await self._plan(intent.scope.user_id, intent.scope.project_name, episode, confirmed)
+                elif plan.next_action.type is A.CONFIRM_REQUEST_DURATION:
                     raise OwnerBlocked("WORKFLOW_CONFIRM_REQUEST_DURATION")
-                plan = await self._plan(intent.scope.user_id, intent.scope.project_name, episode, confirmed)
             if await self._cast_voices(intent, receipt.digest, plan):
                 return outcome(intent, "WAIT", owner_state="VOICES_CASTING")
             if plan.next_action.type is not A.WAIT_FOR_TASK:
