@@ -21,28 +21,18 @@ const RUN = {
 describe("ActiveRunNotice", () => {
   afterEach(() => vi.restoreAllMocks());
 
-  it("warns while a run makes media and pauses it on request", async () => {
+  it("warns while a run makes media and links to the run's controls instead of holding one", async () => {
+    window.history.pushState({}, "", "/app/projects/demo/characters");
     vi.spyOn(client, "listProductionRuns").mockResolvedValue({ start: {}, runs: [RUN] } as unknown as RunList);
-    const control = vi
-      .spyOn(client, "controlProductionRun")
-      .mockResolvedValue({ ...RUN, status: "PAUSED" } as RunSnapshot);
+    const control = vi.spyOn(client, "controlProductionRun");
 
     render(<ActiveRunNotice projectName="demo" />);
-    await userEvent.click(await screen.findByRole("button", { name: "暂停运行" }));
-    // The banner's button only asks; nothing is paused until the question is answered.
-    expect(control).not.toHaveBeenCalled();
-    await userEvent.click(screen.getByRole("button", { name: "不暂停" }));
-    expect(screen.queryByRole("button", { name: "暂停" })).not.toBeInTheDocument();
-    await userEvent.click(screen.getByRole("button", { name: "暂停运行" }));
-    await userEvent.click(screen.getByRole("button", { name: "暂停" }));
+    expect(await screen.findByRole("status")).toHaveTextContent("第 2 集");
+    expect(screen.queryByRole("button", { name: "暂停运行" })).not.toBeInTheDocument();
 
-    expect(control).toHaveBeenCalledWith(
-      "demo",
-      "r1",
-      "pause",
-      expect.objectContaining({ expected_version: 7, expected_input_digest: "sha256:i", policy_digest: "sha256:p" }),
-    );
-    expect(screen.queryByRole("status")).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "查看并控制本次运行" }));
+    expect(window.location.pathname).toBe("/app/projects/demo");
+    expect(control).not.toHaveBeenCalled();
   });
 
   it("says nothing when the run has stopped", async () => {

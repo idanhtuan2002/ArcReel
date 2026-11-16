@@ -88,4 +88,34 @@ describe("ProjectOutcome", () => {
     await user.click(screen.getByRole("button", { name: "继续" }));
     expect(resume).toHaveBeenCalledWith("demo", stoppedRun, expect.any(String));
   });
+
+  it("pauses a running run from the status card after asking", async () => {
+    const running = run({
+      run_id: "live",
+      status: "WAITING_TASK",
+      stage: "EPISODE_PLAN",
+      targets: ["episode:2"],
+      version: 3,
+      input_digest: "sha256:i",
+      policy_digest: "sha256:p",
+    } as Partial<RunSnapshot>);
+    vi.spyOn(client, "listProductionRuns").mockResolvedValue({ start: {}, runs: [running] } as unknown as RunList);
+    const control = vi.spyOn(client, "controlProductionRun").mockResolvedValue({ ...running, status: "PAUSED" });
+    const user = userEvent.setup();
+
+    render(<ProjectOutcome projectName="demo" titles={{}} onOpenDetails={vi.fn()} />);
+    await user.click(await screen.findByRole("button", { name: "暂停运行" }));
+    expect(control).not.toHaveBeenCalled();
+    await user.click(screen.getByRole("button", { name: "不暂停" }));
+    await user.click(screen.getByRole("button", { name: "暂停运行" }));
+    await user.click(screen.getByRole("button", { name: "暂停" }));
+
+    expect(control).toHaveBeenCalledWith(
+      "demo",
+      "live",
+      "pause",
+      expect.objectContaining({ expected_version: 3, expected_input_digest: "sha256:i", policy_digest: "sha256:p" }),
+    );
+    expect(await screen.findByRole("button", { name: "继续" })).toBeInTheDocument();
+  });
 });
