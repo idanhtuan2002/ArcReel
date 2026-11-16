@@ -6,12 +6,14 @@ from pathlib import Path
 
 import pytest
 
+from r2.contracts.automation import RunStage
 from server.production_run.final_checks import (
     length_findings,
     picture_findings,
     sound_findings,
     subtitle_findings,
     timing_findings,
+    variety_findings,
 )
 
 NARRATION = "Ông lão lặng lẽ thả lưới giữa dòng sông. Bỗng chiếc hộp gỗ mắc vào lưới."
@@ -178,3 +180,36 @@ def test_a_final_far_from_the_episode_target_is_minor(seconds: float, target: in
 
 def test_no_target_means_no_length_finding() -> None:
     assert length_findings(26.1, None, unit_key="episode:1") == []
+
+
+# Shot variety; the run cases are OpenMontage's (tests/lib/test_variation_checker_runs.py at 08e2151).
+def test_separate_pairs_of_one_size_are_not_a_run():
+    sizes = ("Long Shot", "Long Shot", "Close-up", "Close-up", "Medium Shot", "Medium Shot")
+    assert variety_findings(sizes, unit_key="episode:1") == []
+
+
+def test_three_consecutive_shots_of_one_size_are_a_minor_finding():
+    (finding,) = variety_findings(("Long Shot", "Long Shot", "Long Shot", "Close-up", "Medium Shot"), unit_key="e:1")
+    assert (finding.code, finding.severity, finding.repair_stage) == ("CHECK_SHOT_RUN", "MINOR", RunStage.SCRIPT)
+    assert finding.detail == "3 consecutive Long Shot shots"
+
+
+def test_shots_of_unknown_size_form_no_run_and_break_one():
+    assert variety_findings(("", "", "", "Close-up"), unit_key="e:1") == []
+    assert variety_findings(("Close-up", "Close-up", "", "Close-up", "Long Shot"), unit_key="e:1") == []
+
+
+def test_one_size_over_sixty_percent_of_five_or_more_shots_is_monotony():
+    sizes = (
+        "Medium Shot",
+        "Close-up",
+        "Medium Shot",
+        "Long Shot",
+        "Medium Shot",
+        "Close-up",
+        "Medium Shot",
+        "Medium Shot",
+    )
+    codes = [finding.code for finding in variety_findings(sizes, unit_key="e:1")]
+    assert codes == ["CHECK_SHOT_MONOTONY"]
+    assert variety_findings(("Medium Shot", "Close-up", "Medium Shot", "Medium Shot"), unit_key="e:1") == []

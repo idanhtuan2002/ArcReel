@@ -5,7 +5,7 @@ placeholder text. The picture must not be black for long and, in most frames, mu
 finding with the stage that repairs it; the checks read only the final, its subtitle sidecar and the narration.
 
 Delivery checks (loudness against the render contract, dead air, subtitle reading speed and event duration, the final's
-length against the run's episode target) are MINOR
+length against the run's episode target, the variety of its shot sizes) are MINOR
 findings: they are recorded and shown with every review but never send the run back, so reviewer qualification is
 unchanged.
 """
@@ -16,6 +16,8 @@ import contextlib
 import re
 import subprocess
 import unicodedata
+from collections import Counter
+from collections.abc import Sequence
 from difflib import SequenceMatcher
 from pathlib import Path
 
@@ -41,6 +43,11 @@ MIN_CUE_SECONDS = 5 / 6
 MAX_CUE_SECONDS = 7.0
 #: The share a final may miss the run's episode target by, as the adaptation's length check allows.
 TARGET_LENGTH_TOLERANCE = 0.2
+#: Shot variety (OpenMontage ``lib/variation_checker.py``): three or more consecutive shots of one size read as a
+#: slideshow; one size over 60% of an episode of at least five shots reads as one camera position.
+SAME_SHOT_RUN = 3
+DOMINANT_SHOT_SHARE = 0.6
+DOMINANT_SHOT_MIN_SHOTS = 5
 
 _CUE = re.compile(r"(\d+):(\d+):(\d+)[,.](\d+)\s*-->\s*(\d+):(\d+):(\d+)[,.](\d+)")
 _SILENCE = re.compile(r"silence_duration:\s*([0-9.]+)")
@@ -286,6 +293,42 @@ def length_findings(seconds: float, target: float | None, *, unit_key: str) -> l
     ]
 
 
+def variety_findings(shot_types: Sequence[str], *, unit_key: str) -> list[AssessmentFinding]:
+    """MINOR findings for a monotonous shot plan: a run of ``SAME_SHOT_RUN`` or more consecutive shots of one size,
+    or one size over ``DOMINANT_SHOT_SHARE`` of the shots; none for an episode without shot sizes."""
+    found: list[AssessmentFinding] = []
+    longest, current, longest_size = 0, 0, ""
+    for index, size in enumerate(shot_types):
+        # A shot of unknown size counts in no run and breaks the one it interrupts.
+        current = (current + 1 if index and size == shot_types[index - 1] else 1) if size else 0
+        if current > longest:
+            longest, longest_size = current, size
+    sizes = [size for size in shot_types if size]
+    if longest >= SAME_SHOT_RUN:
+        found.append(
+            AssessmentFinding(
+                code="CHECK_SHOT_RUN",
+                severity="MINOR",
+                unit_key=unit_key,
+                repair_stage=RunStage.SCRIPT,
+                detail=f"{longest} consecutive {longest_size} shots",
+            )
+        )
+    if len(sizes) >= DOMINANT_SHOT_MIN_SHOTS:
+        size, count = Counter(sizes).most_common(1)[0]
+        if count / len(sizes) > DOMINANT_SHOT_SHARE:
+            found.append(
+                AssessmentFinding(
+                    code="CHECK_SHOT_MONOTONY",
+                    severity="MINOR",
+                    unit_key=unit_key,
+                    repair_stage=RunStage.SCRIPT,
+                    detail=f"{count} of {len(sizes)} shots are {size}",
+                )
+            )
+    return found
+
+
 __all__ = [
     "length_findings",
     "picture_findings",
@@ -293,4 +336,5 @@ __all__ = [
     "subtitle_findings",
     "subtitle_text",
     "timing_findings",
+    "variety_findings",
 ]

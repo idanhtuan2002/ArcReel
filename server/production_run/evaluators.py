@@ -41,6 +41,7 @@ from server.production_run.final_checks import (
     sound_findings,
     subtitle_findings,
     timing_findings,
+    variety_findings,
 )
 from server.production_run.vision_chat import AccessFor, ollama_access, vision_chat
 
@@ -451,6 +452,8 @@ class FinalEvidence:
     language: str = "vi"
     #: The film's form the review prompt is written for (``review_form`` of the run's launch profile).
     form: str = "narration"
+    #: The shot size of each segment in play order, from the episode script; empty when unknown.
+    shot_types: tuple[str, ...] = ()
 
 
 class QualifiedEvaluator(Protocol):
@@ -585,6 +588,7 @@ class FrameReviewer:
             checks += timing_findings(subtitles, unit_key=evidence.unit_key)
             checks += await asyncio.to_thread(sound_findings, evidence.final_path, unit_key=evidence.unit_key)
             checks += length_findings(duration, evidence.target_seconds, unit_key=evidence.unit_key)
+            checks += variety_findings(evidence.shot_types, unit_key=evidence.unit_key)
             cues = "\n".join(
                 f"{_FRAME_WORD.get(evidence.language, 'Frame')} {index + 1} ({seconds:.1f}s): "
                 f"«{cue_at(subtitles, seconds) or '—'}»"

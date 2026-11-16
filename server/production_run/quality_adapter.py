@@ -14,6 +14,7 @@ import asyncio
 import hashlib
 import json
 from pathlib import Path
+from typing import Any
 
 from lib.db.repositories.production_runs import ProductionRunRepository
 from lib.db.repositories.reviewer_qualifications import ReviewerQualificationRepository, qualification_digest
@@ -248,17 +249,31 @@ class QualityAdapter:
                 target_seconds=run.policy.target_duration_seconds,
                 language=run.policy.language,
                 form=review_form(run.policy.launch_profile_id),
+                shot_types=self._shot_types(run.project_name, episode),
             )
         return targets
 
-    def _narration(self, project_name: str, episode: int) -> str:
+    def _script(self, project_name: str, episode: int) -> dict[str, Any]:
         project = self._projects.load_project(project_name)
         entry = next((e for e in project.get("episodes") or [] if e.get("episode") == episode), {})
         script_file = entry.get("script_file")
         if not isinstance(script_file, str):
             raise OwnerBlocked("UPSTREAM_RECEIPT_MISSING")
-        script = json.loads((self._projects.get_project_path(project_name) / script_file).read_text(encoding="utf-8"))
+        return json.loads((self._projects.get_project_path(project_name) / script_file).read_text(encoding="utf-8"))
+
+    def _narration(self, project_name: str, episode: int) -> str:
+        script = self._script(project_name, episode)
         return "\n".join(str(item.get("novel_text", "")) for item in script.get("segments") or [])
+
+    def _shot_types(self, project_name: str, episode: int) -> tuple[str, ...]:
+        """Each segment's shot size in play order; a segment without one counts as unknown (empty)."""
+        sizes: list[str] = []
+        for item in self._script(project_name, episode).get("segments") or []:
+            prompt = item.get("image_prompt") if isinstance(item, dict) else None
+            composition = prompt.get("composition") if isinstance(prompt, dict) else None
+            size = composition.get("shot_type") if isinstance(composition, dict) else None
+            sizes.append(size if isinstance(size, str) else "")
+        return tuple(sizes)
 
     @staticmethod
     def _review_path(evidence: FinalEvidence, role: str) -> Path:

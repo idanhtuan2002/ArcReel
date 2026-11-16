@@ -40,6 +40,7 @@ from server.production_run.final_checks import (
     sound_findings,
     subtitle_findings,
     timing_findings,
+    variety_findings,
 )
 from server.production_run.vision_chat import AccessFor, model_access
 
@@ -91,6 +92,7 @@ class GeminiReviewer:
             if evidence.target_seconds:
                 seconds = await asyncio.to_thread(final_duration, evidence.final_path)
                 checks += length_findings(seconds, evidence.target_seconds, unit_key=evidence.unit_key)
+            checks += variety_findings(evidence.shot_types, unit_key=evidence.unit_key)
             base_url, api_key = await self._credentials_for(route.provider_id)
             body = {
                 "contents": [
