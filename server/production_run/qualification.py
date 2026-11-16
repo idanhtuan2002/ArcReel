@@ -58,6 +58,7 @@ def _evidence(corpus: Path, output: Path, language: str, form: str = "narration"
                     subject_digest=_digest(final),
                     language=language,
                     form=form,
+                    dialogue=(root / case["dialogue"]).read_text(encoding="utf-8") if case.get("dialogue") else None,
                 ),
             )
         )

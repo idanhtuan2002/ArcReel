@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import dataclasses
 import json
 import math
 import shutil
@@ -101,6 +102,21 @@ def _reviewer(
         return httpx.Response(200, json={"message": {"content": content}})
 
     return OllamaReviewer(base_url_for=_base_url, transport=httpx.MockTransport(handler))
+
+
+async def test_a_drama_review_reads_each_line_with_its_speaker_and_checks_subtitles_on_the_bare_lines(
+    tmp_path: Path,
+) -> None:
+    sent: list[dict] = []
+    evidence = dataclasses.replace(_evidence(tmp_path), form="drama", dialogue="Hải: Xin chào")
+
+    review = await _reviewer(ANSWER, sent=sent).assess(route=ROUTE, evidence=evidence)
+
+    assert review.outcome == "COMPLETED"
+    scoring = sent[-1]["messages"][0]["content"]
+    assert "LỜI THOẠI:\nHải: Xin chào" in scoring
+    # The subtitle check compares the bare lines: a speaker name is never a subtitle mismatch.
+    assert not [f for f in review.findings if f.code.startswith("CHECK_SUBTITLE")]
 
 
 async def test_review_request_refuses_silent_truncation_and_sends_every_frame(tmp_path: Path) -> None:

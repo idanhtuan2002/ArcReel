@@ -264,6 +264,7 @@ class QualityAdapter:
                 form=review_form(run.policy.launch_profile_id),
                 shot_types=self._shot_types(run.project_name, episode),
                 unlisted_cast=self._unlisted_cast(run.project_name, episode),
+                dialogue=self._dialogue(run.project_name, episode),
             )
         return targets
 
@@ -276,8 +277,19 @@ class QualityAdapter:
         return json.loads((self._projects.get_project_path(project_name) / script_file).read_text(encoding="utf-8"))
 
     def _narration(self, project_name: str, episode: int) -> str:
+        """What the final says, as its subtitles show it: a narration's segments, or a drama's spoken lines in order
+        (``scenes[].utterances[].text``; a drama script has no segments)."""
         script = self._script(project_name, episode)
-        return "\n".join(str(item.get("novel_text", "")) for item in script.get("segments") or [])
+        if script.get("segments"):
+            return "\n".join(str(item.get("novel_text", "")) for item in script.get("segments") or [])
+        return "\n".join(text for _speaker, text in _spoken_lines(script))
+
+    def _dialogue(self, project_name: str, episode: int) -> str | None:
+        """A drama's lines with their speakers for the review prompt; ``None`` for a narration."""
+        lines = _spoken_lines(self._script(project_name, episode))
+        if not lines or self._script(project_name, episode).get("segments"):
+            return None
+        return "\n".join(f"{speaker}: {text}" if speaker else text for speaker, text in lines)
 
     def _unlisted_cast(self, project_name: str, episode: int) -> tuple[tuple[str, tuple[str, ...]], ...]:
         characters = (self._projects.load_project(project_name).get("characters") or {}).keys()
@@ -287,9 +299,10 @@ class QualityAdapter:
         return tuple((item.segment_id, item.names) for item in unlisted_cast(segments, characters))
 
     def _shot_types(self, project_name: str, episode: int) -> tuple[str, ...]:
-        """Each segment's shot size in play order; a segment without one counts as unknown (empty)."""
+        """Each segment's (a drama's: scene's) shot size in play order; one without a size counts as unknown."""
         sizes: list[str] = []
-        for item in self._script(project_name, episode).get("segments") or []:
+        script = self._script(project_name, episode)
+        for item in script.get("segments") or script.get("scenes") or []:
             prompt = item.get("image_prompt") if isinstance(item, dict) else None
             composition = prompt.get("composition") if isinstance(prompt, dict) else None
             size = composition.get("shot_type") if isinstance(composition, dict) else None
@@ -392,6 +405,19 @@ class QualityAdapter:
                 staged = path.with_suffix(".tmp")
                 staged.write_text(review.model_dump_json(), encoding="utf-8")
                 staged.replace(path)
+
+
+def _spoken_lines(script: dict[str, Any]) -> list[tuple[str, str]]:
+    """A drama script's spoken lines in order as (speaker, text); a voiceover has no speaker."""
+    lines: list[tuple[str, str]] = []
+    for scene in script.get("scenes") or []:
+        utterances = (scene.get("utterances") if isinstance(scene, dict) else None) or []
+        lines.extend(
+            (str(utterance.get("speaker") or "").strip(), str(utterance["text"]).strip())
+            for utterance in utterances
+            if isinstance(utterance, dict) and str(utterance.get("text") or "").strip()
+        )
+    return lines
 
 
 #: Verdicts that are the reviewers' judgement of the final, as opposed to missing, stale or unqualified evidence.

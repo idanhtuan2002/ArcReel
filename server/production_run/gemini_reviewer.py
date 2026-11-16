@@ -116,7 +116,8 @@ class GeminiReviewer:
                             },
                             {
                                 "text": review_prompts(evidence.language, evidence.form)[1].format(
-                                    subtitles=subtitles[:6000], narration=evidence.narration_text[:6000]
+                                    subtitles=subtitles[:6000],
+                                    narration=(evidence.dialogue or evidence.narration_text)[:6000],
                                 )
                             },
                         ],

@@ -460,6 +460,9 @@ class FinalEvidence:
     unlisted_cast: tuple[tuple[str, tuple[str, ...]], ...] = ()
     #: A transcript of the final's sound, when a transcription route made one; ``None`` leaves speech unchecked.
     speech_transcript: str | None = None
+    #: A drama's lines with their speakers ("Name: line", one per line) for the review prompt, which judges whether
+    #: each line is the right character's; ``narration_text`` keeps the bare lines the subtitles are checked against.
+    dialogue: str | None = None
 
 
 class QualifiedEvaluator(Protocol):
@@ -611,7 +614,7 @@ class FrameReviewer:
                 frame_count=len(frames),
                 frame_cues=cues,
                 subtitles=subtitles[:6000],
-                narration=evidence.narration_text[:6000],
+                narration=(evidence.dialogue or evidence.narration_text)[:6000],
             )
             times = frame_times(duration, len(frames))
             async with vision_chat(
