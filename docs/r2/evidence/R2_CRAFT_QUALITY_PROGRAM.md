@@ -147,3 +147,18 @@ Catalog `docs/r2/R2_CONTENT_FORMS_CATALOG.md`; gap analysis `docs/research/2026-
   - reviewer_a `qwen2.5vl:7b` rejected: story 4, visual 3, audio 5, continuity 4, pacing 4; MINOR finding that frame 3 does not match its subtitle.
   - reviewer_b `gemma3:4b` accepted: 4/4/5/4/4; MINOR findings: harsh light on Ông Ba's face, and Hải's feet on the steps while he appears on the boat.
   - The best-of-2 selection was redone once in generation 7 because generation 6's evidence predates `kept_version`.
+- 2026-11-16, ADR-0166 phase C, continued (r2-v2.5.66):
+  - `8f9f56eac`: a drama final is reviewed against its spoken lines.
+    - Before: the quality adapter read the narration from script segments, and a drama script has none. Every drama final went to review with an empty narration, and the subtitle check failed it as CRITICAL. The phase C smoke run would have stopped at QUALITY.
+    - Now: the bare lines are checked against the subtitles. `FinalEvidence.dialogue` ("Name: line") feeds the drama review prompt. A corpus case may name a dialogue file.
+  - Drama reviewer corpus builder:
+    - Script: `/mnt/arcreel/D/ArcReel/operations/reviewer-corpus-drama-2026-11-16/build_drama.py`.
+    - Content: the 20 Vietnamese corpus stories, rewritten as two-character dialogue by OpenRouter Ernie with Particle as fallback, and checked in code. Lines are voiced by local VieNeu, a male and a female voice per story. Stills come from the English corpus. The defects are the same 10 types.
+    - Each case carries `narration.txt` and `dialogue.txt`.
+    - Run: `OR=<openrouter key> uv run python build_drama.py` (`one` builds story 0 only).
+  - The host start script `v2-release-start.sh` sets `ARCREEL_REVIEWER_CORPUS_DRAMA` to that manifest (backup `.before-drama-corpus.20261116`). It applies at the next deploy.
+  - Remaining for phase C:
+    - build the corpus (the sponsor runs it with the OpenRouter key);
+    - after trial 7's run frees the GPU, qualify the reviewers for `fiction_drama_vi_v2` from the run panel;
+    - run the two-character smoke run.
+
