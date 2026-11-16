@@ -1,7 +1,7 @@
 import { startTransition, useState, useEffect, useRef } from "react";
 import { errMsg, voidPromise } from "@/utils/async";
 import { useLocation } from "wouter";
-import { ChevronLeft, Activity, Settings, Bell, Coins, Download, Loader2, Package } from "lucide-react";
+import { ChevronLeft, Activity, Settings, Bell, Coins, Download, Loader2, Package, PanelLeftClose, PanelLeftOpen } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useAppStore } from "@/stores/app-store";
 import { useConfigStatusStore } from "@/stores/config-status-store";
@@ -46,6 +46,8 @@ interface GlobalHeaderProps {
  * - 右：通知 / 费用 / 任务雷达 / 导出 / 资产库 / 设置
  */
 export function GlobalHeader({ onNavigateBack }: GlobalHeaderProps) {
+  const sidebarHidden = useAppStore((s) => s.sidebarHidden);
+  const toggleSidebarHidden = useAppStore((s) => s.toggleSidebarHidden);
   const { t } = useTranslation();
   const [, setLocation] = useLocation();
   const { currentProjectData, currentProjectName } = useProjectsStore();
@@ -216,6 +218,17 @@ export function GlobalHeader({ onNavigateBack }: GlobalHeaderProps) {
         <div className="flex min-w-0 items-center gap-2">
           <button
             type="button"
+            onClick={toggleSidebarHidden}
+            className="grid h-7 w-7 place-items-center rounded-md transition-colors focus-ring"
+            style={{ color: "var(--color-text-3)" }}
+            aria-pressed={!sidebarHidden}
+            aria-label={sidebarHidden ? t("dashboard:sidebar_show") : t("dashboard:sidebar_hide")}
+            title={`${sidebarHidden ? t("dashboard:sidebar_show") : t("dashboard:sidebar_hide")} (Ctrl/⌘+B)`}
+          >
+            {sidebarHidden ? <PanelLeftOpen className="h-4 w-4" /> : <PanelLeftClose className="h-4 w-4" />}
+          </button>
+          <button
+            type="button"
             onClick={onNavigateBack}
             className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs transition-colors focus-ring"
             style={{ color: "var(--color-text-3)" }}
@@ -224,7 +237,7 @@ export function GlobalHeader({ onNavigateBack }: GlobalHeaderProps) {
             aria-label={t("dashboard:projects")}
           >
             <ChevronLeft className="h-4 w-4" />
-            <span className="hidden sm:inline">{t("dashboard:projects")}</span>
+            <span className="hidden whitespace-nowrap sm:inline">{t("dashboard:projects")}</span>
           </button>
           <div
             aria-hidden="true"

@@ -26,6 +26,33 @@ export const ASSISTANT_PANEL_MAX_WIDTH = 720;
 const ASSISTANT_PANEL_WIDTH_STORAGE_KEY = "arcreel_assistant_panel_width";
 const ASSISTANT_PANEL_OPEN_STORAGE_KEY = "arcreel_assistant_panel_open";
 
+export const SIDEBAR_DEFAULT_WIDTH = 256;
+export const SIDEBAR_MIN_WIDTH = 200;
+export const SIDEBAR_MAX_WIDTH = 420;
+const SIDEBAR_WIDTH_STORAGE_KEY = "arcreel.sidebar.width";
+const SIDEBAR_HIDDEN_STORAGE_KEY = "arcreel.sidebar.hidden";
+
+export function clampSidebarWidth(value: number): number {
+  if (!Number.isFinite(value)) return SIDEBAR_DEFAULT_WIDTH;
+  return Math.min(SIDEBAR_MAX_WIDTH, Math.max(SIDEBAR_MIN_WIDTH, Math.round(value)));
+}
+
+function readStored(key: string): string | null {
+  try {
+    return typeof window === "undefined" ? null : window.localStorage.getItem(key);
+  } catch {
+    return null;
+  }
+}
+
+function writeStored(key: string, value: string): void {
+  try {
+    window.localStorage.setItem(key, value);
+  } catch {
+    // localStorage unavailable (private mode / quota): the in-memory value still applies
+  }
+}
+
 export function clampAssistantPanelWidth(value: number): number {
   if (!Number.isFinite(value)) return ASSISTANT_PANEL_DEFAULT_WIDTH;
   return Math.min(
@@ -107,6 +134,13 @@ interface AppState {
   persistAssistantPanelWidth: () => void;
   taskHudOpen: boolean;
   setTaskHudOpen: (open: boolean) => void;
+  /** The project sidebar is hidden entirely (header button, Ctrl/Cmd+B); remembered per browser. */
+  sidebarHidden: boolean;
+  toggleSidebarHidden: () => void;
+  /** The expanded project sidebar's width in pixels, dragged by its edge; remembered per browser. */
+  sidebarWidth: number;
+  setSidebarWidth: (width: number) => void;
+  persistSidebarWidth: () => void;
 
   // Source files invalidation signal
   sourceFilesVersion: number;
@@ -273,6 +307,15 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
   taskHudOpen: false,
   setTaskHudOpen: (open) => set({ taskHudOpen: open }),
+  sidebarHidden: readStored(SIDEBAR_HIDDEN_STORAGE_KEY) === "1",
+  toggleSidebarHidden: () =>
+    set((s) => {
+      writeStored(SIDEBAR_HIDDEN_STORAGE_KEY, s.sidebarHidden ? "0" : "1");
+      return { sidebarHidden: !s.sidebarHidden };
+    }),
+  sidebarWidth: clampSidebarWidth(Number(readStored(SIDEBAR_WIDTH_STORAGE_KEY) ?? SIDEBAR_DEFAULT_WIDTH)),
+  setSidebarWidth: (width) => set({ sidebarWidth: clampSidebarWidth(width) }),
+  persistSidebarWidth: () => writeStored(SIDEBAR_WIDTH_STORAGE_KEY, String(get().sidebarWidth)),
 
   sourceFilesVersion: 0,
   invalidateSourceFiles: () => set((s) => ({ sourceFilesVersion: s.sourceFilesVersion + 1 })),

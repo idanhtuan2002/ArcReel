@@ -22,7 +22,7 @@ import {
 } from "lucide-react";
 import { useProjectsStore } from "@/stores/projects-store";
 import { useCostStore } from "@/stores/cost-store";
-import { useAppStore } from "@/stores/app-store";
+import { SIDEBAR_DEFAULT_WIDTH, SIDEBAR_MAX_WIDTH, SIDEBAR_MIN_WIDTH, useAppStore } from "@/stores/app-store";
 import { API } from "@/api";
 import { useDemoWorkbench } from "@/onboarding/use-demo-workbench";
 import { isDemoProject } from "@/onboarding/demo-project";
@@ -58,6 +58,10 @@ export function AssetSidebar({ className }: AssetSidebarProps) {
   const debouncedFetchCost = useCostStore((s) => s.debouncedFetch);
   const [location, setLocation] = useLocation();
   const [collapsedByUser, setCollapsed] = useState(false);
+  const sidebarWidth = useAppStore((s) => s.sidebarWidth);
+  const setSidebarWidth = useAppStore((s) => s.setSidebarWidth);
+  const persistSidebarWidth = useAppStore((s) => s.persistSidebarWidth);
+  const [resizing, setResizing] = useState(false);
   // 窄屏下侧栏固定收成图标栏，给画布留出宽度
   const narrow = useNarrowViewport();
   const collapsed = collapsedByUser || narrow;
@@ -230,15 +234,57 @@ export function AssetSidebar({ className }: AssetSidebarProps) {
 
   return (
     <aside
-      className={`flex flex-col overflow-hidden transition-[width] duration-[180ms] ease-out motion-reduce:transition-none ${className ?? ""}`}
+      className={`relative flex flex-col overflow-hidden ${resizing ? "" : "transition-[width] duration-[180ms] ease-out motion-reduce:transition-none"} ${className ?? ""}`}
       style={{
-        width: collapsed ? 64 : 256,
+        width: collapsed ? 64 : sidebarWidth,
         borderRight: "1px solid var(--color-hairline)",
         background:
           "linear-gradient(180deg, oklch(0.195 0.011 265 / 0.6), oklch(0.175 0.010 265 / 0.5))",
         boxShadow: "inset -1px 0 0 oklch(1 0 0 / 0.015)",
       }}
     >
+      {!collapsed && (
+        // eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions -- WAI-ARIA window splitter: a focusable separator with a value is an interactive widget
+        <div
+          role="separator"
+          aria-orientation="vertical"
+          aria-label={t("dashboard:sidebar_resize")}
+          aria-valuemin={SIDEBAR_MIN_WIDTH}
+          aria-valuemax={SIDEBAR_MAX_WIDTH}
+          aria-valuenow={sidebarWidth}
+          // eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- the window splitter takes focus to be resized by keyboard
+          tabIndex={0}
+          title={t("dashboard:sidebar_resize")}
+          className="absolute inset-y-0 right-0 z-10 w-1.5 cursor-col-resize hover:bg-[var(--color-accent-soft)] focus-visible:bg-[var(--color-accent-soft)] focus-visible:outline-none"
+          onPointerDown={(event) => {
+            event.preventDefault();
+            const startX = event.clientX;
+            const startWidth = sidebarWidth;
+            setResizing(true);
+            const move = (e: PointerEvent) => setSidebarWidth(startWidth + e.clientX - startX);
+            const up = () => {
+              window.removeEventListener("pointermove", move);
+              window.removeEventListener("pointerup", up);
+              setResizing(false);
+              persistSidebarWidth();
+            };
+            window.addEventListener("pointermove", move);
+            window.addEventListener("pointerup", up);
+          }}
+          onDoubleClick={() => {
+            setSidebarWidth(SIDEBAR_DEFAULT_WIDTH);
+            persistSidebarWidth();
+          }}
+          onKeyDown={(event) => {
+            const step = event.shiftKey ? 48 : 16;
+            if (event.key === "ArrowLeft" || event.key === "ArrowRight") {
+              event.preventDefault();
+              setSidebarWidth(sidebarWidth + (event.key === "ArrowRight" ? step : -step));
+              persistSidebarWidth();
+            }
+          }}
+        />
+      )}
       {/* ---- Workspace nav ---- */}
       <div className="px-2.5 pb-1.5 pt-2.5">
         {navItems.map((item) => {

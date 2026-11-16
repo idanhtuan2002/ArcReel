@@ -5,7 +5,8 @@ import { ProductionRunPanel } from "@/features/production-run/ui/ProductionRunPa
 import { ProjectOutcome } from "@/features/production-run/ui/ProjectOutcome";
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Pencil, RefreshCw, Sparkles, Users, Landmark, Package } from "lucide-react";
+import { useLocation } from "wouter";
+import { ChevronDown, ChevronRight, ChevronUp, Pencil, RefreshCw, Sparkles, Users, Landmark, Package } from "lucide-react";
 import type { ProjectData } from "@/types";
 import { API, ConflictError } from "@/api";
 import { useProjectsStore } from "@/stores/projects-store";
@@ -28,6 +29,9 @@ interface OverviewCanvasProps {
   /** 只读展示（引导演示项目）：不渲染编辑与重新生成入口。 */
   readOnly?: boolean;
 }
+
+/** The workspace pages of each asset kind, as the sidebar opens them. */
+const ASSET_PATHS = { character: "/characters", scene: "/scenes", prop: "/props" } as const;
 
 const CARD_BG =
   "linear-gradient(180deg, oklch(0.22 0.012 265 / 0.55), oklch(0.19 0.010 265 / 0.40))";
@@ -94,6 +98,7 @@ export function OverviewCanvas({
   // 加载已有概览的项目不会触发；AgentHandoffHint 内还有 sessionStorage
   // 防 reload 重复。
   const [handoffTrigger, setHandoffTrigger] = useState(0);
+  const [, setLocation] = useLocation();
   // The operations details (pipeline, gates, every automatic run) stay closed until the filmmaker asks for them.
   const [operationsOpen, setOperationsOpen] = useState(false);
   const operationsRef = useRef<HTMLDetailsElement>(null);
@@ -227,6 +232,8 @@ export function OverviewCanvas({
   }, [projectName, refreshProject]);
 
   const [editingOverview, setEditingOverview] = useState(false);
+  // A written overview can be folded away while it is not needed; it opens again on edit.
+  const [overviewFolded, setOverviewFolded] = useState(false);
   const [savingOverview, setSavingOverview] = useState(false);
   const [draft, setDraft] = useState<OverviewDraft>({
     synopsis: "",
@@ -420,8 +427,17 @@ export function OverviewCanvas({
                   {t("project_overview_title")}
                 </span>
                 <div className="flex-1" />
-                {!editingOverview && !readOnly && (
+                {!editingOverview && !readOnly && overview && (
                   <>
+                    <button
+                      type="button"
+                      onClick={() => setOverviewFolded((folded) => !folded)}
+                      aria-expanded={!overviewFolded}
+                      className="focus-ring inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] text-[var(--color-text-3)] transition-colors hover:bg-[oklch(1_0_0_/_0.05)] hover:text-[var(--color-text)]"
+                    >
+                      {overviewFolded ? <ChevronDown className="h-3 w-3" /> : <ChevronUp className="h-3 w-3" />}
+                      <span>{overviewFolded ? t("overview_unfold") : t("overview_fold")}</span>
+                    </button>
                     <button
                       type="button"
                       onClick={enterOverviewEdit}
@@ -447,6 +463,9 @@ export function OverviewCanvas({
                 )}
               </div>
 
+              <p className="-mt-1 mb-3 text-[12px] leading-[1.6]" style={{ color: "var(--color-text-3)" }}>
+                {t("project_overview_explain")}
+              </p>
               {editingOverview && !readOnly ? (
                 <div className="space-y-3">
                   <div>
@@ -527,6 +546,7 @@ export function OverviewCanvas({
                   </div>
                 </div>
               ) : overview ? (
+                overviewFolded ? null : (
                 <>
                   {overview.synopsis && (
                     <p
@@ -585,16 +605,29 @@ export function OverviewCanvas({
                     </div>
                   )}
                 </>
+                )
               ) : readOnly ? null : (
-                <button
-                  type="button"
-                  onClick={enterOverviewEdit}
-                  className="focus-ring flex w-full items-center justify-center gap-2 rounded-lg border border-dashed border-[var(--color-hairline)] px-3 py-4 text-[13px] text-[var(--color-text-4)] transition-colors hover:border-[var(--color-accent-soft)] hover:text-[var(--color-text-2)]"
-                  style={{ background: "oklch(0.18 0.010 265 / 0.35)" }}
-                >
-                  <Pencil className="h-4 w-4" />
-                  {t("create_overview")}
-                </button>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => void handleRegenerate()}
+                    disabled={regenerating}
+                    className="focus-ring inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[12px] disabled:opacity-50"
+                    style={{ background: "var(--color-accent-dim)", border: "1px solid var(--color-accent-soft)", color: "var(--color-text)" }}
+                  >
+                    <Sparkles className={`h-3.5 w-3.5 ${regenerating ? "animate-pulse" : ""}`} />
+                    {regenerating ? t("regenerating_short") : t("overview_generate_from_source")}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={enterOverviewEdit}
+                    className="focus-ring inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[12px]"
+                    style={{ border: "1px solid var(--color-hairline)", color: "var(--color-text-2)" }}
+                  >
+                    <Pencil className="h-3.5 w-3.5" />
+                    {t("overview_write_myself")}
+                  </button>
+                </div>
               )}
             </section>
 
@@ -612,9 +645,12 @@ export function OverviewCanvas({
                   };
                   const Icon = key === "character" ? Users : key === "scene" ? Landmark : Package;
                   return (
-                    <div
+                    <button
+                      type="button"
                       key={key}
-                      className="rounded-2xl p-4"
+                      onClick={() => setLocation(ASSET_PATHS[key])}
+                      aria-label={t("open_asset_page", { label: labels[key], available: cat.available, total: cat.total })}
+                      className="focus-ring group rounded-2xl p-3.5 text-left transition-colors hover:border-[var(--color-accent-soft)]"
                       style={{
                         border: "1px solid var(--color-hairline-soft)",
                         background: CARD_BG,
@@ -650,6 +686,11 @@ export function OverviewCanvas({
                           {cat.available}
                           <span style={{ color: "var(--color-text-4)" }}>/{cat.total}</span>
                         </span>
+                        <ChevronRight
+                          aria-hidden
+                          className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5"
+                          style={{ color: "var(--color-text-3)" }}
+                        />
                       </div>
                       <div
                         className="relative h-1.5 overflow-hidden rounded-full"
@@ -670,13 +711,7 @@ export function OverviewCanvas({
                           }}
                         />
                       </div>
-                      <div
-                        className="num mt-1.5 text-right text-[10px]"
-                        style={{ color: "var(--color-text-4)" }}
-                      >
-                        {pct}%
-                      </div>
-                    </div>
+                    </button>
                   );
                 })}
               </section>
@@ -818,9 +853,12 @@ export function OverviewCanvas({
                     // 只读态不展示费用：演示数据没有对应的真实费用记录。
                     const epCost = readOnly ? undefined : getEpisodeCost(ep.episode);
                     return (
-                      <div
+                      <button
+                        type="button"
                         key={ep.episode}
-                        className="num flex flex-wrap items-center gap-3 rounded-xl px-4 py-2.5 text-[12px]"
+                        onClick={() => setLocation(`/episodes/${ep.episode}`)}
+                        aria-label={t("open_episode", { episode: ep.episode, title: ep.title ?? "" })}
+                        className="num focus-ring group flex w-full flex-wrap items-center gap-3 rounded-xl px-4 py-2.5 text-left text-[12px] transition-colors hover:border-[var(--color-accent-soft)]"
                         style={{
                           border: "1px solid var(--color-hairline-soft)",
                           background:
@@ -892,7 +930,12 @@ export function OverviewCanvas({
                             />
                           </span>
                         )}
-                      </div>
+                        <ChevronRight
+                          aria-hidden
+                          className="ml-auto h-3.5 w-3.5 shrink-0 transition-transform group-hover:translate-x-0.5"
+                          style={{ color: "var(--color-text-3)" }}
+                        />
+                      </button>
                     );
                   })}
                 </div>

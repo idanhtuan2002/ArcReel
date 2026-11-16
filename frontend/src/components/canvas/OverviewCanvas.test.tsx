@@ -162,14 +162,16 @@ describe("OverviewCanvas", () => {
     expect(screen.getByText("summary")).toBeInTheDocument();
   });
 
-  it("offers a create-overview entry when overview is absent but episodes exist", () => {
+  it("explains the overview and offers to generate it or write it when it is absent but episodes exist", () => {
     render(
       <OverviewCanvas
         projectName="demo"
         projectData={makeProjectData({ overview: undefined })}
       />,
     );
-    expect(screen.getByRole("button", { name: "创建概述" })).toBeInTheDocument();
+    expect(screen.getByText(/AI 在写剧本和生成画面时以此为上下文/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "由 AI 根据原文生成" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "自己填写" })).toBeInTheDocument();
   });
 
   it("dismisses a pending conflict prompt once the canvas turns read-only", async () => {
@@ -608,5 +610,12 @@ describe("OverviewCanvas ad mode", () => {
     );
     expect(screen.queryByTestId("ad-init-canvas")).not.toBeInTheDocument();
     expect(screen.getByTestId("welcome-canvas")).toBeInTheDocument();
+  });
+
+  it("opens an episode from its row", () => {
+    window.history.pushState({}, "", "/");
+    render(<OverviewCanvas projectName="demo" projectData={makeProjectData({})} />);
+    fireEvent.click(screen.getByRole("button", { name: /打开第 1 集/ }));
+    expect(window.location.pathname).toBe("/episodes/1");
   });
 });

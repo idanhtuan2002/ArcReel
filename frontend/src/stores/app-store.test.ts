@@ -57,3 +57,21 @@ describe("assistant panel state", () => {
     expect(useAppStore.getState().assistantPanelOpen).toBe(false);
   });
 });
+
+describe("project sidebar", () => {
+  it("keeps a dragged width within bounds and remembers it, and toggles hidden", () => {
+    useAppStore.getState().setSidebarWidth(999);
+    expect(useAppStore.getState().sidebarWidth).toBe(420);
+    useAppStore.getState().setSidebarWidth(10);
+    expect(useAppStore.getState().sidebarWidth).toBe(200);
+    useAppStore.getState().setSidebarWidth(300);
+    useAppStore.getState().persistSidebarWidth();
+    expect(window.localStorage.getItem("arcreel.sidebar.width")).toBe("300");
+
+    const hidden = useAppStore.getState().sidebarHidden;
+    useAppStore.getState().toggleSidebarHidden();
+    expect(useAppStore.getState().sidebarHidden).toBe(!hidden);
+    expect(window.localStorage.getItem("arcreel.sidebar.hidden")).toBe(hidden ? "0" : "1");
+    useAppStore.getState().toggleSidebarHidden();
+  });
+});

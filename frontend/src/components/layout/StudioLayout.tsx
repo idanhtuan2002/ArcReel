@@ -33,6 +33,8 @@ interface StudioLayoutProps {
  * 工作台三栏布局壳：顶栏 + （侧栏 / 主区 / Agent 面板）。
  */
 export function StudioLayout({ children }: StudioLayoutProps) {
+  const sidebarHidden = useAppStore((s) => s.sidebarHidden);
+  const toggleSidebarHidden = useAppStore((s) => s.toggleSidebarHidden);
   const { t } = useTranslation("dashboard");
   const [, setLocation] = useLocation();
   const currentProjectName = useProjectsStore((s) => s.currentProjectName);
@@ -163,6 +165,19 @@ export function StudioLayout({ children }: StudioLayoutProps) {
 
   const displayedPanelWidth = draftWidth ?? assistantPanelWidth;
 
+  // Ctrl/Cmd+B hides or shows the project sidebar (not while typing, where it may mean bold).
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (!(event.ctrlKey || event.metaKey) || event.key.toLowerCase() !== "b" || event.altKey || event.shiftKey) return;
+      const target = event.target as HTMLElement | null;
+      if (target && (target.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName))) return;
+      event.preventDefault();
+      toggleSidebarHidden();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [toggleSidebarHidden]);
+
   return (
     <div
       className="flex h-screen flex-col"
@@ -175,7 +190,7 @@ export function StudioLayout({ children }: StudioLayoutProps) {
       <MigrationRepairBanner />
       {demoMode ? null : <ActiveRunNotice projectName={sseProjectName} />}
       <div className="relative flex flex-1 overflow-hidden">
-        <AssetSidebar />
+        {sidebarHidden ? null : <AssetSidebar />}
         <main className="flex-1 overflow-hidden">
           {children}
         </main>
