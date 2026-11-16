@@ -201,7 +201,7 @@ export function ProjectOutcome({ projectName, titles, onOpenDetails }: Props) {
         {stopped && reason && (
           <>
             <p className="m-0 mt-1 text-[13px]" style={{ color: "var(--color-text)" }}>
-              {reason.text}
+              {reason.text.charAt(0).toLocaleUpperCase() + reason.text.slice(1)}
             </p>
             {reason.hint && (
               <p className="m-0 mt-1 text-[12.5px]" style={{ color: "var(--color-text-2)" }}>

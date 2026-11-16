@@ -309,7 +309,7 @@ export function OverviewCanvas({
 
   return (
     <div className="h-full overflow-y-auto">
-      <div className="mx-auto max-w-5xl space-y-5 px-6 py-6">
+      <div className="mx-auto max-w-5xl space-y-5 px-6 pb-24 pt-6">
         {/* Project title — display-serif heading with accent dash */}
         <header className="flex items-end gap-3">
           <span
@@ -376,8 +376,8 @@ export function OverviewCanvas({
               </span>
             </summary>
             <div className="space-y-4 px-3 pb-3">
-              <PipelineBoard projectName={projectName} />
               <ProductionRunPanel key={projectName} projectName={projectName} />
+              <PipelineBoard projectName={projectName} />
             </div>
           </details>
         ) : null}
@@ -849,7 +849,7 @@ export function OverviewCanvas({
                             status: t(`episode_status_label_${ep.status ?? "draft"}`),
                           })}
                         </span>
-                        {epCost && (
+                        {epCost && hasRecordedCost(epCost.totals) && (
                           <span className="ml-auto flex min-w-0 flex-shrink flex-wrap gap-3 text-[11px]">
                             <CostInline
                               label={t("estimate")}

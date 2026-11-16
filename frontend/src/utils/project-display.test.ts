@@ -29,6 +29,9 @@ describe("getProjectDisplayName with Markdown titles", () => {
     expect(getProjectDisplayName("# MÊ CUNG DỤC VỌNG", "x")).toBe("MÊ CUNG DỤC VỌNG");
     expect(getProjectDisplayName("## Chuyến đò cuối ", "x")).toBe("Chuyến đò cuối");
     expect(getProjectDisplayName("C# và #hashtag", "x")).toBe("C# và #hashtag");
+    expect(getProjectDisplayName("# MÊ CUNG DỤC VỌNG ### LABYRINTH OF DESIRE", "x")).toBe(
+      "MÊ CUNG DỤC VỌNG · LABYRINTH OF DESIRE",
+    );
     expect(getProjectDisplayName("  #  ", "Chưa đặt tên")).toBe("Chưa đặt tên");
   });
 });

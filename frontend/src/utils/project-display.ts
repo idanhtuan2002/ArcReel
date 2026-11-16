@@ -5,7 +5,12 @@ export function getProjectDisplayName(
   rawTitle: string | null | undefined,
   untitledLabel: string,
 ): string {
-  // A title taken from a Markdown story keeps its heading marks ("# Title"); they are not part of the name.
-  const trimmed = rawTitle?.trim().replace(/^#{1,6}\s+/, "").trim();
+  // A title taken from a Markdown story keeps its heading marks ("# Title", "Title ### Subtitle"); they are not part
+  // of the name: a leading run is dropped and an inner run separates the parts.
+  const trimmed = rawTitle
+    ?.trim()
+    .replace(/^#{1,6}\s+/, "")
+    .replace(/\s+#{1,6}\s+/g, " · ")
+    .trim();
   return trimmed && trimmed.length > 0 && !/^#+$/.test(trimmed) ? trimmed : untitledLabel;
 }

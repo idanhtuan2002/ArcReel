@@ -83,8 +83,9 @@ export function ProjectMenu() {
           </div>
           {currentProjectData && (
             <div
-              className="mt-0.5 text-[10px] font-medium uppercase leading-[1.1]"
+              className="mt-0.5 truncate whitespace-nowrap text-[10px] font-medium uppercase leading-[1.1]"
               style={{ color: "var(--color-text-4)", letterSpacing: "0.2px" }}
+              title={modeTagline}
             >
               {modeTagline}
             </div>
