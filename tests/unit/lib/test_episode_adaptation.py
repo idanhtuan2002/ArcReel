@@ -326,3 +326,21 @@ def test_an_excerpt_whose_start_is_not_in_the_source_once_is_left_for_the_check(
     short = {**_narration()["scenes"][1], "source_excerpt": "Lan không tin... gì cả"}
     draft = EpisodeAdaptationDraft.model_validate(_narration(scenes=[invented, short]))
     assert anchor_excerpts(draft, SOURCE) == draft
+
+
+async def test_characters_registered_after_an_adaptation_keep_it_current_and_removed_ones_do_not(tmp_path: Path):
+    project_path = _write(tmp_path)
+    project = _project()
+    await adapt_episode(project_path, project, 1, generate=_Model(_narration()))
+    record_path = project_path / "adaptations" / "episode_1.json"
+    assert json.loads(record_path.read_text(encoding="utf-8"))["characters"] == ["Lan"]
+
+    added = {**project, "characters": {**project["characters"], "Chú Tư": {"description": "ông lái đò"}}}
+    assert adaptation_state(project_path, added, 1) == "current"
+    assert adaptation_state(project_path, {**project, "characters": {"Minh": {"description": "x"}}}, 1) == "stale"
+
+    legacy = json.loads(record_path.read_text(encoding="utf-8"))
+    del legacy["characters"]  # a record written before the names were kept
+    record_path.write_text(json.dumps(legacy, ensure_ascii=False), encoding="utf-8")
+    assert adaptation_state(project_path, added, 1) == "current"
+    assert adaptation_state(project_path, {**project, "characters": {"Minh": {"description": "x"}}}, 1) == "stale"

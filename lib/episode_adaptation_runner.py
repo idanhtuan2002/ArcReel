@@ -60,6 +60,7 @@ async def adapt_episode(project_path: Path, project: Mapping[str, Any], episode:
             "episode": episode,
             "mode": inputs.mode,
             "basis": inputs.basis(),
+            "characters": list(inputs.characters),
             "source_relpath": episode_source_relpath(episode),
             "text_relpath": adaptation_text_relpath(episode),
             "text_digest": "sha256:" + hashlib.sha256(data).hexdigest(),

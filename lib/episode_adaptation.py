@@ -25,7 +25,7 @@ import json
 import re
 import unicodedata
 from collections.abc import Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any, Literal
 
@@ -499,9 +499,32 @@ def adaptation_state(
     except (OSError, ValueError, AdaptationError):
         return "stale"
     text_digest = "sha256:" + hashlib.sha256(text_path.read_bytes()).hexdigest()
-    if record.get("basis") != inputs.basis() or record.get("text_digest") != text_digest:
+    if not _basis_holds(record, inputs) or record.get("text_digest") != text_digest:
         return "stale"
     return "current"
+
+
+#: Characters registered after a record that kept no names which the basis check may set aside.
+_LEGACY_ADDED_CHARACTERS = 3
+
+
+def _basis_holds(record: Mapping[str, Any], inputs: AdaptationInputs) -> bool:
+    """Whether the record adapted what ``inputs`` reads now. Characters registered since (the run's own script step
+    registers the people its script names) leave it current: the record's names must all still be registered and
+    everything else must be the same. A record that kept no names is matched with up to three of the current
+    characters set aside."""
+    recorded = record.get("basis")
+    if recorded == inputs.basis():
+        return True
+    current = set(inputs.characters)
+    names = record.get("characters")
+    if isinstance(names, list) and all(isinstance(name, str) for name in names):
+        return set(names) <= current and recorded == replace(inputs, characters=tuple(sorted(names))).basis()
+    for count in range(1, min(_LEGACY_ADDED_CHARACTERS, len(current)) + 1):
+        for added in itertools.combinations(sorted(current), count):
+            if recorded == replace(inputs, characters=tuple(sorted(current - set(added)))).basis():
+                return True
+    return False
 
 
 __all__ = [
