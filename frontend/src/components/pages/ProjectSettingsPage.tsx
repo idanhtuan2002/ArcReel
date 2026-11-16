@@ -62,7 +62,12 @@ function sameProfileFiles(left: string[], right: string[]) {
 
 // ─── Section card primitive ─────────────────────────────────────────────────
 
+/** The anchor of the model section; "Open model settings" links here (``/settings#models``). */
+export const MODELS_ANCHOR = "models";
+
 interface SectionCardProps {
+  /** Anchor a link can open the page at (``#models``). */
+  id?: string;
   kicker: string;
   title?: string;
   description?: string;
@@ -70,10 +75,11 @@ interface SectionCardProps {
   footer?: React.ReactNode;
 }
 
-function SectionCard({ kicker, title, description, children, footer }: SectionCardProps) {
+function SectionCard({ id, kicker, title, description, children, footer }: SectionCardProps) {
   return (
     <section
-      className="overflow-hidden rounded-[12px] border border-hairline"
+      id={id}
+      className="scroll-mt-4 overflow-hidden rounded-[12px] border border-hairline"
       style={{
         background:
           "linear-gradient(180deg, oklch(0.20 0.012 270 / 0.55), oklch(0.16 0.010 265 / 0.55))",
@@ -105,6 +111,8 @@ function SectionCard({ kicker, title, description, children, footer }: SectionCa
 // ─── Component ───────────────────────────────────────────────────────────────
 
 export function ProjectSettingsPage() {
+  // Opened from "Open model settings": the model section starts open and in view once its options load.
+  const [openedAtModels] = useState(() => typeof window !== "undefined" && window.location.hash === `#${MODELS_ANCHOR}`);
   const { t } = useTranslation("dashboard");
   const params = useParams<{ projectName: string }>();
   const projectName = params.projectName || "";
@@ -222,6 +230,12 @@ export function ProjectSettingsPage() {
 
   // 候选是全局配置、与项目无关，故不跟随下面按 projectName 重取的效果；reload 的标识随语言
   // 变化，语言切换时只刷新候选与译名，不重取项目表单。拉取失败也只影响细分区。
+  useEffect(() => {
+    if (openedAtModels && options) {
+      document.getElementById(MODELS_ANCHOR)?.scrollIntoView({ block: "start" });
+    }
+  }, [openedAtModels, options]);
+
   useEffect(() => {
     void reloadCandidates();
   }, [reloadCandidates]);
@@ -798,9 +812,10 @@ export function ProjectSettingsPage() {
           {options && (
             <>
               {/* Model config (video + duration + image + text) */}
-              <SectionCard kicker="Engine Routing" title={t("model_config")}>
+              <SectionCard id={MODELS_ANCHOR} kicker="Engine Routing" title={t("model_config")}>
                 <ModelConfigSection
                   collapsible
+                  defaultOpen={openedAtModels}
                   projectName={projectName}
                   value={{
                     videoBackend,

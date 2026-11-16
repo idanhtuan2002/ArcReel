@@ -74,6 +74,8 @@ export interface ModelConfigSectionProps {
    */
   showSubFields?: boolean;
   collapsible?: boolean;
+  /** Opens the per-project model choices at once (a deep link to them, such as "Open model settings"). */
+  defaultOpen?: boolean;
   /**
    * 媒体细分项的候选（docs/adr/0054）。缺席（拉取失败）时细分区降级：只保留已配置的细分项、
    * 候选只列其当前值，未配置项不渲染；全部未配置即整块折叠区不渲染。
@@ -151,6 +153,7 @@ export function ModelConfigSection({
   options,
   showSubFields = true,
   collapsible = false,
+  defaultOpen = false,
   candidates,
   candidatesError,
   providers,
@@ -163,7 +166,7 @@ export function ModelConfigSection({
   enable,
 }: ModelConfigSectionProps) {
   const { t } = useTranslation(["templates", "dashboard"]);
-  const [customizationOpen, setCustomizationOpen] = useState<boolean | undefined>();
+  const [customizationOpen, setCustomizationOpen] = useState<boolean | undefined>(defaultOpen ? true : undefined);
   const configuredModels = [value.videoBackend, value.videoProviderI2V, value.videoProviderR2V,
     value.imageBackendDefault, value.imageBackendT2I, value.imageBackendI2I,
     value.textBackendDefault, value.textBackendSimple, value.textBackendComplex].filter(Boolean);

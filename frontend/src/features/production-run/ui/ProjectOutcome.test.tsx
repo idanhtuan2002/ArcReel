@@ -46,6 +46,11 @@ describe("ProjectOutcome", () => {
     expect(screen.getByText("第 2 集停在「改编」")).toBeInTheDocument();
     expect(screen.getByText("写作模型多次尝试后仍未能把本集改编成剧本")).toBeInTheDocument();
     expect(screen.queryByText("ADAPTATION_FAILED")).not.toBeInTheDocument();
+
+    window.history.pushState({}, "", "/");
+    await userEvent.click(screen.getByRole("button", { name: "打开模型设置" }));
+    expect(window.location.pathname).toBe("/app/projects/demo/settings");
+    expect(window.location.hash).toBe("#models");
   });
 
   it("offers to resume, and to reset the plan from the stopped episode after naming the episodes it would clear", async () => {

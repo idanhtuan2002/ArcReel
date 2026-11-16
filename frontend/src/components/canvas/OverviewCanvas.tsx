@@ -22,6 +22,7 @@ import { AdInitCanvas } from "./AdInitCanvas";
 import { ConflictModal, type ConflictResolution } from "./ConflictModal";
 import { AgentHandoffHint } from "@/components/copilot/AgentHandoffHint";
 import { ONBOARDING_ANCHORS } from "@/onboarding/anchors";
+import { HelpHint } from "@/components/ui/HelpHint";
 
 interface OverviewCanvasProps {
   projectName: string;
@@ -380,7 +381,8 @@ export function OverviewCanvas({
               </span>
               <span className="ml-2 text-[12px]" style={{ color: "var(--color-text-3)" }}>
                 {t("workflow:ops_details_hint")}
-              </span>
+              </span>{" "}
+              <HelpHint topic={t("workflow:ops_details")}>{t("workflow:help_operations")}</HelpHint>
             </summary>
             <div className="space-y-4 px-3 pb-3">
               <ProductionRunPanel key={projectName} projectName={projectName} />

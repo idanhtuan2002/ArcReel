@@ -12,6 +12,7 @@ import type { WorkflowPlan } from "@/types/workflow";
 
 import { pendingDecisions, stageStates } from "./pipeline-stages";
 import "./pipeline-board.css";
+import { HelpHint } from "@/components/ui/HelpHint";
 
 /** 有对应界面的阶段入口（相对项目工作区）。 */
 const STAGE_ROUTE: Partial<Record<NorthStarStage, string>> = {
@@ -45,7 +46,10 @@ export function PipelineBoardView({ plan, runs, gates = null, videoReady = null 
   return (
     <section aria-labelledby="pipeline-board-title" className="pipeline-board">
       <div className="pipeline-board-head">
-        <h2 id="pipeline-board-title">{t("pipeline_board_title")}</h2>
+        <h2 id="pipeline-board-title">
+          {t("pipeline_board_title")}{" "}
+          <HelpHint topic={t("pipeline_board_title")}>{t("workflow:help_pipeline")}</HelpHint>
+        </h2>
         {nextAction ? <p className="pipeline-next">{nextAction}</p> : null}
       </div>
       <ol className="pipeline-stages">

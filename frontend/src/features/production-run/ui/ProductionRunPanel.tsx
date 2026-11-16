@@ -39,6 +39,7 @@ import {
   type BookLength,
 } from "./BookLengthField";
 import { formatDuration, stageTimes, totalTime } from "./runTimeline";
+import { HelpHint } from "@/components/ui/HelpHint";
 
 const POLL_MS = 5000;
 // React Flow loads only when the owner opens the graph.
@@ -482,6 +483,9 @@ export function ProductionRunPanel({ projectName }: Props) {
                 t("auto_detail_repairs", { stage: t(`auto_stage_${repair.stage}`), count: repair.count }),
               ),
             ].join(" · ")}
+            <HelpHint topic={t("auto_detail_help_topic")} align="left">
+              {t("help_generation")}
+            </HelpHint>
           </p>
           <ol aria-label={t("auto_steps")} className="m-0 flex list-none flex-wrap gap-1 p-0">
             {STAGES.map((stage, index) => {

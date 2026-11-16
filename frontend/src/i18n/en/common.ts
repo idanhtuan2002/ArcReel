@@ -1,5 +1,6 @@
 
 export default {
+  'help_about': 'Explain: {{topic}}',
   'brand_tagline': 'Agent-driven AI film studio',
   'language': 'Language',
   'chinese': 'Chinese',

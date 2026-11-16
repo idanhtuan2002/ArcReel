@@ -5,6 +5,7 @@ import { Bot } from "lucide-react";
 import { useAppStore } from "@/stores/app-store";
 import { controlProductionRun, getProductionRun, newCommandId } from "@/features/production-run/api/productionRunClient";
 import { useAutopilotErrorText } from "./useAutopilotErrorText";
+import { HelpHint } from "@/components/ui/HelpHint";
 import {
   getAutopilot,
   setAutopilot,
@@ -193,6 +194,7 @@ export function AutopilotPanel({ projectName, kind }: { projectName: string; kin
         <h2 id={`${episodesId}-title`} className="flex items-center gap-1.5 text-[13px] font-medium text-text">
           <Bot aria-hidden className="h-4 w-4 text-text-3" />
           {t("ap_title")}
+          <HelpHint topic={t("ap_title")}>{t("workflow:help_autopilot")}</HelpHint>
         </h2>
         {view ? (
           <span className={`text-[12px] ${TONE[state]}`} aria-live="polite">

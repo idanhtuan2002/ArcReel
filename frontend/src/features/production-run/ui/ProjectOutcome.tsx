@@ -15,6 +15,7 @@ import { useLocation } from "wouter";
 import { API } from "@/api";
 import { useAppStore } from "@/stores/app-store";
 import { useProjectsStore } from "@/stores/projects-store";
+import { HelpHint } from "@/components/ui/HelpHint";
 
 const REFRESH_MS = 15000;
 /** Stops a new episode plan from the stopped episode on can fix. */
@@ -186,7 +187,8 @@ export function ProjectOutcome({ projectName, titles, onOpenDetails }: Props) {
             className="num mb-2 text-[10.5px] font-bold uppercase"
             style={{ color: "var(--color-text-4)", letterSpacing: "1.4px" }}
           >
-            Finished films
+            Finished films{" "}
+            <HelpHint topic={t("outcome_section")}>{t("help_review")}</HelpHint>
           </p>
           <ul className="m-0 flex list-none gap-3 overflow-x-auto p-0 pb-1">
             {films.map((film) => {
@@ -304,7 +306,7 @@ export function ProjectOutcome({ projectName, titles, onOpenDetails }: Props) {
           {stopped && reason && MODEL_CODES(reason.code) && (
             <button
               type="button"
-              onClick={() => setLocation(`~/app/projects/${encodeURIComponent(projectName)}/settings`)}
+              onClick={() => setLocation(`~/app/projects/${encodeURIComponent(projectName)}/settings#models`)}
               className="focus-ring rounded-md px-2.5 py-1 text-[12px]"
               style={{ border: "1px solid var(--color-hairline)", color: "var(--color-text)" }}
             >

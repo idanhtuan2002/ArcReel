@@ -9,6 +9,7 @@ import {
   startReviewerQualification,
 } from "../api/productionRunClient";
 import type { MediaRouteStatus, QualificationStatus } from "../api/types";
+import { HelpHint } from "@/components/ui/HelpHint";
 
 const POLL_MS = 5000;
 const LINK_CLS =
@@ -132,7 +133,8 @@ export function AutomationQualification({ projectName, onChanged }: Props) {
       }}
     >
       <summary className="cursor-pointer" style={{ color: "var(--color-text-2)" }}>
-        {t("auto_qual_title")}
+        {t("auto_qual_title")}{" "}
+        <HelpHint topic={t("auto_qual_title")}>{t("help_qualification")}</HelpHint>
       </summary>
       <div className="mt-1 space-y-1.5">
         {status && (
