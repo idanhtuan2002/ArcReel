@@ -2,9 +2,9 @@ import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Download, Play } from "lucide-react";
 import {
-  controlProductionRun,
   downloadProductionOutput,
   listProductionRuns,
+  resumeProductionRun,
   newCommandId,
   previewProductionFinal,
 } from "../api/productionRunClient";
@@ -135,12 +135,7 @@ export function ProjectOutcome({ projectName, titles, onOpenDetails }: Props) {
     setBusy(true);
     setActionFailed(false);
     try {
-      const resumed = await controlProductionRun(projectName, latest.run_id, "resume", {
-        command_id: newCommandId(),
-        expected_version: latest.version,
-        expected_input_digest: latest.input_digest,
-        policy_digest: latest.policy_digest,
-      });
+      const resumed = await resumeProductionRun(projectName, latest, newCommandId());
       setRuns((current) => (current ? [resumed, ...current.slice(1)] : current));
     } catch {
       setActionFailed(true);

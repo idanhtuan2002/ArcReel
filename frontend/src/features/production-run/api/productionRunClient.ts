@@ -159,6 +159,36 @@ export function controlProductionRun(
   });
 }
 
+/**
+ * Resumes ``run``. A run blocked because its inputs changed (a re-planned episode, an edited script, a new source)
+ * resumes on the project's current inputs: the command carries the input digest of the project as it is now, read
+ * when the button is pressed, so the run starts a new lineage from them instead of retrying the step that refused.
+ */
+export async function resumeProductionRun(
+  projectName: string,
+  run: Pick<RunSnapshot, "run_id" | "status" | "version" | "input_digest" | "policy_digest">,
+  commandId: string,
+  options: CallOptions = {},
+): Promise<RunSnapshot> {
+  let inputDigest = run.input_digest;
+  if (run.status === "BLOCKED_INPUT_CHANGED") {
+    const list = await listProductionRuns(projectName, options);
+    inputDigest = list.start.input_digest ?? run.input_digest;
+  }
+  return controlProductionRun(
+    projectName,
+    run.run_id,
+    "resume",
+    {
+      command_id: commandId,
+      expected_version: run.version,
+      expected_input_digest: inputDigest,
+      policy_digest: run.policy_digest,
+    },
+    options,
+  );
+}
+
 export function changeProductionRunMode(
   projectName: string,
   runId: string,

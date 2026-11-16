@@ -3,7 +3,7 @@ import { useTranslation } from "react-i18next";
 import { Bot } from "lucide-react";
 
 import { useAppStore } from "@/stores/app-store";
-import { controlProductionRun, getProductionRun, newCommandId } from "@/features/production-run/api/productionRunClient";
+import { getProductionRun, newCommandId, resumeProductionRun } from "@/features/production-run/api/productionRunClient";
 import { useAutopilotErrorText } from "./useAutopilotErrorText";
 import { HelpHint } from "@/components/ui/HelpHint";
 import {
@@ -169,12 +169,7 @@ export function AutopilotPanel({ projectName, kind }: { projectName: string; kin
     setBusy(true);
     try {
       const run = await getProductionRun(projectName, runId);
-      await controlProductionRun(projectName, runId, "resume", {
-        command_id: newCommandId(),
-        expected_version: run.version,
-        expected_input_digest: run.input_digest,
-        policy_digest: run.policy_digest,
-      });
+      await resumeProductionRun(projectName, run, newCommandId());
       await load();
     } catch (error) {
       useAppStore.getState().pushToast(`${t("ap_failed")}${errorText(error)}`, "error");

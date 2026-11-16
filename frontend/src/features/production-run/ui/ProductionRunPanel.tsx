@@ -8,6 +8,7 @@ import {
   getProductionRunProgress,
   downloadProductionOutput,
   listProductionRuns,
+  resumeProductionRun,
   newCommandId,
   reviewProductionRun,
   startProductionRun,
@@ -235,12 +236,14 @@ export function ProductionRunPanel({ projectName }: Props) {
   const control = (action: ControlAction) => {
     if (!run) return;
     void act(() =>
-      controlProductionRun(projectName, run.run_id, action, {
-        command_id: newCommandId(),
-        expected_version: run.version,
-        expected_input_digest: run.input_digest,
-        policy_digest: run.policy_digest,
-      }),
+      action === "resume"
+        ? resumeProductionRun(projectName, run, newCommandId())
+        : controlProductionRun(projectName, run.run_id, action, {
+            command_id: newCommandId(),
+            expected_version: run.version,
+            expected_input_digest: run.input_digest,
+            policy_digest: run.policy_digest,
+          }),
     );
   };
 

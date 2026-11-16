@@ -65,7 +65,7 @@ describe("ProjectOutcome", () => {
       policy_digest: "sha256:p",
     } as Partial<RunSnapshot>);
     vi.spyOn(client, "listProductionRuns").mockResolvedValue({ start: {}, runs: [stoppedRun] } as unknown as RunList);
-    const control = vi.spyOn(client, "controlProductionRun").mockResolvedValue({ ...stoppedRun, status: "RUNNING" });
+    const resume = vi.spyOn(client, "resumeProductionRun").mockResolvedValue({ ...stoppedRun, status: "RUNNING" });
     const request = vi
       .spyOn(API, "request")
       .mockResolvedValueOnce({ confirmation_required: true, consumed_episodes: [2] })
@@ -86,11 +86,6 @@ describe("ProjectOutcome", () => {
     expect(screen.getByRole("button", { name: "打开模型设置" })).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "继续" }));
-    expect(control).toHaveBeenCalledWith(
-      "demo",
-      "new",
-      "resume",
-      expect.objectContaining({ expected_version: 4, expected_input_digest: "sha256:i", policy_digest: "sha256:p" }),
-    );
+    expect(resume).toHaveBeenCalledWith("demo", stoppedRun, expect.any(String));
   });
 });
