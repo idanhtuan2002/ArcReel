@@ -37,10 +37,13 @@ from server.story_authoring.variant_profiles import PROFILES
 from server.tool_runtime import (
     CallerContext,
     ProjectScope,
+    ResetEpisodePlanningRequest,
+    ResetEpisodePlanningResult,
     Services,
     ToolRequest,
     TranslateStoryRequest,
     UploadSourceRequest,
+    reset_episode_planning,
     translate_story,
     upload_source,
 )
@@ -190,6 +193,47 @@ async def translate_project_story(
     if outcome.problem is not None:
         raise HTTPException(status_code=409, detail={"code": outcome.problem.code, "detail": outcome.problem.detail})
     return {"queued": True, "target_language": req.target_language}
+
+
+class ResetEpisodePlanningBody(_Request):
+    from_episode: int = Field(ge=1)
+    confirm_consumed: bool = False
+
+
+@router.post("/projects/{project_name}/episode-planning/reset")
+async def reset_project_episode_planning(
+    project_name: str, req: ResetEpisodePlanningBody, user: InteractiveUser, service: Service
+) -> dict:
+    """Clear the episode plan from ``from_episode`` on so the remaining source is planned again. When episodes that
+    already have scripts or media would be cleared, nothing changes and they are named (``confirmation_required``);
+    the call is repeated with ``confirm_consumed`` once the user agrees. Scripts and media stay on disk."""
+    try:
+        await service.require_source_grant(user.sub, user_id=user.id, project_name=project_name)
+    except REFUSALS as error:
+        raise _refusal(error) from error
+    projects = get_project_manager()
+    outcome = await reset_episode_planning(
+        ToolRequest(ResetEpisodePlanningRequest(from_episode=req.from_episode, confirm_consumed=req.confirm_consumed)),
+        ProjectScope(project_name=project_name, projects_root=projects.projects_root),
+        CallerContext(user_id=user.id, source="mcp"),
+        Services(
+            projects=projects,
+            workflow_planner=workflow_planner.get_workflow_planner(projects),
+            capabilities=ConfigResolver(async_session_factory),
+        ),
+    )
+    if outcome.problem is not None:
+        raise HTTPException(status_code=409, detail={"code": outcome.problem.code, "detail": outcome.problem.detail})
+    result = outcome.value
+    if not isinstance(result, ResetEpisodePlanningResult):
+        raise HTTPException(status_code=500, detail={"code": "episode_reset_failed"})
+    return {
+        "confirmation_required": result.confirmation_required,
+        "consumed_episodes": result.consumed_episodes,
+        "removed_episodes": result.removed_episodes,
+        "deleted_files": result.deleted_files,
+        "archived_files": [list(item) if isinstance(item, tuple) else item for item in result.archived_files],
+    }
 
 
 @router.post("/projects/{project_name}/story-sync")

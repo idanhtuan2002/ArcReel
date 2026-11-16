@@ -222,6 +222,44 @@ async def test_a_story_translation_is_queued_for_the_projects_showrunner(
     assert refused.status_code == 422
 
 
+async def test_resetting_episode_planning_asks_first_when_consumed_episodes_are_hit_then_resets(
+    concurrent_session_factory: Factory, grants, projects: ProjectManager, monkeypatch
+):
+    from server.tool_runtime import ResetEpisodePlanningResult, ToolOutcome
+
+    calls: list[tuple[int, bool]] = []
+
+    async def reset(request, scope, caller, services):
+        calls.append((request.value.from_episode, request.value.confirm_consumed))
+        if not request.value.confirm_consumed:
+            return ToolOutcome(
+                value=ResetEpisodePlanningResult(message="m", confirmation_required=True, consumed_episodes=[2])
+            )
+        return ToolOutcome(
+            value=ResetEpisodePlanningResult(message="m", confirmation_required=False, removed_episodes=[2, 3])
+        )
+
+    monkeypatch.setattr(story_runs, "reset_episode_planning", reset)
+    monkeypatch.setattr(story_runs, "get_project_manager", lambda: projects)
+    url = f"/api/v1/projects/{PROJECT}/episode-planning/reset"
+    async with _client(concurrent_session_factory, grants, projects, interactive=True) as client:
+        asked = await client.post(url, json={"from_episode": 2})
+        done = await client.post(url, json={"from_episode": 2, "confirm_consumed": True})
+        refused = await client.post(url, json={"from_episode": 0})
+
+    assert asked.status_code == 200, asked.text
+    assert asked.json() == {
+        "confirmation_required": True,
+        "consumed_episodes": [2],
+        "removed_episodes": [],
+        "deleted_files": [],
+        "archived_files": [],
+    }
+    assert done.json()["removed_episodes"] == [2, 3]
+    assert calls == [(2, False), (2, True)]
+    assert refused.status_code == 422
+
+
 async def test_a_film_project_imports_its_story_projects_text_without_overwriting_its_own(
     concurrent_session_factory: Factory, grants, projects: ProjectManager, monkeypatch
 ):

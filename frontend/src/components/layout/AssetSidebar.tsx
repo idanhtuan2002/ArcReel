@@ -28,6 +28,7 @@ import { useDemoWorkbench } from "@/onboarding/use-demo-workbench";
 import { isDemoProject } from "@/onboarding/demo-project";
 import { normalizeRoute } from "@/utils/generation-mode";
 import { EpisodeCard } from "./EpisodeCard";
+import { ResetEpisodePlanning } from "./ResetEpisodePlanning";
 import { SourceFileTree } from "./SourceFileTree";
 import { StoryRunTree } from "./StoryRunTree";
 
@@ -363,7 +364,7 @@ export function AssetSidebar({ className }: AssetSidebarProps) {
       {/* ---- Episodes (a story project has none) ---- */}
       {!collapsed && !isStory ? (
         <>
-          <div className="flex items-center gap-2 px-3.5 pb-1.5 pt-2.5">
+          <div className="relative flex items-center gap-2 px-3.5 pb-1.5 pt-2.5">
             <span
               className="text-[10.5px] font-bold uppercase"
               style={{ color: "var(--color-text-4)", letterSpacing: "0.8px" }}
@@ -378,6 +379,12 @@ export function AssetSidebar({ className }: AssetSidebarProps) {
                   {episodes.length}
                 </span>
                 <span className="flex-1" />
+                {currentProjectName && (
+                  <ResetEpisodePlanning
+                    projectName={currentProjectName}
+                    lastEpisode={episodes.reduce((max, ep) => Math.max(max, Number(ep.episode) || 0), 0)}
+                  />
+                )}
                 <button
                   type="button"
                   disabled
