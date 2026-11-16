@@ -363,6 +363,34 @@ async def test_renaming_an_episode_keeps_its_adaptation_current(tmp_path: Path):
     assert adaptation_state(project_path, rehooked, 1) == "stale"
 
 
+async def test_re_planning_the_next_episode_keeps_this_adaptation_current(tmp_path: Path):
+    # trial 7, 2026-11-16: resetting the plan from episode 2 made episode 1's finished adaptation stale
+    project_path = _write(tmp_path)
+    project = _project(
+        episodes=[
+            {"episode": 1, "title": "Phong thư", "hook": "Một món nợ cũ"},
+            {"episode": 2, "title": "Người tên Minh", "hook": "Một cái tên"},
+        ]
+    )
+    await adapt_episode(project_path, project, 1, generate=_Model(_narration()))
+    record = json.loads((project_path / "adaptations" / "episode_1.json").read_text(encoding="utf-8"))
+    assert record["next_outline"] is not None
+
+    replanned = {**project, "episodes": [project["episodes"][0], {"episode": 2, "title": "Bến đò", "hook": "Khác"}]}
+    reset = {**project, "episodes": [project["episodes"][0]]}
+    assert adaptation_state(project_path, replanned, 1) == "current"
+    assert adaptation_state(project_path, reset, 1) == "current"
+    # Every allowed change at once still holds; this episode's own outline does not.
+    together = {
+        **replanned,
+        "characters": {**project["characters"], "Chú Tư": {"description": "x"}},
+        "episodes": [{**project["episodes"][0], "title": "Món nợ cũ"}, replanned["episodes"][1]],
+    }
+    assert adaptation_state(project_path, together, 1) == "current"
+    rehooked = {**reset, "episodes": [{**project["episodes"][0], "hook": "Một người lạ"}]}
+    assert adaptation_state(project_path, rehooked, 1) == "stale"
+
+
 def test_an_adaptation_that_fails_every_attempt_moves_to_the_next_fallback_model(tmp_path: Path):
     project_path = _write(tmp_path)
     bad = json.dumps(_narration(cast=["Lan", "Hùng"]), ensure_ascii=False)

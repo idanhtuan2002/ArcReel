@@ -540,7 +540,8 @@ _LEGACY_ADDED_CHARACTERS = 3
 
 
 def _basis_holds(record: Mapping[str, Any], inputs: AdaptationInputs) -> bool:
-    """Whether the record adapted what ``inputs`` reads now. Two changes leave it current: characters registered
+    """Whether the record adapted what ``inputs`` reads now. Three changes leave it current: the next episode's outline
+    (when the record kept it), characters registered
     since (the run's own script step registers the people its script names), when the record's names are all still
     registered; and a new episode title (a display name the user or a script may change), when the record kept the
     title it adapted. Everything else must be the same. A record that kept no names is matched with up to three of
@@ -548,6 +549,18 @@ def _basis_holds(record: Mapping[str, Any], inputs: AdaptationInputs) -> bool:
     recorded = record.get("basis")
     if recorded == inputs.basis():
         return True
+    if "next_outline" in record and isinstance(record.get("characters"), list):
+        # A record that kept what it was adapted with is matched with every allowed change restored at once: the next
+        # episode's outline (only the cliffhanger's lead-in; re-planning later episodes leaves this one current), the
+        # title, and the characters registered since.
+        restored = replace(inputs, next_outline=record["next_outline"])
+        title = record.get("outline_title")
+        if isinstance(title, str) and restored.outline is not None:
+            restored = replace(restored, outline={**restored.outline, "title": title})
+        names = [str(name) for name in record["characters"]]
+        if not set(names) <= set(inputs.characters):
+            return False
+        return recorded == replace(restored, characters=tuple(sorted(names))).basis()
     title = record.get("outline_title")
     if isinstance(title, str) and inputs.outline is not None:
         inputs = replace(inputs, outline={**inputs.outline, "title": title})

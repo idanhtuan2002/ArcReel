@@ -97,6 +97,7 @@ async def _adapt_on_current_model(
             "basis": inputs.basis(),
             "characters": list(inputs.characters),
             "outline_title": (inputs.outline or {}).get("title"),
+            "next_outline": inputs.next_outline,
             "source_relpath": episode_source_relpath(episode),
             "text_relpath": adaptation_text_relpath(episode),
             "text_digest": "sha256:" + hashlib.sha256(data).hexdigest(),
