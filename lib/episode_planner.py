@@ -400,6 +400,14 @@ def _before_cjk(text: str) -> str:
     return text
 
 
+class _AttemptsExhausted(Exception):
+    """当前模型的每次重试都未通过校验，也没有可提交的有效前缀。"""
+
+    def __init__(self, message: str):
+        super().__init__(message)
+        self.message = message
+
+
 class _AnchorLocator:
     """在一个窗口内定位 end_anchor，逐层放宽，首个命中（≥1 处）的层决定结果。
 
@@ -1138,6 +1146,39 @@ class EpisodePlanner:
         max_episode_units: int | None = None,
         min_episode_units: int | None = None,
     ) -> tuple[list[NarrationEpisodeDraft], list[int]]:
+        """当前模型的校验循环；每次重试都失败且没有可提交的有效前缀时，换到项目设置里的下一个备用文本模型
+        从头再规划（ADR-0139 补充：答案违约也换模型，不只是线路故障）；没有可换的模型才失败。"""
+        if self.generator is None:
+            raise RuntimeError("TextGenerator 未初始化，请使用 EpisodePlanner.create() 工厂方法")
+        while True:
+            try:
+                return await self._validated_drafts_on_current_model(
+                    draft_model,
+                    prompt_builder,
+                    window,
+                    snap_whitespace_tail=snap_whitespace_tail,
+                    max_episodes=max_episodes,
+                    language=language,
+                    max_episode_units=max_episode_units,
+                    min_episode_units=min_episode_units,
+                )
+            except _AttemptsExhausted as exhausted:
+                fall_back = getattr(self.generator, "fall_back_after_rejection", None)
+                if fall_back is None or not await fall_back(exhausted.message):
+                    raise EpisodePlanningError(exhausted.message) from None
+
+    async def _validated_drafts_on_current_model(
+        self,
+        draft_model: type[NarrationPlanDraft | DramaPlanDraft],
+        prompt_builder: Callable[[list[str] | None], str],
+        window: str,
+        *,
+        snap_whitespace_tail: bool,
+        max_episodes: int | None,
+        language: str | None = None,
+        max_episode_units: int | None = None,
+        min_episode_units: int | None = None,
+    ) -> tuple[list[NarrationEpisodeDraft], list[int]]:
         """LLM 调用 + schema/机械校验循环；重试 prompt 附上一轮失败原因。
 
         结构化输出被输出上限截断时 :class:`TextOutputTruncatedError` 直接短路本循环——
@@ -1215,7 +1256,7 @@ class EpisodePlanner:
                 "; ".join(failure or []),
             )
             return best_prefix
-        raise EpisodePlanningError(
+        raise _AttemptsExhausted(
             f"分集规划连续 {self.max_attempts} 次未通过校验，最后一轮原因：{'; '.join(failure or [])}"
         )
 

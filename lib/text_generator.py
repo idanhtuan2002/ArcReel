@@ -34,6 +34,10 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
+class _AnswersRejected(Exception):
+    """A model's answers failed a caller's checks on every attempt (logged when the generator falls back)."""
+
+
 class TextGenerator:
     """组合 TextBackend + Ledger，统一封装文本生成 + 记账。"""
 
@@ -91,6 +95,21 @@ class TextGenerator:
         )
         return cls(backend, Ledger(), resolved_provider, task_type=task_type, fallbacks=fallbacks)
 
+    @property
+    def has_fallback(self) -> bool:
+        """Whether a fallback model is left to move to."""
+        return bool(self._fallbacks)
+
+    async def fall_back_after_rejection(self, reason: str) -> bool:
+        """Move to the next fallback model after this model's answers failed a caller's checks on every attempt
+        (a planner or an adaptation that ran out of retries); ``False`` when no usable fallback is left.
+
+        A route failure moves the generator on its own (:meth:`generate`); an answer that keeps breaking the rules is
+        the caller's to judge, so the caller asks. The run's rules on fallbacks (ADR-0139) apply as they do there."""
+        if not self._fallbacks:
+            return False
+        return await self._fall_back(_AnswersRejected(reason))
+
     async def _fall_back(self, error: BaseException) -> bool:
         """Move to the next fallback model that can do this task; ``False`` when none is left."""
         assert self._task_type is not None
@@ -104,7 +123,7 @@ class TextGenerator:
                 logger.warning("text fallback %s/%s unusable: %s", provider_id, model_id, type(unusable).__name__)
                 continue
             logger.warning(
-                "text model %s/%s failed on its route (%s); moving to %s/%s",
+                "text model %s/%s failed (%s); moving to %s/%s",
                 self._provider_id,
                 self.backend.model,
                 type(error).__name__,

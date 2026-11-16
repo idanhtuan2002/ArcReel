@@ -2034,7 +2034,13 @@ async def _execute_episode_adaptation(task: dict[str, Any], scope: ProjectScope,
     project_path = services.projects.get_project_path(scope.project_name)
     project = await asyncio.to_thread(services.projects.load_project, scope.project_name)
     try:
-        result = await run_episode_adaptation(project_path, project, int(payload["episode"]), generate=generate)
+        result = await run_episode_adaptation(
+            project_path,
+            project,
+            int(payload["episode"]),
+            generate=generate,
+            fall_back=generator.fall_back_after_rejection,
+        )
     except AdaptationError as exc:
         problem = ToolProblem("adaptation_failed", str(exc), action=GenerationAction.RETRY.value)
         raise RuntimeError(encode_generation_problem(_queued_generation_problem(problem))) from exc

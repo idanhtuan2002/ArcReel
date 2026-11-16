@@ -1057,6 +1057,45 @@ class TestPlan:
         assert (project_dir / "project.json").read_text(encoding="utf-8") == before
         assert not list((project_dir / "source").glob("episode_*.txt"))
 
+    async def test_a_model_that_breaks_the_rules_on_every_attempt_hands_the_window_to_the_next_fallback(
+        self, tmp_path: Path
+    ):
+        """ADR-0139 amendment: three rejected answers with no valid prefix move to the next fallback model, which
+        plans the window afresh with its own attempts (trial 7: a local 9B wrote Chinese titles and backward anchors)."""
+        project_dir = _write_project(tmp_path)
+        bad = _plan_response([{"title": "坏", "hook": "坏", "end_anchor": "不在原文里"}])
+        good = _plan_response([{"title": "甲", "hook": "甲", "end_anchor": ANCHOR_EP1}])
+        fake = _FakeTextGenerator([bad, bad, bad, good])
+        moves: list[str] = []
+
+        async def fall_back_after_rejection(reason: str) -> bool:
+            moves.append(reason)
+            fake.model = "fallback-model"
+            return len(moves) == 1
+
+        fake.fall_back_after_rejection = fall_back_after_rejection
+
+        await EpisodePlanner(project_dir, generator=fake).plan()
+
+        assert len(moves) == 1
+        assert "连续 3 次未通过校验" in moves[0]
+        assert len(fake.requests) == 4
+        assert (project_dir / "source" / "episode_1.txt").is_file()
+
+    async def test_planning_fails_when_no_fallback_model_is_left(self, tmp_path: Path):
+        project_dir = _write_project(tmp_path)
+        bad = _plan_response([{"title": "坏", "hook": "坏", "end_anchor": "不在原文里"}])
+        fake = _FakeTextGenerator([bad] * 6)
+
+        async def no_fallback_left(reason: str) -> bool:
+            return False
+
+        fake.fall_back_after_rejection = no_fallback_left
+
+        with pytest.raises(EpisodePlanningError, match="连续 3 次未通过校验"):
+            await EpisodePlanner(project_dir, generator=fake).plan()
+        assert len(fake.requests) == 3
+
     async def test_plan_keeps_longest_valid_prefix_after_retry_exhaustion(self, tmp_path: Path):
         """重试耗尽但某轮开头若干集有效：提交各轮中最长的有效前缀集，其余原文留给下一批。"""
         project_dir = _write_project(tmp_path)

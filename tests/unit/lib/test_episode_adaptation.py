@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 from pathlib import Path
 
@@ -360,3 +361,40 @@ async def test_renaming_an_episode_keeps_its_adaptation_current(tmp_path: Path):
     assert adaptation_state(project_path, renamed, 1) == "current"
     rehooked = {**project, "episodes": [{**project["episodes"][0], "hook": "Một người lạ"}]}
     assert adaptation_state(project_path, rehooked, 1) == "stale"
+
+
+def test_an_adaptation_that_fails_every_attempt_moves_to_the_next_fallback_model(tmp_path: Path):
+    project_path = _write(tmp_path)
+    bad = json.dumps(_narration(cast=["Lan", "Hùng"]), ensure_ascii=False)
+    good = json.dumps(_narration(), ensure_ascii=False)
+    answers = [bad, bad, bad, good]
+    moves: list[str] = []
+
+    async def generate(request: TextGenerationRequest) -> TextGenerationResult:
+        return TextGenerationResult(text=answers.pop(0), provider="fake", model="fake")
+
+    async def fall_back(reason: str) -> bool:
+        moves.append(reason)
+        return True
+
+    result = asyncio.run(adapt_episode(project_path, _project(), 1, generate=generate, fall_back=fall_back))
+
+    assert len(moves) == 1
+    assert "failed its checks after 3 attempts" in moves[0]
+    assert result["attempts"] == 4
+    record = json.loads((project_path / "adaptations" / "episode_1.json").read_text(encoding="utf-8"))
+    assert len(record["attempts"]) == 4
+
+
+def test_an_adaptation_fails_when_no_fallback_model_is_left(tmp_path: Path):
+    project_path = _write(tmp_path)
+    bad = json.dumps(_narration(cast=["Lan", "Hùng"]), ensure_ascii=False)
+
+    async def generate(request: TextGenerationRequest) -> TextGenerationResult:
+        return TextGenerationResult(text=bad, provider="fake", model="fake")
+
+    async def no_fallback(reason: str) -> bool:
+        return False
+
+    with pytest.raises(AdaptationError, match="after 3 attempts"):
+        asyncio.run(adapt_episode(project_path, _project(), 1, generate=generate, fall_back=no_fallback))

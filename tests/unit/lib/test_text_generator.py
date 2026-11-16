@@ -190,6 +190,38 @@ class TestRouteFallback:
             await lone.generate(TextGenerationRequest(prompt="x"), project_name="demo")
 
 
+class TestRejectedAnswersFallback:
+    """ADR-0139 amendment: a caller whose checks rejected every answer moves the generator to the next fallback."""
+
+    async def test_the_caller_moves_to_the_next_usable_fallback_and_then_runs_out(self, wired, monkeypatch):
+        from lib import text_generator
+        from lib.text_backends.base import TextTaskType
+
+        weak = _make_backend("ollama", "weak-9b")
+        strong = _make_backend("openai", "strong")
+
+        async def build(task_type, *, provider_id, model_id):
+            if model_id == "broken":
+                raise ValueError("model disabled")
+            return strong, provider_id
+
+        monkeypatch.setattr(text_generator, "create_text_backend_for_model", build)
+        gen = TextGenerator(
+            weak,
+            wired.ledger,
+            "custom-1",
+            task_type=TextTaskType.SCRIPT,
+            fallbacks=(("custom-2", "broken"), ("custom-6", "strong")),
+        )
+
+        assert gen.has_fallback
+        assert await gen.fall_back_after_rejection("3 attempts failed the checks") is True
+        assert gen.model == "strong"
+        assert not gen.has_fallback
+        assert await gen.fall_back_after_rejection("3 attempts failed the checks") is False
+        assert gen.model == "strong"
+
+
 class TestRunPinnedScriptModel:
     """ADR-0139: inside a run's task, script work stays on the run's frozen script model."""
 

@@ -33,10 +33,45 @@ from lib.text_backends.base import TextGenerationRequest, TextGenerationResult
 type Generate = Callable[[TextGenerationRequest], Awaitable[TextGenerationResult]]
 
 
-async def adapt_episode(project_path: Path, project: Mapping[str, Any], episode: int, *, generate: Generate) -> dict:
-    """Adapt ``episode`` and write its script and record; raises :class:`AdaptationError` when no draft passes."""
+type FallBack = Callable[[str], Awaitable[bool]]
+
+
+async def adapt_episode(
+    project_path: Path,
+    project: Mapping[str, Any],
+    episode: int,
+    *,
+    generate: Generate,
+    fall_back: FallBack | None = None,
+) -> dict:
+    """Adapt ``episode`` and write its script and record; raises :class:`AdaptationError` when no draft passes.
+
+    When every attempt of the current model fails the checks, ``fall_back`` (the generator's move to the project's
+    next fallback text model, ADR-0139) is asked once per model; a ``True`` gives the next model a fresh set of
+    attempts, a ``False`` or no ``fall_back`` fails the adaptation."""
     inputs = read_inputs(project_path, project, episode)
     attempts: list[dict[str, Any]] = []
+    problems: list[str] | None = None
+    while True:
+        written = await _adapt_on_current_model(project_path, inputs, episode, generate, attempts)
+        if isinstance(written, dict):
+            return written
+        problems = written
+        message = f"episode {episode} adaptation failed its checks after {MAX_ATTEMPTS} attempts: " + "; ".join(
+            problems or []
+        )
+        if fall_back is None or not await fall_back(message):
+            raise AdaptationError(message)
+
+
+async def _adapt_on_current_model(
+    project_path: Path,
+    inputs: Any,
+    episode: int,
+    generate: Generate,
+    attempts: list[dict[str, Any]],
+) -> dict | list[str] | None:
+    """One model's attempts: the result when a draft passes and is written, else the last attempt's problems."""
     problems: list[str] | None = None
     for attempt in range(1, MAX_ATTEMPTS + 1):
         result = await generate(
@@ -79,10 +114,8 @@ async def adapt_episode(project_path: Path, project: Mapping[str, Any], episode:
             raise AdaptationError(f"adaptation path leaves the project: {error}") from None
         atomic_write_bytes(text_path, data)
         atomic_write_json(record_path, record)
-        return {"episode": episode, "spoken_seconds": record["spoken_seconds"], "attempts": attempt}
-    raise AdaptationError(
-        f"episode {episode} adaptation failed its checks after {MAX_ATTEMPTS} attempts: " + "; ".join(problems or [])
-    )
+        return {"episode": episode, "spoken_seconds": record["spoken_seconds"], "attempts": len(attempts)}
+    return problems or []
 
 
-__all__ = ["Generate", "adapt_episode"]
+__all__ = ["FallBack", "Generate", "adapt_episode"]
