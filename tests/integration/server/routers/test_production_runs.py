@@ -772,7 +772,21 @@ async def test_a_queued_task_of_a_run_executes_only_while_the_run_may_still_act(
         configure_run_task_authority(None)
 
 
-@pytest.mark.parametrize("reason", ["ADAPTATION_FAILED", "OWNER_TASK_FAILED"])
+@pytest.mark.parametrize(
+    "reason",
+    [
+        "ADAPTATION_FAILED",
+        "OWNER_TASK_FAILED",
+        "VOICE_CAST_FAILED",
+        "MEDIA_RETRY_LIMIT",
+        "MEDIA_IMAGE_CHECK_FAILED",
+        "MEDIA_TTS_CHECK_FAILED",
+        "RENDER_FAILED",
+        "RENDER_RETRY_LIMIT",
+        "ASSESSOR_FAILED",
+        "ASSESSMENT_RETRY_LIMIT",
+    ],
+)
 async def test_a_run_blocked_by_spent_task_attempts_retries_its_stage_in_a_new_lineage_on_resume(host, reason):
     from server.production_run.owner_support import OwnerBlocked
 
@@ -817,3 +831,28 @@ async def test_a_run_blocked_for_another_reason_resumes_in_its_lineage(host):
     resumed = await host.command(blocked, "resume", command_id="resume-same-lineage")
     assert resumed.status_code == 200, resumed.text
     assert resumed.json()["generation"] == blocked["generation"]
+
+
+async def test_an_owner_found_input_change_with_an_unmoved_witness_is_retried_in_a_new_lineage(host):
+    from server.production_run.owner_support import OwnerBlocked
+
+    run = (await host.start()).json()
+    original = host.owner.inspect
+
+    async def moved(*, intent, receipt):
+        raise OwnerBlocked("EXTERNAL_INPUT_CHANGED")
+
+    host.owner.inspect = moved
+    await host.scheduler.scan_once()
+    blocked = await host.read(run)
+    assert (blocked["status"], blocked["reason"]) == ("BLOCKED_INPUT_CHANGED", "EXTERNAL_INPUT_CHANGED")
+    host.owner.inspect = original
+    resumed = await host.command(blocked, "resume", command_id="resume-unmoved-witness")
+    assert resumed.status_code == 200, resumed.text
+    view = resumed.json()
+    assert (view["status"], view["stage"], view["generation"]) == (
+        "RUNNING",
+        blocked["stage"],
+        blocked["generation"] + 1,
+    )
+    assert view["input_digest"] == blocked["input_digest"]

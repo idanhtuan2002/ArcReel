@@ -110,3 +110,14 @@ def test_the_speakers_to_cast_are_the_characters_of_spoken_scenes_without_a_voic
         "tts_voice_route": "custom-7/gemini-tts",
     }
     assert speakers_to_cast("scenes", scenes, project["characters"], route="custom-7/gemini-tts") == []
+
+
+def test_a_speaker_who_is_not_a_registered_character_is_neither_cast_nor_registered():
+    from lib.voice_cast import record_voices, speakers_to_cast
+
+    scenes = [{"scene_id": "E1S01", "utterances": [{"kind": "dialogue", "speaker": "Người lạ", "text": "Đi thôi."}]}]
+    characters = {"Hòa": {"description": "cô gái"}}
+    assert speakers_to_cast("scenes", scenes, characters, route="r") == []
+    project = {"characters": {"Hòa": {"description": "cô gái"}}}
+    record_voices(project, {"Hòa": "Kore", "Người lạ": "Puck"}, route="r")
+    assert set(project["characters"]) == {"Hòa"}

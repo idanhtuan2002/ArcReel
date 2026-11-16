@@ -102,7 +102,9 @@ async def submit_task(
             task_id=task_id,
         )
     if result["task_id"] != task_id:
-        raise OwnerBlocked("EXTERNAL_INPUT_CHANGED")
+        # Another task is active on the same resource (an earlier run's, or one the user started): the resource is
+        # busy, nothing the run pinned moved, and a resume submits again once it is free.
+        raise OwnerBlocked("RESOURCE_UNAVAILABLE")
     return task_id
 
 

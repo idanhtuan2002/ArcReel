@@ -875,13 +875,15 @@ class MediaAdapter:
 
     @staticmethod
     def _episode_media_current(plan: WorkflowPlan) -> bool:
-        """The target episode's script and every unit's storyboard, video and audio are current.
+        """The target episode has its script and every unit's storyboard, video and audio is current.
 
         The plan names a project-wide next step (planning more episodes from the remaining source) once the
-        target episode is complete; that step is outside this run's targets."""
+        target episode is complete; that step is outside this run's targets. A script made stale by assets the
+        run registered or described after writing it (its basis holds every character, scene and prop) still
+        completes the episode, as on the export path: the episode's output is its media, each checked current."""
         artifacts = plan.status.artifacts
         script = artifacts.get("script")
-        if not isinstance(script, dict) or script.get("state") != "current":
+        if not isinstance(script, dict) or script.get("state") not in ("current", "stale"):
             return False
         for kind in ("storyboards", "videos", "audio"):
             collection = artifacts.get(kind)

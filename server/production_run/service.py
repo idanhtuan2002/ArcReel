@@ -130,7 +130,20 @@ async def _language_unchanged(_project_name: str) -> None:
 
 
 #: Block reasons of a step whose owner tasks all failed; nothing of the step is pending or of unknown outcome.
-_SPENT_TASK_ATTEMPTS = frozenset({"OWNER_TASK_FAILED", "ADAPTATION_FAILED", "VOICE_CAST_FAILED"})
+_SPENT_TASK_ATTEMPTS = frozenset(
+    {
+        "OWNER_TASK_FAILED",
+        "ADAPTATION_FAILED",
+        "VOICE_CAST_FAILED",
+        "MEDIA_RETRY_LIMIT",
+        "MEDIA_IMAGE_CHECK_FAILED",
+        "MEDIA_TTS_CHECK_FAILED",
+        "RENDER_FAILED",
+        "RENDER_RETRY_LIMIT",
+        "ASSESSOR_FAILED",
+        "ASSESSMENT_RETRY_LIMIT",
+    }
+)
 
 
 class ProductionRunService:
@@ -640,9 +653,13 @@ class ProductionRunService:
             raise ProductionRunRefused("STALE_PRODUCTION_RUN")
         if not rebind:
             self._bound(run, command)
-            if run.status is RunStatus.BLOCKED_CONFIGURATION and run.reason in _SPENT_TASK_ATTEMPTS:
-                # The stage's step spent its task attempts, and a step keeps its failed tasks: the resume retries the
-                # stage as a new lineage (earlier stages' receipts stay current at a higher generation).
+            if (run.status is RunStatus.BLOCKED_CONFIGURATION and run.reason in _SPENT_TASK_ATTEMPTS) or (
+                run.status is RunStatus.BLOCKED_INPUT_CHANGED
+            ):
+                # The stage's step spent its attempts, or found a pinned input moved while the witness did not; a
+                # step keeps its attempts and pins, so the resume retries the stage as a new lineage that plans from
+                # the current inputs (earlier stages' receipts stay current at a higher generation; an upstream input
+                # that really moved still blocks the new step).
                 return _changed(
                     run, status=RunStatus.RUNNING, reason=None, pending_review=None, generation=run.generation + 1
                 )

@@ -98,3 +98,16 @@ async def test_spent_cast_attempts_block_the_step(drama_media):
     with pytest.raises(OwnerBlocked) as blocked:
         await adapter._cast_voices(intent, "d", plan)
     assert blocked.value.reason == "VOICE_CAST_FAILED"
+
+
+@pytest.mark.parametrize(("script_state", "complete"), [("current", True), ("stale", True), ("missing", False)])
+def test_an_episode_whose_media_are_current_is_complete_even_if_assets_moved_its_script(script_state, complete):
+    collection = {"current_ids": ["E1S01"], "missing_ids": [], "stale_ids": []}
+    artifacts = {
+        "script": {"state": script_state},
+        "storyboards": collection,
+        "videos": collection,
+        "audio": collection,
+    }
+    plan = SimpleNamespace(status=SimpleNamespace(artifacts=artifacts))
+    assert MediaAdapter._episode_media_current(plan) is complete

@@ -162,7 +162,7 @@ def speakers_to_cast(
     *,
     route: str,
 ) -> list[Speaker]:
-    """The characters who speak in the units, as speech admission reads them, and have no voice for ``route``
+    """The registered characters who speak in the units, as speech admission reads them, and have no voice for ``route``
     (``<provider_id>/<model_id>``), most lines first; each with its description and number of lines."""
     from lib.speech_composition import SpeechMode, SpeechOwner, admit_script_unit
 
@@ -177,7 +177,8 @@ def speakers_to_cast(
     speakers: list[Speaker] = []
     for name, lines in sorted(counts.items(), key=lambda item: (-item[1], item[0])):
         entry = characters.get(name)
-        entry = entry if isinstance(entry, Mapping) else {}
+        if not isinstance(entry, Mapping):
+            continue  # not a registered character: the script's validation refuses it, a cast never registers it
         voice = entry.get("tts_voice")
         if isinstance(voice, str) and voice.strip() and entry.get("tts_voice_route") == route:
             continue
@@ -186,10 +187,15 @@ def speakers_to_cast(
 
 
 def record_voices(project: dict, voices: Mapping[str, str], *, route: str) -> None:
-    """Write each cast voice on its character as ``tts_voice`` with the ``route`` it was chosen for."""
-    characters = project.setdefault("characters", {})
+    """Write each cast voice on its registered character as ``tts_voice`` with the ``route`` it was chosen for; a
+    name that is no registered character is skipped, never registered."""
+    characters = project.get("characters")
+    if not isinstance(characters, dict):
+        return
     for name, voice in voices.items():
-        entry = characters.setdefault(name, {})
+        entry = characters.get(name)
+        if not isinstance(entry, dict):
+            continue
         entry["tts_voice"] = voice
         entry["tts_voice_route"] = route
 
