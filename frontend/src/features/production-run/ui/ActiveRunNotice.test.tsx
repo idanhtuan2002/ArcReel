@@ -29,6 +29,12 @@ describe("ActiveRunNotice", () => {
 
     render(<ActiveRunNotice projectName="demo" />);
     await userEvent.click(await screen.findByRole("button", { name: "暂停运行" }));
+    // The banner's button only asks; nothing is paused until the question is answered.
+    expect(control).not.toHaveBeenCalled();
+    await userEvent.click(screen.getByRole("button", { name: "不暂停" }));
+    expect(screen.queryByRole("button", { name: "暂停" })).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "暂停运行" }));
+    await userEvent.click(screen.getByRole("button", { name: "暂停" }));
 
     expect(control).toHaveBeenCalledWith(
       "demo",
