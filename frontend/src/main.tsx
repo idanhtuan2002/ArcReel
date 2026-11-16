@@ -19,7 +19,7 @@ import "./css/onboarding.css";
 
 // 启动时按 BRAND 设置文档标题与 meta description（index.html 中的
 // <title> 与 <meta name="description"> 仅作为加载阶段的占位）。
-document.title = BRAND_DOCUMENT_TITLE;
+document.title = BRAND_DOCUMENT_TITLE; // replaced by the interface-language title once i18n is ready
 const metaDescription = document.querySelector<HTMLMetaElement>('meta[name="description"]');
 if (metaDescription) {
   metaDescription.content = BRAND.description;

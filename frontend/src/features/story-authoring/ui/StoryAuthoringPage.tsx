@@ -307,6 +307,25 @@ function NewStory({
     budgetValid &&
     (source !== "idea" || bookLengthValid(book)),
   );
+  // What still blocks the brief, named next to the button instead of leaving it silently disabled.
+  const missing =
+    source === "variant" && !sourceProject
+      ? "story_missing_source"
+      : !(source === "variant" ? variantProfile || idea.trim() : idea.trim())
+        ? "story_missing_idea"
+        : !genre.trim()
+          ? "story_missing_genre"
+          : !writerRoute?.enabled
+            ? "story_missing_writer"
+            : judge && !judgeRoute?.enabled
+              ? "story_missing_judge"
+              : !targetValid
+                ? "story_missing_target"
+                : !budgetValid
+                  ? "story_missing_budget"
+                  : source === "idea" && !bookLengthValid(book)
+                    ? "story_missing_book"
+                    : null;
   const routeLabel = (route: StoryRoute) => {
     const reason =
       route.reason === "MISSING_CREDENTIAL"
@@ -599,9 +618,19 @@ function NewStory({
           </div>
         </fieldset>
         <div className="flex flex-wrap gap-2">
-          <button type="submit" disabled={busy || !ready} className="sa-btn sa-btn-accent">
+          <button
+            type="submit"
+            disabled={busy || !ready}
+            aria-describedby={!ready && missing ? `${ids.target}-missing` : undefined}
+            className="sa-btn sa-btn-accent"
+          >
             {busy ? t("story_preparing") : t("story_prepare")}
           </button>
+          {!busy && !ready && missing ? (
+            <p id={`${ids.target}-missing`} className="m-0 self-center text-[12px] text-text-3">
+              {t(missing)}
+            </p>
+          ) : null}
           {onCancel ? (
             <button type="button" className="sa-btn" disabled={busy} onClick={onCancel}>
               {t("story_cancel")}

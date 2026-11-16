@@ -1,6 +1,7 @@
 import type enCommon from "@/i18n/en/common";
 
 export default {
+  'brand_tagline': 'Xưởng làm phim AI do Agent điều khiển',
   'language': 'Ngôn ngữ',
   'chinese': 'Tiếng Trung',
   'english': 'Tiếng Anh',

@@ -2,7 +2,7 @@ import i18n from 'i18next';
 import { initReactI18next } from 'react-i18next';
 import LanguageDetector from 'i18next-browser-languagedetector';
 import resourcesToBackend from 'i18next-resources-to-backend';
-import { BRAND } from '@/branding';
+import { BRAND, brandDocumentTitle } from '@/branding';
 
 // 按需加载 i18n namespace（issue #489）：
 // Vite import.meta.glob 在编译期为每个 (lang, ns) 文件生成独立 chunk；运行时由
@@ -91,7 +91,11 @@ export const i18nReady = i18n
 
 // 页面语言跟随界面语言：浏览器据此选字形，样式据 :lang() 为越南语换用带越南语字符集的衬线体
 function syncDocumentLanguage(lng: string | undefined) {
-  if (typeof document !== 'undefined' && lng) document.documentElement.lang = lng;
+  if (typeof document === 'undefined' || !lng) return;
+  document.documentElement.lang = lng;
+  // The tab title follows the interface language too (a missing key reads as the default tagline).
+  const tagline = i18n.t('common:brand_tagline', { lng, defaultValue: '' });
+  document.title = brandDocumentTitle(tagline || null);
 }
 i18n.on('languageChanged', syncDocumentLanguage);
 syncDocumentLanguage(i18n.language);

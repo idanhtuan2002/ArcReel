@@ -2,6 +2,7 @@
 import { AutopilotPanel } from "@/features/autopilot/AutopilotPanel";
 import { PipelineBoard } from "./pipeline/PipelineBoard";
 import { ProductionRunPanel } from "@/features/production-run/ui/ProductionRunPanel";
+import { ProjectOutcome } from "@/features/production-run/ui/ProjectOutcome";
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Pencil, RefreshCw, Sparkles, Users, Landmark, Package } from "lucide-react";
@@ -85,6 +86,9 @@ export function OverviewCanvas({
   // 加载已有概览的项目不会触发；AgentHandoffHint 内还有 sessionStorage
   // 防 reload 重复。
   const [handoffTrigger, setHandoffTrigger] = useState(0);
+  // The operations details (pipeline, gates, every automatic run) stay closed until the filmmaker asks for them.
+  const [operationsOpen, setOperationsOpen] = useState(false);
+  const operationsRef = useRef<HTMLDetailsElement>(null);
   const wasWelcomeRef = useRef<boolean | null>(null);
   useEffect(() => {
     // 只读态（如切入演示项目）不触发交接提示：同一路由复用同一个 OverviewCanvas 实例时，
@@ -283,6 +287,10 @@ export function OverviewCanvas({
 
   const status = projectData.status;
   const overview = projectData.overview;
+  const openOperations = () => {
+    setOperationsOpen(true);
+    window.requestAnimationFrame(() => operationsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }));
+  };
   const showWelcome = !overview && (projectData.episodes?.length ?? 0) === 0;
   // ad 项目恒单集（episodes 非空），不会落入 showWelcome；建项后素材全空时进入初始化页：
   // 上传商品图 + 商品描述 + brief + 可选 sheet 生成。任一素材就绪即切回概览。
@@ -328,13 +336,43 @@ export function OverviewCanvas({
           </div>
         </header>
 
-        {!readOnly ? <PipelineBoard projectName={projectName} /> : null}
+        {!readOnly && projectData.project_kind !== "story" ? (
+          <ProjectOutcome
+            key={`outcome-${projectName}`}
+            projectName={projectName}
+            titles={Object.fromEntries(
+              (projectData.episodes ?? []).map((ep) => [Number(ep.episode), String(ep.title ?? "")]),
+            )}
+            onOpenDetails={openOperations}
+          />
+        ) : null}
         {!readOnly && projectData.project_kind !== "story" ? (
           <div className="mb-4">
             <AutopilotPanel projectName={projectName} kind="film" />
           </div>
         ) : null}
-        {!readOnly ? <ProductionRunPanel key={projectName} projectName={projectName} /> : null}
+        {!readOnly ? (
+          <details
+            ref={operationsRef}
+            open={operationsOpen}
+            onToggle={(event) => setOperationsOpen(event.currentTarget.open)}
+            className="rounded-2xl"
+            style={{ border: "1px solid var(--color-hairline-soft)" }}
+          >
+            <summary className="focus-ring cursor-pointer rounded-2xl px-4 py-3">
+              <span className="text-[13px] font-semibold" style={{ color: "var(--color-text)" }}>
+                {t("workflow:ops_details")}
+              </span>
+              <span className="ml-2 text-[12px]" style={{ color: "var(--color-text-3)" }}>
+                {t("workflow:ops_details_hint")}
+              </span>
+            </summary>
+            <div className="space-y-4 px-3 pb-3">
+              <PipelineBoard projectName={projectName} />
+              <ProductionRunPanel key={projectName} projectName={projectName} />
+            </div>
+          </details>
+        ) : null}
 
         {showAdInit ? (
           <AdInitCanvas projectName={projectName} onDone={refreshProject} />

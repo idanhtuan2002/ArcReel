@@ -1,5 +1,6 @@
 
 export default {
+  'brand_tagline': 'Agent-driven AI film studio',
   'language': 'Language',
   'chinese': 'Chinese',
   'english': 'English',

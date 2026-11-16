@@ -41,7 +41,12 @@ export function ProjectMenu() {
     typeof currentProjectData?.aspect_ratio === "string"
       ? currentProjectData.aspect_ratio
       : currentProjectData?.aspect_ratio?.storyboard;
-  const modeLabel = contentMode === "drama" ? "DRAMA" : contentMode === "ad" ? "AD" : "NARRATION";
+  const modeLabel =
+    contentMode === "drama"
+      ? t("dashboard:drama_animation_mode")
+      : contentMode === "ad"
+        ? t("dashboard:ad_short_video_mode")
+        : t("dashboard:narration_visuals_mode");
   const modeTagline = aspectRatio ? `${modeLabel} · ${aspectRatio}` : modeLabel;
 
   return (

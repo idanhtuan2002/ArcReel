@@ -28,3 +28,10 @@ export const BRAND = {
 
 export const BRAND_DOCUMENT_TITLE = `${BRAND.name} · ${BRAND.tagline}`;
 
+const TAGLINE_OVERRIDE = fallback(env.VITE_BRAND_TAGLINE, "");
+
+/** The browser tab title in the interface language; a distribution's own tagline (VITE_BRAND_TAGLINE) wins. */
+export function brandDocumentTitle(translatedTagline: string | null): string {
+  return `${BRAND.name} · ${TAGLINE_OVERRIDE || translatedTagline || BRAND.tagline}`;
+}
+

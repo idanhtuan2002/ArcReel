@@ -1,5 +1,6 @@
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { describeReason } from "../reasonCopy";
 import { ApiRequestError } from "@/api";
 import {
   changeProductionRunMode,
@@ -82,8 +83,8 @@ interface Props {
  */
 export function ProductionRunPanel({ projectName }: Props) {
   const { t } = useTranslation("workflow");
-  // A reason code the panel has no words for is shown as the code itself, never dropped.
-  const reasonText = useCallback((code: string) => t(`auto_reason_${code}`, { defaultValue: code }), [t]);
+  // A reason is read in words (its own, its family's or a generic sentence naming the code), never as a bare code.
+  const reasonText = useCallback((code: string) => describeReason(t, code).text, [t]);
   // A refused command names its code and reasons in words; anything else keeps its own message.
   const errorText = useCallback(
     (cause: unknown): string => {
@@ -551,13 +552,22 @@ export function ProductionRunPanel({ projectName }: Props) {
               style={{ border: `1px solid ${statusTone(run.status)}`, color: statusTone(run.status) }}
             >
               <span>{t("auto_reason", { reason: reasonText(run.reason) })}</span>
-              <button
-                type="button"
-                className="focus-ring rounded text-[11.5px] underline underline-offset-2 hover:opacity-80"
-                onClick={() => void navigator.clipboard?.writeText(`${run.run_id} ${run.stage} ${run.reason}`)}
-              >
-                {t("auto_copy_error")}
-              </button>
+              {describeReason(t, run.reason).hint && (
+                <span className="basis-full" style={{ color: "var(--color-text-2)" }}>
+                  {describeReason(t, run.reason).hint}
+                </span>
+              )}
+              <details className="basis-full text-[11px]" style={{ color: "var(--color-text-3)" }}>
+                <summary className="cursor-pointer">{t("auto_reason_details")}</summary>
+                <span className="font-mono">{run.reason}</span>{" "}
+                <button
+                  type="button"
+                  className="focus-ring rounded underline underline-offset-2 hover:opacity-80"
+                  onClick={() => void navigator.clipboard?.writeText(`${run.run_id} ${run.stage} ${run.reason}`)}
+                >
+                  {t("auto_copy_error")}
+                </button>
+              </details>
             </div>
           )}
           {run.pending_review && (

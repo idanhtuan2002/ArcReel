@@ -1,6 +1,7 @@
 import type enCommon from '../en/common';
 
 export default {
+  'brand_tagline': 'Agent 驱动的 AI 视频创作工作台',
   'language': '语言',
   'chinese': '中文',
   'english': '英文',

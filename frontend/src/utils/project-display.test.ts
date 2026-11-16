@@ -23,3 +23,12 @@ describe("getProjectDisplayName", () => {
     expect(getProjectDisplayName("", "Dự án chưa đặt tên")).toBe("Dự án chưa đặt tên");
   });
 });
+
+describe("getProjectDisplayName with Markdown titles", () => {
+  it("reads a title written as a Markdown heading without its marks", () => {
+    expect(getProjectDisplayName("# MÊ CUNG DỤC VỌNG", "x")).toBe("MÊ CUNG DỤC VỌNG");
+    expect(getProjectDisplayName("## Chuyến đò cuối ", "x")).toBe("Chuyến đò cuối");
+    expect(getProjectDisplayName("C# và #hashtag", "x")).toBe("C# và #hashtag");
+    expect(getProjectDisplayName("  #  ", "Chưa đặt tên")).toBe("Chưa đặt tên");
+  });
+});

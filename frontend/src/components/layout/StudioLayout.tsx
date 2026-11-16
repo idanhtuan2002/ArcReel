@@ -12,6 +12,7 @@ import { useProjectEventsSSE } from "@/hooks/useProjectEventsSSE";
 import { TaskFailureListener } from "./TaskFailureListener";
 import { ScriptGenerationNoticeListener } from "./ScriptGenerationNoticeListener";
 import { MigrationRepairBanner } from "./MigrationRepairBanner";
+import { ActiveRunNotice } from "@/features/production-run/ui/ActiveRunNotice";
 import { useProjectsStore } from "@/stores/projects-store";
 import { DemoAssistantPanel } from "@/onboarding/DemoAssistantPanel";
 import { DemoReadOnlyBanner } from "@/onboarding/DemoReadOnlyBanner";
@@ -172,6 +173,7 @@ export function StudioLayout({ children }: StudioLayoutProps) {
       <GlobalHeader onNavigateBack={() => setLocation("~/app/projects")} />
       {demoMode ? <DemoReadOnlyBanner /> : null}
       <MigrationRepairBanner />
+      {demoMode ? null : <ActiveRunNotice projectName={sseProjectName} />}
       <div className="relative flex flex-1 overflow-hidden">
         <AssetSidebar />
         <main className="flex-1 overflow-hidden">
