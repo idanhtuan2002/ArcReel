@@ -23,6 +23,7 @@ Vietnamese scene, `json_schema`, read by the main agent; `scratchpad/or_probe.py
 | Final reviewers (vision) | local `qwen2.5vl:7b` + `gemma3:4b` (qualified) | local | a cloud reviewer must be re-qualified on the corpus before use |
 | Continuity judge (ADR-0134) | Gemini Flash (20/day/model) → Groq `qwen/qwen3.8-27b` (≤3 images) → BytePlus `seed-2-0-lite` / `dola-seed-2-1-turbo` | daily / once | qualification still open; `seed-2-0-pro` free quota is used up |
 | Craft judge (ADR-0132) | local `gemma3:12b` | local | |
+| ArcReel Agent (chat, Claude Agent SDK) | OpenRouter `baidu/ernie-5.5-flash-preview:free` (main, sonnet, opus, subagent) + `nvidia/nemotron-3.5-super-vl:free` (haiku) → `nvidia/nemotron-3-ultra-550b-a55b:free` → local `qwen3.5-vimax:9b` | 1,000/day shared (OpenRouter) | only free pool with an Anthropic Messages endpoint; probe below |
 | Image / video / TTS | local ComfyUI klein, still-clip, VieNeu | local | BytePlus Seedream 4.5 (200) / Seedance 1.0 pro-fast (2M) kept for bake-offs |
 | ASR / TTS A/B | Alibaba `qwen-audio-3.1-*` (1M each, until 2027-02-11), Groq `whisper-large-v3-turbo` | once / daily | |
 
@@ -62,6 +63,18 @@ Alibaba `qwen-plus-character` (76 words), BytePlus `seed-2-0-lite` (states the b
 - In the app (2026-11-14): the five used models carry price `token` 0/0 USD (a story route needs explicit USD prices);
   project `san-xuat-tu-ong-7fb4ef4b` writer = ernie, writer fallbacks particle-1 → ling-3.2-flash → gemma-4-31b →
   local `qwen3.5-vimax:9b`; per-call ceiling 1 cent, run cap 5,000 cents (reservation only; settled cost is 0).
+
+- **[V 2026-11-16]** Agent probe (`scratchpad/agent_model_probe.py`, run by the sponsor): Anthropic Messages at
+  `https://openrouter.ai/api/v1/messages` with the key as **`x-api-key`** works (the app's ANTHROPIC_API_KEY path), two
+  tools, a Vietnamese two-step task (list episodes → rewrite the first draft, episode 2). Every free tool model that
+  answered picked the right tools and episode, with no Han leak: ernie-5.5-flash-preview (2.2 s + 1.9 s, Vietnamese
+  instruction, explains to the user, context 1,024k), nemotron-3-ultra-550b (3.3 + 2.4 s, Vietnamese, no user text),
+  nemotron-3.5-super-vl / -lightning (fast, Vietnamese), ling-3.2-flash, particle-1 (12.9 s), dots-3-note (expires
+  2026-12-31), flint, cohere north-mini-code / liquid lfm-3-1.7b / nemotron-3-nano-omni (instructions in English).
+  gemma-4-26b/31b: 429 upstream; inkling-2-small: 403 "agentic harnesses only". The probe is short: a real Agent
+  session (long system prompt, many turns) still has to be watched once.
+- Other keys for the Agent: Alibaba has an Anthropic endpoint (`/apps/anthropic`) but its free text models are only
+  `qwen-*-character`; Groq, BytePlus and Gemini have no Anthropic endpoint in their docs (read 2026-11-16).
 
 ## Google AI Studio (Gemini)
 
