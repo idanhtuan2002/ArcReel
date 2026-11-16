@@ -293,7 +293,7 @@ export function ProductionRunPanel({ projectName }: Props) {
   };
 
   const latest = runs[0] ?? null;
-  const shownRuns = runs.filter((item) => item.run_id === run?.run_id || inFilter(item.status, historyFilter));
+  const shownRuns = runs.filter((item) => inFilter(item.status, historyFilter));
   const active = run !== null && !TERMINAL.has(run.status);
   const startable = latest === null || TERMINAL.has(latest.status);
   const reached = run ? STAGES.indexOf(run.stage) : -1;
@@ -425,22 +425,30 @@ export function ProductionRunPanel({ projectName }: Props) {
       )}
       {runs.length > 1 && (
         <div role="group" aria-label={t("auto_history_filter")} className="flex flex-wrap gap-1 text-[11.5px]">
-          {(["all", "active", "done", "failed"] as const).map((filter) => (
+          {(["all", "active", "done", "failed"] as const).map((filter) => {
+            const matching = runs.filter((item) => inFilter(item.status, filter));
+            return (
             <button
               key={filter}
               type="button"
+              disabled={matching.length === 0}
               aria-pressed={historyFilter === filter}
-              className="focus-ring rounded-full px-2 py-0.5"
+              className="focus-ring rounded-full px-2 py-0.5 disabled:cursor-not-allowed disabled:opacity-40"
               style={{
                 border: "1px solid var(--color-hairline-strong)",
                 background: historyFilter === filter ? "var(--color-accent-dim)" : "transparent",
                 color: historyFilter === filter ? "var(--color-accent-2)" : "var(--color-text-3)",
               }}
-              onClick={() => setHistoryFilter(filter)}
+              onClick={() => {
+                setHistoryFilter(filter);
+                // The filter shows its newest run at once; the run list below narrows to the filter too.
+                if (run === null || !inFilter(run.status, filter)) setSelected(matching[0]?.run_id ?? null);
+              }}
             >
-              {t(`auto_history_${filter}`, { count: runs.filter((item) => inFilter(item.status, filter)).length })}
+              {t(`auto_history_${filter}`, { count: matching.length })}
             </button>
-          ))}
+            );
+          })}
         </div>
       )}
       {runs.length > 1 && (

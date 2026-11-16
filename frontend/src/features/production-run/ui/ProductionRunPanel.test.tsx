@@ -543,10 +543,15 @@ describe("ProductionRunPanel", () => {
 
     expect(await screen.findByRole("alert")).toHaveTextContent("Reason: the budget is used up");
     expect(screen.getByRole("button", { name: "Copy error" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Active (1)" })).toBeEnabled();
     fireEvent.click(screen.getByRole("button", { name: "Failed (1)" }));
 
-    const options = screen.getAllByRole("option").map((option) => option.getAttribute("value"));
-    expect(options).toEqual(["run-3", "run-1"]);
+    // The filter shows its newest run at once and narrows the run list to itself.
+    expect(document.querySelector("[data-run-id]")).toHaveAttribute("data-run-id", "run-1");
+    expect(screen.getAllByRole("option").map((option) => option.getAttribute("value"))).toEqual(["run-1"]);
+
+    fireEvent.click(screen.getByRole("button", { name: "Done (1)" }));
+    expect(document.querySelector("[data-run-id]")).toHaveAttribute("data-run-id", "run-2");
   });
 
   it("fills the idea from an example", async () => {
