@@ -63,7 +63,7 @@ def test_the_thumbnail_is_the_same_bytes_every_time(tmp_path: Path):
 
 
 def test_export_accepts_only_metadata_and_a_thumbnail_of_this_episodes_final(tmp_path: Path):
-    from server.production_run.packaging_adapter import _publish_matches, _thumbnail_of
+    from server.production_run.packaging_adapter import _publish_matches
 
     final = tmp_path / "final.mp4"
     subprocess.run(
@@ -90,5 +90,12 @@ def test_export_accepts_only_metadata_and_a_thumbnail_of_this_episodes_final(tmp
     assert _publish_matches(good, 2, manifest)
     assert not _publish_matches({**good, "episode": 3}, 2, manifest)
     assert not _publish_matches({**good, "duration_seconds": 9.0}, 2, manifest)
-    assert _thumbnail_of(final.read_bytes()) == thumbnail_frame(final)
-    assert _thumbnail_of(final.read_bytes()) != thumbnail_frame(other)
+    assert thumbnail_frame(final) != thumbnail_frame(other)
+
+
+def test_export_takes_the_archived_thumbnail_the_archive_digest_already_pins():
+    from server.production_run.packaging_adapter import _thumbnail_holds
+
+    assert _thumbnail_holds(b"\xff\xd8\xff\xe0" + b"x" * 64)  # a JPEG, whatever bytes ffmpeg gives today
+    assert not _thumbnail_holds(b"")
+    assert not _thumbnail_holds(b"\x89PNG\r\n\x1a\n")

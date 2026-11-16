@@ -258,3 +258,20 @@ async def test_a_video_remake_confirms_the_duration_tier_its_tool_proposes_as_th
     submitted = await adapter._call_tool(WorkflowActionType.GENERATE_VIDEOS, intent, args)
     assert submitted.value == {"summary": "queued"}
     assert calls[1]["confirmed_request_durations"] == {"E1S01": 3}
+
+
+async def test_a_restore_the_judge_asked_for_that_fails_is_recorded_instead_of_crashing_the_step(drama_media):
+    _projects, _tasks, adapter, _plan, _intent = drama_media
+    restored: list[tuple] = []
+
+    async def failing(project, resource_type, unit, version):
+        raise RuntimeError("version store busy")
+
+    async def working(project, resource_type, unit, version):
+        restored.append((resource_type, unit, version))
+
+    adapter._restore = failing
+    assert await adapter._restore_choice("demo", "E1S01", 1) == "RuntimeError"
+    adapter._restore = working
+    assert await adapter._restore_choice("demo", "E1S01", 1) is None
+    assert restored == [("storyboards", "E1S01", 1)]

@@ -15,7 +15,6 @@ import hashlib
 import io
 import json
 import os
-import tempfile
 import zipfile
 from pathlib import Path
 from typing import Literal
@@ -239,12 +238,10 @@ def _publish_matches(publish: object, episode: int, manifest: dict) -> bool:
     )
 
 
-def _thumbnail_of(final_bytes: bytes) -> bytes:
-    """The thumbnail frame of the archived final itself, extracted again (bit-exact)."""
-    with tempfile.TemporaryDirectory() as work:
-        final = Path(work) / "final.mp4"
-        final.write_bytes(final_bytes)
-        return thumbnail_frame(final)
+def _thumbnail_holds(thumbnail: bytes) -> bool:
+    """Whether the archived thumbnail is a JPEG. Its bytes are pinned by the archive digest checked first; it is not
+    extracted again, since a JPEG encoder need not give the same bytes twice (another ffmpeg build after a deploy)."""
+    return len(thumbnail) > 4 and thumbnail.startswith(b"\xff\xd8")
 
 
 def verify_run_outputs(
@@ -282,7 +279,7 @@ def verify_run_outputs(
             or lineage.get("master", {}).get("digest") != masters[episode].digest
             or lineage.get("quality_decision") != decisions[episode]
             or not _publish_matches(publish, episode, manifest)
-            or thumbnail != _thumbnail_of(final_bytes)
+            or not _thumbnail_holds(thumbnail)
         ):
             raise OwnerBlocked("ARCHIVE_CHANGED")
         outputs.append(

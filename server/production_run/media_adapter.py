@@ -433,16 +433,16 @@ class MediaAdapter:
                 await asyncio.to_thread(
                     self._record_choice, evidence, run, unit, {**decision, "restore_requested": restore}
                 )
-            if restore and isinstance(chosen, int):
-                await self._restore(run.project_name, "storyboards", unit, chosen)
-            kept = versions.get_versions("storyboards", unit)["current_version"]
-            await asyncio.to_thread(
-                self._record_choice,
-                evidence,
-                run,
-                unit,
-                {**decision, "restore_requested": restore, "kept_version": kept},
+            failure = (
+                await self._restore_choice(run.project_name, unit, chosen)
+                if restore and isinstance(chosen, int)
+                else None
             )
+            kept = versions.get_versions("storyboards", unit)["current_version"]
+            fields: dict[str, Any] = {"restore_requested": restore, "kept_version": kept}
+            if failure is not None:
+                fields["restore_error"] = failure
+            await asyncio.to_thread(self._record_choice, evidence, run, unit, {**decision, **fields})
 
     async def _kept_storyboards(
         self, intent: DispatchIntent, items: list[dict[str, Any]], id_field: str, episode: int | None
@@ -454,6 +454,15 @@ class MediaAdapter:
         units = [str(item[id_field]) for item in items if item.get(id_field)]
         current = {unit: versions.get_versions("storyboards", unit)["current_version"] for unit in units}
         return await asyncio.to_thread(self._kept_units, root, intent.scope.run_id, episode, current)
+
+    async def _restore_choice(self, project_name: str, unit: str, version: int) -> str | None:
+        """Restore the chosen storyboard version; the error's name when the restore failed. A failed restore keeps
+        the current storyboard and is recorded with the choice, instead of ending the step's tick."""
+        try:
+            await self._restore(project_name, "storyboards", unit, version)
+        except Exception as error:
+            return type(error).__name__
+        return None
 
     @staticmethod
     def _kept_units(root: Path, run_id: str, episode: int, current: Mapping[str, int]) -> set[str]:
