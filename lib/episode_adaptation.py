@@ -35,6 +35,7 @@ from lib.adaptation_fidelity import SpokenLine, fidelity_problems
 from lib.episode_ledger import episode_outline_context
 from lib.episode_paths import episode_source_path, episode_source_relpath
 from lib.episode_target_volume import resolve_episode_target_volume
+from lib.output_hygiene import leak_reason
 from lib.path_safety import PathTraversalError, safe_join
 from lib.speech_rate import estimate_spoken_seconds, project_speech_rate_override, speech_rate_units_per_second
 from lib.text_attestation import has_cjk, named_in, skeleton
@@ -335,6 +336,21 @@ def check_adaptation(draft: EpisodeAdaptationDraft, inputs: AdaptationInputs) ->
             names=(*inputs.characters, *cast),
         )
     )
+    descriptive = [
+        ("logline", draft.logline),
+        ("conflict", draft.conflict),
+        ("cliffhanger", draft.cliffhanger),
+        *(("cast", name) for name in draft.cast),
+        *(
+            (f"scene {number} {field}", value)
+            for number, scene in enumerate(draft.scenes, start=1)
+            for field, value in (("heading", scene.heading), ("purpose", scene.purpose))
+        ),
+    ]
+    for field, value in descriptive:
+        reason = leak_reason(value, schema_fields=("source_excerpt", "cliffhanger", "logline"))
+        if reason:
+            problems.append(f"{field}: {reason}; write only the {field.split()[-1]} itself")
     spoken = spoken_text(draft)
     if not spoken:
         problems.append("the adaptation has no spoken line")

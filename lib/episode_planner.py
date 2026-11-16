@@ -48,6 +48,7 @@ from lib.episode_ledger import (
 from lib.episode_paths import episode_script_relpath, episode_source_path
 from lib.episode_target_volume import EpisodeTargetVolume, resolve_episode_target_volume
 from lib.formal_write import FormalWriteReceipt, project_metadata_lock
+from lib.output_hygiene import leak_reason
 from lib.path_safety import PathTraversalError, safe_join
 from lib.project_manager import ProjectManager, resolve_source_kind
 from lib.prompt_builders_script import USER_INSTRUCTIONS_HEADER
@@ -736,6 +737,21 @@ def _screen_episodes(
                 problems.append(
                     f"第 {idx + 1} 条的标题、钩子或大纲含汉字或中文标点，请全部使用源文语言（{language}）书写: {draft.title!r}"
                 )
+        leaked = next(
+            (
+                text
+                for text in [
+                    draft.title,
+                    draft.hook,
+                    *getattr(draft, "story_beats", []),
+                    getattr(draft, "next_episode_teaser", None) or "",
+                ]
+                if leak_reason(text, schema_fields=("end_anchor", "story_beats", "next_episode_teaser"))
+            ),
+            None,
+        )
+        if leaked is not None:
+            problems.append(f"第 {idx + 1} 条的标题、钩子或大纲混入了推理过程或结构字段，只写内容本身: {leaked[:60]!r}")
         if max_units is not None:
             units = count_reading_units(window[start:end], language)
             inner = bisect_left(sentence_ends, end) - bisect_right(sentence_ends, start)

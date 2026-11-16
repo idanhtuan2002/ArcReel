@@ -19,6 +19,7 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from lib.asset_inventory import AssetInventoryCompletion, AssetInventoryError, complete_asset_inventory
 from lib.asset_types import DERIVATIVES_FIELD, resolve_asset_key, validate_asset_name
+from lib.output_hygiene import leak_reason
 from lib.project_manager import ProjectManager
 from lib.source_revision import SourceScope, compute_source_revision
 from lib.text_attestation import named_in
@@ -133,6 +134,10 @@ def _attested_states(states: list[_State], source: str) -> dict[str, dict[str, s
     return attested
 
 
+#: Field names of the extraction schema; one inside a description is scaffolding, not a description.
+_SCHEMA_FIELDS = ("description", "voice_style", "evidence", "states", "change")
+
+
 def _entries(extraction: AssetExtraction, project: dict[str, Any], source: str) -> dict[str, dict[str, dict[str, Any]]]:
     buckets: dict[str, dict[str, dict[str, Any]]] = {}
     for bucket, items in (
@@ -153,8 +158,16 @@ def _entries(extraction: AssetExtraction, project: dict[str, Any], source: str) 
             # may carry a descriptive name, so only characters are held to the source's words.
             if bucket == "characters" and not named_in(name, source):
                 continue
+            # A description holding the model's reasoning or schema scaffolding is not one; another chunk may
+            # describe the same asset cleanly.
+            if leak_reason(item.description, schema_fields=_SCHEMA_FIELDS):
+                continue
             entry: dict[str, Any] = {"description": item.description.strip()}
-            if isinstance(item, _Character) and item.voice_style.strip():
+            if (
+                isinstance(item, _Character)
+                and item.voice_style.strip()
+                and not leak_reason(item.voice_style, schema_fields=_SCHEMA_FIELDS)
+            ):
                 entry["voice_style"] = item.voice_style.strip()
             if isinstance(item, _Character):
                 states = _attested_states(item.states, source)

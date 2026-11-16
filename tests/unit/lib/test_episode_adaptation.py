@@ -151,6 +151,7 @@ def test_a_drama_draft_renders_as_a_scene_headed_screenplay(tmp_path: Path):
         ({"line": {"kind": "action", "text": "Lan quay đi."}}, "only narration lines"),
         ({"long": True}, "spoken length"),
         ({"hook": "陌生人来讨债。"}, "CJK"),
+        ({"logline": "* Input: một tập về món nợ. Output: logline."}, "logline: it contains"),
     ],
 )
 def test_each_failed_check_is_named_for_the_retry(tmp_path: Path, change: dict, needle: str):
@@ -166,6 +167,8 @@ def test_each_failed_check_is_named_for_the_retry(tmp_path: Path, change: dict, 
         draft["scenes"][0]["lines"].append(change["line"])
     if "hook" in change:
         draft["scenes"][0]["lines"][0]["text"] = change["hook"]
+    if "logline" in change:
+        draft["logline"] = change["logline"]
     if change.get("long"):
         draft["scenes"][1]["lines"].append({"kind": "narration", "text": " ".join(["kể tiếp"] * 40)})
     problems = check_adaptation(EpisodeAdaptationDraft.model_validate(draft), inputs)
