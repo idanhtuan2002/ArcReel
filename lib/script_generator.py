@@ -237,6 +237,21 @@ class ScriptGenerator:
         """项目生成模式（project.json 顶层字段）：创建即定、之后不可变，不随集号变化。"""
         return self.project_json.get("generation_mode")
 
+    def _fallback_title(self, episode: int) -> str:
+        """The title a script gets when the model wrote none: the planned episode title, else the episode's label in
+        the source language."""
+        planned = self._episode_entry(episode).get("title")
+        if isinstance(planned, str) and planned.strip():
+            return planned.strip()
+        return self._episode_label(episode)
+
+    def _episode_label(self, episode: int) -> str:
+        """The episode's label in the source language ("Tập 3", "Episode 3"; "第3集" for Chinese or no language)."""
+        from lib.publish_metadata import EPISODE_WORD
+
+        language = self.project_json.get("source_language")
+        return EPISODE_WORD.get(language if isinstance(language, str) else "zh", EPISODE_WORD["en"]).format(n=episode)
+
     def _episode_entry(self, episode: int) -> dict:
         """按集号取 project.json episodes 条目；缺失返回空 dict。"""
         return next(
@@ -370,7 +385,7 @@ class ScriptGenerator:
         存量剧本经此一次即带上条目级口径。
         """
         script_data: dict[str, Any] = {
-            "title": title or scope.existing_title or f"第{episode}集",
+            "title": title or scope.existing_title or self._fallback_title(episode),
             scope.items_key: [],
         }
         script_data = self._add_metadata(script_data, episode)
@@ -758,7 +773,7 @@ class ScriptGenerator:
         visual_scenes = self._parse_drama_visual(result.text)
         merged_scenes = merge_drama_visual_into_scenes(authoring_scope.entries_to_rewrite, visual_scenes)
 
-        script_data = {"title": title or f"第{episode}集", "scenes": merged_scenes}
+        script_data = {"title": title or self._fallback_title(episode), "scenes": merged_scenes}
         script_data = self._add_metadata(script_data, episode)
         script_data = self._assemble_script(script_data, authoring_scope)
 
@@ -1735,7 +1750,7 @@ class ScriptGenerator:
         if isinstance(data, dict):
             raw_title = data.get("title")
             if not (isinstance(raw_title, str) and raw_title.strip()):
-                data["title"] = f"第{episode}集"
+                data["title"] = self._fallback_title(episode)
         try:
             flat = ReferencePromptAuthoringFlatScript.model_validate(data)
         except ValidationError as e:
@@ -1784,7 +1799,7 @@ class ScriptGenerator:
         if isinstance(data, dict):
             raw_title = data.get("title")
             if not (isinstance(raw_title, str) and raw_title.strip()):
-                data["title"] = f"第{episode}集"
+                data["title"] = self._fallback_title(episode)
         return ReferencePromptAuthoringFlatScript.model_validate(data).model_dump()
 
     def _quarantine_reference_prompt_authoring(
@@ -2035,7 +2050,7 @@ class ScriptGenerator:
         if isinstance(data, dict):
             title = data.get("title")
             if not (isinstance(title, str) and title.strip()):
-                data["title"] = f"第{episode}集"
+                data["title"] = self._fallback_title(episode)
 
         # 校验模型经规范解析定骨架种类（分镜图生视频按创作类型，参考生视频统一 video_units），
         # kind→模型映射留本地（模型属上层依赖，不进 SKELETONS 窄表）。
@@ -2088,7 +2103,7 @@ class ScriptGenerator:
             units.append(unit)
 
         return ReferenceVideoScript.model_validate(
-            {"title": flat.title or f"第{episode}集", "content_mode": "ad", "video_units": units}
+            {"title": flat.title or self._fallback_title(episode), "content_mode": "ad", "video_units": units}
         ).model_dump()
 
     def _parse_narration_visual(self, response_text: str, episode: int) -> dict:
@@ -2153,7 +2168,7 @@ class ScriptGenerator:
 
         title = visual_data.get("title")
         return {
-            "title": title if isinstance(title, str) and title.strip() else f"第{episode}集",
+            "title": title if isinstance(title, str) and title.strip() else self._fallback_title(episode),
             "segments": merged_segments,
         }
 
@@ -2285,7 +2300,7 @@ class ScriptGenerator:
         if not isinstance(novel, dict) or not novel.get("title") or not novel.get("chapter"):
             script_data["novel"] = {
                 "title": self.project_json.get("title", ""),
-                "chapter": f"第{episode}集",
+                "chapter": self._episode_label(episode),
             }
         # 剥离已废弃的 source_file（AI 可能虚构）
         novel = script_data.get("novel")

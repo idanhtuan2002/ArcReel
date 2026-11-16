@@ -1271,8 +1271,13 @@ class ProjectManager:
         if episode_entry is None:
             episode_entry = {"episode": episode_num}
             episodes.append(episode_entry)
-        # 同步核心元数据（不包含统计字段，统计字段由项目摘要读时计算）
-        episode_entry["title"] = episode_title
+        # 同步核心元数据（不包含统计字段，统计字段由项目摘要读时计算）。已规划的集（带 outline）
+        # 标题属于分集规划（亦进入改编依据），剧本标题不覆盖它；未规划的集取剧本标题。
+        planned_title = episode_entry.get("title")
+        if not (
+            isinstance(episode_entry.get("outline"), dict) and isinstance(planned_title, str) and planned_title.strip()
+        ):
+            episode_entry["title"] = episode_title
         episode_entry["script_file"] = script_file
         episodes.sort(key=lambda x: x["episode"])
 

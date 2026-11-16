@@ -878,7 +878,8 @@ async def test_script_plan_dialogue_overload_is_caught_before_the_paid_prompt_au
 
 
 async def test_prompt_authoring_missing_title_falls_back_instead_of_failing_the_paid_call(reference_project: Path):
-    """非约束解码通道漏写 title 时兜底为「第N集」：title 仅展示用，不值得让已付费的展开失败。"""
+    """非约束解码通道漏写 title 时兜底为该集已规划的标题（无规划时为源语言的集号标签）：title 仅展示用，
+    不值得让已付费的展开失败；兜底不能改写已规划集的标题。"""
     drafts = reference_project / "drafts" / "episode_1"
     (drafts / "script_plan_reference_units.json").write_text(SCRIPT_PLAN_UNITS_JSON, encoding="utf-8")
     generator = MagicMock()
@@ -890,7 +891,7 @@ async def test_prompt_authoring_missing_title_falls_back_instead_of_failing_the_
     gen = ScriptGenerator(reference_project, generator=generator)
     out = await gen.generate(episode=1)
 
-    assert _json.loads(out.read_text(encoding="utf-8"))["title"] == "第1集"
+    assert _json.loads(out.read_text(encoding="utf-8"))["title"] == "t1"  # the planned episode title
 
 
 # ---------------------------------------------------------------------------
