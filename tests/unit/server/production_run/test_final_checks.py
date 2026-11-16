@@ -12,6 +12,7 @@ from server.production_run.final_checks import (
     length_findings,
     picture_findings,
     sound_findings,
+    speech_findings,
     subtitle_findings,
     timing_findings,
     variety_findings,
@@ -225,3 +226,13 @@ def test_segments_naming_unlisted_characters_are_minor_findings():
     )
     assert finding.detail == "E2S02 names Ông Ba without listing them"
     assert cast_findings((), unit_key="episode:2") == []
+
+
+def test_a_transcript_that_misses_the_narration_is_a_minor_finding():
+    (finding,) = speech_findings(
+        "Ông Ba không trả lời. Ông cúi xuống.", "Ông Bà không trả lời.", language="vi", unit_key="episode:2"
+    )
+    assert (finding.code, finding.severity, finding.repair_stage) == ("CHECK_SPEECH_ACCURACY", "MINOR", RunStage.MEDIA)
+    assert finding.detail.startswith("word accuracy 0.")
+    assert speech_findings("Ông Ba không trả lời.", None, language="vi", unit_key="episode:2") == []
+    assert speech_findings("Ông Ba không trả lời.", "ông ba không trả lời", language="vi", unit_key="e:2") == []

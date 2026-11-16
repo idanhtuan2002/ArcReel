@@ -69,6 +69,7 @@ from server.production_run.text_adapter import (
     ScriptAdapter,
     ScriptPlanAdapter,
 )
+from server.production_run.transcription import whisper_transcriber
 from server.production_run.vision_chat import model_access
 from server.services.automation_grants import AutomationGrantCustodian, RunAutomationAuthority
 from server.services.governance_grants import CurrentShowrunnerGrantReader
@@ -350,7 +351,9 @@ def build_adapters(
             sessions, music=music_service_from_env(), ambience=ambience_service_from_env(), **owners
         ),
         RunStage.MASTER: FinalMasterAdapter(sessions, **owners),
-        RunStage.QUALITY: QualityAdapter(sessions, **owners, evaluator=evaluator),
+        RunStage.QUALITY: QualityAdapter(
+            sessions, **owners, evaluator=evaluator, transcribe=whisper_transcriber(sessions)
+        ),
         RunStage.PACKAGE: PackagingAdapter(sessions, **owners),
         RunStage.EXPORT: ExportAdapter(sessions, **owners),
     }

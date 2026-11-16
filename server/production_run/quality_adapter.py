@@ -11,8 +11,12 @@ anything else blocks. Model evidence never satisfies a Human slot and is never w
 from __future__ import annotations
 
 import asyncio
+import contextlib
+import dataclasses
 import hashlib
 import json
+import logging
+from collections.abc import Awaitable, Callable
 from pathlib import Path
 from typing import Any
 
@@ -74,6 +78,12 @@ def _episode(receipt: OwnerReceipt) -> int:
     return int(receipt.receipt_ref.split(":")[1])
 
 
+logger = logging.getLogger(__name__)
+
+#: Transcribes a final film's sound in the given language; ``None`` when it cannot.
+Transcriber = Callable[[Path, str], Awaitable[str | None]]
+
+
 class QualityAdapter:
     owner = QUALITY_OWNER
     seconds_per_target = 900
@@ -86,9 +96,11 @@ class QualityAdapter:
         projects: ProjectManager,
         evaluator: QualifiedEvaluator,
         max_attempts: int = 2,
+        transcribe: Transcriber | None = None,
     ) -> None:
         self._sessions, self._authority, self._projects = sessions, authority, projects
         self._evaluator = evaluator
+        self._transcribe = transcribe
         self._max_attempts = max_attempts
         self._jobs: dict[str, asyncio.Task[None]] = {}
 
@@ -341,8 +353,36 @@ class QualityAdapter:
             await repository.record_owner_attempt(intent=intent, sub_key="review")
         self._jobs[key] = asyncio.create_task(self._review_all(targets, routes))
 
+    async def _transcript(self, evidence: FinalEvidence) -> str | None:
+        """A transcript of the final's sound, made once per final and kept beside its reviews; ``None`` without a
+        transcription route or when it fails, which leaves the speech unchecked and never blocks the review."""
+        if self._transcribe is None:
+            return None
+        token = evidence.subject_digest.removeprefix("sha256:")[:16]
+        path = evidence.final_path.parent / "quality" / f"{token}.transcript.json"
+        if path.is_file():
+            with contextlib.suppress(OSError, ValueError):
+                stored = json.loads(path.read_text(encoding="utf-8"))
+                if isinstance(stored, dict) and isinstance(stored.get("text"), str):
+                    return stored["text"]
+        try:
+            text = await self._transcribe(evidence.final_path, evidence.language)
+        except Exception:  # a transcription outage only leaves speech unchecked
+            logger.warning("final transcription failed for %s", evidence.unit_key, exc_info=True)
+            return None
+        if text is None:
+            return None
+        path.parent.mkdir(parents=True, exist_ok=True)
+        staged = path.with_suffix(".tmp")
+        staged.write_text(json.dumps({"text": text}, ensure_ascii=False), encoding="utf-8")
+        staged.replace(path)
+        return text
+
     async def _review_all(self, targets: dict[int, FinalEvidence], routes: dict[str, ModelRoute]) -> None:
-        for evidence in targets.values():
+        for target in targets.values():
+            evidence = target
+            if not all(self._review_path(target, role).is_file() for role in REVIEWER_ROLES):
+                evidence = dataclasses.replace(target, speech_transcript=await self._transcript(target))
             for role in REVIEWER_ROLES:
                 path = self._review_path(evidence, role)
                 if path.is_file():

@@ -39,6 +39,7 @@ from server.production_run.final_checks import (
     length_findings,
     picture_findings,
     sound_findings,
+    speech_findings,
     subtitle_findings,
     timing_findings,
     variety_findings,
@@ -95,6 +96,12 @@ class GeminiReviewer:
                 checks += length_findings(seconds, evidence.target_seconds, unit_key=evidence.unit_key)
             checks += variety_findings(evidence.shot_types, unit_key=evidence.unit_key)
             checks += cast_findings(evidence.unlisted_cast, unit_key=evidence.unit_key)
+            checks += speech_findings(
+                evidence.narration_text,
+                evidence.speech_transcript,
+                language=evidence.language,
+                unit_key=evidence.unit_key,
+            )
             base_url, api_key = await self._credentials_for(route.provider_id)
             body = {
                 "contents": [

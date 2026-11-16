@@ -70,3 +70,20 @@ API, a CLI or an agent skill, not automatically.
 
 - [U] Whether DC reaches `run_sketch_select` automatically (its agent skills live outside `src/`).
 - [U] Vietnamese ASR word accuracy on VieNeu output; no measurement yet.
+
+## 5. What was built (2026-11-16, same day)
+
+Each gap is recorded first and blocks nothing until real runs measure it; the MINOR findings show with every review.
+
+- **G1** `lib/speech_fidelity.py`, `server/production_run/transcription.py`: every final review transcribes the final's
+  sound once (the app's Whisper route, the one video sources use; cached as `quality/<subject>.transcript.json`) and
+  records `CHECK_SPEECH_ACCURACY` (word accuracy < 0.9, misheard words named) and `CHECK_SPEECH_SYMBOL` (symbols read
+  aloud). No route or a failed call leaves speech unchecked. Next: once VieNeu accuracies are measured, check each
+  line right after TTS and regenerate it (ADR).
+- **G2** `lib/script_cast.py`: the narration script-plan receipt lists segments naming registered characters they do
+  not list (soft violation, never refused); every review records `CHECK_CAST_UNLISTED`. 15 production segments: none.
+- **G3** `final_checks.variety_findings`: `CHECK_SHOT_RUN` (≥ 3 consecutive of one size; unknown sizes break runs, as
+  OM) and `CHECK_SHOT_MONOTONY` (> 60 % of ≥ 5 shots); OM's run cases are the tests.
+- **G4** `lib/output_hygiene.py`: leaked reasoning, schema field names, code/tool markup or U+FFFD refused in
+  descriptive fields of asset extraction (asset dropped), episode planning and adaptation (retry with the reason);
+  DramaClaw's observed corruption values are the tests; 117 production fields scanned clean.

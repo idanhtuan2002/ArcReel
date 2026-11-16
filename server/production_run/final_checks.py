@@ -22,6 +22,7 @@ from difflib import SequenceMatcher
 from pathlib import Path
 
 from lib.presentation_renderer import RenderRefused, measure_loudness
+from lib.speech_fidelity import MIN_WORD_ACCURACY, compare
 from r2.automation.assessment import AssessmentFinding
 from r2.contracts.automation import RunStage
 
@@ -344,11 +345,42 @@ def cast_findings(unlisted: Sequence[tuple[str, Sequence[str]]], *, unit_key: st
     ]
 
 
+def speech_findings(narration: str, transcript: str | None, *, language: str, unit_key: str) -> list[AssessmentFinding]:
+    """MINOR findings when a transcript of the final's sound misses the narration (word accuracy under
+    ``MIN_WORD_ACCURACY``) or names symbols the TTS read aloud; none without a transcript."""
+    if transcript is None or not narration.strip():
+        return []
+    comparison = compare(narration, transcript, language=language)
+    found: list[AssessmentFinding] = []
+    if comparison.accuracy < MIN_WORD_ACCURACY:
+        found.append(
+            AssessmentFinding(
+                code="CHECK_SPEECH_ACCURACY",
+                severity="MINOR",
+                unit_key=unit_key,
+                repair_stage=RunStage.MEDIA,
+                detail=f"word accuracy {comparison.accuracy:.2f}; misheard: {', '.join(comparison.misheard)}",
+            )
+        )
+    if comparison.spoken_symbols:
+        found.append(
+            AssessmentFinding(
+                code="CHECK_SPEECH_SYMBOL",
+                severity="MINOR",
+                unit_key=unit_key,
+                repair_stage=RunStage.MEDIA,
+                detail=f"the voice reads symbols aloud: {', '.join(comparison.spoken_symbols)}",
+            )
+        )
+    return found
+
+
 __all__ = [
     "cast_findings",
     "length_findings",
     "picture_findings",
     "sound_findings",
+    "speech_findings",
     "subtitle_findings",
     "subtitle_text",
     "timing_findings",

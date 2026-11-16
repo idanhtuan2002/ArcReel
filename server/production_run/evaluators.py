@@ -40,6 +40,7 @@ from server.production_run.final_checks import (
     length_findings,
     picture_findings,
     sound_findings,
+    speech_findings,
     subtitle_findings,
     timing_findings,
     variety_findings,
@@ -457,6 +458,8 @@ class FinalEvidence:
     shot_types: tuple[str, ...] = ()
     #: Segments whose narration names registered characters they do not list, as (segment id, names).
     unlisted_cast: tuple[tuple[str, tuple[str, ...]], ...] = ()
+    #: A transcript of the final's sound, when a transcription route made one; ``None`` leaves speech unchecked.
+    speech_transcript: str | None = None
 
 
 class QualifiedEvaluator(Protocol):
@@ -593,6 +596,12 @@ class FrameReviewer:
             checks += length_findings(duration, evidence.target_seconds, unit_key=evidence.unit_key)
             checks += variety_findings(evidence.shot_types, unit_key=evidence.unit_key)
             checks += cast_findings(evidence.unlisted_cast, unit_key=evidence.unit_key)
+            checks += speech_findings(
+                evidence.narration_text,
+                evidence.speech_transcript,
+                language=evidence.language,
+                unit_key=evidence.unit_key,
+            )
             cues = "\n".join(
                 f"{_FRAME_WORD.get(evidence.language, 'Frame')} {index + 1} ({seconds:.1f}s): "
                 f"«{cue_at(subtitles, seconds) or '—'}»"
