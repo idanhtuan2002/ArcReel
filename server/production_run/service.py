@@ -653,13 +653,27 @@ class ProductionRunService:
             raise ProductionRunRefused("STALE_PRODUCTION_RUN")
         if not rebind:
             self._bound(run, command)
-            if (run.status is RunStatus.BLOCKED_CONFIGURATION and run.reason in _SPENT_TASK_ATTEMPTS) or (
-                run.status is RunStatus.BLOCKED_INPUT_CHANGED
-            ):
-                # The stage's step spent its attempts, or found a pinned input moved while the witness did not; a
-                # step keeps its attempts and pins, so the resume retries the stage as a new lineage that plans from
-                # the current inputs (earlier stages' receipts stay current at a higher generation; an upstream input
-                # that really moved still blocks the new step).
+            if run.status is RunStatus.BLOCKED_INPUT_CHANGED:
+                # A step found a pinned input moved while the witness did not (an episode plan reset, a script or an
+                # adaptation written outside the run). The input may belong to an earlier stage — a reset plan is
+                # EPISODE_PLAN's — so retrying the refusing stage would only refuse again. The resume starts a new
+                # lineage at the first film stage: stages whose inputs did not move pass on their current
+                # artifacts, and the one whose input moved does its work again. Story stages are never redone.
+                stages = list(RunStage)
+                film_start = RunStage.ASSET_ANALYSIS
+                stage = film_start if stages.index(run.stage) > stages.index(film_start) else run.stage
+                return _changed(
+                    run,
+                    status=RunStatus.RUNNING,
+                    reason=None,
+                    pending_review=None,
+                    generation=run.generation + 1,
+                    stage=stage,
+                )
+            if run.status is RunStatus.BLOCKED_CONFIGURATION and run.reason in _SPENT_TASK_ATTEMPTS:
+                # The stage's step spent its attempts; a step keeps its attempts and pins, so the resume retries the
+                # stage as a new lineage that plans from the current inputs (earlier stages' receipts stay current at
+                # a higher generation).
                 return _changed(
                     run, status=RunStatus.RUNNING, reason=None, pending_review=None, generation=run.generation + 1
                 )

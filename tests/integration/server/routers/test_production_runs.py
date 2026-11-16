@@ -850,9 +850,14 @@ async def test_an_owner_found_input_change_with_an_unmoved_witness_is_retried_in
     resumed = await host.command(blocked, "resume", command_id="resume-unmoved-witness")
     assert resumed.status_code == 200, resumed.text
     view = resumed.json()
+    # The moved input may be an earlier stage's (a reset episode plan): the new lineage starts at the first film
+    # stage, never in the story stages.
+    film_start = "ASSET_ANALYSIS"
+    stages = ["BRIEF", "STORY", "STORY_COMMIT", "HANDOFF", film_start]
+    expected_stage = blocked["stage"] if blocked["stage"] in stages else film_start
     assert (view["status"], view["stage"], view["generation"]) == (
         "RUNNING",
-        blocked["stage"],
+        expected_stage,
         blocked["generation"] + 1,
     )
     assert view["input_digest"] == blocked["input_digest"]

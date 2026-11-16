@@ -185,6 +185,39 @@ def test_input_rebind_starts_a_new_lineage_from_the_brief():
     )
 
 
+@pytest.mark.parametrize(
+    ("blocked_at", "resumed_at"),
+    [
+        # A reset episode plan is refused at ADAPTATION but is EPISODE_PLAN's input: the new lineage starts at the
+        # first film stage so EPISODE_PLAN runs again (trial 7, run fece65fc).
+        (RunStage.ADAPTATION, RunStage.ASSET_ANALYSIS),
+        (RunStage.MEDIA, RunStage.ASSET_ANALYSIS),
+        (RunStage.ASSET_ANALYSIS, RunStage.ASSET_ANALYSIS),
+        # Story stages are never redone by a film-side change.
+        (RunStage.STORY, RunStage.STORY),
+    ],
+)
+def test_an_input_change_with_an_unmoved_witness_restarts_at_the_first_film_stage(blocked_at, resumed_at):
+    run = _run(status=RunStatus.BLOCKED_INPUT_CHANGED, reason="EXTERNAL_INPUT_CHANGED", stage=blocked_at)
+
+    resumed = _service()._resume(run, _command(run, "RESUME"), rebind=False)
+
+    assert (resumed.status, resumed.stage, resumed.generation, resumed.input_digest) == (
+        RunStatus.RUNNING,
+        resumed_at,
+        run.generation + 1,
+        INPUT,
+    )
+
+
+def test_a_spent_stage_retries_in_place_in_a_new_lineage():
+    run = _run(status=RunStatus.BLOCKED_CONFIGURATION, reason="ADAPTATION_FAILED", stage=RunStage.ADAPTATION)
+
+    resumed = _service()._resume(run, _command(run, "RESUME"), rebind=False)
+
+    assert (resumed.stage, resumed.generation) == (RunStage.ADAPTATION, run.generation + 1)
+
+
 def test_only_an_input_changed_block_can_rebind_input():
     run = _run(status=RunStatus.PAUSED)
 
