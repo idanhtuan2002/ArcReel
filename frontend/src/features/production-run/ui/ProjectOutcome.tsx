@@ -1,12 +1,29 @@
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Download, Play } from "lucide-react";
-import { downloadProductionOutput, listProductionRuns, previewProductionFinal } from "../api/productionRunClient";
+import {
+  controlProductionRun,
+  downloadProductionOutput,
+  listProductionRuns,
+  newCommandId,
+  previewProductionFinal,
+} from "../api/productionRunClient";
 import { STOPPED, TERMINAL, type RunSnapshot } from "../api/types";
 import { describeReason } from "../reasonCopy";
 import { SEVERITY_TONES } from "@/utils/severity-tone";
+import { useLocation } from "wouter";
+import { API } from "@/api";
+import { useAppStore } from "@/stores/app-store";
+import { useProjectsStore } from "@/stores/projects-store";
 
 const REFRESH_MS = 15000;
+/** Stops a new episode plan from the stopped episode on can fix. */
+const PLAN_CODES = new Set(["ADAPTATION_FAILED", "ADAPTATION_INPUT_MISSING"]);
+/** Stops the project's model choices can fix. */
+const MODEL_CODES = (code: string) =>
+  code === "ADAPTATION_FAILED" || code === "VOICE_CAST_FAILED" || code.startsWith("MEDIA_") || code.startsWith("PROJECT_");
+/** Stops the task list explains. */
+const TASK_CODES = new Set(["RESOURCE_UNAVAILABLE", "OUTCOME_UNKNOWN", "OWNER_TASK_FAILED", "RENDER_FAILED"]);
 
 interface FinishedFilm {
   episode: number;
@@ -45,6 +62,13 @@ export function ProjectOutcome({ projectName, titles, onOpenDetails }: Props) {
   const [runs, setRuns] = useState<RunSnapshot[] | null>(null);
   const [playing, setPlaying] = useState<Record<string, string>>({});
   const [failed, setFailed] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [actionFailed, setActionFailed] = useState(false);
+  // Episodes a plan reset from the stopped episode would clear although they have scripts or media: asked first.
+  const [consumed, setConsumed] = useState<number[] | null>(null);
+  const [, setLocation] = useLocation();
+  const setTaskHudOpen = useAppStore((s) => s.setTaskHudOpen);
+  const refreshProject = useProjectsStore((s) => s.refreshProject);
   const urls = useRef<string[]>([]);
   useEffect(() => () => urls.current.forEach((url) => URL.revokeObjectURL(url)), []);
 
@@ -103,6 +127,45 @@ export function ProjectOutcome({ projectName, titles, onOpenDetails }: Props) {
       URL.revokeObjectURL(url);
     } catch {
       setFailed(true);
+    }
+  };
+
+  const resume = async () => {
+    setBusy(true);
+    setActionFailed(false);
+    try {
+      const resumed = await controlProductionRun(projectName, latest.run_id, "resume", {
+        command_id: newCommandId(),
+        expected_version: latest.version,
+        expected_input_digest: latest.input_digest,
+        policy_digest: latest.policy_digest,
+      });
+      setRuns((current) => (current ? [resumed, ...current.slice(1)] : current));
+    } catch {
+      setActionFailed(true);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const resetPlan = async (from: number) => {
+    setBusy(true);
+    setActionFailed(false);
+    try {
+      const result = await API.request<{ confirmation_required: boolean; consumed_episodes: number[] }>(
+        `/projects/${encodeURIComponent(projectName)}/episode-planning/reset`,
+        { method: "POST", body: JSON.stringify({ from_episode: from, confirm_consumed: consumed !== null }) },
+      );
+      if (result.confirmation_required) {
+        setConsumed(result.consumed_episodes);
+        return;
+      }
+      setConsumed(null);
+      await refreshProject(projectName);
+    } catch {
+      setActionFailed(true);
+    } finally {
+      setBusy(false);
     }
   };
 
@@ -210,14 +273,68 @@ export function ProjectOutcome({ projectName, titles, onOpenDetails }: Props) {
             )}
           </>
         )}
-        <button
-          type="button"
-          onClick={onOpenDetails}
-          className="focus-ring mt-2 rounded-md px-2.5 py-1 text-[12px]"
-          style={{ border: "1px solid var(--color-hairline)", color: "var(--color-text)" }}
-        >
-          {stopped ? t("outcome_resolve") : t("outcome_details")}
-        </button>
+        {consumed && (
+          <p className="m-0 mt-2 text-[12.5px]" style={{ color: SEVERITY_TONES.warnings.color }}>
+            {t("outcome_reset_consumed", { episodes: consumed.join(", ") })}
+          </p>
+        )}
+        <div className="mt-2 flex flex-wrap items-center gap-2">
+          {STOPPED.has(latest.status) && (
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => void resume()}
+              className="focus-ring rounded-md px-2.5 py-1 text-[12px] font-semibold disabled:opacity-50"
+              style={{ background: "var(--color-accent-dim)", border: "1px solid var(--color-accent-soft)", color: "var(--color-text)" }}
+            >
+              {t("outcome_resume")}
+            </button>
+          )}
+          {stopped && reason && PLAN_CODES.has(reason.code) && latestEpisode !== null && (
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => void resetPlan(latestEpisode)}
+              className="focus-ring rounded-md px-2.5 py-1 text-[12px] disabled:opacity-50"
+              style={{ border: "1px solid var(--color-hairline)", color: "var(--color-text)" }}
+            >
+              {consumed ? t("outcome_reset_confirm") : t("outcome_reset_plan", { episode: latestEpisode })}
+            </button>
+          )}
+          {stopped && reason && MODEL_CODES(reason.code) && (
+            <button
+              type="button"
+              onClick={() => setLocation(`~/app/projects/${encodeURIComponent(projectName)}/settings`)}
+              className="focus-ring rounded-md px-2.5 py-1 text-[12px]"
+              style={{ border: "1px solid var(--color-hairline)", color: "var(--color-text)" }}
+            >
+              {t("outcome_open_models")}
+            </button>
+          )}
+          {stopped && reason && TASK_CODES.has(reason.code) && (
+            <button
+              type="button"
+              onClick={() => setTaskHudOpen(true)}
+              className="focus-ring rounded-md px-2.5 py-1 text-[12px]"
+              style={{ border: "1px solid var(--color-hairline)", color: "var(--color-text)" }}
+            >
+              {t("outcome_open_tasks")}
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={onOpenDetails}
+            className="focus-ring rounded-md px-2.5 py-1 text-[12px]"
+            style={{ color: "var(--color-text-2)" }}
+          >
+            {t("outcome_details")}
+          </button>
+        </div>
+        {actionFailed && (
+          <p role="alert" className="m-0 mt-1 text-[12px]" style={{ color: SEVERITY_TONES.blocking.color }}>
+            {t("outcome_action_failed")}
+          </p>
+        )}
       </div>
     </section>
   );

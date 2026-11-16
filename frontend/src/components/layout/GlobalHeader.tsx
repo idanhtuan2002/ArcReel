@@ -16,6 +16,7 @@ import { WorkspaceNotificationsDrawer } from "./WorkspaceNotificationsDrawer";
 import { ExportScopeDialog } from "./ExportScopeDialog";
 import { ProjectMenu } from "./ProjectMenu";
 import { PhaseStepper } from "./PhaseStepper";
+import { phaseEpisode } from "@/utils/phase-episode";
 
 import { API } from "@/api";
 import { ArchiveDiagnosticsDialog } from "@/components/shared/ArchiveDiagnosticsDialog";
@@ -235,7 +236,11 @@ export function GlobalHeader({ onNavigateBack }: GlobalHeaderProps) {
 
         {/* ---- Center: phase stepper ---- */}
         <div className="hidden justify-self-center md:flex">
-          <PhaseStepper currentPhase={currentPhase} />
+          <PhaseStepper
+            currentPhase={currentPhase}
+            episode={phaseEpisode(currentProjectData?.status?.episodes_summary)}
+            progress={currentProjectData?.status?.episodes_summary ?? null}
+          />
         </div>
 
         {/* ---- Right: actions ---- */}

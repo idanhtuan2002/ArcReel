@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import { Link, useLocation } from "wouter";
 import { BookOpen, ChevronLeft, ChevronRight, Clapperboard, Trash2 } from "lucide-react";
 import { getProjectDisplayName } from "@/utils/project-display";
+import { phaseEpisode } from "@/utils/phase-episode";
 
 import { API } from "@/api";
 import { FilmsForStories } from "@/features/autopilot/FilmsForStories";
@@ -84,6 +85,13 @@ export function ProjectLibrary({
   const { t } = useTranslation("dashboard");
   const [, navigate] = useLocation();
   const phaseLabels = usePhaseLabels();
+  // The phase names the episode it is about, so it never contradicts the finished-episode count beside it.
+  const phaseCell = (label: string, episode: number | "done" | null) =>
+    episode === "done"
+      ? t("phase_all_episodes_done")
+      : typeof episode === "number"
+        ? t("phase_for_episode", { stage: label, episode })
+        : label;
   const relative = useRelativeTime();
   const [kind, setKind] = useState<Kind>("all");
   const [stage, setStage] = useState<Phase | "">("");
@@ -242,7 +250,7 @@ export function ProjectLibrary({
                       <KindCell project={project} />
                     </td>
                     <td className="px-3 py-2 text-text-2">
-                      {status ? phaseLabels[status.phase] : ""}
+                      {status ? phaseCell(phaseLabels[status.phase], phaseEpisode(episodes)) : ""}
                       {status?.needs_repair ? <span className="ml-1.5 text-danger">{t("cr_needs_repair")}</span> : null}
                     </td>
                     <td className="px-3 py-2 tabular-nums text-text-2">

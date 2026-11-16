@@ -28,4 +28,18 @@ describe("PhaseStepper on the North Star loop", () => {
     render(<PhaseStepper currentPhase={undefined} />);
     expect(screen.getAllByRole("listitem").some((item) => item.getAttribute("aria-current") === "step")).toBe(false);
   });
+
+  it("names the episode the current stage is about and how many episodes are done", () => {
+    render(<PhaseStepper currentPhase="script" episode={2} progress={{ completed: 1, total: 10 }} />);
+
+    const current = screen.getByRole("listitem", { current: "step" });
+    expect(current).toHaveTextContent("剧本 · 第 2 集");
+    expect(current).toHaveAttribute("title", "剧本 · 第 2 集 · 已完成 1/10 集");
+  });
+
+  it("says every episode is done instead of naming a stage", () => {
+    render(<PhaseStepper currentPhase="completed" episode="done" progress={{ completed: 7, total: 7 }} />);
+
+    expect(screen.getByRole("listitem", { current: "step" })).toHaveTextContent("全部剧集已完成");
+  });
 });
