@@ -83,6 +83,16 @@
 /* 全局 body 背景 — radial+linear 复合梯度 */
 html { color-scheme: dark; }
 
+/* A select's open list is drawn by the browser from the select's own colors; a transparent select (the common
+   inline style here) gives a white list with the light text on it. Options carry the surface and text tokens. */
+select { color-scheme: dark; }
+select option,
+select optgroup {
+    background-color: var(--color-surface-2);
+    color: var(--color-text);
+}
+select option:disabled { color: var(--color-text-4); }
+
 body {
     background:
         radial-gradient(1000px 500px at 8% -10%, oklch(0.32 0.05 295 / 0.28), transparent 55%),
