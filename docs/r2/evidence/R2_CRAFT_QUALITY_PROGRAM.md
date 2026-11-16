@@ -136,3 +136,10 @@ Catalog `docs/r2/R2_CONTENT_FORMS_CATALOG.md`; gap analysis `docs/research/2026-
   - Tests:
     - production_run, router, adaptation, voice, MCP and tts on PG: all pass.
     - script_generator and project_manager: 251 pass without PG. Their PG-only failures also occur at r2-v2.5.41.
+- 2026-11-16, trial 7 at MEDIA, releases r2-v2.5.43–2.5.48 (all pushed; 2.5.45 deployed):
+  - The project had no `image_provider_i2i` or `video_backend`, so every storyboard failed with `image_capability_missing_i2i`. I set them like san-xuat. **2.5.43** makes preflight check the project's real media lanes.
+  - **2.5.44**: stale storyboards whose videos are current complete an episode.
+  - The "Mái chèo" prop was regenerated from the UI six times during MEDIA, which redrew the storyboards and left the videos stale. **2.5.45**: MEDIA remakes stale videos.
+  - Each resume redid best-of-2 selection. **2.5.46**: a kept choice (`kept_version`) survives a new lineage.
+  - Remakes were refused with `reference_duration_confirmation_required`, and MEDIA just retried. **2.5.47**: a call that queued nothing blocks with the real refusal. **2.5.48**: remakes confirm the tiers the tool proposes. I checked the refusal by POSTing generate/video for E1S01 (planned 2 s, TTS 2.8 s, tier 3 s).
+  - Tests: production_run on PG, 3269 passed, 0 failed.
