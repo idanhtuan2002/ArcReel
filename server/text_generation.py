@@ -10,7 +10,7 @@ import logging
 import re
 import unicodedata
 from collections import Counter
-from collections.abc import Callable
+from collections.abc import Callable, Iterable
 from contextlib import ExitStack
 from dataclasses import asdict, dataclass, replace
 from pathlib import Path
@@ -81,6 +81,7 @@ from lib.reference_video.script_preview import (
 from lib.reference_video.text_parser import extract_mentions
 from lib.reference_video.voice_settings import VoiceRenderSettings
 from lib.schema_guards import is_int, is_str
+from lib.script_cast import unlisted_cast
 from lib.script_generator import ScriptGenerator
 from lib.script_models import (
     NarrationScriptPlanDraft,
@@ -1242,7 +1243,21 @@ def _drama_script_plan_result_text(script_plan_path: Path, scenes: list[dict], *
     return f"✅ 规范化剧本{action}（结构化内容）已保存: {script_plan_path}\n📊 生成统计: {len(scenes)} 个分镜"
 
 
-def _narration_script_plan_result_text(script_plan_path: Path, segments: list[dict], *, action: str) -> str:
+def unlisted_cast_soft_violations(segments: list[dict], characters: Iterable[str]) -> list[str]:
+    """登记角色在分镜旁白里被点名、却不在该分镜 ``characters_in_segment`` 中的提示行（见 :mod:`lib.script_cast`）。
+
+    被点名不等于出场（回忆、书信里提到的人），所以只提示不阻断：出场就补进列表，只是提及则保持原样。
+    """
+    return [
+        f"{_narration_segment_label(segments[item.index], item.index)} 的旁白点名了 {list(item.names)} 但 "
+        "characters_in_segment 未列出；若其在画面中出场请补列（否则分镜图不会挂其参考图），仅被提及则无需改动"
+        for item in unlisted_cast(segments, characters)
+    ]
+
+
+def _narration_script_plan_result_text(
+    script_plan_path: Path, segments: list[dict], *, action: str, characters: Iterable[str] = ()
+) -> str:
     """narration script_plan 的落盘回执；``action`` 取「拆分」/「晋升」，理由同 drama 侧。"""
     total_chars = sum(len(str(segment.get("novel_text") or "")) for segment in segments)
     total_seconds = sum(int(segment.get("duration_seconds") or 0) for segment in segments)
@@ -1251,6 +1266,8 @@ def _narration_script_plan_result_text(script_plan_path: Path, segments: list[di
         f"✅ 旁白/解说分镜{action}（结构化 script_plan）已保存: {script_plan_path}\n"
         f"📊 生成统计: {len(segments)} 个分镜 / {total_chars} 字，"
         f"预计总时长 {total_seconds} 秒；segment_break 标记 {break_count} 个"
+    ) + render_soft_violation_section(
+        unlisted_cast_soft_violations(segments, characters), note=SOFT_VIOLATION_NOTE_COMMITTED
     )
 
 
@@ -1812,7 +1829,9 @@ async def generate_narration_script_plan(
                 ) from exc
 
         return CompensableTextGenerationResult(
-            _narration_script_plan_result_text(script_plan_path, raw_segments, action="拆分"),
+            _narration_script_plan_result_text(
+                script_plan_path, raw_segments, action="拆分", characters=(project.get("characters") or {}).keys()
+            ),
             cancellation_receipt.compensate_cancelled,
         )
     except TextGenerationError:

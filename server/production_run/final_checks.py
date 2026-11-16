@@ -329,7 +329,23 @@ def variety_findings(shot_types: Sequence[str], *, unit_key: str) -> list[Assess
     return found
 
 
+def cast_findings(unlisted: Sequence[tuple[str, Sequence[str]]], *, unit_key: str) -> list[AssessmentFinding]:
+    """A MINOR finding per segment whose narration names registered characters it does not list as appearing, so
+    its storyboard had no reference sheet for them (``lib.script_cast``)."""
+    return [
+        AssessmentFinding(
+            code="CHECK_CAST_UNLISTED",
+            severity="MINOR",
+            unit_key=unit_key,
+            repair_stage=RunStage.SCRIPT_PLAN,
+            detail=f"{segment_id or 'a segment'} names {', '.join(names)} without listing them",
+        )
+        for segment_id, names in unlisted
+    ]
+
+
 __all__ = [
+    "cast_findings",
     "length_findings",
     "picture_findings",
     "sound_findings",

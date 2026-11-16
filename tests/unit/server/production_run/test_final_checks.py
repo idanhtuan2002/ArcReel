@@ -8,6 +8,7 @@ import pytest
 
 from r2.contracts.automation import RunStage
 from server.production_run.final_checks import (
+    cast_findings,
     length_findings,
     picture_findings,
     sound_findings,
@@ -213,3 +214,14 @@ def test_one_size_over_sixty_percent_of_five_or_more_shots_is_monotony():
     codes = [finding.code for finding in variety_findings(sizes, unit_key="e:1")]
     assert codes == ["CHECK_SHOT_MONOTONY"]
     assert variety_findings(("Medium Shot", "Close-up", "Medium Shot", "Medium Shot"), unit_key="e:1") == []
+
+
+def test_segments_naming_unlisted_characters_are_minor_findings():
+    (finding,) = cast_findings((("E2S02", ("Ông Ba",)),), unit_key="episode:2")
+    assert (finding.code, finding.severity, finding.repair_stage) == (
+        "CHECK_CAST_UNLISTED",
+        "MINOR",
+        RunStage.SCRIPT_PLAN,
+    )
+    assert finding.detail == "E2S02 names Ông Ba without listing them"
+    assert cast_findings((), unit_key="episode:2") == []

@@ -19,6 +19,7 @@ from typing import Any
 from lib.db.repositories.production_runs import ProductionRunRepository
 from lib.db.repositories.reviewer_qualifications import ReviewerQualificationRepository, qualification_digest
 from lib.project_manager import ProjectManager
+from lib.script_cast import unlisted_cast
 from r2.automation.assessment import AssessmentVerdict, ModelAssessment, combine
 from r2.automation.identity import digest_value
 from r2.automation.profiles import review_form
@@ -250,6 +251,7 @@ class QualityAdapter:
                 language=run.policy.language,
                 form=review_form(run.policy.launch_profile_id),
                 shot_types=self._shot_types(run.project_name, episode),
+                unlisted_cast=self._unlisted_cast(run.project_name, episode),
             )
         return targets
 
@@ -264,6 +266,13 @@ class QualityAdapter:
     def _narration(self, project_name: str, episode: int) -> str:
         script = self._script(project_name, episode)
         return "\n".join(str(item.get("novel_text", "")) for item in script.get("segments") or [])
+
+    def _unlisted_cast(self, project_name: str, episode: int) -> tuple[tuple[str, tuple[str, ...]], ...]:
+        characters = (self._projects.load_project(project_name).get("characters") or {}).keys()
+        segments = [
+            item for item in self._script(project_name, episode).get("segments") or [] if isinstance(item, dict)
+        ]
+        return tuple((item.segment_id, item.names) for item in unlisted_cast(segments, characters))
 
     def _shot_types(self, project_name: str, episode: int) -> tuple[str, ...]:
         """Each segment's shot size in play order; a segment without one counts as unknown (empty)."""

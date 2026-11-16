@@ -36,6 +36,7 @@ from r2.automation.profiles import route_digest
 from r2.contracts.automation import ModelRoute, RunStage
 from r2.contracts.common import ensure_json_value
 from server.production_run.final_checks import (
+    cast_findings,
     length_findings,
     picture_findings,
     sound_findings,
@@ -454,6 +455,8 @@ class FinalEvidence:
     form: str = "narration"
     #: The shot size of each segment in play order, from the episode script; empty when unknown.
     shot_types: tuple[str, ...] = ()
+    #: Segments whose narration names registered characters they do not list, as (segment id, names).
+    unlisted_cast: tuple[tuple[str, tuple[str, ...]], ...] = ()
 
 
 class QualifiedEvaluator(Protocol):
@@ -589,6 +592,7 @@ class FrameReviewer:
             checks += await asyncio.to_thread(sound_findings, evidence.final_path, unit_key=evidence.unit_key)
             checks += length_findings(duration, evidence.target_seconds, unit_key=evidence.unit_key)
             checks += variety_findings(evidence.shot_types, unit_key=evidence.unit_key)
+            checks += cast_findings(evidence.unlisted_cast, unit_key=evidence.unit_key)
             cues = "\n".join(
                 f"{_FRAME_WORD.get(evidence.language, 'Frame')} {index + 1} ({seconds:.1f}s): "
                 f"«{cue_at(subtitles, seconds) or '—'}»"

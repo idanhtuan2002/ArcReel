@@ -35,6 +35,7 @@ from server.production_run.evaluators import (
     review_prompts,
 )
 from server.production_run.final_checks import (
+    cast_findings,
     length_findings,
     picture_findings,
     sound_findings,
@@ -93,6 +94,7 @@ class GeminiReviewer:
                 seconds = await asyncio.to_thread(final_duration, evidence.final_path)
                 checks += length_findings(seconds, evidence.target_seconds, unit_key=evidence.unit_key)
             checks += variety_findings(evidence.shot_types, unit_key=evidence.unit_key)
+            checks += cast_findings(evidence.unlisted_cast, unit_key=evidence.unit_key)
             base_url, api_key = await self._credentials_for(route.provider_id)
             body = {
                 "contents": [
