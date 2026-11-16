@@ -1787,6 +1787,26 @@ class TestMergeNarrationVisual:
         merged = sg._merge_narration_visual(script_plan, visual, episode=3)
         assert merged["title"] == "第3集"
 
+    @pytest.mark.parametrize(
+        "model_title",
+        ["visual_layer_ep02", "episode_2", "E2S01", "* Input: tiêu đề. Output: tiêu đề", "最后的渡河", "  "],
+    )
+    def test_a_model_title_that_is_not_a_title_falls_back_to_the_planned_one(self, tmp_path, model_title):
+        # trial 7, 2026-11-16: the visual layer titled episode 2 "visual_layer_ep02" and the episode took that name
+        sg = _bare_generator(
+            tmp_path,
+            {"source_language": "vi", "episodes": [{"episode": 2, "title": "Lời thỉnh cầu", "script_file": "x.json"}]},
+        )
+        visual = {"title": model_title, "segments": [_visual_seg("E2S01")]}
+        merged = sg._merge_narration_visual([_script_plan_seg("E2S01", "Ông Ba không trả lời.")], visual, episode=2)
+        assert merged["title"] == "Lời thỉnh cầu"
+
+    def test_a_real_model_title_is_kept(self, tmp_path):
+        sg = _bare_generator(tmp_path, {"source_language": "vi"})
+        visual = {"title": "Chuyến đò lúc nửa đêm", "segments": [_visual_seg("E1S01")]}
+        merged = sg._merge_narration_visual([_script_plan_seg("E1S01", "甲")], visual, episode=1)
+        assert merged["title"] == "Chuyến đò lúc nửa đêm"
+
 
 class TestLoadNarrationScriptPlan:
     """script_plan 结构化中间文件 script_plan_segments.json 的读取与校验。"""

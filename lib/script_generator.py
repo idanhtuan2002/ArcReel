@@ -8,6 +8,7 @@ import asyncio
 import hashlib
 import json
 import logging
+import re
 from collections import Counter
 from collections.abc import Callable, Iterable, Mapping
 from contextlib import nullcontext
@@ -131,6 +132,8 @@ from lib.text_generator import TextGenerator
 from lib.text_utils import strip_json_code_fences
 
 logger = logging.getLogger(__name__)
+#: A token made of letters, digits, "_", "-" or "." only: an identifier, when it holds "_" or a digit.
+_IDENTIFIER = re.compile(r"[A-Za-z0-9_.\-]+")
 
 
 class _UnsetExpectedFingerprint:
@@ -244,6 +247,29 @@ class ScriptGenerator:
         if isinstance(planned, str) and planned.strip():
             return planned.strip()
         return self._episode_label(episode)
+
+    def _usable_title(self, value: object, episode: int) -> str:
+        """The model's episode title when it reads as one, else :meth:`_fallback_title`. Not a title: an empty value,
+        an identifier (``visual_layer_ep02``, ``episode_2``: letters, digits and ``_`` without a space), leaked
+        reasoning or schema text, or Han characters in a project in another language (trial 7's episode 2 was saved
+        as ``visual_layer_ep02``)."""
+        from lib.output_hygiene import leak_reason
+        from lib.text_attestation import has_cjk
+
+        title = value.strip() if isinstance(value, str) else ""
+        language = self.project_json.get("source_language")
+        if (
+            not title
+            or (
+                " " not in title
+                and _IDENTIFIER.fullmatch(title) is not None
+                and ("_" in title or any(c.isdigit() for c in title))
+            )
+            or leak_reason(title, schema_fields=("title", "segments", "scenes", "video_units")) is not None
+            or (has_cjk(title) and isinstance(language, str) and language.split("-")[0] not in ("zh", "ja", "ko"))
+        ):
+            return self._fallback_title(episode)
+        return title
 
     def _episode_label(self, episode: int) -> str:
         """The episode's label in the source language ("Tập 3", "Episode 3"; "第3集" for Chinese or no language)."""
@@ -737,7 +763,7 @@ class ScriptGenerator:
             require_script_unit_admitted("scenes", scene)
         await self._assert_drama_script_plan_durations(content_scenes, episode=episode, gen_mode=gen_mode)
         filename = output_filename or episode_script_filename(episode)
-        title = content.get("title") if isinstance(content.get("title"), str) else None
+        title = self._usable_title(content.get("title"), episode)
         authoring_scope, saved_path = await self._scope_or_save_without_rewrite(
             episode,
             filename,
@@ -1748,9 +1774,7 @@ class ScriptGenerator:
         # title 缺失/空白兜底须在校验之前：title 仅展示用、用户可改，非约束解码通道下模型
         # 整字段漏写不该让一次已付费的展开失败（与 _parse_response 的兜底同口径）。
         if isinstance(data, dict):
-            raw_title = data.get("title")
-            if not (isinstance(raw_title, str) and raw_title.strip()):
-                data["title"] = self._fallback_title(episode)
+            data["title"] = self._usable_title(data.get("title"), episode)
         try:
             flat = ReferencePromptAuthoringFlatScript.model_validate(data)
         except ValidationError as e:
@@ -1797,9 +1821,7 @@ class ScriptGenerator:
         """
         data = json.loads(strip_json_code_fences(response_text))
         if isinstance(data, dict):
-            raw_title = data.get("title")
-            if not (isinstance(raw_title, str) and raw_title.strip()):
-                data["title"] = self._fallback_title(episode)
+            data["title"] = self._usable_title(data.get("title"), episode)
         return ReferencePromptAuthoringFlatScript.model_validate(data).model_dump()
 
     def _quarantine_reference_prompt_authoring(
@@ -2048,9 +2070,7 @@ class ScriptGenerator:
         # title 缺失/空白兜底：非约束解码通道下模型可能整字段漏写。title 仅展示用、
         # 用户可改，不值得让整集生成失败；与 _merge_narration_visual 的兜底同口径。
         if isinstance(data, dict):
-            title = data.get("title")
-            if not (isinstance(title, str) and title.strip()):
-                data["title"] = self._fallback_title(episode)
+            data["title"] = self._usable_title(data.get("title"), episode)
 
         # 校验模型经规范解析定骨架种类（分镜图生视频按创作类型，参考生视频统一 video_units），
         # kind→模型映射留本地（模型属上层依赖，不进 SKELETONS 窄表）。
@@ -2103,7 +2123,7 @@ class ScriptGenerator:
             units.append(unit)
 
         return ReferenceVideoScript.model_validate(
-            {"title": flat.title or self._fallback_title(episode), "content_mode": "ad", "video_units": units}
+            {"title": self._usable_title(flat.title, episode), "content_mode": "ad", "video_units": units}
         ).model_dump()
 
     def _parse_narration_visual(self, response_text: str, episode: int) -> dict:
@@ -2168,7 +2188,7 @@ class ScriptGenerator:
 
         title = visual_data.get("title")
         return {
-            "title": title if isinstance(title, str) and title.strip() else self._fallback_title(episode),
+            "title": self._usable_title(title, episode),
             "segments": merged_segments,
         }
 
