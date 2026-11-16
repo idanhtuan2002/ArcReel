@@ -893,11 +893,49 @@ class MediaAdapter:
             repository = ProductionRunRepository(session)
             for sub_key in sub_keys:
                 await repository.record_owner_attempt(intent=intent, sub_key=sub_key)
-        submitted = await self._tools[action](self._context(intent), args)
+        submitted = await self._call_tool(action, intent, args)
         if submitted.problem is not None:
             raise OwnerBlocked("MEDIA_" + submitted.problem.code.upper())
         if (refusal := self._refusal_reason(submitted)) is not None:
             raise OwnerBlocked(refusal)
+
+    async def _call_tool(
+        self, action: WorkflowActionType, intent: DispatchIntent, args: dict[str, Any]
+    ) -> ToolOutcome[Any]:
+        """Call the action's tool. A video call whose units are all refused only for a request duration tier that
+        needs confirming is sent once more with the tiers the tool proposed confirmed, as the step confirms the
+        planner's proposed tiers on the first make (CONFIRM_REQUEST_DURATION)."""
+        submitted = await self._tools[action](self._context(intent), args)
+        if action is not A.GENERATE_VIDEOS or "confirmed_request_durations" in args:
+            return submitted
+        confirmed = self._proposed_tiers(submitted)
+        if not confirmed:
+            return submitted
+        return await self._tools[action](self._context(intent), {**args, "confirmed_request_durations": confirmed})
+
+    @staticmethod
+    def _proposed_tiers(submitted: ToolOutcome[Any]) -> dict[str, int]:
+        """Each refused unit's proposed request duration when every refusal asks only to confirm a duration tier."""
+        value = submitted.value
+        result = (
+            value.get("generation_result") if isinstance(value, Mapping) else getattr(value, "generation_result", None)
+        )
+        if not isinstance(result, GenerationBatchResult) or not result.blocked:
+            return {}
+        tiers: dict[str, int] = {}
+        for item in result.items:
+            if item.unit_id not in result.blocked:
+                continue
+            problem = item.problem
+            duration = (problem.params or {}).get("request_duration") if problem is not None else None
+            if (
+                problem is None
+                or problem.code != "reference_duration_confirmation_required"
+                or not isinstance(duration, int)
+            ):
+                return {}
+            tiers[item.unit_id] = duration
+        return tiers
 
     @staticmethod
     def _refusal_reason(submitted: ToolOutcome[Any]) -> str | None:
@@ -965,7 +1003,7 @@ class MediaAdapter:
             async with self._sessions() as session, session.begin():
                 await self._authority.require_locked(session, subject=subject)
                 await ProductionRunRepository(session).record_owner_attempt(intent=intent, sub_key=sub_key)
-            submitted = await self._tools[action.type](self._context(intent), args)
+            submitted = await self._call_tool(action.type, intent, args)
             if submitted.problem is not None:
                 raise OwnerBlocked("MEDIA_" + submitted.problem.code.upper())
             if (refusal := self._refusal_reason(submitted)) is not None:

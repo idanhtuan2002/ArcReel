@@ -205,3 +205,56 @@ def test_a_tool_call_that_queued_nothing_and_refused_units_names_their_problem()
         "MEDIA_VIDEO_SHORTER_THAN_TTS"
     )
     assert MediaAdapter._refusal_reason(ToolOutcome(value={"summary": "queued"})) is None
+
+
+async def test_a_video_remake_confirms_the_duration_tier_its_tool_proposes_as_the_first_make_does(drama_media):
+    from lib.generation_result import (
+        GenerationAction,
+        GenerationBatchResult,
+        GenerationItemResult,
+        GenerationItemState,
+        GenerationProblem,
+        GenerationSelectionMode,
+    )
+    from lib.workflow_state import WorkflowActionType
+    from server.tool_runtime import ToolOutcome
+
+    _projects, _tasks, adapter, _plan, intent = drama_media
+
+    def refused(ids):
+        items = [
+            GenerationItemResult(
+                unit_id=unit,
+                state=GenerationItemState.BLOCKED,
+                problem=GenerationProblem(
+                    code="reference_duration_confirmation_required",
+                    detail="x",
+                    action=GenerationAction.CONFIRM_REQUEST_DURATION,
+                    params={"request_duration": 3},
+                ),
+            )
+            for unit in ids
+        ]
+        result = GenerationBatchResult(
+            operation="generate_videos",
+            selection=GenerationSelectionMode.EXPLICIT,
+            requested=list(ids),
+            succeeded=[],
+            failed=[],
+            blocked=list(ids),
+            items=items,
+        )
+        return ToolOutcome(value={"generation_result": result})
+
+    calls: list[dict] = []
+
+    async def videos(ctx, args):
+        calls.append(args)
+        return ToolOutcome(value={"summary": "queued"}) if "confirmed_request_durations" in args else refused(["E1S01"])
+
+    adapter._tools = {WorkflowActionType.GENERATE_VIDEOS: videos}
+    adapter._context = lambda intent: None
+    args = {"script": "episode_1.json", "target": {"scope": "selected", "ids": ["E1S01"]}, "force": True}
+    submitted = await adapter._call_tool(WorkflowActionType.GENERATE_VIDEOS, intent, args)
+    assert submitted.value == {"summary": "queued"}
+    assert calls[1]["confirmed_request_durations"] == {"E1S01": 3}
