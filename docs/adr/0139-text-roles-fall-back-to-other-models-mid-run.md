@@ -28,3 +28,14 @@ Not covered, and why:
 - **Replays** (M1, M2). A take-over is complete only when its top-up is recorded; a fallback writes the state's top-up first, then the task's brief, then queues it, and pins the chosen brief before any write, so a replay finishes the same move.
 - **Autopilot** (M4). A stopped story keeps the autopilot waiting unless the next run would take it over under the same conditions (current content safety; the book's next part, or the autopilot's own idea for a first part).
 - **Launch qualification** (H4, M5). A record made stale by a model change is replaced like a missing one; the bookkeeping never fails a settings save or a films batch.
+
+## Amended 2026-11-16: rejected answers also move to the next fallback
+
+Trial 7's episode planning ran on the run's frozen local 9B script model and failed nine attempts in three tasks
+(Chinese titles in a Vietnamese plan, anchors behind the previous episode, altered anchor text); the run blocked at
+`OWNER_TASK_FAILED` although the project's fallback list held stronger models. A route failure was the only reason to
+move. Now a caller whose own checks rejected every attempt of a model asks the generator to move
+(`TextGenerator.fall_back_after_rejection`): episode planning (when no attempt left a valid prefix to commit) and
+episode adaptation give the next usable fallback a fresh set of attempts, under the same run rules as a route move.
+Without a fallback left they fail as before. The run's frozen script model is still tried first; a better default
+applies from the next run (§4).
