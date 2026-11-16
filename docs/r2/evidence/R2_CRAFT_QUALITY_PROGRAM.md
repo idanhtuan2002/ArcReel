@@ -143,3 +143,7 @@ Catalog `docs/r2/R2_CONTENT_FORMS_CATALOG.md`; gap analysis `docs/research/2026-
   - Each resume redid best-of-2 selection. **2.5.46**: a kept choice (`kept_version`) survives a new lineage.
   - Remakes were refused with `reference_duration_confirmation_required`, and MEDIA just retried. **2.5.47**: a call that queued nothing blocks with the real refusal. **2.5.48**: remakes confirm the tiers the tool proposes. I checked the refusal by POSTing generate/video for E1S01 (planned 2 s, TTS 2.8 s, tier 3 s).
   - Tests: production_run on PG, 3269 passed, 0 failed.
+- 2026-11-16 11:46, **trial 7 SUCCEEDED** on r2-v2.5.48. Run `454e9a8f`, episode 1, generation 7. Stage times: MEDIA done 11:42, RENDER 11:43, QUALITY 11:45, EXPORT 11:46. Quality (record gate):
+  - reviewer_a `qwen2.5vl:7b` rejected: story 4, visual 3, audio 5, continuity 4, pacing 4; MINOR finding that frame 3 does not match its subtitle.
+  - reviewer_b `gemma3:4b` accepted: 4/4/5/4/4; MINOR findings: harsh light on Ông Ba's face, and Hải's feet on the steps while he appears on the boat.
+  - The best-of-2 selection was redone once in generation 7 because generation 6's evidence predates `kept_version`.
