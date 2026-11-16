@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import { RotateCcw } from "lucide-react";
 import { API } from "@/api";
 import { useProjectsStore } from "@/stores/projects-store";
+import { SEVERITY_TONES } from "@/utils/severity-tone";
 
 interface ResetResult {
   confirmation_required: boolean;
@@ -76,7 +77,7 @@ export function ResetEpisodePlanning({ projectName, lastEpisode }: Props) {
         onClick={() => (open ? close() : setOpen(true))}
         disabled={lastEpisode < 1}
         className="grid h-5 w-5 place-items-center rounded focus-ring disabled:cursor-not-allowed disabled:opacity-50"
-        style={{ background: "oklch(0.28 0.012 250 / 0.6)", color: "var(--color-text-3)" }}
+        style={{ background: "var(--color-surface-2)", color: "var(--color-text-3)" }}
         title={t("reset_planning")}
         aria-label={t("reset_planning")}
         aria-expanded={open}
@@ -89,7 +90,7 @@ export function ResetEpisodePlanning({ projectName, lastEpisode }: Props) {
           aria-label={t("reset_planning")}
           className="absolute left-2.5 right-2.5 top-9 z-20 space-y-2 rounded-md p-2.5 text-[11.5px]"
           style={{
-            background: "var(--color-surface-2, oklch(0.20 0.010 250))",
+            background: "var(--color-surface-2)",
             border: "1px solid var(--color-hairline)",
             color: "var(--color-text-2)",
           }}
@@ -111,13 +112,13 @@ export function ResetEpisodePlanning({ projectName, lastEpisode }: Props) {
             />
           </label>
           {consumed && (
-            <p className="m-0" style={{ color: "var(--color-warning, oklch(0.8 0.14 80))" }}>
+            <p className="m-0" style={{ color: SEVERITY_TONES.warnings.color }}>
               {t("reset_planning_consumed", { episodes: consumed.join(", ") })}
             </p>
           )}
           {message && <p className="m-0">{message}</p>}
           {failed && (
-            <p className="m-0" style={{ color: "var(--color-danger, oklch(0.7 0.18 25))" }}>
+            <p className="m-0" style={{ color: SEVERITY_TONES.blocking.color }}>
               {t("reset_planning_failed")}
             </p>
           )}
@@ -129,7 +130,7 @@ export function ResetEpisodePlanning({ projectName, lastEpisode }: Props) {
               type="button"
               disabled={busy}
               className="rounded px-2 py-1 focus-ring disabled:opacity-50"
-              style={{ background: "oklch(0.32 0.03 250)", color: "var(--color-text)" }}
+              style={{ background: "var(--color-accent-dim)", color: "var(--color-text)" }}
               onClick={() => void run(consumed !== null)}
             >
               {consumed ? t("reset_planning_confirm") : t("reset_planning_run")}

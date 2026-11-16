@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link, useLocation } from "wouter";
 import { BookOpen, ChevronLeft, ChevronRight, Clapperboard, Trash2 } from "lucide-react";
+import { getProjectDisplayName } from "@/utils/project-display";
 
 import { API } from "@/api";
 import { FilmsForStories } from "@/features/autopilot/FilmsForStories";
@@ -204,7 +205,7 @@ export function ProjectLibrary({
           <table className="w-full min-w-[720px] border-collapse text-left text-[13px]">
             <thead className="text-[11.5px] text-text-3">
               <tr className="border-b border-hairline">
-                <th scope="col" className="px-3 py-2 font-medium">{t("cr_col_project")}</th>
+                <th scope="col" className="w-[34%] px-3 py-2 font-medium">{t("cr_col_project")}</th>
                 <th scope="col" className="px-3 py-2 font-medium">{t("cr_col_kind")}</th>
                 <th scope="col" className="px-3 py-2 font-medium">{t("cr_col_stage")}</th>
                 <th scope="col" className="px-3 py-2 font-medium">{t("cr_col_episodes")}</th>
@@ -222,18 +223,19 @@ export function ProjectLibrary({
                   <tr
                     key={project.name}
                     onClick={() => navigate(href)}
-                    className="cursor-pointer border-b border-hairline-soft last:border-b-0 hover:bg-white/[0.03]"
+                    className="group cursor-pointer border-b border-hairline-soft last:border-b-0 hover:bg-white/[0.03]"
                   >
                     <td className="max-w-0 px-3 py-2">
                       <Link
                         href={href}
                         onClick={(event) => event.stopPropagation()}
+                        title={getProjectDisplayName(project.title, project.name)}
                         className="block truncate font-medium text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
                       >
-                        {project.title || project.name}
+                        {getProjectDisplayName(project.title, project.name)}
                       </Link>
                       {project.title && project.title !== project.name ? (
-                        <span className="block truncate text-[11.5px] text-text-3">{project.name}</span>
+                        <span className="block truncate text-[11px] text-text-4">{project.name}</span>
                       ) : null}
                     </td>
                     <td className="max-w-[16rem] px-3 py-2">
@@ -256,7 +258,7 @@ export function ProjectLibrary({
                           event.stopPropagation();
                           onDelete(project);
                         }}
-                        className="rounded p-1 text-text-3 hover:bg-white/5 hover:text-danger focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+                        className="rounded p-1 text-text-3 opacity-0 transition-opacity hover:bg-white/5 hover:text-danger focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent group-hover:opacity-100 group-focus-within:opacity-100 [@media(hover:none)]:opacity-100"
                       >
                         <Trash2 aria-hidden className="h-3.5 w-3.5" />
                       </button>

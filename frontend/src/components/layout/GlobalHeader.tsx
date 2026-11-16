@@ -1,7 +1,7 @@
 import { startTransition, useState, useEffect, useRef } from "react";
 import { errMsg, voidPromise } from "@/utils/async";
 import { useLocation } from "wouter";
-import { ChevronLeft, Activity, Settings, Bell, Download, Loader2, Package } from "lucide-react";
+import { ChevronLeft, Activity, Settings, Bell, Coins, Download, Loader2, Package } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useAppStore } from "@/stores/app-store";
 import { useConfigStatusStore } from "@/stores/config-status-store";
@@ -299,6 +299,8 @@ export function GlobalHeader({ onNavigateBack }: GlobalHeaderProps) {
               }}
               title={t("dashboard:cost_tooltip", { cost: costTooltip })}
             >
+              {/* A coin marks the badge as the project's cost, so an empty cost never reads as a lone dash. */}
+              <Coins aria-hidden className="h-3.5 w-3.5" style={{ color: "var(--color-text-3)" }} />
               {primaryCost ? (
                 <span className="num" style={{ color: "var(--color-text-4)" }}>
                   {formatCurrencyAmount(primaryCost[0], primaryCost[1])}

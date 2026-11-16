@@ -294,7 +294,7 @@
 }
 
 .agent-handoff-card {
-  animation: handoff-card-in 540ms cubic-bezier(0.22, 1.2, 0.36, 1) both;
+  animation: handoff-card-in 540ms cubic-bezier(0.22, 1, 0.36, 1) both;
   will-change: opacity, transform, filter;
 }
 .agent-handoff-card[data-leaving="true"] {

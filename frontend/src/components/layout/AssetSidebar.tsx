@@ -230,10 +230,9 @@ export function AssetSidebar({ className }: AssetSidebarProps) {
 
   return (
     <aside
-      className={`flex flex-col overflow-hidden ${className ?? ""}`}
+      className={`flex flex-col overflow-hidden transition-[width] duration-[180ms] ease-out motion-reduce:transition-none ${className ?? ""}`}
       style={{
         width: collapsed ? 64 : 256,
-        transition: "width .18s ease",
         borderRight: "1px solid var(--color-hairline)",
         background:
           "linear-gradient(180deg, oklch(0.195 0.011 265 / 0.6), oklch(0.175 0.010 265 / 0.5))",

@@ -234,7 +234,7 @@ export function StudioLayout({ children }: StudioLayoutProps) {
         )}
       </div>
 
-      {/* 悬浮 Agent 球：收起时显示在右上角 */}
+      {/* 悬浮 Agent 球：收起时显示在右下角，不遮挡页面标题与右上角操作 */}
       {demoMode ? null : (
       <button
         type="button"
@@ -242,7 +242,7 @@ export function StudioLayout({ children }: StudioLayoutProps) {
         disabled={assistantPanelOpen}
         tabIndex={assistantPanelOpen ? -1 : 0}
         aria-hidden={assistantPanelOpen}
-        className={`fixed right-4 top-14 grid h-10 w-10 place-items-center rounded-xl transition-all duration-300 ease-in-out ${UI_LAYERS.workspaceFloating} ${
+        className={`fixed bottom-5 right-5 grid h-11 w-11 place-items-center rounded-xl transition-all duration-300 ease-in-out ${UI_LAYERS.workspaceFloating} ${
           assistantPanelOpen
             ? "scale-0 pointer-events-none opacity-0"
             : "scale-100 cursor-pointer opacity-100"

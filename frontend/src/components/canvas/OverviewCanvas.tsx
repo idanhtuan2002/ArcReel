@@ -12,6 +12,7 @@ import { useProjectsStore } from "@/stores/projects-store";
 import { useAppStore } from "@/stores/app-store";
 import { useCostStore } from "@/stores/cost-store";
 import { costEntries, formatCost, totalBreakdown } from "@/utils/cost-format";
+import type { CostBreakdown, CostByType } from "@/types/cost";
 import { errMsg } from "@/utils/async";
 import { itemCountKey, normalizeRoute } from "@/utils/generation-mode";
 
@@ -45,6 +46,13 @@ interface OverviewDraft {
   genre: string;
   theme: string;
   world_setting: string;
+}
+
+/** Whether any estimate or spend is known: a card of dashes says nothing (local models cost nothing). */
+function hasRecordedCost(totals: { estimate: CostByType; actual: CostByType }): boolean {
+  return [totals.estimate, totals.actual].some((byType) =>
+    (Object.values(byType ?? {}) as (CostBreakdown | undefined)[]).some((breakdown) => costEntries(breakdown).length > 0),
+  );
 }
 
 export function OverviewCanvas({
@@ -704,7 +712,7 @@ export function OverviewCanvas({
             )}
 
             {/* Project total cost */}
-            {!readOnly && projectTotals && (
+            {!readOnly && projectTotals && hasRecordedCost(projectTotals) && (
               <section
                 className="relative overflow-hidden rounded-2xl p-5"
                 style={{
