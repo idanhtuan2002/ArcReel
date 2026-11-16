@@ -135,6 +135,8 @@ expected source revision：{next_action.args.expected_source_revision}
 
 调用 `mcp__arcreel__adapt_episode({"episode": N})`。服务端用项目的剧本文本模型把 `source/episode_N.txt` 改编为解说口播稿（开头钩子、压缩、对白由解说引用），写出 `adaptations/episode_N.txt`（之后的脚本规划读它，而不是原文切片）与 `adaptations/episode_N.json`。改编不改情节与结局、不添事件；机械校验不过会自动带原因重试，最终失败时把工具返回的原因告诉用户，不要手写改编稿绕过。原文、分集规划、人物表或单集目标时长变化后改编稿会变 stale，计划会再次给出本动作。
 
+工具返回 `adaptation_failed` 时服务端已带原因重试过 3 次：**不要立即重复调用**。同一集最多再调用一次；仍失败就停下，把失败原因用用户的话转述，并建议用户在概览页「从第 N 集重新规划分集」（本集原文切片过短、分集规划不合理时最常见），不要继续往后做脚本规划。
+
 ## `prepare_script_plan`：单集脚本规划
 
 **触发**：`next_action.type == "prepare_script_plan"`

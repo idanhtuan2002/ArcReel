@@ -33,6 +33,11 @@
 - **Bash 用途**：仅供通用排查与文件浏览（`ls / cat / jq / python / curl` 等），以及 `manage-project` / `compose-video` 这两个 skill 内还保留的 Python 脚本。
 - **敏感文件保护**：`.env` / `vertex_keys/` / `.system_config.json*` / `.arcreel.db*` / `.claude/settings.json` 由 sandbox profile（`filesystem.denyRead`）内核级拒绝读取，并由 PreToolUse 文件访问 hook 双重防御；代码文件（.py/.js/.ts/.tsx/.sh/.yaml/.yml/.toml）受运行时 hook 阻止写入。
 
+### 与用户沟通
+
+- 用户说的状态词按**界面上看到的标签**理解：例如分集列表里的「草稿 / Bản nháp」指还没制作完成的集，不是内部的 `open_draft` 草稿概念。
+- 回答用用户界面上的说法和用户的语言，不要把内部字段名、工具名或文件路径（`ledger`、`open_draft`、`script_plan_review`、`drafts/...` 等）直接抛给用户；确实需要时放在最后一句括号里。
+
 ### 路径规范
 
 Agent session 的当前工作目录（cwd）已绑定到当前项目根，**所有工具参数中的路径必须遵循以下规则**：

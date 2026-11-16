@@ -31,6 +31,7 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from lib.adaptation_fidelity import SpokenLine, fidelity_problems
 from lib.episode_ledger import episode_outline_context
 from lib.episode_paths import episode_source_path, episode_source_relpath
 from lib.episode_target_volume import resolve_episode_target_volume
@@ -321,6 +322,19 @@ def check_adaptation(draft: EpisodeAdaptationDraft, inputs: AdaptationInputs) ->
                     )
                 elif line.speaker.strip() not in cast:
                     problems.append(f"scene {number}: speaker {line.speaker!r} is not in the cast")
+    problems.extend(
+        fidelity_problems(
+            [
+                SpokenLine(number, line.kind, line.speaker, line.text)
+                for number, scene in enumerate(draft.scenes, start=1)
+                for line in scene.lines
+            ],
+            mode=inputs.mode,
+            source=inputs.source,
+            previous_tail=inputs.previous_tail,
+            names=(*inputs.characters, *cast),
+        )
+    )
     spoken = spoken_text(draft)
     if not spoken:
         problems.append("the adaptation has no spoken line")
@@ -419,7 +433,8 @@ PROMPT = """You adapt one episode of a published story into a screen script. The
 an adaptation of this episode only.
 
 FIDELITY — never change what happens, who does it, or how the episode ends; add no event, character or fact the
-source does not contain. You may cut, reorder within a scene, compress and dramatize.
+source does not contain. You may cut, reorder within a scene, compress and dramatize. A line the source quotes
+stays with the character the source gives it to; only characters who appear in this episode's source speak.
 
 {form}
 
