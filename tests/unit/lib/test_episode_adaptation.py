@@ -344,3 +344,16 @@ async def test_characters_registered_after_an_adaptation_keep_it_current_and_rem
     record_path.write_text(json.dumps(legacy, ensure_ascii=False), encoding="utf-8")
     assert adaptation_state(project_path, added, 1) == "current"
     assert adaptation_state(project_path, {**project, "characters": {"Minh": {"description": "x"}}}, 1) == "stale"
+
+
+async def test_renaming_an_episode_keeps_its_adaptation_current(tmp_path: Path):
+    project_path = _write(tmp_path)
+    project = _project()
+    await adapt_episode(project_path, project, 1, generate=_Model(_narration()))
+    record = json.loads((project_path / "adaptations" / "episode_1.json").read_text(encoding="utf-8"))
+    assert record["outline_title"] == "Phong thư"
+
+    renamed = {**project, "episodes": [{**project["episodes"][0], "title": "Món nợ cũ"}]}
+    assert adaptation_state(project_path, renamed, 1) == "current"
+    rehooked = {**project, "episodes": [{**project["episodes"][0], "hook": "Một người lạ"}]}
+    assert adaptation_state(project_path, rehooked, 1) == "stale"

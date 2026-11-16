@@ -509,13 +509,19 @@ _LEGACY_ADDED_CHARACTERS = 3
 
 
 def _basis_holds(record: Mapping[str, Any], inputs: AdaptationInputs) -> bool:
-    """Whether the record adapted what ``inputs`` reads now. Characters registered since (the run's own script step
-    registers the people its script names) leave it current: the record's names must all still be registered and
-    everything else must be the same. A record that kept no names is matched with up to three of the current
-    characters set aside."""
+    """Whether the record adapted what ``inputs`` reads now. Two changes leave it current: characters registered
+    since (the run's own script step registers the people its script names), when the record's names are all still
+    registered; and a new episode title (a display name the user or a script may change), when the record kept the
+    title it adapted. Everything else must be the same. A record that kept no names is matched with up to three of
+    the current characters set aside."""
     recorded = record.get("basis")
     if recorded == inputs.basis():
         return True
+    title = record.get("outline_title")
+    if isinstance(title, str) and inputs.outline is not None:
+        inputs = replace(inputs, outline={**inputs.outline, "title": title})
+        if recorded == inputs.basis():
+            return True
     current = set(inputs.characters)
     names = record.get("characters")
     if isinstance(names, list) and all(isinstance(name, str) for name in names):

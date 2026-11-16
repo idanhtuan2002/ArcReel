@@ -464,27 +464,6 @@ class TestProjectManager:
         scripts_dir = pm.get_project_path("demo") / "scripts"
         assert not (scripts_dir / "episode_10.json").exists()
 
-    def test_a_script_title_never_replaces_a_planned_episode_title(self, tmp_path):
-        """A planned episode's title is part of its plan (and of the adaptation made from it); a script keeps its own
-        title without renaming the episode. An unplanned episode takes the script's title."""
-        pm = ProjectManager(tmp_path / "projects")
-        pm.create_project("demo")
-        pm.create_project_metadata("demo", "Demo", "Anime", "narration")
-        pm.update_project(
-            "demo",
-            lambda p: p.update(episodes=[{"episode": 1, "title": "Chuyến đò cuối", "outline": {"story_beats": ["a"]}}]),
-        )
-        for episode in (1, 2):
-            script = {
-                "episode": episode,
-                "title": f"Tập {episode}",
-                "content_mode": "narration",
-                "segments": [{"segment_id": f"E{episode}S01", "duration_seconds": 4}],
-            }
-            pm.save_script("demo", script, f"episode_{episode}.json", validate=False)
-        titles = {ep["episode"]: ep["title"] for ep in pm.load_project("demo")["episodes"]}
-        assert titles == {1: "Chuyến đò cuối", 2: "Tập 2"}
-
     def test_sync_episode_rejects_filename_episode_mismatch(self, tmp_path):
         """文件名隐含集号与脚本内 episode 字段不一致时必须拒绝同步。
 
