@@ -29,6 +29,7 @@ Every target's final script is pinned when the stage is planned; a different cur
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import json
 from collections.abc import Awaitable, Callable, Mapping
 from functools import partial
@@ -521,10 +522,36 @@ class MediaAdapter:
             for item in items
             if item.get(id_field) and (item.get("generated_assets") or {}).get("storyboard_image")
         ]
-        first = [unit for unit in units if not await self._attempts(intent, f"continuity:{unit}:judged")]
+        # Frames already judged consistent, or already redone once, by any run are not judged again: a new run
+        # (after a cancel or a block) would otherwise regenerate frames an earlier run settled.
+        project_path = self._projects.get_project_path(intent.scope.project_name)
+        frames = {
+            str(item[id_field]): _file_digest(
+                project_path, (item.get("generated_assets") or {}).get("storyboard_image")
+            )
+            for item in items
+            if item.get(id_field)
+        }
+        settled = _read_settled_frames(project_path)
+        first = [
+            unit
+            for unit in units
+            if (frames.get(unit) is None or frames[unit] not in settled)
+            and not await self._attempts(intent, f"continuity:{unit}:judged")
+        ]
         if first:
             return await self._continuity_round(intent, subject_digest, run, episode, "judged", first, target)
         segments = continuity_pass.read_evidence(self._continuity_evidence(run, episode)).get("segments") or {}
+        _settle_frames(
+            project_path,
+            {
+                digest: "consistent"
+                for unit in units
+                if (digest := frames.get(unit))
+                and isinstance(verdict := (segments.get(unit) or {}).get("first", {}).get("verdict"), dict)
+                and verdict.get("status") != "drift"
+            },
+        )
         fixes = {
             unit: fix
             for unit in units
@@ -551,6 +578,18 @@ class MediaAdapter:
         ]
         if second:
             return await self._continuity_round(intent, subject_digest, run, episode, "rejudged", second, target)
+        # A redone frame was judged again: it is never redone once more, by this run or a later one.
+        redone_items, _ = self._script_items(intent.scope.project_name, target.script_filename)
+        _settle_frames(
+            project_path,
+            {
+                digest: "redone"
+                for item in redone_items
+                if item.get(id_field)
+                and await self._attempts(intent, f"continuity:{item[id_field]}:rejudged")
+                and (digest := _file_digest(project_path, (item.get("generated_assets") or {}).get("storyboard_image")))
+            },
+        )
         return False
 
     async def _continuity_round(
@@ -1135,6 +1174,42 @@ class MediaAdapter:
             and any(isinstance(p, dict) and p.get("action") in wanted for p in unit.get("problems") or [])
         }
         return sorted(segments)
+
+
+#: Storyboard frames, by content digest, that no run judges again (``consistent`` or ``redone`` once).
+SETTLED_FRAMES = "production/continuity-settled.json"
+
+
+def _file_digest(project_path: Path, relative: object) -> str | None:
+    if not isinstance(relative, str) or not relative:
+        return None
+    try:
+        return hashlib.sha256((project_path / relative).read_bytes()).hexdigest()
+    except OSError:
+        return None
+
+
+def _read_settled_frames(project_path: Path) -> dict[str, str]:
+    try:
+        found = json.loads((project_path / SETTLED_FRAMES).read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+    return {str(k): str(v) for k, v in found.items()} if isinstance(found, dict) else {}
+
+
+def _settle_frames(project_path: Path, frames: dict[str, str]) -> None:
+    """Records frames no run judges again; a run's own files under ``production/``, never a pinned input."""
+    if not frames:
+        return
+    settled = _read_settled_frames(project_path)
+    if all(settled.get(digest) == status for digest, status in frames.items()):
+        return
+    settled.update(frames)
+    path = project_path / SETTLED_FRAMES
+    path.parent.mkdir(parents=True, exist_ok=True)
+    staged = path.with_suffix(".tmp")
+    staged.write_text(json.dumps(settled, sort_keys=True), encoding="utf-8")
+    staged.replace(path)
 
 
 __all__ = ["MEDIA_TOOLS", "MediaAdapter"]

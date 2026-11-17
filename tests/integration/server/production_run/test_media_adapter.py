@@ -703,6 +703,74 @@ def _versions(root: Path, current: dict[str, int]) -> None:
     (root / "versions" / "versions.json").write_text(json.dumps({"storyboards": versions}), encoding="utf-8")
 
 
+async def test_frames_an_earlier_run_settled_are_not_judged_or_made_again(media_host, monkeypatch):
+    # trial 7, 2026-11-17: a new run after a cancel judged every frame again and regenerated the ones it found drifting
+    sessions, controller, run, planner, tools, script = media_host
+    _script_with_storyboards(script, blank=set())
+    root = script.parent.parent
+    (root / "project.json").write_text(json.dumps({"title": "t", "characters": {}}), encoding="utf-8")
+    _versions(root, {"E1S01": 1, "E1S02": 1})
+    adapter = controller._adapters[RunStage.MEDIA]
+    judge = ContinuityJudgeStub(
+        {
+            ("E1S01", 1): Verdict(score=55, status="drift", prompt_fix="Linh wears the yellow raincoat."),
+            ("E1S02", 1): Verdict(score=95, status="aligned"),
+            ("E1S01", 2): Verdict(score=40, status="drift", prompt_fix="worse"),
+        }
+    )
+    restored = []
+
+    async def restore(project, resource_type, unit, version):
+        restored.append((resource_type, unit, version))
+
+    adapter._continuity, adapter._restore = judge, restore
+    judge_route = ModelRoute.model_validate(
+        {
+            "role": "reviewer_a",
+            "provider_id": "gemini-aistudio",
+            "model_id": "gemini-3.5-flash",
+            "model_identity": "gemini-aistudio/gemini-3.5-flash@3.5-flash-05-2026",
+            "config_digest": "sha256:" + "2" * 64,
+            "local": False,
+            "paid": True,
+            "currency": "USD",
+            "max_cost_per_call": None,
+        }
+    )
+    real_run = adapter._run
+
+    async def judged_run(intent):
+        snapshot = await real_run(intent)
+        policy = snapshot.policy.model_copy(
+            update={
+                "continuity_judge_identity": judge_route.model_identity,
+                "continuity_judge_prompt_digest": "sha256:" + "4" * 64,
+                "routes": (judge_route,),
+            }
+        )
+        return snapshot.model_copy(update={"policy": policy})
+
+    monkeypatch.setattr(adapter, "_run", judged_run)
+    planner.plans = [_plan(A.GENERATE_TTS, artifacts=_storyboards_made())]
+
+    import hashlib
+
+    from server.production_run.media_adapter import SETTLED_FRAMES
+
+    items = json.loads(script.read_text(encoding="utf-8"))["segments"]
+    settled = {
+        hashlib.sha256((root / item["generated_assets"]["storyboard_image"]).read_bytes()).hexdigest(): "consistent"
+        for item in items
+    }
+    (root / SETTLED_FRAMES).parent.mkdir(parents=True, exist_ok=True)
+    (root / SETTLED_FRAMES).write_text(json.dumps(settled), encoding="utf-8")
+
+    await _tick(sessions, controller, run)
+
+    assert judge.calls == []
+    assert tools.calls == [(A.GENERATE_TTS, {"script": "episode_1.json"})]
+
+
 async def test_a_drifting_storyboard_is_made_again_with_its_fix_and_the_better_version_kept(media_host, monkeypatch):
     sessions, controller, run, planner, tools, script = media_host
     _script_with_storyboards(script, blank=set())
