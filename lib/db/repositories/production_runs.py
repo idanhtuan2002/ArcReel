@@ -809,7 +809,7 @@ class ProductionRunRepository:
     async def settled_usage(self, reservation: BudgetReservation) -> UsageReceipt | None:
         """The usage this reservation was settled with, if it was; a resumed step settles on it again."""
         reservation = BudgetReservation.model_validate(reservation)
-        row = (
+        rows = (
             await self.session.execute(
                 select(ProductionUsageModel).where(
                     ProductionUsageModel.user_id == reservation.scope.user_id,
@@ -818,14 +818,15 @@ class ProductionRunRepository:
                     ProductionUsageModel.reservation_id == reservation.reservation_id,
                 )
             )
-        ).scalar_one_or_none()
-        if row is None:
-            return None
-        usage = UsageReceipt.model_validate_json(row.usage_json)
-        if row.usage_digest != _wire_digest("r2.production-usage-reference.v1", usage.model_dump(mode="json")):
-            raise ProductionRunConflict("RUN_STATE_INTEGRITY_FAILED")
-        # An unknown outcome is not a settlement: the step measures again (its calls may since have been settled).
-        return None if usage.outcome == "UNKNOWN" else usage
+        ).scalars()
+        for row in rows:
+            usage = UsageReceipt.model_validate_json(row.usage_json)
+            if row.usage_digest != _wire_digest("r2.production-usage-reference.v1", usage.model_dump(mode="json")):
+                raise ProductionRunConflict("RUN_STATE_INTEGRITY_FAILED")
+            # An unknown outcome is not a settlement: the step measures again (its calls may since have settled).
+            if usage.outcome != "UNKNOWN":
+                return usage
+        return None
 
     async def settle_budget(self, *, reservation: BudgetReservation, usage: UsageReceipt) -> None:
         reservation, usage = BudgetReservation.model_validate(reservation), UsageReceipt.model_validate(usage)
@@ -842,31 +843,39 @@ class ProductionRunRepository:
         digest = _wire_digest("r2.production-usage-reference.v1", usage.model_dump(mode="json"))
         key = (reservation.scope.user_id, reservation.scope.project_name, usage.owner, usage.receipt_ref)
         prior = await self.session.get(ProductionUsageModel, key)
+        if (
+            prior is not None
+            and prior.usage_digest != digest
+            and row.state == "UNKNOWN"
+            and prior.reservation_id == row.reservation_id
+            and UsageReceipt.model_validate_json(prior.usage_json).outcome == "UNKNOWN"
+            and usage.outcome != "UNKNOWN"
+        ):
+            # The usage ledger is append-only (AUTO_PRODUCTION_IMMUTABLE): a measurement that replaces an unknown one
+            # is a new reference beside it, and the reservation settles on it (after a crash a dead worker's calls
+            # stay pending until their tasks are known to have finished).
+            usage = usage.model_copy(update={"receipt_ref": f"{usage.receipt_ref}#measured"})
+            digest = _wire_digest("r2.production-usage-reference.v1", usage.model_dump(mode="json"))
+            key = (key[0], key[1], key[2], usage.receipt_ref)
+            prior = await self.session.get(ProductionUsageModel, key)
         if prior is not None:
-            if prior.reservation_id != row.reservation_id:
+            if prior.usage_digest != digest or prior.reservation_id != row.reservation_id:
                 raise ProductionRunConflict("COMMAND_REPLAY_CONFLICT")
-            if prior.usage_digest == digest:
-                return
-            if row.state != "UNKNOWN" or UsageReceipt.model_validate_json(prior.usage_json).outcome != "UNKNOWN":
-                raise ProductionRunConflict("COMMAND_REPLAY_CONFLICT")
-            # An unknown usage is measured again and replaced, never a settled one (after a crash a dead worker's
-            # calls stay pending until their tasks are known to have finished).
-            prior.usage_digest, prior.usage_json = digest, usage.model_dump_json()
-        elif row.state == "SETTLED":
+            return
+        if row.state == "SETTLED":
             raise ProductionRunConflict("ALLOCATION_ALREADY_SETTLED")
-        else:
-            self.session.add(
-                ProductionUsageModel(
-                    user_id=key[0],
-                    project_name=key[1],
-                    owner=key[2],
-                    receipt_ref=key[3],
-                    run_id=reservation.scope.run_id,
-                    reservation_id=reservation.reservation_id,
-                    usage_digest=digest,
-                    usage_json=usage.model_dump_json(),
-                )
+        self.session.add(
+            ProductionUsageModel(
+                user_id=key[0],
+                project_name=key[1],
+                owner=key[2],
+                receipt_ref=key[3],
+                run_id=reservation.scope.run_id,
+                reservation_id=reservation.reservation_id,
+                usage_digest=digest,
+                usage_json=usage.model_dump_json(),
             )
+        )
         if usage.outcome == "UNKNOWN":
             row.state = "UNKNOWN"
         else:
