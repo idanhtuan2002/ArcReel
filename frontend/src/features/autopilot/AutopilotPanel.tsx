@@ -109,7 +109,16 @@ export function StoryAutopilotFields({
  * ADR-0124: one line with the project's autopilot state and its switch. Turning a story project's autopilot on asks
  * for the idea and the book's length; a film project's for the episodes per run.
  */
-export function AutopilotPanel({ projectName, kind }: { projectName: string; kind: "story" | "film" }) {
+export function AutopilotPanel({
+  projectName,
+  kind,
+  variant = "panel",
+}: {
+  projectName: string;
+  kind: "story" | "film";
+  /** ``header``: one compact line for the project header, the form opening below it. */
+  variant?: "panel" | "header";
+}) {
   const { t } = useTranslation("dashboard");
   const errorText = useAutopilotErrorText();
   const [view, setView] = useState<AutopilotView | null>(null);
@@ -183,65 +192,7 @@ export function AutopilotPanel({ projectName, kind }: { projectName: string; kin
   const state = view?.status.state ?? "off";
   const haltedRun = state === "halted" ? (view?.status.run_id ?? null) : null;
 
-  return (
-    <section aria-labelledby={`${episodesId}-title`} className="rounded-md border border-hairline px-3 py-2">
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
-        <h2 id={`${episodesId}-title`} className="flex items-center gap-1.5 text-[13px] font-medium text-text">
-          <Bot aria-hidden className="h-4 w-4 text-text-3" />
-          {t("ap_title")}
-          <HelpHint topic={t("ap_title")}>{t("workflow:help_autopilot")}</HelpHint>
-        </h2>
-        {view ? (
-          <span className={`text-[12px] ${TONE[state]}`} aria-live="polite">
-            {t(`ap_state_${state}`)}
-            {state === "halted" && view.status.reason ? (
-              <span className="text-text-3"> · {t("ap_reason", { reason: view.status.reason })}</span>
-            ) : null}
-          </span>
-        ) : null}
-        {haltedRun ? (
-          <button
-            type="button"
-            disabled={busy}
-            onClick={() => void resume(haltedRun)}
-            className="rounded-md border border-accent/40 px-2.5 py-1 text-[12.5px] text-text hover:border-accent disabled:opacity-50"
-          >
-            {t("ap_resume")}
-          </button>
-        ) : null}
-        <span className="ml-auto flex items-center gap-2">
-          {view && !view.available ? <span className="text-[12px] text-text-3">{t("ap_unavailable")}</span> : null}
-          {on ? (
-            <button
-              type="button"
-              disabled={busy}
-              onClick={() => void change({ enabled: false })}
-              className="rounded-md border border-hairline px-2.5 py-1 text-[12.5px] text-text-2 hover:text-text disabled:opacity-50"
-            >
-              {t("ap_turn_off")}
-            </button>
-          ) : !editing ? (
-            <button
-              type="button"
-              disabled={busy || !view?.available}
-              onClick={startEditing}
-              className="rounded-md border border-hairline px-2.5 py-1 text-[12.5px] text-text hover:border-accent/40 disabled:opacity-50"
-            >
-              {t("ap_turn_on")}
-            </button>
-          ) : null}
-        </span>
-      </div>
-      {on && view?.delegation ? (
-        <p className="mt-1 text-[12px] text-text-3">
-          {view.delegation.story
-            ? view.delegation.story.book_chapters
-              ? t("ap_story_summary", { chapters: view.delegation.story.book_chapters })
-              : t("ap_story_summary_auto")
-            : t("ap_film_summary", { count: view.delegation.film?.episodes_per_run ?? 1 })}
-        </p>
-      ) : null}
-      {editing && !on ? (
+  const form = editing && !on ? (
         <form
           className="mt-3 space-y-3 border-t border-hairline-soft pt-3"
           onSubmit={(event) => {
@@ -291,7 +242,128 @@ export function AutopilotPanel({ projectName, kind }: { projectName: string; kin
             </button>
           </div>
         </form>
-      ) : null}
+  ) : null;
+  const summary =
+    on && view?.delegation
+      ? view.delegation.story
+        ? view.delegation.story.book_chapters
+          ? t("ap_story_summary", { chapters: view.delegation.story.book_chapters })
+          : t("ap_story_summary_auto")
+        : t("ap_film_summary", { count: view.delegation.film?.episodes_per_run ?? 1 })
+      : null;
+
+  if (variant === "header") {
+    // One compact line in the project header: the state, its explanation and the switch; turning it on opens the
+    // same form below the line.
+    return (
+      <div className="relative flex items-center gap-1.5 text-[12px]" title={summary ?? undefined}>
+        <Bot aria-hidden className="h-3.5 w-3.5 text-text-3" />
+        <span className="hidden whitespace-nowrap text-text-2 lg:inline">{t("ap_title")}</span>
+        {view ? (
+          <span className={`whitespace-nowrap ${TONE[state]}`} aria-live="polite">
+            {t(`ap_state_${state}`)}
+          </span>
+        ) : null}
+        <HelpHint topic={t("ap_title")} align="right">
+          {t("workflow:help_autopilot")}
+          {summary ? <span className="mt-1 block text-text-3">{summary}</span> : null}
+          {state === "halted" && view?.status.reason ? (
+            <span className="mt-1 block text-text-3">{t("ap_reason", { reason: view.status.reason })}</span>
+          ) : null}
+        </HelpHint>
+        {haltedRun ? (
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => void resume(haltedRun)}
+            className="whitespace-nowrap rounded-md border border-accent/40 px-2 py-0.5 text-[12px] text-text hover:border-accent disabled:opacity-50"
+          >
+            {t("ap_resume")}
+          </button>
+        ) : null}
+        {on ? (
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => void change({ enabled: false })}
+            className="whitespace-nowrap rounded-md border border-hairline px-2 py-0.5 text-[12px] text-text-2 hover:text-text disabled:opacity-50"
+          >
+            {t("ap_turn_off")}
+          </button>
+        ) : (
+          <button
+            type="button"
+            disabled={busy || !view?.available || editing}
+            onClick={startEditing}
+            title={view && !view.available ? t("ap_unavailable") : undefined}
+            className="whitespace-nowrap rounded-md border border-hairline px-2 py-0.5 text-[12px] text-text hover:border-accent/40 disabled:opacity-50"
+          >
+            {t("ap_turn_on")}
+          </button>
+        )}
+        {form ? (
+          <div
+            className="absolute right-0 top-full z-40 mt-2 w-80 rounded-lg p-3 shadow-lg"
+            style={{ background: "var(--color-surface-2)", border: "1px solid var(--color-hairline)" }}
+          >
+            {form}
+          </div>
+        ) : null}
+      </div>
+    );
+  }
+
+  return (
+    <section aria-labelledby={`${episodesId}-title`} className="rounded-md border border-hairline px-3 py-2">
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
+        <h2 id={`${episodesId}-title`} className="flex items-center gap-1.5 text-[13px] font-medium text-text">
+          <Bot aria-hidden className="h-4 w-4 text-text-3" />
+          {t("ap_title")}
+          <HelpHint topic={t("ap_title")}>{t("workflow:help_autopilot")}</HelpHint>
+        </h2>
+        {view ? (
+          <span className={`text-[12px] ${TONE[state]}`} aria-live="polite">
+            {t(`ap_state_${state}`)}
+            {state === "halted" && view.status.reason ? (
+              <span className="text-text-3"> · {t("ap_reason", { reason: view.status.reason })}</span>
+            ) : null}
+          </span>
+        ) : null}
+        {haltedRun ? (
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => void resume(haltedRun)}
+            className="rounded-md border border-accent/40 px-2.5 py-1 text-[12.5px] text-text hover:border-accent disabled:opacity-50"
+          >
+            {t("ap_resume")}
+          </button>
+        ) : null}
+        <span className="ml-auto flex items-center gap-2">
+          {view && !view.available ? <span className="text-[12px] text-text-3">{t("ap_unavailable")}</span> : null}
+          {on ? (
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => void change({ enabled: false })}
+              className="rounded-md border border-hairline px-2.5 py-1 text-[12.5px] text-text-2 hover:text-text disabled:opacity-50"
+            >
+              {t("ap_turn_off")}
+            </button>
+          ) : !editing ? (
+            <button
+              type="button"
+              disabled={busy || !view?.available}
+              onClick={startEditing}
+              className="rounded-md border border-hairline px-2.5 py-1 text-[12.5px] text-text hover:border-accent/40 disabled:opacity-50"
+            >
+              {t("ap_turn_on")}
+            </button>
+          ) : null}
+        </span>
+      </div>
+      {summary ? <p className="mt-1 text-[12px] text-text-3">{summary}</p> : null}
+      {form}
     </section>
   );
 }

@@ -7,6 +7,7 @@ import { API } from "@/api";
 import { useProjectsStore } from "@/stores/projects-store";
 import type { RunList, RunSnapshot } from "../api/types";
 import { ProjectOutcome } from "./ProjectOutcome";
+import { useRunsStore } from "../runsStore";
 
 function run(over: Partial<RunSnapshot>): RunSnapshot {
   return {
@@ -21,7 +22,10 @@ function run(over: Partial<RunSnapshot>): RunSnapshot {
 }
 
 describe("ProjectOutcome", () => {
-  afterEach(() => vi.restoreAllMocks());
+  afterEach(() => {
+    vi.restoreAllMocks();
+    useRunsStore.setState({ byProject: {} });
+  });
 
   it("shows the finished film of the older run and says in words why the latest run stopped", async () => {
     vi.spyOn(client, "listProductionRuns").mockResolvedValue({
@@ -89,33 +93,19 @@ describe("ProjectOutcome", () => {
     expect(resume).toHaveBeenCalledWith("demo", stoppedRun, expect.any(String));
   });
 
-  it("pauses a running run from the status card after asking", async () => {
+  it("shows no status card while a run makes the film: its state and pause live in the operations summary", async () => {
     const running = run({
       run_id: "live",
       status: "WAITING_TASK",
       stage: "EPISODE_PLAN",
       targets: ["episode:2"],
-      version: 3,
-      input_digest: "sha256:i",
-      policy_digest: "sha256:p",
     } as Partial<RunSnapshot>);
     vi.spyOn(client, "listProductionRuns").mockResolvedValue({ start: {}, runs: [running] } as unknown as RunList);
-    const control = vi.spyOn(client, "controlProductionRun").mockResolvedValue({ ...running, status: "PAUSED" });
-    const user = userEvent.setup();
 
-    render(<ProjectOutcome projectName="demo" titles={{}} onOpenDetails={vi.fn()} />);
-    await user.click(await screen.findByRole("button", { name: "暂停运行" }));
-    expect(control).not.toHaveBeenCalled();
-    await user.click(screen.getByRole("button", { name: "不暂停" }));
-    await user.click(screen.getByRole("button", { name: "暂停运行" }));
-    await user.click(screen.getByRole("button", { name: "暂停" }));
+    const { container } = render(<ProjectOutcome projectName="demo" titles={{}} onOpenDetails={vi.fn()} />);
 
-    expect(control).toHaveBeenCalledWith(
-      "demo",
-      "live",
-      "pause",
-      expect.objectContaining({ expected_version: 3, expected_input_digest: "sha256:i", policy_digest: "sha256:p" }),
-    );
-    expect(await screen.findByRole("button", { name: "继续" })).toBeInTheDocument();
+    await vi.waitFor(() => expect(client.listProductionRuns).toHaveBeenCalled());
+    expect(container.querySelector("#run-controls")).toBeNull();
+    expect(screen.queryByRole("button", { name: "暂停运行" })).not.toBeInTheDocument();
   });
 });

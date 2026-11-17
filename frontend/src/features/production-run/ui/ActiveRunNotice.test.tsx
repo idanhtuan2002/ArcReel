@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import * as client from "../api/productionRunClient";
 import type { RunList, RunSnapshot } from "../api/types";
+import { useRunsStore } from "../runsStore";
 import { ActiveRunNotice } from "./ActiveRunNotice";
 
 const RUN = {
@@ -18,13 +19,25 @@ const RUN = {
   policy_digest: "sha256:p",
 } as unknown as RunSnapshot;
 
-describe("ActiveRunNotice", () => {
-  afterEach(() => vi.restoreAllMocks());
+function runs(run: RunSnapshot): void {
+  vi.spyOn(client, "listProductionRuns").mockResolvedValue({ start: {}, runs: [run] } as unknown as RunList);
+}
 
-  it("warns while a run makes media and links to the run's controls instead of holding one", async () => {
+describe("ActiveRunNotice", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+    useRunsStore.setState({ byProject: {} });
+  });
+
+  it("warns on a page that edits media and leads to the run's controls, holding none itself", async () => {
     window.history.pushState({}, "", "/app/projects/demo/characters");
-    vi.spyOn(client, "listProductionRuns").mockResolvedValue({ start: {}, runs: [RUN] } as unknown as RunList);
+    runs(RUN);
     const control = vi.spyOn(client, "controlProductionRun");
+    const card = document.createElement("summary");
+    card.id = "run-controls";
+    card.tabIndex = 0;
+    card.scrollIntoView = vi.fn();
+    document.body.appendChild(card);
 
     render(<ActiveRunNotice projectName="demo" />);
     expect(await screen.findByRole("status")).toHaveTextContent("第 2 集");
@@ -32,32 +45,27 @@ describe("ActiveRunNotice", () => {
 
     await userEvent.click(screen.getByRole("button", { name: "查看并控制本次运行" }));
     expect(window.location.pathname).toBe("/app/projects/demo");
-    expect(control).not.toHaveBeenCalled();
-  });
-
-  it("brings the status card into view and focus, also when the overview is already open", async () => {
-    window.history.pushState({}, "", "/app/projects/demo");
-    vi.spyOn(client, "listProductionRuns").mockResolvedValue({ start: {}, runs: [RUN] } as unknown as RunList);
-    const card = document.createElement("div");
-    card.id = "run-controls";
-    card.tabIndex = -1;
-    card.scrollIntoView = vi.fn();
-    document.body.appendChild(card);
-
-    render(<ActiveRunNotice projectName="demo" />);
-    await userEvent.click(await screen.findByRole("button", { name: "查看并控制本次运行" }));
-
     expect(card.scrollIntoView).toHaveBeenCalled();
     expect(card).toHaveFocus();
+    expect(control).not.toHaveBeenCalled();
     card.remove();
   });
 
-  it("says nothing when the run has stopped", async () => {
+  it("stays quiet on pages that change no media, and when the run has stopped", async () => {
+    window.history.pushState({}, "", "/app/projects/demo");
     const list = vi
       .spyOn(client, "listProductionRuns")
-      .mockResolvedValue({ start: {}, runs: [{ ...RUN, status: "BLOCKED_CONFIGURATION" }] } as unknown as RunList);
-    render(<ActiveRunNotice projectName="demo" />);
+      .mockResolvedValue({ start: {}, runs: [RUN] } as unknown as RunList);
+    const { unmount } = render(<ActiveRunNotice projectName="demo" />);
     await vi.waitFor(() => expect(list).toHaveBeenCalled());
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
+    unmount();
+
+    window.history.pushState({}, "", "/app/projects/demo/episodes/2");
+    useRunsStore.setState({ byProject: {} });
+    runs({ ...RUN, status: "BLOCKED_CONFIGURATION" } as RunSnapshot);
+    render(<ActiveRunNotice projectName="demo" />);
+    await vi.waitFor(() => expect(useRunsStore.getState().byProject.demo).toBeDefined());
     expect(screen.queryByRole("status")).not.toBeInTheDocument();
   });
 });

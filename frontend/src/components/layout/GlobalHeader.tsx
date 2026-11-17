@@ -7,6 +7,7 @@ import { useAppStore } from "@/stores/app-store";
 import { useConfigStatusStore } from "@/stores/config-status-store";
 import { useProjectsStore } from "@/stores/projects-store";
 import { useDemoWorkbench } from "@/onboarding/use-demo-workbench";
+import { AutopilotPanel } from "@/features/autopilot/AutopilotPanel";
 import { isDemoProject } from "@/onboarding/demo-project";
 import { useTasksStore } from "@/stores/tasks-store";
 import { useUsageStore, type UsageStats } from "@/stores/usage-store";
@@ -258,6 +259,16 @@ export function GlobalHeader({ onNavigateBack }: GlobalHeaderProps) {
 
         {/* ---- Right: actions ---- */}
         <div className="flex items-center gap-1">
+          {usageProjectName ? (
+            <>
+              <AutopilotPanel
+                projectName={usageProjectName}
+                kind={currentProjectData?.project_kind === "story" ? "story" : "film"}
+                variant="header"
+              />
+              <div aria-hidden="true" className="mx-1 h-4 w-px" style={{ background: "var(--color-hairline)" }} />
+            </>
+          ) : null}
           <div className="relative" ref={notificationAnchorRef}>
             <button
               type="button"

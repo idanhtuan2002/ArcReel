@@ -44,3 +44,20 @@ describe("autopilot panel of a halted run", () => {
     );
   });
 });
+
+describe("autopilot in the project header", () => {
+  it("shows its state and switch on one line and opens the form below it", async () => {
+    getAutopilot.mockResolvedValue({
+      available: true,
+      delegation: null,
+      status: { state: "off", run_id: null, reason: null },
+    });
+
+    render(<AutopilotPanel projectName="p" kind="film" variant="header" />);
+
+    expect(await screen.findByText("Off")).toBeInTheDocument();
+    expect(screen.queryByLabelText("Episodes per run")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Turn on" }));
+    expect(screen.getByLabelText("Episodes per run")).toBeInTheDocument();
+  });
+});

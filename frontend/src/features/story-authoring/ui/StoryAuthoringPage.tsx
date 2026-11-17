@@ -6,7 +6,6 @@
  * owns every state and verdict; the page only shows them and sends the Human's decisions.
  */
 import { useProjectsStore } from "@/stores/projects-store";
-import { AutopilotPanel } from "@/features/autopilot/AutopilotPanel";
 import { DrawnProfile } from "@/features/autopilot/DrawnProfile";
 import "./story-authoring.css";
 
@@ -197,7 +196,6 @@ export default function StoryAuthoringPage({ projectName }: StoryAuthoringPagePr
       <div className="mx-auto w-full max-w-5xl px-4 py-6">
         {isStoryProject ? (
           <div className="mb-4 space-y-2">
-            <AutopilotPanel projectName={projectName} kind="story" />
             {drawnProfile ? <DrawnProfile profile={drawnProfile} /> : null}
           </div>
         ) : null}

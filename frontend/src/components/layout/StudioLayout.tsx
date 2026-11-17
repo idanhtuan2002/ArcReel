@@ -13,6 +13,7 @@ import { TaskFailureListener } from "./TaskFailureListener";
 import { ScriptGenerationNoticeListener } from "./ScriptGenerationNoticeListener";
 import { MigrationRepairBanner } from "./MigrationRepairBanner";
 import { ActiveRunNotice } from "@/features/production-run/ui/ActiveRunNotice";
+import { useRunNotifications } from "@/features/production-run/useRunNotifications";
 import { useProjectsStore } from "@/stores/projects-store";
 import { DemoAssistantPanel } from "@/onboarding/DemoAssistantPanel";
 import { DemoReadOnlyBanner } from "@/onboarding/DemoReadOnlyBanner";
@@ -79,6 +80,8 @@ export function StudioLayout({ children }: StudioLayoutProps) {
   // 同步这一判定，否则该帧会退化成对全局任务的轮询而非真正停用。
   const isEffectivelyDemo = demoMode || isDemoProject(currentProjectName);
   const sseProjectName = isEffectivelyDemo ? null : currentProjectName;
+  // Tells the workspace notifications what the project's automatic run is doing (stages, stops, finished films).
+  useRunNotifications(sseProjectName);
   useTaskRefresh(sseProjectName, !isEffectivelyDemo);
   useProjectEventsSSE(sseProjectName);
 

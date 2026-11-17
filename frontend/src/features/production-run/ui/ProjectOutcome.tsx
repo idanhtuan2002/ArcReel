@@ -3,8 +3,6 @@ import { useTranslation } from "react-i18next";
 import { Download, Play } from "lucide-react";
 import {
   downloadProductionOutput,
-  controlProductionRun,
-  listProductionRuns,
   resumeProductionRun,
   newCommandId,
   previewProductionFinal,
@@ -17,13 +15,12 @@ import { API } from "@/api";
 import { useAppStore } from "@/stores/app-store";
 import { useProjectsStore } from "@/stores/projects-store";
 import { HelpHint } from "@/components/ui/HelpHint";
+import { RUN_CONTROLS_ID } from "../runControls";
+import { useProjectRuns, useRunsStore } from "../runsStore";
 
-const REFRESH_MS = 15000;
 /** Stops a new episode plan from the stopped episode on can fix. */
 const PLAN_CODES = new Set(["ADAPTATION_FAILED", "ADAPTATION_INPUT_MISSING"]);
 /** Stops the project's model choices can fix. */
-/** The status card that holds the run's controls; the run banner on every project page leads here. */
-export const RUN_CONTROLS_ID = "run-controls";
 const MODEL_CODES = (code: string) =>
   code === "ADAPTATION_FAILED" || code === "VOICE_CAST_FAILED" || code.startsWith("MEDIA_") || code.startsWith("PROJECT_");
 /** Stops the task list explains. */
@@ -63,14 +60,13 @@ function finishedFilms(runs: RunSnapshot[]): FinishedFilm[] {
  */
 export function ProjectOutcome({ projectName, titles, onOpenDetails }: Props) {
   const { t } = useTranslation("workflow");
-  const [runs, setRuns] = useState<RunSnapshot[] | null>(null);
+  const runs = useProjectRuns(projectName);
+  const putRun = useRunsStore((state) => state.putRun);
   const [playing, setPlaying] = useState<Record<string, string>>({});
   const [failed, setFailed] = useState(false);
   const [busy, setBusy] = useState(false);
   const [actionFailed, setActionFailed] = useState(false);
   // Episodes a plan reset from the stopped episode would clear although they have scripts or media: asked first.
-  // Pausing asks first, like every control that stops a run.
-  const [confirmingPause, setConfirmingPause] = useState(false);
   const [consumed, setConsumed] = useState<number[] | null>(null);
   const [, setLocation] = useLocation();
   const setTaskHudOpen = useAppStore((s) => s.setTaskHudOpen);
@@ -78,27 +74,6 @@ export function ProjectOutcome({ projectName, titles, onOpenDetails }: Props) {
   const urls = useRef<string[]>([]);
   useEffect(() => () => urls.current.forEach((url) => URL.revokeObjectURL(url)), []);
 
-  useEffect(() => {
-    let controller = new AbortController();
-    const load = () => {
-      controller.abort();
-      controller = new AbortController();
-      const { signal } = controller;
-      listProductionRuns(projectName, { signal })
-        .then((list) => {
-          if (!signal.aborted) setRuns(list.runs);
-        })
-        .catch(() => {
-          // The outcome is a summary; the operations details report their own errors.
-        });
-    };
-    load();
-    const timer = window.setInterval(load, REFRESH_MS);
-    return () => {
-      window.clearInterval(timer);
-      controller.abort();
-    };
-  }, [projectName]);
 
   if (runs === null || runs.length === 0) return null;
   const films = finishedFilms(runs);
@@ -141,26 +116,7 @@ export function ProjectOutcome({ projectName, titles, onOpenDetails }: Props) {
     setActionFailed(false);
     try {
       const resumed = await resumeProductionRun(projectName, latest, newCommandId());
-      setRuns((current) => (current ? [resumed, ...current.slice(1)] : current));
-    } catch {
-      setActionFailed(true);
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const pause = async () => {
-    setConfirmingPause(false);
-    setBusy(true);
-    setActionFailed(false);
-    try {
-      const paused = await controlProductionRun(projectName, latest.run_id, "pause", {
-        command_id: newCommandId(),
-        expected_version: latest.version,
-        expected_input_digest: latest.input_digest,
-        policy_digest: latest.policy_digest,
-      });
-      setRuns((current) => (current ? [paused, ...current.slice(1)] : current));
+      putRun(projectName, resumed);
     } catch {
       setActionFailed(true);
     } finally {
@@ -274,6 +230,7 @@ export function ProjectOutcome({ projectName, titles, onOpenDetails }: Props) {
         </div>
       )}
 
+      {!running && (
       <div
         id={RUN_CONTROLS_ID}
         tabIndex={-1}
@@ -344,41 +301,6 @@ export function ProjectOutcome({ projectName, titles, onOpenDetails }: Props) {
               {t("outcome_open_tasks")}
             </button>
           )}
-          {running &&
-            (confirmingPause ? (
-              <span className="flex items-center gap-2" role="group" aria-label={t("active_run_pause_confirm")}>
-                <span className="text-[12px]" style={{ color: "var(--color-text-2)" }}>
-                  {t("active_run_pause_confirm")}
-                </span>
-                <button
-                  type="button"
-                  disabled={busy}
-                  onClick={() => void pause()}
-                  className="focus-ring rounded-md px-2.5 py-1 text-[12px] disabled:opacity-50"
-                  style={{ border: `1px solid ${SEVERITY_TONES.warnings.ring}`, color: "var(--color-text)" }}
-                >
-                  {t("active_run_pause_yes")}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setConfirmingPause(false)}
-                  className="focus-ring rounded-md px-2.5 py-1 text-[12px]"
-                  style={{ color: "var(--color-text-2)" }}
-                >
-                  {t("active_run_pause_no")}
-                </button>
-              </span>
-            ) : (
-              <button
-                type="button"
-                disabled={busy}
-                onClick={() => setConfirmingPause(true)}
-                className="focus-ring rounded-md px-2.5 py-1 text-[12px] disabled:opacity-50"
-                style={{ border: "1px solid var(--color-hairline)", color: "var(--color-text)" }}
-              >
-                {t("active_run_pause")}
-              </button>
-            ))}
           <button
             type="button"
             onClick={onOpenDetails}
@@ -394,6 +316,7 @@ export function ProjectOutcome({ projectName, titles, onOpenDetails }: Props) {
           </p>
         )}
       </div>
+      )}
     </section>
   );
 }

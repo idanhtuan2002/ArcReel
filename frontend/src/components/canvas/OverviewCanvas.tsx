@@ -1,8 +1,11 @@
 
-import { AutopilotPanel } from "@/features/autopilot/AutopilotPanel";
 import { PipelineBoard } from "./pipeline/PipelineBoard";
 import { ProductionRunPanel } from "@/features/production-run/ui/ProductionRunPanel";
 import { ProjectOutcome } from "@/features/production-run/ui/ProjectOutcome";
+import { RunPauseControl } from "@/features/production-run/ui/RunPauseControl";
+import { RUN_CONTROLS_ID, showRunControls } from "@/features/production-run/runControls";
+import { useProjectRuns, useRunsStore } from "@/features/production-run/runsStore";
+import { STOPPED, TERMINAL } from "@/features/production-run/api/types";
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useLocation } from "wouter";
@@ -32,6 +35,9 @@ interface OverviewCanvasProps {
 }
 
 /** The workspace pages of each asset kind, as the sidebar opens them. */
+/** Remembers that the filmmaker folded the operations details (open by default). */
+const OPERATIONS_FOLDED_KEY = "arcreel.overview.operationsFolded";
+
 const ASSET_PATHS = { character: "/characters", scene: "/scenes", prop: "/props" } as const;
 
 const CARD_BG =
@@ -100,8 +106,28 @@ export function OverviewCanvas({
   // 防 reload 重复。
   const [handoffTrigger, setHandoffTrigger] = useState(0);
   const [, setLocation] = useLocation();
-  // The operations details (pipeline, gates, every automatic run) stay closed until the filmmaker asks for them.
-  const [operationsOpen, setOperationsOpen] = useState(false);
+  // The operations details (the run's state and controls, pipeline, gates, every automatic run) are open unless the
+  // filmmaker folded them; the choice is remembered per browser.
+  const [operationsOpen, setOperationsOpen] = useState(() => {
+    try {
+      return window.localStorage.getItem(OPERATIONS_FOLDED_KEY) !== "1";
+    } catch {
+      return true;
+    }
+  });
+  const runs = useProjectRuns(readOnly ? null : projectName);
+  const putRun = useRunsStore((state) => state.putRun);
+  const latestRun = runs?.[0] ?? null;
+  const runningRun =
+    latestRun && !TERMINAL.has(latestRun.status) && !STOPPED.has(latestRun.status) ? latestRun : null;
+  const scrollTarget = useAppStore((state) => state.scrollTarget);
+  const clearScrollTarget = useAppStore((state) => state.clearScrollTarget);
+  useEffect(() => {
+    // A notification about the run opens its controls here.
+    if (scrollTarget?.type !== "run_controls") return;
+    clearScrollTarget(scrollTarget.request_id);
+    showRunControls();
+  }, [scrollTarget, clearScrollTarget]);
   const operationsRef = useRef<HTMLDetailsElement>(null);
   const wasWelcomeRef = useRef<boolean | null>(null);
   useEffect(() => {
@@ -362,27 +388,49 @@ export function OverviewCanvas({
             onOpenDetails={openOperations}
           />
         ) : null}
-        {!readOnly && projectData.project_kind !== "story" ? (
-          <div className="mb-4">
-            <AutopilotPanel projectName={projectName} kind="film" />
-          </div>
-        ) : null}
         {!readOnly ? (
           <details
             ref={operationsRef}
             open={operationsOpen}
-            onToggle={(event) => setOperationsOpen(event.currentTarget.open)}
+            onToggle={(event) => {
+              const open = event.currentTarget.open;
+              setOperationsOpen(open);
+              try {
+                window.localStorage.setItem(OPERATIONS_FOLDED_KEY, open ? "0" : "1");
+              } catch {
+                // Private mode: the details simply open again next time.
+              }
+            }}
             className="rounded-2xl"
             style={{ border: "1px solid var(--color-hairline-soft)" }}
           >
-            <summary className="focus-ring cursor-pointer rounded-2xl px-4 py-3">
+            <summary
+              id={runningRun ? RUN_CONTROLS_ID : undefined}
+              tabIndex={runningRun ? 0 : undefined}
+              className="focus-ring flex cursor-pointer flex-wrap items-center gap-x-3 gap-y-1.5 rounded-2xl px-4 py-3"
+            >
               <span className="text-[13px] font-semibold" style={{ color: "var(--color-text)" }}>
                 {t("workflow:ops_details")}
               </span>
-              <span className="ml-2 text-[12px]" style={{ color: "var(--color-text-3)" }}>
+              <span className="text-[12px]" style={{ color: "var(--color-text-3)" }}>
                 {t("workflow:ops_details_hint")}
-              </span>{" "}
+              </span>
               <HelpHint topic={t("workflow:ops_details")}>{t("workflow:help_operations")}</HelpHint>
+              {runningRun ? (
+                <span className="ml-auto flex flex-wrap items-center gap-2">
+                  <span className="text-[12.5px] font-semibold" style={{ color: "var(--color-accent-2)" }} role="status">
+                    {t("workflow:outcome_running", {
+                      episode: Number((runningRun.targets[0] ?? "episode:0").split(":")[1]) || null,
+                      stage: t(`workflow:auto_stage_${runningRun.stage}`),
+                    })}
+                  </span>
+                  <RunPauseControl
+                    projectName={projectName}
+                    run={runningRun}
+                    onPaused={(paused) => putRun(projectName, paused)}
+                  />
+                </span>
+              ) : null}
             </summary>
             <div className="space-y-4 px-3 pb-3">
               <ProductionRunPanel key={projectName} projectName={projectName} />

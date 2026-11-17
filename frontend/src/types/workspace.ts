@@ -81,7 +81,7 @@ export interface ProjectDeletedPayload {
 
 export interface WorkspaceFocusTarget {
   request_id: string;
-  type: "character" | "scene" | "prop" | "segment" | "grid" | "reference_unit";
+  type: "character" | "scene" | "prop" | "segment" | "grid" | "reference_unit" | "run_controls";
   id: string;
   route: string;
   highlight: true;

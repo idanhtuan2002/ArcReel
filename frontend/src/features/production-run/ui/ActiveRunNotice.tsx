@@ -1,67 +1,39 @@
-import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useLocation } from "wouter";
-import { listProductionRuns } from "../api/productionRunClient";
-import { STOPPED, TERMINAL, type RunSnapshot, type RunStage } from "../api/types";
+import { STOPPED, TERMINAL, type RunStage } from "../api/types";
+import { showRunControls } from "../runControls";
+import { useProjectRuns } from "../runsStore";
 import { SEVERITY_TONES } from "@/utils/severity-tone";
-import { RUN_CONTROLS_ID } from "./ProjectOutcome";
 
-const REFRESH_MS = 20000;
 /** Stages whose work a hand-made regeneration of an asset, a storyboard, a voice or a clip throws away. */
 const MAKING_STAGES: ReadonlySet<RunStage> = new Set(["ASSET_ANALYSIS", "EPISODE_PLAN", "ADAPTATION", "SCRIPT_PLAN", "SCRIPT", "MEDIA"]);
+/** Pages where a sheet, a storyboard, a voice, a clip or the source can be regenerated or edited by hand. */
+const EDITING_PAGE = /\/app\/projects\/[^/]+\/(characters|scenes|props|products|episodes|source)(\/|$)/;
 
 interface Props {
   projectName: string | null;
 }
 
 /**
- * Says, on every page of a project, that an automatic run is making its media: regenerating a sheet, a storyboard, a
- * voice or a clip by hand now makes the run redo the work that depends on it. The run's controls (pause, resume) stay
- * together on the overview's status card; the notice links there and holds no control of its own.
+ * Warns, on the pages where media or the source can be changed by hand, that an automatic run is making its media:
+ * regenerating a sheet, a storyboard, a voice or a clip now makes the run redo the work that depends on it. The run's
+ * controls stay together on the overview; the notice links there and holds no control of its own. Elsewhere the
+ * operations summary and the workspace notifications say what the run is doing.
  */
-/** Brings the overview's status card into view and focus once it is on the page (the overview may still be mounting
- * after the navigation; on the overview itself the address does not change, so scrolling is the only response). */
-function showRunControls(tries = 30): void {
-  const card = document.getElementById(RUN_CONTROLS_ID);
-  if (card) {
-    card.scrollIntoView({ behavior: "smooth", block: "center" });
-    card.focus({ preventScroll: true });
-    return;
-  }
-  if (tries > 0) window.setTimeout(() => showRunControls(tries - 1), 50);
-}
-
 export function ActiveRunNotice({ projectName }: Props) {
   const { t } = useTranslation("workflow");
+  // Read to re-render on navigation; the full address decides whether this page edits media.
   const [, setLocation] = useLocation();
-  // The latest run with the project it was read for: a run read for another project is never shown.
-  const [read, setRead] = useState<{ project: string; run: RunSnapshot | null } | null>(null);
-
-  useEffect(() => {
-    if (!projectName) return;
-    let controller = new AbortController();
-    const load = () => {
-      controller.abort();
-      controller = new AbortController();
-      const { signal } = controller;
-      listProductionRuns(projectName, { signal })
-        .then((list) => {
-          if (!signal.aborted) setRead({ project: projectName, run: list.runs[0] ?? null });
-        })
-        .catch(() => {
-          // A notice, not a source of truth: without the run list nothing is shown.
-        });
-    };
-    load();
-    const timer = window.setInterval(load, REFRESH_MS);
-    return () => {
-      window.clearInterval(timer);
-      controller.abort();
-    };
-  }, [projectName]);
-
-  const run = read && read.project === projectName ? read.run : null;
-  if (!projectName || !run || TERMINAL.has(run.status) || STOPPED.has(run.status) || !MAKING_STAGES.has(run.stage)) {
+  const runs = useProjectRuns(projectName);
+  const run = runs?.[0] ?? null;
+  if (
+    !projectName ||
+    !run ||
+    TERMINAL.has(run.status) ||
+    STOPPED.has(run.status) ||
+    !MAKING_STAGES.has(run.stage) ||
+    !EDITING_PAGE.test(window.location.pathname)
+  ) {
     return null;
   }
   const episode = Number((run.targets[0] ?? "episode:0").split(":")[1]) || null;
