@@ -161,4 +161,22 @@ Catalog `docs/r2/R2_CONTENT_FORMS_CATALOG.md`; gap analysis `docs/research/2026-
     - build the corpus (the sponsor runs it with the OpenRouter key);
     - after trial 7's run frees the GPU, qualify the reviewers for `fiction_drama_vi_v2` from the run panel;
     - run the two-character smoke run.
+- 2026-11-17, r2-v2.5.68–2.5.74 (all deployed; 2.5.74 is on production):
+  - Trial 7, episode 2:
+    - A video batch is no longer withheld for one unit's duration tier.
+    - The app deadlocked on the project lock (an event-loop wait under the lock). Fixed.
+    - API calls left pending by a dead worker no longer keep usage unknown.
+    - An unknown usage is re-measured as a new append-only reference (AUTO_PRODUCTION_IMMUTABLE).
+    - Continuity verdicts are kept by frame digest across runs.
+  - UI changes:
+    - autopilot in the header;
+    - run status and pause in the operations summary;
+    - the run banner only on editing pages;
+    - run news in the workspace notifications.
+  - Run d87361b8 rendered episode 2's film at 11:58. Its QUALITY findings are not read yet.
+  - Next steps (phase C):
+    1. The sponsor runs `build_drama.py` with the OpenRouter key.
+    2. Qualify `fiction_drama_vi_v2` from the run panel.
+    3. Run a two-character drama smoke.
+  - Also open: rename episode 2's title, which is "visual_layer_ep02".
 
