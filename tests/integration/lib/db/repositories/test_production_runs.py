@@ -313,6 +313,50 @@ async def test_unknown_usage_does_not_release_run_allocation(concurrent_session_
             await ProductionRunRepository(session).reserve_budget(run=run, intent=second)
 
 
+async def test_an_unknown_usage_is_measured_again_and_replaced_but_a_known_one_is_not(concurrent_session_factory):
+    # trial 7, 2026-11-17: after a crash the MEDIA step settled UNKNOWN (calls a dead worker left pending) and every
+    # resume read that settlement back instead of measuring the finished tasks again
+    from lib.db.repositories.production_runs import ProductionRunConflict, ProductionRunRepository
+    from r2.contracts.automation import UsageReceipt
+
+    factory = concurrent_session_factory
+    await create_run(factory)
+    run = await claim(factory)
+    intent = intent_for(run, "first")
+    async with factory() as session, session.begin():
+        repo = ProductionRunRepository(session)
+        await repo.stage_intent(run=run, intent=intent)
+        reservation = await repo.reserve_budget(run=run, intent=intent)
+
+    def usage(outcome: str, calls: int) -> UsageReceipt:
+        return UsageReceipt(
+            owner="media",
+            receipt_ref="usage-1",
+            digest="sha256:" + "d" * 64,
+            reservation_id=reservation.reservation_id,
+            currency="USD",
+            cost_minor_units=0,
+            model_calls=calls,
+            tasks=calls,
+            runtime_seconds=0,
+            outcome=outcome,
+        )
+
+    async with factory() as session, session.begin():
+        repo = ProductionRunRepository(session)
+        await repo.settle_budget(reservation=reservation, usage=usage("UNKNOWN", 31))
+        assert await repo.settled_usage(reservation) is None
+    async with factory() as session, session.begin():
+        repo = ProductionRunRepository(session)
+        await repo.settle_budget(reservation=reservation, usage=usage("KNOWN", 33))
+        settled = await repo.settled_usage(reservation)
+        assert settled is not None
+        assert (settled.outcome, settled.model_calls) == ("KNOWN", 33)
+    with pytest.raises(ProductionRunConflict, match="COMMAND_REPLAY_CONFLICT"):
+        async with factory() as session, session.begin():
+            await ProductionRunRepository(session).settle_budget(reservation=reservation, usage=usage("KNOWN", 34))
+
+
 async def test_usage_replay_cannot_double_debit_run(concurrent_session_factory):
     from lib.db.repositories.production_runs import ProductionRunRepository
     from r2.contracts.automation import UsageReceipt
