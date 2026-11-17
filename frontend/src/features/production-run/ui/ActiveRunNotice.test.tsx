@@ -35,6 +35,23 @@ describe("ActiveRunNotice", () => {
     expect(control).not.toHaveBeenCalled();
   });
 
+  it("brings the status card into view and focus, also when the overview is already open", async () => {
+    window.history.pushState({}, "", "/app/projects/demo");
+    vi.spyOn(client, "listProductionRuns").mockResolvedValue({ start: {}, runs: [RUN] } as unknown as RunList);
+    const card = document.createElement("div");
+    card.id = "run-controls";
+    card.tabIndex = -1;
+    card.scrollIntoView = vi.fn();
+    document.body.appendChild(card);
+
+    render(<ActiveRunNotice projectName="demo" />);
+    await userEvent.click(await screen.findByRole("button", { name: "查看并控制本次运行" }));
+
+    expect(card.scrollIntoView).toHaveBeenCalled();
+    expect(card).toHaveFocus();
+    card.remove();
+  });
+
   it("says nothing when the run has stopped", async () => {
     const list = vi
       .spyOn(client, "listProductionRuns")

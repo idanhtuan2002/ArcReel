@@ -22,6 +22,8 @@ const REFRESH_MS = 15000;
 /** Stops a new episode plan from the stopped episode on can fix. */
 const PLAN_CODES = new Set(["ADAPTATION_FAILED", "ADAPTATION_INPUT_MISSING"]);
 /** Stops the project's model choices can fix. */
+/** The status card that holds the run's controls; the run banner on every project page leads here. */
+export const RUN_CONTROLS_ID = "run-controls";
 const MODEL_CODES = (code: string) =>
   code === "ADAPTATION_FAILED" || code === "VOICE_CAST_FAILED" || code.startsWith("MEDIA_") || code.startsWith("PROJECT_");
 /** Stops the task list explains. */
@@ -273,7 +275,9 @@ export function ProjectOutcome({ projectName, titles, onOpenDetails }: Props) {
       )}
 
       <div
-        className="rounded-xl px-4 py-3"
+        id={RUN_CONTROLS_ID}
+        tabIndex={-1}
+        className="rounded-xl px-4 py-3 outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-accent-soft)]"
         role={stopped ? "status" : undefined}
         style={{ border: `1px solid ${tone}`, background: "var(--color-hairline-soft)" }}
       >
