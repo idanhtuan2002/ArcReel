@@ -8,6 +8,7 @@ task runtimes of exactly the step's own tasks.
 
 from __future__ import annotations
 
+import logging
 import math
 import uuid
 from typing import Any
@@ -24,6 +25,8 @@ from r2.contracts.automation import BudgetReservation, DispatchIntent, OwnerRece
 from r2.contracts.common import ensure_json_value
 from server.production_run.owner_support import OwnerBlocked, Sessions, current_subject, usage_receipt
 from server.services.automation_grants import RunAutomationAuthority
+
+logger = logging.getLogger(__name__)
 
 ACTIVE = frozenset({"queued", "running", "cancelling"})
 FINISHED = frozenset({"succeeded", "failed", "cancelled"})
@@ -180,9 +183,18 @@ async def tasks_usage(
                 ).scalars()
             )
     cost = 0
+    finished = {task.task_id for task in tasks if task.status in FINISHED}
     for call in calls:
         if call.status == "pending":
-            known = False
+            if call.task_id in finished:
+                # A call left pending by a worker that died mid-call (the app was killed while the task ran) is never
+                # settled; its task's outcome is known, so the call counts with what it recorded rather than keeping
+                # the step's usage unknown forever (trial 7, 2026-11-17: every resume blocked on OUTCOME_UNKNOWN).
+                logger.warning(
+                    "api call %s of finished task %s was left pending; counted as recorded", call.id, call.task_id
+                )
+            else:
+                known = False
         amount = float(call.cost_amount or 0)
         if amount > 0:
             if call.currency != reservation.currency:
