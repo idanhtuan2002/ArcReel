@@ -1,10 +1,11 @@
 """Record a production run's model reviews as M10 Quality evidence, a sealed run and a PASS/REWORK disposition.
 
-Each qualified reviewer contributes one MODEL narrative observation per slot of the project's published automatic
-profile; the M10 run is sealed by ``QualityRunService`` and the disposition issued by ``DispositionService``, both
+Each configured reviewer (ADR-0169) contributes one MODEL narrative observation per slot of the project's published
+automatic profile; the M10 run is sealed by ``QualityRunService`` and the disposition issued by ``DispositionService``, both
 under the run's automation authority, which is re-required inside their own transactions. Identities are derived
 from the step command, so a replay returns the same observations, run and disposition instead of new ones.
-Nothing here can WAIVE, and an observation from a reviewer whose qualification no longer stands is never admitted.
+Nothing here can WAIVE. An observation names its reviewer by a configured-route attestation over model identity,
+route configuration and review method, recomputed whenever the evidence is read.
 """
 
 from __future__ import annotations
@@ -21,9 +22,14 @@ from lib.db.repositories.quality import QualityProfileRepository
 from lib.db.repositories.quality_dispositions import QualityDispositionRepository
 from lib.db.repositories.quality_runs import QualityRunRepository
 from r2.artifact_identity import episode_video_key
-from r2.automation.assessment import AssessmentVerdict, ModelAssessment
+from r2.automation.assessment import (
+    CONFIGURED_REVIEWER_REF,
+    AssessmentVerdict,
+    ModelAssessment,
+    configured_reviewer_digest,
+)
 from r2.automation.identity import digest_value
-from r2.contracts.automation import AuthorizationSubject, DispatchIntent, OwnerReceipt, ReviewerQualification
+from r2.contracts.automation import AuthorizationSubject, DispatchIntent, ModelRoute, OwnerReceipt
 from r2.contracts.common import ensure_json_value
 from r2.quality.digests import compute_digest
 from r2.quality.runs import run_digest
@@ -74,8 +80,7 @@ def _observations(
     profile: q.QualityProfileRevision,
     subject_digest: str,
     assessments: tuple[ModelAssessment, ...],
-    qualifications: dict[str, ReviewerQualification],
-    qualification_digests: dict[str, str],
+    reviewers: dict[str, ModelRoute],
 ) -> list[q.NarrativeObservation]:
     slots = [
         (requirement.requirement_id, slot)
@@ -87,11 +92,12 @@ def _observations(
         raise OwnerBlocked("PROFILE_MODEL_ASSESSMENT_INCOMPLETE")
     observations = []
     for review in assessments:
-        record = qualifications.get(review.model_identity)
-        if record is None:
-            raise OwnerBlocked("REVIEWER_NOT_QUALIFIED")
-        if review.prompt_digest != record.prompt_digest:
-            raise OwnerBlocked("REVIEWER_PROMPT_NOT_QUALIFIED")
+        route = reviewers.get(review.model_identity)
+        if route is None:
+            raise OwnerBlocked("REVIEWER_NOT_CONFIGURED")
+        attestation = configured_reviewer_digest(
+            model_identity=route.model_identity, config_digest=route.config_digest, prompt_digest=review.prompt_digest
+        )
         for requirement_id, slot in slots:
             key = f"{seed}:{review.model_identity}:{requirement_id}:{slot.slot_id}"
             findings = tuple(
@@ -113,13 +119,13 @@ def _observations(
                     observation_type=q.ObservationType.NARRATIVE,
                     requirement_id=requirement_id,
                     slot_id=slot.slot_id,
-                    assessor_identity=record.model_identity,
+                    assessor_identity=route.model_identity,
                     assessor_version=review.prompt_digest,
-                    assessor_qualification_ref=qualification_digests[review.model_identity],
-                    assessor_qualification_digest=qualification_digests[review.model_identity],
-                    independence_group="model:" + record.model_identity,
+                    assessor_qualification_ref=CONFIGURED_REVIEWER_REF,
+                    assessor_qualification_digest=attestation,
+                    independence_group="model:" + route.model_identity,
                     producer_conflict=False,
-                    config_digest=record.config_digest,
+                    config_digest=route.config_digest,
                     subject_digest=subject_digest,
                     status=q.ObservationStatus.PASS if review.accepts() else q.ObservationStatus.FAIL,
                     findings=findings,
@@ -149,8 +155,7 @@ async def record_quality(
     profile_digest: str,
     assessments: tuple[ModelAssessment, ...],
     verdict: AssessmentVerdict,
-    qualifications: dict[str, ReviewerQualification],
-    qualification_digests: dict[str, str],
+    reviewers: dict[str, ModelRoute],
 ) -> OwnerReceipt:
     """The episode's M10 disposition receipt; PASS only when the sealed M10 run supports it."""
     if verdict.kind not in {"PASS", "REWORK"}:
@@ -182,8 +187,7 @@ async def record_quality(
         profile=profile,
         subject_digest=m10_subject,
         assessments=assessments,
-        qualifications=qualifications,
-        qualification_digests=qualification_digests,
+        reviewers=reviewers,
     )
     async with sessions() as session, session.begin():
         await authority.require_locked(session, subject=principal_subject)

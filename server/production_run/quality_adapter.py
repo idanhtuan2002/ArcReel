@@ -21,7 +21,6 @@ from pathlib import Path
 from typing import Any
 
 from lib.db.repositories.production_runs import ProductionRunRepository
-from lib.db.repositories.reviewer_qualifications import ReviewerQualificationRepository, qualification_digest
 from lib.project_manager import ProjectManager
 from lib.script_cast import unlisted_cast
 from r2.automation.assessment import AssessmentVerdict, ModelAssessment, combine
@@ -32,7 +31,6 @@ from r2.contracts.automation import (
     DispatchIntent,
     ModelRoute,
     OwnerReceipt,
-    ReviewerQualification,
     RunSnapshot,
     RunStage,
     StageOutcome,
@@ -142,8 +140,8 @@ class QualityAdapter:
         if any(review is None for review in reviews.values()):
             await self._start(intent, receipt.digest, run, targets)
             return outcome(intent, "WAIT", owner_state="REVIEWING")
-        records = await self._qualified_records(run)
-        identities = frozenset(records)
+        reviewers = self._reviewer_routes(run)
+        identities = frozenset(reviewers)
         writers = frozenset(r.model_identity for r in run.policy.routes if r.role in {"writer", "script"})
         verdicts: dict[int, AssessmentVerdict] = {}
         for episode, evidence in targets.items():
@@ -153,7 +151,7 @@ class QualityAdapter:
                 subject_digest=evidence.subject_digest,
                 language=run.policy.language,
                 writer_identities=writers,
-                qualified_identities=identities,
+                reviewer_identities=identities,
             )
         recording = run.policy.quality_gate == "record"
         if recording:
@@ -171,7 +169,7 @@ class QualityAdapter:
             raise OwnerBlocked(blocked[0].reason or "REQUIRED_EVIDENCE_MISSING")
         project_root = self._projects.get_project_path(run.project_name)
         try:
-            dispositions = await self._record(intent, receipt, run, project_root, targets, reviews, verdicts, records)
+            dispositions = await self._record(intent, receipt, run, project_root, targets, reviews, verdicts, reviewers)
         except M10Error:
             raise OwnerBlocked("QUALITY_EVIDENCE_REFUSED") from None
         reworks = [v for v in verdicts.values() if v.kind == "REWORK"]
@@ -226,7 +224,7 @@ class QualityAdapter:
         targets: dict[int, FinalEvidence],
         reviews: dict[int, tuple[ModelAssessment, ...] | None],
         verdicts: dict[int, AssessmentVerdict],
-        records: dict[str, tuple[ReviewerQualification, str]],
+        reviewers: dict[str, ModelRoute],
     ) -> dict[int, OwnerReceipt]:
         """Each target's M10 disposition receipt, issued from its sealed M10 run."""
         return {
@@ -241,8 +239,7 @@ class QualityAdapter:
                 profile_digest=run.policy.profile_digest,
                 assessments=reviews[episode] or (),
                 verdict=verdicts[episode],
-                qualifications={identity: record for identity, (record, _) in records.items()},
-                qualification_digests={identity: digest for identity, (_, digest) in records.items()},
+                reviewers=reviewers,
             )
             for episode in sorted(targets)
         }
@@ -338,27 +335,10 @@ class QualityAdapter:
             found.append(review)
         return tuple(found)
 
-    async def _qualified_records(self, run: RunSnapshot) -> dict[str, tuple[ReviewerQualification, str]]:
-        """The run's reviewer routes that hold a current qualification of the profile scope, by model identity."""
-        async with self._sessions() as session:
-            records = await ReviewerQualificationRepository(session).qualified(
-                profile_digest=run.policy.profile_digest,
-                launch_profile_id=run.policy.launch_profile_id,
-                language=run.policy.language,
-            )
-        routes = {r.role: r for r in run.policy.routes}
-        found: dict[str, tuple[ReviewerQualification, str]] = {}
-        for record in records:
-            for role in REVIEWER_ROLES:
-                route = routes.get(role)
-                if route is not None and (
-                    record.provider_id,
-                    record.model_id,
-                    record.model_identity,
-                    record.config_digest,
-                ) == (route.provider_id, route.model_id, route.model_identity, route.config_digest):
-                    found[record.model_identity] = (record, qualification_digest(record))
-        return found
+    @staticmethod
+    def _reviewer_routes(run: RunSnapshot) -> dict[str, ModelRoute]:
+        """The run's reviewer routes by model identity; they are trusted by configuration (ADR-0169)."""
+        return {route.model_identity: route for route in run.policy.routes if route.role in REVIEWER_ROLES}
 
     async def _start(
         self, intent: DispatchIntent, subject_digest: str, run: RunSnapshot, targets: dict[int, FinalEvidence]

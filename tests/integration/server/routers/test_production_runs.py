@@ -713,10 +713,10 @@ async def test_a_succeeded_runs_archive_downloads_only_verified_and_only_in_its_
                 ],
             },
         ),
-        ("POST", "automation/qualification/reviewers", None),
+        ("POST", "automation/qualification/media", None),
         ("POST", "automation/qualification/launch", None),
     ],
-    ids=["settings", "reviewer-qualification", "launch-qualification"],
+    ids=["settings", "media-probes", "launch-qualification"],
 )
 async def test_setup_and_qualification_need_the_projects_showrunner(host, method, path, body):
     stranger = {"Authorization": f"Bearer {auth.create_token('intruder')}"}

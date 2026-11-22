@@ -25,17 +25,17 @@ def _review(identity: str, **changes) -> ModelAssessment:
     )
 
 
-def _combine(*reviews, writers=frozenset({"writer"}), qualified=frozenset({"a", "b"})):
+def _combine(*reviews, writers=frozenset({"writer"}), reviewers=frozenset({"a", "b"})):
     return combine(
         assessments=reviews,
         subject_digest=SUBJECT,
         language="vi",
         writer_identities=writers,
-        qualified_identities=qualified,
+        reviewer_identities=reviewers,
     )
 
 
-def test_two_qualified_accepting_reviews_pass():
+def test_two_configured_accepting_reviews_pass():
     assert _combine(_review("a"), _review("b")).kind == "PASS"
 
 
@@ -46,7 +46,7 @@ def test_two_qualified_accepting_reviews_pass():
         ((_review("a"), _review("b", outcome="FAILED")), "ASSESSOR_FAILED"),
         ((_review("a"), _review("a")), "REVIEWER_INDEPENDENCE_MISSING"),
         ((_review("a"), _review("writer")), "REVIEWER_INDEPENDENCE_MISSING"),
-        ((_review("a"), _review("c")), "REVIEWER_NOT_QUALIFIED"),
+        ((_review("a"), _review("c")), "REVIEWER_NOT_CONFIGURED"),
         ((_review("a"), _review("b", subject_digest="sha256:" + "9" * 64)), "ASSESSMENT_STALE"),
         ((_review("a"), _review("b", language="zh")), "WRONG_LANGUAGE"),
         ((_review("a"), _review("b", scores={"story": 5})), "ASSESSMENT_INCOMPLETE"),
@@ -71,3 +71,14 @@ def test_critical_rejection_without_a_repair_target_fails_and_is_never_waived():
     critical = AssessmentFinding(code="UNSAFE", severity="CRITICAL", unit_key="episode:1")
     verdict = _combine(_review("a", findings=(critical,)), _review("b", findings=(critical,)))
     assert (verdict.kind, verdict.reason) == ("BLOCK", "FAILED_QUALITY")
+
+
+def test_a_configured_reviewer_is_attested_by_its_model_route_and_method():
+    from r2.automation.assessment import configured_reviewer_digest
+
+    base = {"model_identity": "a", "config_digest": "sha256:" + "5" * 64, "prompt_digest": "sha256:" + "6" * 64}
+    digest = configured_reviewer_digest(**base)
+
+    assert digest == configured_reviewer_digest(**base)
+    for field in base:
+        assert configured_reviewer_digest(**{**base, field: base[field] + "x"}) != digest

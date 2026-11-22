@@ -1,7 +1,7 @@
 """Record a project's launch qualification once every other automatic-production prerequisite already holds.
 
-The release owner runs this after the project's automatic Quality profile is published and both reviewer routes are
-qualified (``qualify_reviewers.py --record``). ``--evidence`` is the host's media-route qualification record for the
+The release owner runs this after the project's automatic Quality profile is published and its two reviewer routes are
+configured (reviewers are trusted by configuration, ADR-0169). ``--evidence`` is the host's media-route qualification record for the
 launch profile's image, video and audio routes. It resolves the policy a run would freeze, runs the real preflight,
 and refuses unless the only blocking reason is the missing launch qualification. The record binds the project, launch
 profile, profile digest, route digests and the project's declared resource envelope; the evidence file is named and

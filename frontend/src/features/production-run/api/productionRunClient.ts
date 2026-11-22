@@ -104,13 +104,6 @@ export function getQualification(projectName: string, options: CallOptions = {})
   });
 }
 
-export function startReviewerQualification(projectName: string): Promise<QualificationStatus> {
-  return API.request<QualificationStatus>(
-    `/projects/${encodeURIComponent(projectName)}/automation/qualification/reviewers`,
-    { method: "POST" },
-  );
-}
-
 export function startMediaProbes(projectName: string): Promise<QualificationStatus> {
   return API.request<QualificationStatus>(
     `/projects/${encodeURIComponent(projectName)}/automation/qualification/media`,

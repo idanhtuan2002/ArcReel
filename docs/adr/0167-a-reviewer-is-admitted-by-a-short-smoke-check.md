@@ -1,5 +1,5 @@
 ---
-status: accepted
+status: superseded by ADR-0169
 ---
 
 # A reviewer is admitted by a short smoke check, not a labeled 40-film corpus

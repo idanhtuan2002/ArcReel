@@ -6,7 +6,6 @@ import {
   getQualification,
   recordLaunchQualification,
   startMediaProbes,
-  startReviewerQualification,
 } from "../api/productionRunClient";
 import type { MediaRouteStatus, QualificationStatus } from "../api/types";
 import { HelpHint } from "@/components/ui/HelpHint";
@@ -17,13 +16,13 @@ const LINK_CLS =
 
 interface Props {
   projectName: string;
-  /** Called after a reviewer job ends or the launch is recorded, so readiness is checked again. */
+  /** Called after a probe job ends or the launch is recorded, so readiness is checked again. */
   onChanged?: () => void;
 }
 
 /**
- * Qualify the project's reviewer routes on this host's labeled corpus and record the launch, then follow the jobs.
- * Read when opened; polled only while a reviewer job runs.
+ * Probe media routes outside the launch profile and record the launch, then follow the jobs. Reviewers are trusted by
+ * configuration and have no qualification (ADR-0169). Read when opened; polled only while a probe job runs.
  */
 export function AutomationQualification({ projectName, onChanged }: Props) {
   const { t } = useTranslation("workflow");
@@ -49,9 +48,7 @@ export function AutomationQualification({ projectName, onChanged }: Props) {
   }, [projectName, refusal]);
 
   const media = status?.media ?? [];
-  const running =
-    (status?.reviewers.some((reviewer) => reviewer.job?.state === "running") ?? false) ||
-    media.some((route) => route.job?.state === "running");
+  const running = media.some((route) => route.job?.state === "running");
   const unprobed = media.some((route) => !route.profile_route && route.probe?.passed !== true);
   useEffect(() => {
     if (!open || !running) return;
@@ -64,18 +61,6 @@ export function AutomationQualification({ projectName, onChanged }: Props) {
     if (wasRunning.current && !running) onChanged?.();
     wasRunning.current = running;
   }, [running, onChanged]);
-
-  const startReviewers = async () => {
-    setBusy(true);
-    setMessage(null);
-    try {
-      setStatus(await startReviewerQualification(projectName));
-    } catch (cause) {
-      setMessage({ ok: false, text: refusal(cause) });
-    } finally {
-      setBusy(false);
-    }
-  };
 
   const probeMedia = async () => {
     setBusy(true);
@@ -139,35 +124,6 @@ export function AutomationQualification({ projectName, onChanged }: Props) {
       <div className="mt-1 space-y-1.5">
         {status && (
           <>
-            {status.reviewers.length === 0 && (
-              <p style={{ color: "var(--color-text-3)" }}>{t("auto_qual_no_routes")}</p>
-            )}
-            <ul className="m-0 list-none space-y-1 p-0">
-              {status.reviewers.map((reviewer) => (
-                <li key={reviewer.role}>
-                  <span style={{ color: "var(--color-text-2)" }}>
-                    {t(`auto_role_${reviewer.role}`, { defaultValue: reviewer.role })}
-                  </span>{" "}
-                  <span className="font-mono text-[11px]" style={{ color: "var(--color-text-3)" }}>
-                    {reviewer.model_identity.split("@")[0]}
-                  </span>{" "}
-                  <span
-                    style={{ color: reviewer.qualified ? "var(--color-accent-2)" : SEVERITY_TONES.warnings.color }}
-                  >
-                    {reviewer.qualified ? t("auto_qual_qualified") : t("auto_qual_not_qualified")}
-                  </span>
-                  {reviewer.job && (
-                    <span className="ml-2" style={{ color: "var(--color-text-3)" }}>
-                      {reviewer.job.state === "running"
-                        ? t("auto_qual_job_running", { done: reviewer.job.done, total: reviewer.job.total || "…" })
-                        : reviewer.job.state === "failed"
-                          ? t("auto_qual_job_failed", { error: reviewer.job.error ?? "" })
-                          : t("auto_qual_job_done", { done: reviewer.job.done })}
-                    </span>
-                  )}
-                </li>
-              ))}
-            </ul>
             {media.length > 0 && (
               <ul className="m-0 list-none space-y-1 p-0">
                 {media.map((route) => {
@@ -191,23 +147,15 @@ export function AutomationQualification({ projectName, onChanged }: Props) {
             <p style={{ color: status.launch_recorded ? "var(--color-accent-2)" : "var(--color-text-3)" }}>
               {status.launch_recorded ? t("auto_qual_launch_ok") : t("auto_qual_launch_missing")}
             </p>
-            {!status.corpus_configured && (
-              <p style={{ color: SEVERITY_TONES.warnings.color }}>{t("auto_qual_no_corpus")}</p>
+            {unprobed && !status.receipts_configured && (
+              <p style={{ color: SEVERITY_TONES.warnings.color }}>{t("auto_qual_no_receipts")}</p>
             )}
             <div className="flex flex-wrap gap-3">
-              <button
-                type="button"
-                className={LINK_CLS}
-                disabled={busy || running || !status.corpus_configured || status.reviewers.length === 0}
-                onClick={() => void startReviewers()}
-              >
-                {t("auto_qual_start_reviewers")}
-              </button>
               {unprobed && (
                 <button
                   type="button"
                   className={LINK_CLS}
-                  disabled={busy || running || !status.corpus_configured}
+                  disabled={busy || running || !status.receipts_configured}
                   onClick={() => void probeMedia()}
                 >
                   {t("auto_qual_start_media")}

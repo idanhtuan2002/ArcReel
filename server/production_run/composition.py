@@ -2,8 +2,8 @@
 
 Nothing here activates production. ``compose_production`` builds the parts; the app wires them only when
 ``ARCREEL_AUTOMATIC_PRODUCTION=1`` is set at the release gate, and even then every Start passes the read-only
-preflight, which refuses until the launch profile, its published Quality profile and both reviewer routes are
-qualified. A project opts in through its ``automation`` settings (profile and model roles); without them no policy
+preflight, which refuses until the launch profile and its published Quality profile are qualified and two distinct
+reviewer routes are configured (reviewers are trusted by configuration, ADR-0169). A project opts in through its ``automation`` settings (profile and model roles); without them no policy
 resolves.
 """
 
@@ -23,7 +23,6 @@ from lib.config.resolver import ConfigResolver, video_bucket_for_generation_mode
 from lib.db.models.quality import QualityProfileHeadModel
 from lib.db.repositories.launch_qualifications import LaunchQualificationRepository
 from lib.db.repositories.quality import QualityProfileRepository
-from lib.db.repositories.reviewer_qualifications import ReviewerQualificationRepository
 from lib.episode_target_duration import project_episode_target_duration
 from lib.face_identity import FACE_JUDGE_IDENTITY, face_identity_from_env
 from lib.generation_resources import device_admission_configured
@@ -282,11 +281,6 @@ class HostPreflightReader:
     async def read(self, *, user_id: str, project_name: str, policy: RunPolicy) -> PreflightSnapshot:
         project = self._projects.load_project(project_name)
         async with self._sessions() as session:
-            qualifications = await ReviewerQualificationRepository(session).qualified(
-                profile_digest=policy.profile_digest,
-                launch_profile_id=policy.launch_profile_id,
-                language=policy.language,
-            )
             launch = await LaunchQualificationRepository(session).current(
                 user_id=user_id, project_name=project_name, launch_profile_id=policy.launch_profile_id
             )
@@ -303,7 +297,6 @@ class HostPreflightReader:
             language=policy.language,
             routes=routes,
             profile=profile,
-            qualifications=qualifications,
             launch_qualification=launch,
             media_route_probes=passed_probes(receipts_dir(), routes),
             voice_available=await self._policies.voice_available(project_name),

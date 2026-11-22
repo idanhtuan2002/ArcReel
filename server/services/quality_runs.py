@@ -31,6 +31,7 @@ from lib.db.repositories.quality_runs import QualityRunRepository, RunCommandKey
 from lib.db.repositories.reviewer_qualifications import ReviewerQualificationRepository
 from r2.advanced_creative.digests import canonical_json_bytes
 from r2.advanced_creative.exploration import uuid7
+from r2.automation.assessment import CONFIGURED_REVIEWER_REF, configured_reviewer_digest
 from r2.contracts.artifact_metadata import R2ArtifactMetadata
 from r2.governance.grant_transition import GrantScopeV1
 from r2.host_hardening.master_resolver import DatabaseMasterResolver, MasterDivergedError
@@ -185,6 +186,30 @@ async def _grant(reader: CheckpointedShowrunnerGrantReader, session: AsyncSessio
     except ShowrunnerGrantUnavailableError:
         raise RequiredEvidenceMissingError() from None
     return event.event_digest
+
+
+async def _reviewer_attested(session: AsyncSession, observation: q.NarrativeObservation, stored_digest: str) -> bool:
+    """A model observation's reviewer: a configured route whose attestation recomputes (ADR-0169), or, for evidence
+    recorded before that decision, the reviewer qualification it names."""
+    if observation.assessor_qualification_digest != stored_digest:
+        return False
+    if observation.assessor_qualification_ref == CONFIGURED_REVIEWER_REF:
+        return (
+            stored_digest
+            == configured_reviewer_digest(
+                model_identity=observation.assessor_identity,
+                config_digest=observation.config_digest,
+                prompt_digest=observation.assessor_version,
+            )
+            and observation.independence_group == "model:" + observation.assessor_identity
+        )
+    qualification = await ReviewerQualificationRepository(session).current(stored_digest)
+    return (
+        qualification is not None
+        and (observation.assessor_identity, observation.config_digest, observation.assessor_version)
+        == (qualification.model_identity, qualification.config_digest, qualification.prompt_digest)
+        and observation.independence_group == "model:" + qualification.model_identity
+    )
 
 
 def _same_profile(profile: q.QualityProfileRevision, profile_id: str, revision: int, digest: str) -> bool:
@@ -368,16 +393,10 @@ async def _admit(
             user_id=user_id, project_name=project_name, observation_id=binding.observation_id
         )
     ):
-        qualification = await ReviewerQualificationRepository(session).current(model.qualification_digest)
         observation = model.observation
-        if (
-            not _same_profile(profile, model.profile_id, model.profile_revision, model.profile_digest)
-            or qualification is None
-            or observation.assessor_qualification_digest != model.qualification_digest
-            or (observation.assessor_identity, observation.config_digest, observation.assessor_version)
-            != (qualification.model_identity, qualification.config_digest, qualification.prompt_digest)
-            or observation.independence_group != "model:" + qualification.model_identity
-        ):
+        if not _same_profile(
+            profile, model.profile_id, model.profile_revision, model.profile_digest
+        ) or not await _reviewer_attested(session, observation, model.qualification_digest):
             raise RequiredEvidenceMissingError()
         digest = model.digest
         admitted = AdmittedObservation(observation, q.AssessorClass.MODEL)

@@ -391,12 +391,3 @@ def test_the_review_form_follows_the_launch_profile():
 
     assert review_form("fiction_drama_vi_v2") == "drama"
     assert review_form("fiction_narration_vi_v1") == "narration"
-
-
-def test_a_drama_reviewer_is_qualified_on_its_own_corpus():
-    from server.production_run.qualification_jobs import corpus_env
-
-    assert corpus_env("vi") == "ARCREEL_REVIEWER_CORPUS"
-    assert corpus_env("en") == "ARCREEL_REVIEWER_CORPUS_EN"
-    assert corpus_env("vi", "drama") == "ARCREEL_REVIEWER_CORPUS_DRAMA"
-    assert corpus_env("en", "drama") == "ARCREEL_REVIEWER_CORPUS_EN_DRAMA"

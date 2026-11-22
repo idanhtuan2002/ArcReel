@@ -563,7 +563,6 @@ class PreflightSnapshot(AutomationContract):
     language: ExactIdentity
     routes: tuple[ModelRoute, ...]
     profile: QualityProfileRevision | None
-    qualifications: tuple[ReviewerQualification, ...]
     launch_qualification: LaunchQualification | None = None
     #: Route digests of image, video and audio routes whose host media probe passed (``media_probe``).
     media_route_probes: frozenset[Digest] = frozenset()

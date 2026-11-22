@@ -274,7 +274,7 @@ export interface AutomationSettingsUpdate {
   max_target_episodes: number;
 }
 
-export interface ReviewerJob {
+export interface ProbeJob {
   role: string;
   model_identity: string;
   state: "running" | "done" | "failed";
@@ -285,11 +285,11 @@ export interface ReviewerJob {
   started_at: string;
 }
 
-/** Whether each reviewer route and the launch are qualified, and reviewer jobs running on this host. */
+/** Whether the launch is recorded and which media routes are probed, with probe jobs running on this host. */
 export interface QualificationStatus {
-  corpus_configured: boolean;
+  /** The host keeps media probe receipts (``ARCREEL_REVIEWER_RECEIPTS``). Reviewers have no qualification. */
+  receipts_configured: boolean;
   evidence_configured: boolean;
-  reviewers: { role: string; model_identity: string; qualified: boolean; job: ReviewerJob | null }[];
   launch_recorded: boolean;
   /** Image, video and audio routes: the launch profile's own, or admitted by a passed host probe. */
   media?: MediaRouteStatus[];
@@ -301,5 +301,5 @@ export interface MediaRouteStatus {
   model_id: string;
   profile_route: boolean;
   probe: { passed: boolean; problem: string | null; error: string | null; recorded_at: string } | null;
-  job: ReviewerJob | null;
+  job: ProbeJob | null;
 }

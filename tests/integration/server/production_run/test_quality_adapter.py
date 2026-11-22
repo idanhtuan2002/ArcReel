@@ -1,4 +1,4 @@
-"""Rendered, mastered finals reviewed by two qualified model reviewers through the real controller."""
+"""Rendered, mastered finals reviewed by the run's two configured model reviewers through the real controller."""
 
 from __future__ import annotations
 
@@ -13,10 +13,9 @@ from lib.db.models.quality_dispositions import QualityDispositionModel
 from lib.db.repositories.model_observations import ModelObservationRepository
 from lib.db.repositories.production_runs import ProductionRunRepository
 from lib.db.repositories.quality_dispositions import QualityDispositionRepository
-from lib.db.repositories.reviewer_qualifications import ReviewerQualificationRepository
 from r2.automation.assessment import AssessmentFinding, ModelAssessment
 from r2.automation.authorization import automation_principal
-from r2.contracts.automation import QualificationCase, ReviewerQualification, RunStage, RunStatus
+from r2.contracts.automation import RunStage, RunStatus
 from server.production_run.controller import ProductionController
 from server.production_run.final_master_adapter import FinalMasterAdapter
 from server.production_run.packaging_adapter import ExportAdapter, PackagingAdapter
@@ -95,36 +94,6 @@ class Reviewer:
         )
 
 
-def _qualification(route, host) -> ReviewerQualification:
-    cases = [
-        QualificationCase(
-            split=split,
-            label=label,
-            accepted=label == "CLEAN",
-            case_digest="sha256:" + f"{index:064x}",
-            receipt_ref=f"case-{index}",
-            receipt_digest="sha256:" + f"{index:064x}",
-        )
-        for index, (split, label) in enumerate(
-            (split, label)
-            for split in ("CALIBRATION", "HOLDOUT")
-            for label in ("CLEAN", "CRITICAL_DEFECT")
-            for _ in range(10)
-        )
-    ]
-    return ReviewerQualification(
-        profile_digest=host.run.policy.profile_digest,
-        launch_profile_id="fiction_narration_vi_v1",
-        language="vi",
-        provider_id=route.provider_id,
-        model_id=route.model_id,
-        model_identity=route.model_identity,
-        config_digest=route.config_digest,
-        prompt_digest="sha256:" + "3" * 64,
-        cases=tuple(cases),
-    )
-
-
 @pytest.fixture
 async def quality_host(story_host: Host):
     host = story_host
@@ -182,16 +151,8 @@ async def _review(host, controller, quality):
     return await _tick(host, controller)
 
 
-async def _qualify(host):
-    async with host.sessions() as session, session.begin():
-        for route in host.run.policy.routes:
-            if route.role in {"reviewer_a", "reviewer_b"}:
-                await ReviewerQualificationRepository(session).record(_qualification(route, host))
-
-
-async def test_two_qualified_accepting_reviews_pass_the_final(quality_host):
+async def test_two_configured_accepting_reviews_pass_the_final(quality_host):
     host, controller, render, quality, reviewer = quality_host
-    await _qualify(host)
     await _to_quality(host, controller, render)
 
     passed = await _review(host, controller, quality)
@@ -219,7 +180,6 @@ async def test_a_replayed_observation_keeps_its_first_recording_and_other_change
     import r2.contracts.quality as q
 
     host, controller, render, quality, _reviewer = quality_host
-    await _qualify(host)
     await _to_quality(host, controller, render)
     await _review(host, controller, quality)
     async with host.sessions() as session:
@@ -257,7 +217,6 @@ async def _profile(host, row):
 
 async def test_reviewer_exception_never_passes_quality(quality_host):
     host, controller, render, quality, reviewer = quality_host
-    await _qualify(host)
     reviewer.answers["reviewer_b"] = {"outcome": "FAILED", "language": None, "scores": {}}
     await _to_quality(host, controller, render)
 
@@ -273,29 +232,19 @@ async def test_reviewer_exception_never_passes_quality(quality_host):
     assert list(root.rglob("quality/*.reviewer_a.json"))
 
 
-async def test_unqualified_reviewers_cannot_pass(quality_host):
-    host, controller, render, quality, _reviewer = quality_host
-    await _to_quality(host, controller, render)
-
-    blocked = await _review(host, controller, quality)
-
-    assert (blocked.stage, blocked.reason) == (RunStage.QUALITY, "REVIEWER_NOT_QUALIFIED")
-
-
-async def test_a_review_asked_with_an_unqualified_prompt_cannot_pass(quality_host):
+async def test_a_review_by_a_model_that_is_not_a_reviewer_route_cannot_pass(quality_host):
+    """Reviewers are trusted by configuration (ADR-0169): only the run's own reviewer routes count."""
     host, controller, render, quality, reviewer = quality_host
-    await _qualify(host)
-    reviewer.answers["reviewer_a"] = {"prompt_digest": "sha256:" + "9" * 64}
+    reviewer.answers["reviewer_a"] = {"model_identity": "stranger"}
     await _to_quality(host, controller, render)
 
     blocked = await _review(host, controller, quality)
 
-    assert (blocked.stage, blocked.reason) == (RunStage.QUALITY, "REVIEWER_PROMPT_NOT_QUALIFIED")
+    assert (blocked.stage, blocked.reason) == (RunStage.QUALITY, "REVIEWER_NOT_CONFIGURED")
 
 
 async def test_both_rejecting_rework_exactly_the_named_stage(quality_host, monkeypatch):
     host, controller, render, quality, reviewer = quality_host
-    await _qualify(host)
     finding = AssessmentFinding(code="AUDIO_DRIFT", severity="MAJOR", unit_key="episode:1", repair_stage=RunStage.MEDIA)
     for role in ("reviewer_a", "reviewer_b"):
         reviewer.answers[role] = {"scores": {**GOOD, "audio": 2}, "findings": [finding.model_dump()]}
@@ -312,7 +261,6 @@ async def test_both_rejecting_rework_exactly_the_named_stage(quality_host, monke
 
 async def test_a_passed_final_is_packaged_exported_and_the_run_succeeds(quality_host):
     host, controller, render, quality, _reviewer = quality_host
-    await _qualify(host)
     await _to_quality(host, controller, render)
     await _review(host, controller, quality)
 
@@ -346,7 +294,6 @@ async def test_a_passed_final_is_packaged_exported_and_the_run_succeeds(quality_
 
 async def test_a_substituted_archive_prevents_run_success(quality_host):
     host, controller, render, quality, _reviewer = quality_host
-    await _qualify(host)
     await _to_quality(host, controller, render)
     await _review(host, controller, quality)
     packaged = await _tick(host, controller)
@@ -368,7 +315,6 @@ async def test_a_recording_gate_exports_a_rejected_final_with_its_rework_disposi
     import zipfile
 
     host, controller, render, quality, reviewer = quality_host
-    await _qualify(host)
     finding = AssessmentFinding(code="AUDIO_DRIFT", severity="MAJOR", unit_key="episode:1", repair_stage=RunStage.MEDIA)
     for role in ("reviewer_a", "reviewer_b"):
         reviewer.answers[role] = {"scores": {**GOOD, "audio": 2}, "findings": [finding.model_dump()]}
@@ -390,11 +336,76 @@ async def test_a_recording_gate_exports_a_rejected_final_with_its_rework_disposi
 
 @RECORDING
 async def test_a_recording_gate_still_blocks_missing_evidence(quality_host, monkeypatch):
-    host, controller, render, quality, _reviewer = quality_host
+    host, controller, render, quality, reviewer = quality_host
+    reviewer.answers["reviewer_a"] = {"model_identity": "stranger"}
     await _to_quality(host, controller, render)
 
     blocked = await _review(host, controller, quality)
 
     assert blocked.status is not RunStatus.SUCCEEDED
     assert blocked.stage is RunStage.QUALITY
-    assert blocked.reason == "REVIEWER_NOT_QUALIFIED"
+    assert blocked.reason == "REVIEWER_NOT_CONFIGURED"
+
+
+async def test_a_model_observation_is_attested_by_its_configured_route_and_an_older_one_by_its_qualification(
+    quality_host,
+):
+    """ADR-0169: new evidence names the configured reviewer route; evidence recorded under a reviewer qualification
+    before that decision is still verified against it."""
+    import r2.contracts.quality as q
+    from lib.db.repositories.reviewer_qualifications import ReviewerQualificationRepository
+    from r2.automation.assessment import CONFIGURED_REVIEWER_REF
+    from r2.contracts.automation import QualificationCase, ReviewerQualification
+    from server.services.quality_runs import _reviewer_attested
+
+    host, controller, render, quality, _reviewer = quality_host
+    await _to_quality(host, controller, render)
+    await _review(host, controller, quality)
+    async with host.sessions() as session:
+        row = (await session.execute(sa.select(ModelObservationModel))).scalars().first()
+        assert row is not None
+        stored = q.NarrativeObservation.model_validate_json(row.observation_json)
+        assert stored.assessor_qualification_ref == CONFIGURED_REVIEWER_REF
+        assert await _reviewer_attested(session, stored, row.qualification_digest)
+        moved = stored.model_copy(update={"config_digest": "sha256:" + "9" * 64})
+        assert not await _reviewer_attested(session, moved, row.qualification_digest)
+
+    cases = tuple(
+        QualificationCase(
+            split="SMOKE",
+            label=label,
+            accepted=label == "CLEAN",
+            case_digest="sha256:" + f"{i:064x}",
+            receipt_ref=f"case-{i}",
+            receipt_digest="sha256:" + f"{i + 100:064x}",
+        )
+        for i, label in enumerate(("CLEAN", "CRITICAL_DEFECT", "CRITICAL_DEFECT", "CRITICAL_DEFECT"))
+    )
+    record = ReviewerQualification(
+        profile_digest=row.profile_digest,
+        launch_profile_id="fiction_narration_vi_v1",
+        language="vi",
+        provider_id="local",
+        model_id="old-reviewer",
+        model_identity="old-reviewer@v1",
+        config_digest="sha256:" + "7" * 64,
+        prompt_digest="sha256:" + "8" * 64,
+        cases=cases,
+    )
+    async with host.sessions() as session, session.begin():
+        digest = await ReviewerQualificationRepository(session).record(record)
+    older = stored.model_copy(
+        update={
+            "assessor_identity": record.model_identity,
+            "config_digest": record.config_digest,
+            "assessor_version": record.prompt_digest,
+            "assessor_qualification_ref": digest,
+            "assessor_qualification_digest": digest,
+            "independence_group": "model:" + record.model_identity,
+        }
+    )
+    async with host.sessions() as session:
+        assert await _reviewer_attested(session, older, digest)
+        assert not await _reviewer_attested(
+            session, older.model_copy(update={"assessor_version": "sha256:" + "6" * 64}), digest
+        )

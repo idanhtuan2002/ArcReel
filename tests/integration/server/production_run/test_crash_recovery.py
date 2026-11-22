@@ -16,7 +16,6 @@ from server.production_run.render_adapter import RenderAdapter
 from server.services.presentation_read_model import PresentationReadModelService
 from tests.integration.server.production_run.test_quality_adapter import (
     Reviewer,
-    _qualify,
     _tick,
 )
 from tests.integration.server.production_run.test_quality_adapter import quality_host as quality_host
@@ -79,7 +78,6 @@ async def test_a_render_lost_in_a_crash_is_rendered_again_once(quality_host):
 
 async def test_reviews_paid_before_a_crash_are_reused_not_bought_again(quality_host):
     host, controller, render, quality, reviewer = quality_host
-    await _qualify(host)
     await _tick(host, controller)
     await _tick(host, controller)
     await asyncio.gather(*render._jobs.values())

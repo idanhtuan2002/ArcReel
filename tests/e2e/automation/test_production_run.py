@@ -1,12 +1,10 @@
 """A new idea becomes an exported, Quality-passed film through the activated app and real local models.
 
 Opt-in: ``ARCREEL_E2E_AUTOMATION=1`` with PostgreSQL, Ollama (writer and both reviewers pulled), ComfyUI (FLUX.2
-klein and Wan 2.2) and the VieNeu TTS shim running, and ``ARCREEL_E2E_REVIEWER_CORPUS`` naming a labeled corpus
-manifest, and ``ARCREEL_DATA_DIR`` naming an empty projects directory. The host is the real app lifespan with run delegation activated over fixture governance custody. Setup
+klein and Wan 2.2) and the VieNeu TTS shim running, and ``ARCREEL_DATA_DIR`` naming an empty projects directory. The host is the real app lifespan with run delegation activated over fixture governance custody. Setup
 does what a release owner does once per project: configure the launch profile's routes, publish the automatic
-Quality profile, qualify both reviewers on the blind corpus and record the launch qualification. The run itself is
-driven only through the public API. A record of the run is written to ``ARCREEL_E2E_EVIDENCE`` when set; review receipts
-go to ``ARCREEL_E2E_REVIEW_DIR`` when set, where a later run reuses those of the same model, method and case.
+Quality profile and record the launch qualification; reviewers are trusted by configuration (ADR-0169). The run
+itself is driven only through the public API. A record of the run is written to ``ARCREEL_E2E_EVIDENCE`` when set.
 """
 
 from __future__ import annotations
@@ -28,14 +26,10 @@ from lib.db.models.custom_endpoint import CustomEndpoint
 from lib.db.models.custom_provider import CustomProvider, CustomProviderModel
 from lib.db.repositories.launch_qualifications import LaunchQualificationRepository
 from lib.db.repositories.quality_dispositions import QualityDispositionRepository
-from lib.db.repositories.reviewer_qualifications import ReviewerQualificationRepository
 from lib.generation_resources import configure_device_admission
 from lib.project_manager import ProjectManager
-from r2.automation.profiles import reviewer_is_qualified
-from r2.contracts.automation import ModelRoute
 from server import auth
-from server.production_run.composition import ProjectPolicyResolver, device_admission_from_env
-from server.production_run.gemini_reviewer import routed_reviewer
+from server.production_run.composition import device_admission_from_env
 from tests.integration.server.services.test_automation_grants import interactive_env as interactive_env
 
 pytestmark = [
@@ -245,42 +239,6 @@ def _automation_settings(profile: dict) -> dict:
     }
 
 
-async def _qualify_reviewers(sessions, projects: ProjectManager, corpus: Path, output: Path) -> dict:
-    from lib.config.resolver import ConfigResolver
-    from server.production_run.qualification import qualify
-
-    routes = await ProjectPolicyResolver(sessions, projects=projects, resolver=ConfigResolver(sessions)).routes(
-        "project"
-    )
-    settings = projects.load_project("project")["automation"]
-    results = {}
-    for route in routes:
-        if route.role not in REVIEWERS:
-            continue
-        started = time.monotonic()
-        record = await qualify(
-            corpus=corpus,
-            route=ModelRoute.model_validate(route),
-            evaluator=routed_reviewer(sessions),
-            output=output / route.role,
-            profile_digest=settings["profile_digest"],
-            launch_profile_id=settings["launch_profile_id"],
-            language="vi",
-            stop_early=True,
-        )
-        qualified = reviewer_is_qualified(record)
-        results[route.role] = {
-            "model_identity": record.model_identity,
-            "qualified": qualified,
-            "seconds": round(time.monotonic() - started, 1),
-            "cases": [case.model_dump(mode="json") for case in record.cases],
-        }
-        if qualified:
-            async with sessions() as session, session.begin():
-                await ReviewerQualificationRepository(session).record(record)
-    return results
-
-
 @pytest.fixture
 async def e2e_sessions():
     """The process-wide session factory on ``DATABASE_URL``: a PostgreSQL database migrated to head for this run.
@@ -314,16 +272,13 @@ async def e2e_sessions():
     return async_session_factory
 
 
-def _require_services(corpus: Path) -> None:
-    """Fail before any long step when a provider, a model or the corpus is missing."""
+def _require_services() -> None:
+    """Fail before any long step when a provider or a model is missing."""
     names = {item["name"] for item in httpx.get(f"{OLLAMA}/api/tags", timeout=10).json()["models"]}
     missing = {WRITER, *(() if GEMINI_KEY_FILE else REVIEWERS.values())} - names
     assert not missing, f"Ollama models missing: {sorted(missing)}"
     httpx.get(f"{COMFYUI}/system_stats", timeout=10).raise_for_status()
     httpx.get(TTS.removesuffix("/v1") + "/health", timeout=10).raise_for_status()
-    cases = json.loads(corpus.read_text(encoding="utf-8"))["cases"]
-    absent = [c[k] for c in cases for k in ("final", "subtitles", "narration") if not (corpus.parent / c[k]).is_file()]
-    assert not absent, f"corpus files missing: {absent[:3]}"
 
 
 def _empty_data_dir(projects: ProjectManager) -> Path:
@@ -350,14 +305,13 @@ async def test_new_idea_reaches_current_quality_pass_and_export(e2e_sessions, tm
     from tests.integration.server.production_run.test_quality_adapter import _publish_profile
     from tests.integration.server.services.test_quality_profile_custodian import prepare_qualified_custody
 
-    corpus = Path(os.environ["ARCREEL_E2E_REVIEWER_CORPUS"])
     sessions = e2e_sessions
     evidence: dict = {
         "source_head": await asyncio.to_thread(_source_head),
         "started_at": datetime.now(UTC).isoformat(),
         "idea": IDEA,
     }
-    await asyncio.to_thread(_require_services, corpus)
+    await asyncio.to_thread(_require_services)
     root, runtime, *_ = await prepare_qualified_custody(sessions, tmp_path)
     async with serve_governance_attestor(
         root, runtime, session_factory=sessions, expected_uid=os.getuid(), expected_gid=os.getgid()
@@ -390,9 +344,6 @@ async def test_new_idea_reaches_current_quality_pass_and_export(e2e_sessions, tm
         project["speech_rate_units_per_second"] = 3.6
 
     projects.update_project("project", configure)
-    reviews = Path(os.environ.get("ARCREEL_E2E_REVIEW_DIR") or tmp_path / "reviews")
-    evidence["reviewer_qualification"] = await _qualify_reviewers(sessions, projects, corpus, reviews)
-    assert all(item["qualified"] for item in evidence["reviewer_qualification"].values()), "reviewers not qualified"
 
     monkeypatch.setenv("ARCREEL_GPU_ADMISSION_PROBES", f"ollama={OLLAMA},comfyui={COMFYUI}")
     configure_device_admission(device_admission_from_env())

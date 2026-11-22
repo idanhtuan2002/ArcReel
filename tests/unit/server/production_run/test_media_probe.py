@@ -189,7 +189,7 @@ async def test_overlapping_starts_probe_each_route_once(monkeypatch, tmp_path: P
         return {}
 
     monkeypatch.setattr(QualificationJobs, "status", status)
-    jobs = QualificationJobs(None, Projects(), evaluator=object(), routes=routes)
+    jobs = QualificationJobs(None, Projects(), routes=routes)
     await asyncio.gather(
         jobs.start_media_probes(user_id="a", project_name="p"),
         jobs.start_media_probes(user_id="b", project_name="p"),

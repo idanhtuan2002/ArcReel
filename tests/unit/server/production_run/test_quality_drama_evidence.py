@@ -6,7 +6,6 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from server.production_run.qualification import _evidence as corpus_evidence
 from server.production_run.quality_adapter import QualityAdapter
 
 DRAMA = {
@@ -58,26 +57,3 @@ def test_a_narration_keeps_its_segments_and_has_no_dialogue(tmp_path: Path):
 
     assert adapter._narration("p", 2) == "Ông Ba không trả lời."
     assert adapter._dialogue("p", 2) is None
-
-
-def test_a_drama_corpus_case_carries_its_dialogue_file(tmp_path: Path):
-    corpus = tmp_path / "corpus"
-    (corpus / "finals" / "c00").mkdir(parents=True)
-    for name, text in (("final.mp4", "film"), ("subtitles.srt", ""), ("narration.txt", "Con nói phải rồi.")):
-        (corpus / "finals" / "c00" / name).write_text(text, encoding="utf-8")
-    (corpus / "finals" / "c00" / "dialogue.txt").write_text("Ông Ba: Con nói phải rồi.", encoding="utf-8")
-    case = {
-        "case_id": "c00",
-        "split": "CALIBRATION",
-        "label": "CLEAN",
-        "final": "finals/c00/final.mp4",
-        "subtitles": "finals/c00/subtitles.srt",
-        "narration": "finals/c00/narration.txt",
-        "dialogue": "finals/c00/dialogue.txt",
-    }
-    (corpus / "manifest.json").write_text(json.dumps({"cases": [case]}), encoding="utf-8")
-
-    [(_, evidence)] = corpus_evidence(corpus / "manifest.json", tmp_path / "out", "vi", "drama")
-
-    assert evidence.narration_text == "Con nói phải rồi."
-    assert evidence.dialogue == "Ông Ba: Con nói phải rồi."

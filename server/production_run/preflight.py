@@ -8,7 +8,6 @@ from r2.automation.profiles import (
     continuity_judge_is_qualified,
     image_judge_is_qualified,
     resolve_launch_profile,
-    reviewer_is_qualified,
     route_digest,
 )
 from r2.contracts.automation import PreflightReport, PreflightSnapshot, RunPolicy
@@ -124,31 +123,6 @@ class ProductionPreflight:
             or any(route.model_identity in writer_ids for route in reviewers)
         ):
             reasons.append("REVIEWER_INDEPENDENCE_MISSING")
-        for route in reviewers:
-            matches = [
-                record
-                for record in snapshot.qualifications
-                if (
-                    record.profile_digest,
-                    record.launch_profile_id,
-                    record.language,
-                    record.provider_id,
-                    record.model_id,
-                    record.model_identity,
-                    record.config_digest,
-                )
-                == (
-                    policy.profile_digest,
-                    policy.launch_profile_id,
-                    policy.language,
-                    route.provider_id,
-                    route.model_id,
-                    route.model_identity,
-                    route.config_digest,
-                )
-            ]
-            if len(matches) != 1 or not reviewer_is_qualified(matches[0]):
-                reasons.append("MISSING_QUALIFIED_REVIEWER")
         if policy.image_candidates > 1:
             # The judge is the run's reviewer route with the launch profile's pinned identity, and it is qualified; the
             # face-identity judge is a local scorer, not a route, and needs its server configured instead.

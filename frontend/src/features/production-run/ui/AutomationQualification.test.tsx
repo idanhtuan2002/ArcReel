@@ -9,12 +9,8 @@ import { AutomationQualification } from "./AutomationQualification";
 
 function status(changes: Partial<QualificationStatus> = {}): QualificationStatus {
   return {
-    corpus_configured: true,
+    receipts_configured: true,
     evidence_configured: true,
-    reviewers: [
-      { role: "reviewer_a", model_identity: "ollama/qwen2.5vl:7b@sha256:x", qualified: true, job: null },
-      { role: "reviewer_b", model_identity: "ollama/gemma3:4b@sha256:y", qualified: false, job: null },
-    ],
     launch_recorded: false,
     ...changes,
   };
@@ -38,49 +34,26 @@ afterEach(() => {
 });
 
 describe("AutomationQualification", () => {
-  it("shows each reviewer's state and starts a qualification job", async () => {
+  it("asks nothing of reviewers: they are trusted by configuration", async () => {
     vi.spyOn(client, "getQualification").mockResolvedValue(status());
-    const start = vi.spyOn(client, "startReviewerQualification").mockResolvedValue(
-      status({
-        reviewers: [
-          {
-            role: "reviewer_b",
-            model_identity: "ollama/gemma3:4b@sha256:y",
-            qualified: false,
-            job: {
-              role: "reviewer_b",
-              model_identity: "ollama/gemma3:4b@sha256:y",
-              state: "running",
-              done: 3,
-              total: 40,
-              qualified: null,
-              error: null,
-              started_at: "2026-11-04T00:00:00Z",
-            },
-          },
-        ],
-      }),
-    );
     await open();
 
-    expect(await screen.findByText("qualified")).toBeInTheDocument();
-    expect(screen.getByText("not qualified")).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "Qualify reviewers" }));
-
-    await waitFor(() => expect(start).toHaveBeenCalledTimes(1));
-    expect(await screen.findByText("reviewing 3/40 cases")).toBeInTheDocument();
+    expect(
+      await screen.findByText(/Reviewers need no qualification/),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Qualify reviewers" })).not.toBeInTheDocument();
   });
 
   it("records the launch, or names what still blocks it", async () => {
     vi.spyOn(client, "getQualification").mockResolvedValue(status());
     const record = vi
       .spyOn(client, "recordLaunchQualification")
-      .mockResolvedValueOnce({ recorded: false, reasons: ["MISSING_QUALIFIED_REVIEWER"] })
+      .mockResolvedValueOnce({ recorded: false, reasons: ["MISSING_PUBLISHED_PROFILE"] })
       .mockResolvedValueOnce({ recorded: true, reasons: [] });
     const onChanged = await open();
 
     fireEvent.click(await screen.findByRole("button", { name: "Record launch qualification" }));
-    expect(await screen.findByText("Not recorded; first resolve: a reviewer model is not qualified")).toBeInTheDocument();
+    expect(await screen.findByText("Not recorded; first resolve: no published quality profile")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Record launch qualification" }));
 
     expect(await screen.findByText("Launch qualification recorded.")).toBeInTheDocument();
@@ -88,12 +61,15 @@ describe("AutomationQualification", () => {
     expect(onChanged).toHaveBeenCalledTimes(1);
   });
 
-  it("explains a server without a labeled corpus and keeps the job button off", async () => {
-    vi.spyOn(client, "getQualification").mockResolvedValue(status({ corpus_configured: false }));
+  it("explains a server without probe receipts and keeps the probe button off", async () => {
+    const media = [
+      { role: "video", provider_id: "custom-8", model_id: "cloud-video", profile_route: false, probe: null, job: null },
+    ];
+    vi.spyOn(client, "getQualification").mockResolvedValue(status({ receipts_configured: false, media }));
     await open();
 
-    expect(await screen.findByRole("button", { name: "Qualify reviewers" })).toBeDisabled();
-    expect(screen.getByText(/no labeled reviewer corpus/)).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: "Try media routes" })).toBeDisabled();
+    expect(screen.getByText(/no probe receipt folder/)).toBeInTheDocument();
   });
 
   it("lists media routes and probes the ones outside the profile", async () => {

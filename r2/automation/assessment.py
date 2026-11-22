@@ -1,9 +1,10 @@
-"""Combining two qualified model reviews of one final into a verdict; pure, never grants authority.
+"""Combining two configured model reviews of one final into a verdict; pure, never grants authority.
 
-A final passes only when exactly two completed reviews from distinct, qualified model identities (neither the
-writer's) judged the exact subject in the policy language, every creative dimension scored at least 4 by both,
-and neither raised a blocking finding. A reviewer failure, a missing or stale review, a wrong language or an
-unqualified reviewer blocks; reviewers that disagree on acceptability block for a Human. When both reject, the
+Reviewers are trusted by configuration, as every donor does (ADR-0169): the run's two reviewer routes. A final passes
+only when exactly two completed reviews from distinct model identities of those routes (neither the writer's) judged
+the exact subject in the policy language, every creative dimension scored at least 4 by both, and neither raised a
+blocking finding. A reviewer failure, a missing or stale review, a wrong language or a review by a model that is not
+one of the run's reviewer routes blocks; reviewers that disagree on acceptability block for a Human. When both reject, the
 earliest repairable finding names the stage and unit to rework; rejection without a repairable finding fails the
 run's quality. Nothing is ever waived.
 """
@@ -15,7 +16,20 @@ from typing import Annotated, Literal
 
 from pydantic import Field, StringConstraints
 
+from r2.automation.identity import digest_value
 from r2.contracts.automation import AutomationContract, Digest, ExactIdentity, RunStage
+
+#: The reference a model observation names when its reviewer is trusted by configuration (ADR-0169).
+CONFIGURED_REVIEWER_REF = "configured-reviewer-route"
+
+
+def configured_reviewer_digest(*, model_identity: str, config_digest: str, prompt_digest: str) -> str:
+    """The attestation of a configured reviewer: its model, its route configuration and its review method."""
+    return digest_value(
+        "r2.configured-reviewer-route.v1",
+        {"model_identity": model_identity, "config_digest": config_digest, "prompt_digest": prompt_digest},
+    )
+
 
 CREATIVE_DIMENSIONS = ("story", "visual", "audio", "continuity", "pacing")
 PASSING_SCORE = 4
@@ -67,7 +81,7 @@ def combine(
     subject_digest: str,
     language: str,
     writer_identities: frozenset[str],
-    qualified_identities: frozenset[str],
+    reviewer_identities: frozenset[str],
 ) -> AssessmentVerdict:
     reviews = tuple(ModelAssessment.model_validate(a) for a in assessments)
     if len(reviews) != 2:
@@ -77,8 +91,8 @@ def combine(
     identities = {r.model_identity for r in reviews}
     if len(identities) != 2 or identities & writer_identities:
         return _block("REVIEWER_INDEPENDENCE_MISSING")
-    if not identities <= qualified_identities:
-        return _block("REVIEWER_NOT_QUALIFIED")
+    if not identities <= reviewer_identities:
+        return _block("REVIEWER_NOT_CONFIGURED")
     if any(r.subject_digest != subject_digest for r in reviews):
         return _block("ASSESSMENT_STALE")
     if any(r.language != language for r in reviews):
@@ -103,6 +117,7 @@ def combine(
 
 
 __all__ = [
+    "CONFIGURED_REVIEWER_REF",
     "CREATIVE_DIMENSIONS",
     "PASSING_SCORE",
     "REPAIRABLE_STAGES",
@@ -110,4 +125,5 @@ __all__ = [
     "AssessmentVerdict",
     "ModelAssessment",
     "combine",
+    "configured_reviewer_digest",
 ]

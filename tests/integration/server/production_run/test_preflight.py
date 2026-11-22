@@ -11,7 +11,7 @@ from tests.unit.r2.quality.test_quality_profiles import publication_request, pub
 
 def complete_snapshot():
     from r2.automation.profiles import route_digest
-    from r2.contracts.automation import LaunchQualification, ModelRoute, PreflightSnapshot, ReviewerQualification
+    from r2.contracts.automation import LaunchQualification, ModelRoute, PreflightSnapshot
 
     routes = tuple(
         ModelRoute(
@@ -31,39 +31,6 @@ def complete_snapshot():
         )
         for i, role in enumerate(("writer", "script", "reviewer_a", "reviewer_b", "image", "video", "audio"))
     )
-    qualifications = []
-    for route in routes[2:4]:
-        cases = [
-            {
-                "split": split,
-                "label": label,
-                "accepted": label == "CLEAN",
-                "case_digest": "sha256:" + f"{i:064x}",
-                "receipt_ref": f"{route.role}-case-{i}",
-                "receipt_digest": "sha256:" + f"{i + 100:064x}",
-            }
-            for i, (split, label) in enumerate(
-                [
-                    (split, label)
-                    for split in ("CALIBRATION", "HOLDOUT")
-                    for label in ("CLEAN", "CRITICAL_DEFECT")
-                    for _ in range(10)
-                ]
-            )
-        ]
-        qualifications.append(
-            ReviewerQualification(
-                profile_digest="sha256:" + "a" * 64,
-                launch_profile_id="fiction_narration_vi_v1",
-                language="vi",
-                provider_id=route.provider_id,
-                model_id=route.model_id,
-                model_identity=route.model_identity,
-                config_digest=route.config_digest,
-                prompt_digest="sha256:" + "d" * 64,
-                cases=cases,
-            )
-        )
     draft = draft_data()
     for requirement in draft["policy"]["assessment_requirements"]:
         for slot in requirement["slots"]:
@@ -78,9 +45,6 @@ def complete_snapshot():
             ]
             requirement["minimum_satisfied_slots"] = 2
     published = publish(publication_request(**draft))
-    qualifications = [
-        record.model_copy(update={"profile_digest": published.profile_digest}) for record in qualifications
-    ]
     frozen = policy().model_copy(
         update={
             "profile_id": published.profile_id,
@@ -98,7 +62,6 @@ def complete_snapshot():
         language="vi",
         routes=routes,
         profile=published,
-        qualifications=qualifications,
         launch_qualification=LaunchQualification(
             owner="launch-qualification",
             receipt_ref="qualified-launch",
@@ -130,23 +93,31 @@ class SnapshotReader:
         return self.snapshot
 
 
-def test_fixture_uses_complete_independent_reviewer_corpora():
+def test_fixture_configures_two_independent_reviewers():
     frozen, snapshot = complete_snapshot()
-    assert len(snapshot.qualifications) == 2
-    assert len(snapshot.qualifications[0].cases) == 40
+    assert [r.role for r in snapshot.routes if r.role.startswith("reviewer")] == ["reviewer_a", "reviewer_b"]
     assert len(frozen.routes) == 7
 
 
-async def test_missing_qualified_reviewer_refuses_before_dispatch():
+async def test_configured_reviewers_need_no_qualification_but_must_be_independent():
+    """Reviewers are trusted by configuration (ADR-0169); two of the same model still refuse."""
     from server.production_run.preflight import ProductionPreflight
 
     frozen, snapshot = complete_snapshot()
-    reader = SnapshotReader(snapshot.model_copy(update={"qualifications": snapshot.qualifications[:1]}))
-    report = await ProductionPreflight(reader).check(
+    report = await ProductionPreflight(SnapshotReader(snapshot)).check(
         user_id=snapshot.user_id, project_name=snapshot.project_name, policy=frozen
     )
-    assert report.dispatch_allowed is False
-    assert "MISSING_QUALIFIED_REVIEWER" in report.blocking_reasons
+    assert "MISSING_QUALIFIED_REVIEWER" not in report.blocking_reasons
+    same = tuple(
+        r.model_copy(update={"model_identity": "reviewer_a"}) if r.role == "reviewer_b" else r for r in frozen.routes
+    )
+    reader = SnapshotReader(snapshot.model_copy(update={"routes": same}))
+    report = await ProductionPreflight(reader).check(
+        user_id=snapshot.user_id,
+        project_name=snapshot.project_name,
+        policy=frozen.model_copy(update={"routes": same}),
+    )
+    assert "REVIEWER_INDEPENDENCE_MISSING" in report.blocking_reasons
     assert reader.provider_submit_count == 0
 
 
@@ -319,21 +290,6 @@ async def test_drama_remains_blocked_without_qualified_audio_driven_route():
     assert not report.dispatch_allowed
     assert "DRAMA_ROUTE_NOT_QUALIFIED" in report.blocking_reasons
     assert reader.provider_submit_count == 0
-
-
-async def test_qualification_for_another_published_profile_cannot_admit_run():
-    from server.production_run.preflight import ProductionPreflight
-
-    frozen, snapshot = complete_snapshot()
-    foreign = tuple(
-        record.model_copy(update={"profile_digest": "sha256:" + "f" * 64}) for record in snapshot.qualifications
-    )
-    reader = SnapshotReader(snapshot.model_copy(update={"qualifications": foreign}))
-    report = await ProductionPreflight(reader).check(
-        user_id=snapshot.user_id, project_name=snapshot.project_name, policy=frozen
-    )
-    assert not report.dispatch_allowed
-    assert "MISSING_QUALIFIED_REVIEWER" in report.blocking_reasons
 
 
 async def test_model_qualification_alone_does_not_qualify_launch_media_route():
