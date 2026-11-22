@@ -791,3 +791,21 @@ def test_generated_video_equal_to_tts_duration_is_accepted_without_speedup() -> 
     )
 
     assert prepare_narrated_video_output(request, actual_duration_seconds=6.2) is request
+
+
+def test_a_silent_unit_takes_tts_delivery_without_speech_audio() -> None:
+    """A drama's establishing shot has no lines: under TTS delivery it is allowed and needs no audio."""
+    preparation = SpeechPreparation(unit_id="E1S1", mode=SpeechMode.SILENT, utterances=())
+
+    prepared = prepare_narration_delivery(
+        delivery=USE_TTS,
+        preparation=preparation,
+        artifact_path="audio/segment_E1S1.wav",
+        settings=_settings(),
+        evidence=None,
+    )
+
+    assert prepared.tts_status is NarrationTtsStatus.NOT_APPLICABLE
+    assert prepared.allowed is True
+    assert prepared.problems == ()
+    assert prepared.duration_floor is None

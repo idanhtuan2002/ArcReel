@@ -548,7 +548,9 @@ def prepare_narration_delivery(
 
     if preparation.mode is not SpeechMode.NARRATOR_VOICEOVER and not speaks_by_tts(preparation, settings):
         status = NarrationTtsStatus.NOT_APPLICABLE
-        if delivery == USE_TTS and not problems:
+        # A silent unit has nothing to voice: under TTS delivery it keeps its picture without speech audio. A character
+        # unit whose project lets the video model speak cannot take TTS delivery.
+        if delivery == USE_TTS and not problems and preparation.mode is not SpeechMode.SILENT:
             problems.append(
                 _problem(
                     "tts_not_applicable",
@@ -781,7 +783,11 @@ def prepare_narrated_video_output(
 ) -> NarratedVideoDurationPreparation:
     """Validate that generated media can carry the selected current TTS in full."""
 
-    if preparation.narration.delivery != USE_TTS or not preparation.allowed:
+    if (
+        preparation.narration.delivery != USE_TTS
+        or not preparation.allowed
+        or preparation.narration.tts_status is NarrationTtsStatus.NOT_APPLICABLE
+    ):
         return preparation
     tts_duration = preparation.narration.actual_duration_seconds
     if tts_duration is None:
