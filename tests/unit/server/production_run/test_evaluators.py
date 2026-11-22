@@ -16,6 +16,7 @@ from server.production_run.evaluators import (
     FRAME_COUNT,
     PROBABILITIES,
     QUESTIONS,
+    VERDICT_TOKENS,
     WATCH,
     FinalEvidence,
     OllamaReviewer,
@@ -237,6 +238,7 @@ async def test_a_probability_reviewer_reads_first_token_logprobs_per_frame(tmp_p
     assert review.accepts()
     assert len(sent) == 3 * FRAME_COUNT + 1
     assert all(b["logprobs"] is True and b["options"]["num_predict"] == 1 for b in sent[:-1])
+    assert sent[-1]["options"]["num_predict"] == VERDICT_TOKENS
 
 
 @pytest.mark.parametrize(

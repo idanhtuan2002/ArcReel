@@ -52,6 +52,9 @@ logger = logging.getLogger(__name__)
 
 FRAME_COUNT = 8
 CONTEXT_TOKENS = 16384
+#: The most tokens a local reviewer's verdict may take; a model looping over its findings ends here instead of at the
+#: request timeout.
+VERDICT_TOKENS = 2048
 
 FRAME_WIDTH = 432
 UPRIGHT_QUESTION = "Is this photo upside down (rotated 180 degrees, sky at the bottom)? Answer with exactly one English word: yes or no."
@@ -664,7 +667,13 @@ class FrameReviewer:
                         await ask(match_question(evidence.form).format(cue=cue_at(subtitles, seconds) or "—"), frame)
                     )
                 final = await chat.ask(
-                    prompt, frames, schema=SCHEMA, context_tokens=CONTEXT_TOKENS, think=None, shift=False
+                    prompt,
+                    frames,
+                    schema=SCHEMA,
+                    max_tokens=VERDICT_TOKENS,
+                    context_tokens=CONTEXT_TOKENS,
+                    think=None,
+                    shift=False,
                 )
             answer = json.loads(strip_fence(final.text))
             frame_keys = segment_keys(evidence, times)
