@@ -237,6 +237,34 @@ def test_multiple_admission_repairs_preserve_the_first_structured_action() -> No
     assert plan.next_action.type == GenerationAction.GENERATE_TTS.value
 
 
+def test_a_unit_withheld_for_another_takes_the_holding_units_action() -> None:
+    # trial 7 episode 5, 2026-11-19: E5S15's TTS was missing, so E5S01..E5S14 were withheld; the plan named the
+    # first unit's "retry" (nothing to do) instead of E5S15's "generate TTS", and the run stopped on WORKFLOW_RETRY
+    generate_tts = GenerationProblem(
+        code="tts_missing",
+        detail="current TTS is missing",
+        action=GenerationAction.GENERATE_TTS,
+    )
+    admission = BatchAdmission(
+        operation="generate_videos",
+        selection=GenerationSelectionMode.MISSING_ONLY,
+        narration_delivery=USE_TTS,
+        tickets=(
+            UnitAdmissionTicket("E1S01"),
+            UnitAdmissionTicket("E1S02", problems=(generate_tts,)),
+        ),
+    )
+
+    plan = build_workflow_plan(
+        _status(requested_ids=["E1S01", "E1S02"]),
+        narration_delivery=USE_TTS,
+        admission=admission.to_payload(),
+    )
+
+    assert plan.next_action.type == GenerationAction.GENERATE_TTS.value
+    assert plan.next_action.reason == "current TTS is missing"
+
+
 def test_structure_problems_block_before_every_media_step_and_point_to_atomic_edit() -> None:
     problem = GenerationProblem(
         code="mixed_speech",

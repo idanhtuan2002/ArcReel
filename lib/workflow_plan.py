@@ -8,7 +8,7 @@ from typing import Annotated, Any, Literal
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from lib.asset_types import ASSET_SPECS
-from lib.generation_result import GenerationAction, GenerationProblem, ProviderCheckpoint
+from lib.generation_result import GenerationAction, GenerationProblem, GenerationProblemCode, ProviderCheckpoint
 from lib.narration_delivery import POST_PRODUCTION, USE_TTS, NarrationDelivery
 from lib.workflow_rules import WorkflowStepRule, workflow_rule
 from lib.workflow_state import WorkflowActionType, WorkflowBlocker, WorkflowNextAction, WorkflowStatus
@@ -213,13 +213,17 @@ def _admission_action(
     requested_ids: list[str],
 ) -> WorkflowNextAction:
     requires_confirmation = admission.get("decision") == "confirmation_required"
-    action = problems[0].action if problems else GenerationAction.CONFIRM_REQUEST_DURATION
+    # A unit withheld only because another failed carries "retry", which nothing can act on; the batch's action is
+    # the first holding unit's own problem.
+    own = [problem for problem in problems if problem.code != GenerationProblemCode.BATCH_ADMISSION_WITHHELD]
+    first = (own or problems)[0] if problems else None
+    action = first.action if first is not None else GenerationAction.CONFIRM_REQUEST_DURATION
     return WorkflowNextAction(
         type=WorkflowActionType(action.value),
         args={"admission": admission},
         requested_ids=requested_ids,
         requires_confirmation=requires_confirmation,
-        reason=problems[0].detail if problems else "video batch requires confirmation",
+        reason=first.detail if first is not None else "video batch requires confirmation",
     )
 
 
