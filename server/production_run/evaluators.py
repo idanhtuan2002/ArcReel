@@ -176,6 +176,7 @@ Bước 1 — chấm điểm 1–5 cho story, visual, audio, continuity, pacing 
 đang nói, khớp phụ đề và hình; giọng các nhân vật được chấm khi nghe được.
 Không trừ điểm vì phong cách ảnh AI, ánh sáng, chi tiết nhân vật hơi khác giữa các cảnh, hình tĩnh không mấp máy môi,
 hay câu chuyện đơn giản. Phim hình ảnh bình thường, lời thoại đúng người, đúng cảnh và mạch lạc thì chấm 4 hoặc 5.
+Mục nào chấm 3 trở xuống thì phải có ít nhất một finding nêu đúng lỗi đó; không chỉ ra được lỗi cụ thể thì chấm 4 hoặc 5.
 
 Bước 2 — "findings": chỉ ghi lỗi thật, mỗi lỗi có code, severity (CRITICAL/MAJOR/MINOR), repair_stage
 (SCRIPT_PLAN, SCRIPT, MEDIA, RENDER hoặc null) và detail ngắn. "language" là mã ngôn ngữ của lời thoại (ví dụ "vi").
@@ -196,6 +197,7 @@ Bước 1 — chấm điểm 1–5 cho story, visual, audio, continuity, pacing 
 tính, tuổi và tính cách, dễ phân biệt các nhân vật chính; câu thoại khớp phụ đề và cảnh.
 Không trừ điểm vì phong cách ảnh AI, ánh sáng, chi tiết nhân vật hơi khác giữa các cảnh, hình tĩnh không mấp máy môi,
 hay câu chuyện đơn giản. Phim hình ảnh bình thường, giọng đúng nhân vật và mạch lạc thì chấm 4 hoặc 5.
+Mục nào chấm 3 trở xuống thì phải có ít nhất một finding nêu đúng lỗi đó; không chỉ ra được lỗi cụ thể thì chấm 4 hoặc 5.
 
 Bước 2 — "findings": chỉ ghi lỗi thật nhìn hoặc nghe thấy được (hình đen, nhiễu, lộn ngược, sai câu chuyện, sai
 ngôn ngữ, phụ đề hỏng, hai nhân vật cùng giọng, giọng sai giới tính, tiếng lệch hình...), mỗi lỗi có code, severity
