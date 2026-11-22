@@ -376,7 +376,7 @@ def test_a_drama_review_asks_about_characters_lines_and_voices_with_its_own_dige
         assert "lời thoại" in prompt
         assert "giọng" in prompt
         assert "kể chuyện" not in prompt
-        assert "chấm 3 trở xuống thì phải có ít nhất một finding" in prompt
+        assert "chấm 3 trở xuống thì phải có ít nhất một finding mức MAJOR hoặc CRITICAL" in prompt
     assert "Spoken line" in match_question("drama")
     assert "Narration line" in match_question("narration")
     for method in (QUESTIONS, PROBABILITIES, WATCH):
