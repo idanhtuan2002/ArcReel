@@ -212,6 +212,28 @@ class TestProjectsRouter:
             assert resp.status_code == 200
             assert "episode_adaptation" not in fake_pm.project_data["ready"]
 
+    def test_update_project_sets_and_clears_character_speech_delivery(self, tmp_path, monkeypatch):
+        """PATCH character speech delivery (ADR-0166): tts is stored; video or null clears it; others 422."""
+        fake_pm = _FakePM(tmp_path)
+        client = build_projects_client(monkeypatch, fake_pm)
+        with client:
+            resp = client.patch("/api/v1/projects/ready", json={"character_speech_delivery": "tts"})
+            assert resp.status_code == 200
+            assert fake_pm.project_data["ready"]["character_speech_delivery"] == "tts"
+
+            assert (
+                client.patch("/api/v1/projects/ready", json={"character_speech_delivery": "voice"}).status_code == 422
+            )
+
+            resp = client.patch("/api/v1/projects/ready", json={"character_speech_delivery": "video"})
+            assert resp.status_code == 200
+            assert "character_speech_delivery" not in fake_pm.project_data["ready"]
+
+            client.patch("/api/v1/projects/ready", json={"character_speech_delivery": "tts"})
+            resp = client.patch("/api/v1/projects/ready", json={"character_speech_delivery": None})
+            assert resp.status_code == 200
+            assert "character_speech_delivery" not in fake_pm.project_data["ready"]
+
     def test_update_project_sets_and_clears_content_safety(self, tmp_path, monkeypatch):
         """PATCH content safety level (ADR-0121): a level is stored; the default (off) or null clears it; others 422."""
         fake_pm = _FakePM(tmp_path)

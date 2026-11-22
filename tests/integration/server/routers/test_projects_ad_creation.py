@@ -137,6 +137,9 @@ class TestProjectsRouter:
             assert client.patch("/api/v1/projects/ad-ready", json={"episode_target_duration": 120}).status_code == 400
             assert client.patch("/api/v1/projects/ad-ready", json={"episode_target_duration": None}).status_code == 400
             assert client.patch("/api/v1/projects/ad-ready", json={"grid_storyboard": True}).status_code == 400
+            assert (
+                client.patch("/api/v1/projects/ad-ready", json={"character_speech_delivery": "tts"}).status_code == 400
+            )
             assert client.patch("/api/v1/projects/ad-ready", json={"target_duration": None}).status_code == 400
 
             # 非 ad 项目不接受 target_duration / brief

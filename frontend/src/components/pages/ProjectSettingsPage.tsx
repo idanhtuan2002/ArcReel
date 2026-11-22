@@ -179,6 +179,7 @@ export function ProjectSettingsPage() {
   const [speechRate, setSpeechRate] = useState<number | null>(null);
   const [episodeTargetDuration, setEpisodeTargetDuration] = useState<number | null>(null);
   const [episodeAdaptation, setEpisodeAdaptation] = useState(false);
+  const [characterSpeechTts, setCharacterSpeechTts] = useState(false);
   const [contentSafety, setContentSafety] = useState<ContentSafety>("off");
   // 源文语言由内容分析写入，此页只读——只用来决定语速的单位名词（字 / 词）
   const [sourceLanguage, setSourceLanguage] = useState<string | null>(null);
@@ -221,6 +222,7 @@ export function ProjectSettingsPage() {
     speechRate: null as number | null,
     episodeTargetDuration: null as number | null,
     episodeAdaptation: false,
+    characterSpeechTts: false,
     contentSafety: "off",
     videoResolution: null as string | null,
     imageResolution: null as string | null,
@@ -320,6 +322,7 @@ export function ProjectSettingsPage() {
       const rawEtd = project.episode_target_duration;
       const etd = typeof rawEtd === "number" && Number.isFinite(rawEtd) ? rawEtd : null;
       const adapt = project.episode_adaptation === "screen";
+      const speechTts = project.character_speech_delivery === "tts";
       const safety: ContentSafety = CONTENT_SAFETY_LEVELS.includes(project.content_safety as ContentSafety)
         ? (project.content_safety as ContentSafety)
         : "off";
@@ -349,6 +352,7 @@ export function ProjectSettingsPage() {
       setSpeechRate(sr);
       setEpisodeTargetDuration(etd);
       setEpisodeAdaptation(adapt);
+      setCharacterSpeechTts(speechTts);
       setContentSafety(safety);
       setSourceLanguage(sl);
       setVoiceBinding(vbind);
@@ -389,6 +393,7 @@ export function ProjectSettingsPage() {
         aspectRatio: ar, gridStoryboard: grid, defaultDuration: dd, speechRate: sr,
         episodeTargetDuration: etd,
         episodeAdaptation: adapt,
+        characterSpeechTts: speechTts,
         contentSafety: safety,
         videoResolution: vRes, imageResolution: iRes,
       };
@@ -449,6 +454,7 @@ export function ProjectSettingsPage() {
     speechRate !== initialRef.current.speechRate ||
     episodeTargetDuration !== initialRef.current.episodeTargetDuration ||
     episodeAdaptation !== initialRef.current.episodeAdaptation ||
+    characterSpeechTts !== initialRef.current.characterSpeechTts ||
     contentSafety !== initialRef.current.contentSafety ||
     videoResolution !== initialRef.current.videoResolution ||
     imageResolution !== initialRef.current.imageResolution ||
@@ -579,6 +585,8 @@ export function ProjectSettingsPage() {
               episode_target_duration: episodeTargetDuration,
               episode_adaptation: episodeAdaptation ? "screen" : null,
             }),
+        // 只有剧情项目有角色台词：仅在开关可见时写，tts 写入、关闭即 null 清除
+        ...(contentMode === "drama" ? { character_speech_delivery: characterSpeechTts ? "tts" : null } : {}),
         content_safety: contentSafety === "off" ? null : contentSafety,
         model_settings: newModelSettings,
       });
@@ -593,6 +601,7 @@ export function ProjectSettingsPage() {
         aspectRatio, gridStoryboard, defaultDuration, speechRate,
         episodeTargetDuration,
         episodeAdaptation,
+        characterSpeechTts,
         contentSafety,
         videoResolution, imageResolution,
       };
@@ -605,7 +614,7 @@ export function ProjectSettingsPage() {
     } finally {
       setSaving(false);
     }
-  }, [modelSettings, videoBackend, videoProviderI2V, videoProviderR2V, imageBackendDefault, imageBackendT2I, imageBackendI2I, audioOverride, audioBackend, narrationVoice, narrationSpeed, voiceBinding, textDefault, textSimple, textComplex, aspectRatio, generationRoute, gridStoryboard, gridToggleVisible, defaultDuration, speechRate, episodeTargetDuration, episodeAdaptation, contentSafety, contentMode, videoResolution, imageResolution, projectName, t, globalDefaults]);
+  }, [modelSettings, videoBackend, videoProviderI2V, videoProviderR2V, imageBackendDefault, imageBackendT2I, imageBackendI2I, audioOverride, audioBackend, narrationVoice, narrationSpeed, voiceBinding, textDefault, textSimple, textComplex, aspectRatio, generationRoute, gridStoryboard, gridToggleVisible, defaultDuration, speechRate, episodeTargetDuration, episodeAdaptation, characterSpeechTts, contentSafety, contentMode, videoResolution, imageResolution, projectName, t, globalDefaults]);
 
   const handleResetAgentProfile = useCallback(async () => {
     if (profileResetProject !== projectName) {
@@ -988,6 +997,30 @@ export function ProjectSettingsPage() {
                         </p>
                       </div>
                     </div>
+                    {contentMode === "drama" && (
+                      <div className="mt-4 flex items-start gap-2 text-[13px]">
+                        <input
+                          id="character-speech-tts"
+                          type="checkbox"
+                          className="mt-0.5"
+                          checked={characterSpeechTts}
+                          aria-describedby="character-speech-tts-hint"
+                          onChange={(event) => setCharacterSpeechTts(event.target.checked)}
+                        />
+                        <div>
+                          <label htmlFor="character-speech-tts" style={{ color: "var(--color-text-1)" }}>
+                            {t("character_speech_tts_label")}
+                          </label>
+                          <p
+                            id="character-speech-tts-hint"
+                            className="text-[12px]"
+                            style={{ color: "var(--color-text-3)" }}
+                          >
+                            {t("character_speech_tts_hint")}
+                          </p>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
                 <ContentSafetyField value={contentSafety} onChange={setContentSafety} />

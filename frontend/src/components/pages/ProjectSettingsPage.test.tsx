@@ -445,6 +445,61 @@ describe("ProjectSettingsPage – style picker", () => {
     });
   });
 
+  it("shows the TTS character speech switch only on drama projects and saves it", async () => {
+    vi.spyOn(API, "getProject").mockResolvedValue({
+      project: {
+        title: "Demo",
+        content_mode: "drama",
+        episodes: [],
+        characters: {},
+        clues: {},
+      },
+      scripts: {},
+    } as unknown as Awaited<ReturnType<typeof API.getProject>>);
+    const updateSpy = vi.spyOn(API, "updateProject").mockResolvedValue({
+      success: true,
+      project: { title: "Demo" } as unknown as Awaited<ReturnType<typeof API.updateProject>>["project"],
+    });
+
+    renderAt("/app/projects/demo/settings");
+
+    const toggle = await waitFor(() => {
+      const el = document.getElementById("character-speech-tts");
+      expect(el).not.toBeNull();
+      return el as HTMLInputElement;
+    });
+    expect(toggle).not.toBeChecked();
+    fireEvent.click(toggle);
+    fireEvent.click(screen.getByRole("button", { name: /^(保存|Save)$/i }));
+    await waitFor(() => {
+      expect(updateSpy).toHaveBeenCalledWith("demo", expect.objectContaining({ character_speech_delivery: "tts" }));
+    });
+  });
+
+  it("hides the TTS character speech switch and never writes it on narration projects", async () => {
+    vi.spyOn(API, "getProject").mockResolvedValue({
+      project: { title: "Demo", content_mode: "narration", episodes: [], characters: {}, clues: {} },
+      scripts: {},
+    } as unknown as Awaited<ReturnType<typeof API.getProject>>);
+    const updateSpy = vi.spyOn(API, "updateProject").mockResolvedValue({
+      success: true,
+      project: { title: "Demo" } as unknown as Awaited<ReturnType<typeof API.updateProject>>["project"],
+    });
+
+    renderAt("/app/projects/demo/settings");
+
+    const adaptation = await waitFor(() => {
+      const el = document.getElementById("episode-adaptation");
+      expect(el).not.toBeNull();
+      return el as HTMLInputElement;
+    });
+    expect(document.getElementById("character-speech-tts")).toBeNull();
+    fireEvent.click(adaptation);
+    fireEvent.click(screen.getByRole("button", { name: /^(保存|Save)$/i }));
+    await waitFor(() => expect(updateSpy).toHaveBeenCalled());
+    expect(updateSpy.mock.calls[0][1]).not.toHaveProperty("character_speech_delivery");
+  });
+
   it("omits the character voice binding on the storyboard route", async () => {
     vi.spyOn(API, "getProject").mockResolvedValue({
       project: {

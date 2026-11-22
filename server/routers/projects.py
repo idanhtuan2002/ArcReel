@@ -40,7 +40,7 @@ from lib.api_errors import ApiError, BadRequestError, NotFoundError, Unprocessab
 from lib.asset_fingerprints import compute_asset_fingerprints
 from lib.asset_types import asset_name_comparison_key
 from lib.character_voice import PROJECT_FIELD as CHARACTER_VOICE_BINDING_FIELD
-from lib.character_voice import VALID_CHARACTER_VOICE_BINDINGS
+from lib.character_voice import SPEECH_DELIVERY_FIELD, VALID_CHARACTER_VOICE_BINDINGS
 from lib.config.resolver import ConfigResolver, VideoBucketCapabilityError
 from lib.db import async_session_factory
 from lib.episode_adaptation import SETTING as ADAPTATION_SETTING
@@ -275,6 +275,8 @@ class UpdateProjectRequest(BaseModel):
     episode_adaptation: Literal["screen", "verbatim"] | None = None
     # 故事内容安全等级（ADR-0121）：strict / standard / mature / off；null 清除即回到 standard
     content_safety: Literal["strict", "standard", "mature", "off"] | None = None
+    # 剧情角色台词由谁发声（ADR-0166）：tts 用 TTS 朗读；video 或 null 清除即回到默认（视频模型）；ad 项目拒绝
+    character_speech_delivery: Literal["video", "tts"] | None = None
     # 仅 ad 项目：目标总时长（秒），任意正整数合法，不可清空
     target_duration: int | None = Field(default=None, gt=0)
     # 仅 ad 项目：创作诉求短文本；显式 null 清为空字符串
@@ -1069,6 +1071,13 @@ async def update_project(name: str, req: UpdateProjectRequest, _t: Translator):
                         project.pop(ADAPTATION_SETTING, None)
                     else:
                         project[ADAPTATION_SETTING] = req.episode_adaptation
+                if "character_speech_delivery" in req.model_fields_set:
+                    if is_ad:
+                        raise HTTPException(status_code=400, detail=_t("ad_no_character_speech_delivery"))
+                    if req.character_speech_delivery == "tts":
+                        project[SPEECH_DELIVERY_FIELD] = "tts"
+                    else:
+                        project.pop(SPEECH_DELIVERY_FIELD, None)
                 if "content_safety" in req.model_fields_set:
                     if req.content_safety is None or req.content_safety == DEFAULT_CONTENT_SAFETY:
                         project.pop(CONTENT_SAFETY_SETTING, None)

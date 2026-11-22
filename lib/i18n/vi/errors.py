@@ -311,6 +311,7 @@ MESSAGES = {
     "ad_no_default_duration": "Dự án quảng cáo/video ngắn không hỗ trợ thời lượng mặc định; thời lượng cảnh quay được lên kế hoạch theo tổng thời lượng mục tiêu",
     "ad_no_episode_target_duration": "Dự án quảng cáo/video ngắn không hỗ trợ thời lượng mục tiêu mỗi tập; tổng thời lượng được lên kế hoạch theo tổng thời lượng mục tiêu",
     "ad_no_episode_adaptation": "Dự án quảng cáo/video ngắn không chia tập nên không hỗ trợ chuyển thể theo tập",
+    "ad_no_character_speech_delivery": "Dự án quảng cáo/video ngắn không có thoại nhân vật nên không hỗ trợ đọc thoại bằng TTS",
     "ad_grid_not_supported": "Dự án quảng cáo/video ngắn không hỗ trợ tạo video từ phân cảnh đa lưới",
     "grid_storyboard_not_enabled": "Dự án chưa bật phân cảnh đa lưới",
     "ad_target_duration_required": "Dự án quảng cáo/video ngắn bắt buộc phải có tổng thời lượng mục tiêu (số giây nguyên dương)",
