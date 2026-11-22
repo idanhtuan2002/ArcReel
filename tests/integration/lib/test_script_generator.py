@@ -1801,6 +1801,45 @@ class TestMergeNarrationVisual:
         merged = sg._merge_narration_visual([_script_plan_seg("E2S01", "Ông Ba không trả lời.")], visual, episode=2)
         assert merged["title"] == "Lời thỉnh cầu"
 
+    @pytest.mark.parametrize("model_title", ["looks", "Example Domain", "Chuyến đò lúc nửa đêm"])
+    def test_a_planned_episode_keeps_its_planned_title(self, tmp_path, model_title):
+        # trial 7, 2026-11-17..19: episodes 4 and 5 were planned as titled stories and saved as "looks" and
+        # "Example Domain"; a planned episode's title is the plan's, whatever the script model wrote
+        sg = _bare_generator(
+            tmp_path,
+            {
+                "source_language": "vi",
+                "episodes": [
+                    {
+                        "episode": 4,
+                        "title": "Chiếc xuồng máy rời bến",
+                        "script_file": "x.json",
+                        "hook": "Hải sang bờ bên kia.",
+                        "ledger_status": "planned",
+                    }
+                ],
+            },
+        )
+        visual = {"title": model_title, "segments": [_visual_seg("E4S01")]}
+        merged = sg._merge_narration_visual([_script_plan_seg("E4S01", "Ông Ba không trả lời.")], visual, episode=4)
+        assert merged["title"] == "Chiếc xuồng máy rời bến"
+
+    def test_a_planned_title_that_is_not_a_title_yields_to_the_model_title(self, tmp_path):
+        sg = _bare_generator(
+            tmp_path,
+            {
+                "source_language": "vi",
+                "episodes": [{"episode": 2, "title": "visual_layer_ep02", "script_file": "x.json", "hook": "h"}],
+            },
+        )
+        visual = {"title": "Bến đò không ngủ", "segments": [_visual_seg("E2S01")]}
+        merged = sg._merge_narration_visual([_script_plan_seg("E2S01", "甲")], visual, episode=2)
+        assert merged["title"] == "Bến đò không ngủ"
+
+        visual = {"title": "E2S01", "segments": [_visual_seg("E2S01")]}
+        merged = sg._merge_narration_visual([_script_plan_seg("E2S01", "甲")], visual, episode=2)
+        assert merged["title"] == "Tập 2"
+
     def test_a_real_model_title_is_kept(self, tmp_path):
         sg = _bare_generator(tmp_path, {"source_language": "vi"})
         visual = {"title": "Chuyến đò lúc nửa đêm", "segments": [_visual_seg("E1S01")]}

@@ -241,24 +241,39 @@ class ScriptGenerator:
         return self.project_json.get("generation_mode")
 
     def _fallback_title(self, episode: int) -> str:
-        """The title a script gets when the model wrote none: the planned episode title, else the episode's label in
-        the source language."""
+        """The title a script gets when the model wrote none: the planned episode title when it reads as a title, else
+        the episode's label in the source language."""
         planned = self._episode_entry(episode).get("title")
-        if isinstance(planned, str) and planned.strip():
+        if isinstance(planned, str) and self._reads_as_title(planned):
             return planned.strip()
         return self._episode_label(episode)
 
     def _usable_title(self, value: object, episode: int) -> str:
-        """The model's episode title when it reads as one, else :meth:`_fallback_title`. Not a title: an empty value,
-        an identifier (``visual_layer_ep02``, ``episode_2``: letters, digits and ``_`` without a space), leaked
-        reasoning or schema text, or Han characters in a project in another language (trial 7's episode 2 was saved
-        as ``visual_layer_ep02``)."""
+        """The episode's title for a generated script. A planned episode (the episode planner wrote its ``hook`` or
+        ``outline``) keeps its planned title when that reads as a title, whatever the model wrote (trial 7 saved
+        planned episodes as ``looks`` and ``Example Domain``). Otherwise the model's title when it reads as one, else
+        :meth:`_fallback_title`."""
+        entry = self._episode_entry(episode)
+        planned = entry.get("title")
+        if (
+            (entry.get("hook") or self._entry_outline(entry))
+            and isinstance(planned, str)
+            and self._reads_as_title(planned)
+        ):
+            return planned.strip()
+        title = value.strip() if isinstance(value, str) else ""
+        return title if self._reads_as_title(title) else self._fallback_title(episode)
+
+    def _reads_as_title(self, value: str) -> bool:
+        """Whether ``value`` reads as an episode title. Not a title: an empty value, an identifier
+        (``visual_layer_ep02``, ``episode_2``: letters, digits and ``_`` without a space), leaked reasoning or schema
+        text, or Han characters in a project in another language."""
         from lib.output_hygiene import leak_reason
         from lib.text_attestation import has_cjk
 
-        title = value.strip() if isinstance(value, str) else ""
+        title = value.strip()
         language = self.project_json.get("source_language")
-        if (
+        return not (
             not title
             or (
                 " " not in title
@@ -267,9 +282,7 @@ class ScriptGenerator:
             )
             or leak_reason(title, schema_fields=("title", "segments", "scenes", "video_units")) is not None
             or (has_cjk(title) and isinstance(language, str) and language.split("-")[0] not in ("zh", "ja", "ko"))
-        ):
-            return self._fallback_title(episode)
-        return title
+        )
 
     def _episode_label(self, episode: int) -> str:
         """The episode's label in the source language ("Tập 3", "Episode 3"; "第3集" for Chinese or no language)."""
