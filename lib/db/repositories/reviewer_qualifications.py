@@ -1,4 +1,8 @@
-"""Reviewer qualification records: append-only, content-addressed, read by exact profile scope."""
+"""Reviewer qualification records: append-only, content-addressed, read by exact profile scope.
+
+No new records are made (reviewers are trusted by configuration, ADR-0169); the table and this repository stay so that
+model observations recorded under a qualification before that decision can still be verified.
+"""
 
 from __future__ import annotations
 

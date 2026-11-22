@@ -25,7 +25,8 @@ from lib.artifact_manifest import ArtifactManifestError, ProjectArtifactManifest
 from lib.db.models.governance_grant import ShowrunnerGrantHeadModel
 from lib.db.models.quality import QualityProfileHeadModel
 from lib.db.repositories.host_hardening import MasterAuthorityRepository
-from lib.db.repositories.model_observations import ModelObservationRepository
+from lib.db.repositories.model_observations import ModelObservationRepository, StoredModelObservation
+from lib.db.repositories.production_runs import ProductionRunRepository
 from lib.db.repositories.quality import QualityProfileRepository
 from lib.db.repositories.quality_runs import QualityRunRepository, RunCommandKey
 from lib.db.repositories.reviewer_qualifications import ReviewerQualificationRepository
@@ -188,14 +189,28 @@ async def _grant(reader: CheckpointedShowrunnerGrantReader, session: AsyncSessio
     return event.event_digest
 
 
-async def _reviewer_attested(session: AsyncSession, observation: q.NarrativeObservation, stored_digest: str) -> bool:
-    """A model observation's reviewer: a configured route whose attestation recomputes (ADR-0169), or, for evidence
-    recorded before that decision, the reviewer qualification it names."""
+async def _reviewer_attested(
+    session: AsyncSession, *, user_id: str, project_name: str, model: StoredModelObservation
+) -> bool:
+    """A model observation's reviewer: one of the reviewer routes of the production run that recorded it, with an
+    attestation that recomputes (ADR-0169), or, for evidence recorded before that decision, the reviewer qualification
+    it names (the ``reviewer_qualifications`` table is kept for that)."""
+    observation, stored_digest = model.observation, model.qualification_digest
     if observation.assessor_qualification_digest != stored_digest:
         return False
     if observation.assessor_qualification_ref == CONFIGURED_REVIEWER_REF:
+        run = await ProductionRunRepository(session).get(
+            user_id=user_id, project_name=project_name, run_id=model.run_id
+        )
         return (
-            stored_digest
+            run is not None
+            and any(
+                (route.model_identity, route.config_digest)
+                == (observation.assessor_identity, observation.config_digest)
+                for route in run.policy.routes
+                if route.role in ("reviewer_a", "reviewer_b")
+            )
+            and stored_digest
             == configured_reviewer_digest(
                 model_identity=observation.assessor_identity,
                 config_digest=observation.config_digest,
@@ -396,7 +411,7 @@ async def _admit(
         observation = model.observation
         if not _same_profile(
             profile, model.profile_id, model.profile_revision, model.profile_digest
-        ) or not await _reviewer_attested(session, observation, model.qualification_digest):
+        ) or not await _reviewer_attested(session, user_id=user_id, project_name=project_name, model=model):
             raise RequiredEvidenceMissingError()
         digest = model.digest
         admitted = AdmittedObservation(observation, q.AssessorClass.MODEL)

@@ -107,7 +107,7 @@ async def test_configured_reviewers_need_no_qualification_but_must_be_independen
     report = await ProductionPreflight(SnapshotReader(snapshot)).check(
         user_id=snapshot.user_id, project_name=snapshot.project_name, policy=frozen
     )
-    assert "MISSING_QUALIFIED_REVIEWER" not in report.blocking_reasons
+    assert report.dispatch_allowed
     same = tuple(
         r.model_copy(update={"model_identity": "reviewer_a"}) if r.role == "reviewer_b" else r for r in frozen.routes
     )

@@ -189,18 +189,23 @@ async def record_quality(
         assessments=assessments,
         reviewers=reviewers,
     )
-    async with sessions() as session, session.begin():
-        await authority.require_locked(session, subject=principal_subject)
-        observations = [
-            await ModelObservationRepository(session).record(
-                user_id=scope.user_id,
-                project_name=scope.project_name,
-                run_id=scope.run_id,
-                profile=profile,
-                observation=observation,
-            )
-            for observation in observations
-        ]
+    try:
+        async with sessions() as session, session.begin():
+            await authority.require_locked(session, subject=principal_subject)
+            observations = [
+                await ModelObservationRepository(session).record(
+                    user_id=scope.user_id,
+                    project_name=scope.project_name,
+                    run_id=scope.run_id,
+                    profile=profile,
+                    observation=observation,
+                )
+                for observation in observations
+            ]
+    except ValueError as conflict:
+        # A retry whose observations differ from the ones already recorded for the same step (for example across a
+        # release that changed how a reviewer is attested) blocks the run instead of escaping as an owner error.
+        raise OwnerBlocked(str(conflict)) from None
 
     async def guard(session) -> None:
         if session is None:

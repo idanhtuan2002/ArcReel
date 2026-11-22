@@ -26,7 +26,8 @@ drama qualification failed on mislabeled films, not on the reviewers.
 3. **Evidence.** A MODEL observation names its reviewer with `assessor_qualification_ref = "configured-reviewer-route"`
    and a digest over model identity, route config digest and review-method digest
    (`r2.automation.assessment.configured_reviewer_digest`), recomputed when the evidence is read
-   (`server/services/quality_runs.py`). Observations recorded under a reviewer qualification are still verified
+   (`server/services/quality_runs.py`) and required to match one of the reviewer routes of the production run that
+   recorded it. Observations recorded under a reviewer qualification are still verified
    against it, so earlier runs' packages keep their evidence; the qualification table stays for that.
 4. **Removed:** reviewer qualification jobs, their API (`POST …/qualification/reviewers`), `scripts/r2/qualify_reviewers.py`,
    the corpus host settings and the reviewer rows of the run panel's qualification section.

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import dataclasses
 import json
 
 import pytest
@@ -354,7 +355,7 @@ async def test_a_model_observation_is_attested_by_its_configured_route_and_an_ol
     before that decision is still verified against it."""
     import r2.contracts.quality as q
     from lib.db.repositories.reviewer_qualifications import ReviewerQualificationRepository
-    from r2.automation.assessment import CONFIGURED_REVIEWER_REF
+    from r2.automation.assessment import CONFIGURED_REVIEWER_REF, configured_reviewer_digest
     from r2.contracts.automation import QualificationCase, ReviewerQualification
     from server.services.quality_runs import _reviewer_attested
 
@@ -366,9 +367,25 @@ async def test_a_model_observation_is_attested_by_its_configured_route_and_an_ol
         assert row is not None
         stored = q.NarrativeObservation.model_validate_json(row.observation_json)
         assert stored.assessor_qualification_ref == CONFIGURED_REVIEWER_REF
-        assert await _reviewer_attested(session, stored, row.qualification_digest)
-        moved = stored.model_copy(update={"config_digest": "sha256:" + "9" * 64})
-        assert not await _reviewer_attested(session, moved, row.qualification_digest)
+        found = await ModelObservationRepository(session).get(
+            user_id="default", project_name="project", observation_id=stored.observation_id
+        )
+        assert found is not None
+        assert await _reviewer_attested(session, user_id="default", project_name="project", model=found)
+        # A self-consistent observation of a model that is not one of the run's reviewer routes is refused.
+        stranger = stored.model_copy(
+            update={
+                "assessor_identity": "stranger",
+                "independence_group": "model:stranger",
+                "assessor_qualification_digest": configured_reviewer_digest(
+                    model_identity="stranger", config_digest=stored.config_digest, prompt_digest=stored.assessor_version
+                ),
+            }
+        )
+        forged = dataclasses.replace(
+            found, observation=stranger, qualification_digest=stranger.assessor_qualification_digest
+        )
+        assert not await _reviewer_attested(session, user_id="default", project_name="project", model=forged)
 
     cases = tuple(
         QualificationCase(
@@ -405,7 +422,9 @@ async def test_a_model_observation_is_attested_by_its_configured_route_and_an_ol
         }
     )
     async with host.sessions() as session:
-        assert await _reviewer_attested(session, older, digest)
+        legacy = dataclasses.replace(found, observation=older, qualification_digest=digest)
+        assert await _reviewer_attested(session, user_id="default", project_name="project", model=legacy)
+        changed = older.model_copy(update={"assessor_version": "sha256:" + "6" * 64})
         assert not await _reviewer_attested(
-            session, older.model_copy(update={"assessor_version": "sha256:" + "6" * 64}), digest
+            session, user_id="default", project_name="project", model=dataclasses.replace(legacy, observation=changed)
         )
