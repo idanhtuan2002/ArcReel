@@ -104,6 +104,12 @@ def route_digest(route: ModelRoute) -> str:
     return digest_value("r2.production-model-route.v1", ensure_json_value(route.model_dump(mode="json")))
 
 
+#: A smoke record (every case split ``SMOKE``, ADR-0167) needs at least this many clean films, all accepted, and
+#: defect films, all rejected; a record over calibration and hold-out splits keeps the corpus rule.
+SMOKE_CLEAN = 2
+SMOKE_DEFECTS = 3
+
+
 def reviewer_is_qualified(record: ReviewerQualification) -> bool:
     """Check declared corpus results; the host reader must resolve their real owner receipts."""
     record = ReviewerQualification.model_validate(record)
@@ -111,6 +117,15 @@ def reviewer_is_qualified(record: ReviewerQualification) -> bool:
         {case.receipt_ref for case in record.cases}
     ) != len(record.cases):
         return False
+    if record.cases and all(case.split == "SMOKE" for case in record.cases):
+        clean = [case for case in record.cases if case.label == "CLEAN"]
+        defects = [case for case in record.cases if case.label == "CRITICAL_DEFECT"]
+        return (
+            len(clean) >= SMOKE_CLEAN
+            and len(defects) >= SMOKE_DEFECTS
+            and all(case.accepted for case in clean)
+            and not any(case.accepted for case in defects)
+        )
     for split in ("CALIBRATION", "HOLDOUT"):
         clean = [case for case in record.cases if case.split == split and case.label == "CLEAN"]
         defects = [case for case in record.cases if case.split == split and case.label == "CRITICAL_DEFECT"]

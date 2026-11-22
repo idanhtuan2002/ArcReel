@@ -5,10 +5,12 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import pytest
+
 from r2.automation.assessment import ModelAssessment
 from r2.automation.profiles import reviewer_is_qualified
 from r2.contracts.automation import ModelRoute, QualificationCase
-from server.production_run.qualification import cannot_qualify, qualify
+from server.production_run.qualification import SmokeReviewUnanswered, cannot_qualify, qualify
 
 ROUTE = ModelRoute(
     role="reviewer_a",
@@ -206,3 +208,72 @@ async def test_a_stored_review_of_another_method_is_asked_again(tmp_path: Path):
     await _run(tmp_path, again)
 
     assert len(again.seen) == 40
+
+
+def _with_smoke(manifest: Path) -> Path:
+    """The corpus plus three defect and two clean smoke cases reusing its finals."""
+    data = json.loads(manifest.read_text(encoding="utf-8"))
+    picks = [c for c in data["cases"] if c["label"] == "CRITICAL_DEFECT"][:3]
+    picks += [c for c in data["cases"] if c["label"] == "CLEAN"][:2]
+    data["cases"] += [{**c, "case_id": f"smoke-{c['case_id']}", "split": "SMOKE"} for c in picks]
+    manifest.write_text(json.dumps(data), encoding="utf-8")
+    return manifest
+
+
+async def _smoke(tmp_path: Path, reviewer: Reviewer):
+    return await qualify(
+        corpus=_with_smoke(_corpus(tmp_path)),
+        route=ROUTE,
+        evaluator=reviewer,
+        output=tmp_path / "receipts",
+        profile_digest="sha256:" + "a" * 64,
+        launch_profile_id="fiction_narration_vi_v1",
+        language="vi",
+        stop_early=True,
+    )
+
+
+async def test_a_corpus_with_smoke_cases_is_judged_on_them_alone(tmp_path: Path):
+    reviewer = Reviewer()
+
+    record = await _smoke(tmp_path, reviewer)
+
+    assert len(reviewer.seen) == 5
+    assert {case.split for case in record.cases} == {"SMOKE"}
+    assert reviewer_is_qualified(record)
+
+
+async def test_a_smoke_check_fails_on_one_accepted_defect(tmp_path: Path):
+    record = await _smoke(tmp_path, Reviewer(miss_defects=1))
+
+    assert not reviewer_is_qualified(record)
+
+
+class StrictReviewer(Reviewer):
+    """Rejects every final."""
+
+    async def assess(self, *, route, evidence):
+        review = await super().assess(route=route, evidence=evidence)
+        return review.model_copy(update={"scores": {**GOOD, "story": 2}})
+
+
+async def test_a_smoke_check_fails_on_one_rejected_clean_film(tmp_path: Path):
+    reviewer = StrictReviewer()
+
+    record = await _smoke(tmp_path, reviewer)
+
+    assert not reviewer_is_qualified(record)
+    assert len(record.cases) == 4
+
+
+class SilentReviewer(Reviewer):
+    """Fails to answer: a reviewer that cannot answer must not pass by rejecting everything."""
+
+    async def assess(self, *, route, evidence):
+        review = await super().assess(route=route, evidence=evidence)
+        return review.model_copy(update={"outcome": "FAILED", "scores": {}})
+
+
+async def test_an_unanswered_smoke_review_ends_the_check_without_a_record(tmp_path: Path):
+    with pytest.raises(SmokeReviewUnanswered):
+        await _smoke(tmp_path, SilentReviewer())

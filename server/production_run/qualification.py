@@ -1,7 +1,7 @@
 """Reviewer and launch qualification of automatic production, shared by the CLIs and the host's API.
 
-A reviewer route is qualified against a labeled calibration and hold-out corpus of finals: labels never reach the
-reviewer, each review is a receipt beside the output named by its digest, a stored review of the same model, review
+A reviewer route is qualified against the smoke cases of a labeled corpus of finals when it has any (ADR-0167),
+otherwise against its calibration and hold-out splits: labels never reach the reviewer, each review is a receipt beside the output named by its digest, a stored review of the same model, review
 method and case evidence is reused, and the rule is ``reviewer_is_qualified``. A launch qualification is recorded
 only when the real preflight's sole blocking reason is its absence, bound to a host media-route evidence file.
 """
@@ -91,12 +91,21 @@ def _reusable_review(
     return review
 
 
+class SmokeReviewUnanswered(RuntimeError):
+    """A smoke review did not complete; the reviewer is not admitted by rejecting what it cannot answer."""
+
+
 def cannot_qualify(cases: list[QualificationCase], clean_totals: dict[str, int]) -> bool:
-    """True once the answers so far already break the rule: an accepted defect, or too many rejected clean cases."""
+    """True once the answers so far already break the rule: an accepted defect, or too many rejected clean cases
+    (any rejected clean case of a smoke check)."""
     for case in cases:
         if case.label == "CRITICAL_DEFECT" and case.accepted:
             return True
+        if case.split == "SMOKE" and case.label == "CLEAN" and not case.accepted:
+            return True
     for split, total in clean_totals.items():
+        if split == "SMOKE":
+            continue
         rejected = sum(1 for c in cases if c.split == split and c.label == "CLEAN" and not c.accepted)
         if (total - rejected) * 5 < total * 4:
             return True
@@ -122,6 +131,8 @@ async def qualify(
     form = review_form(launch_profile_id)
     method_digest = prompt_digest(review_method(route, protocol), language, form)
     prepared = _evidence(corpus, output, language, form)
+    if any(case["split"] == "SMOKE" for case, _ in prepared):
+        prepared = [(case, evidence) for case, evidence in prepared if case["split"] == "SMOKE"]
     clean_totals: dict[str, int] = {}
     for case, _ in prepared:
         if case["label"] == "CLEAN":
@@ -134,6 +145,8 @@ async def qualify(
         if review is None:
             review = await evaluator.assess(route=route, evidence=evidence)
         name, digest = _receipt(output, receipt_name, review.model_dump_json())
+        if case["split"] == "SMOKE" and review.outcome != "COMPLETED":
+            raise SmokeReviewUnanswered(case["case_id"])
         cases.append(
             QualificationCase(
                 split=case["split"],
@@ -206,4 +219,12 @@ async def build_record(
     )
 
 
-__all__ = ["ONLY_MISSING", "ONLY_STALE", "build_record", "cannot_qualify", "evidence_receipt", "qualify"]
+__all__ = [
+    "ONLY_MISSING",
+    "ONLY_STALE",
+    "SmokeReviewUnanswered",
+    "build_record",
+    "cannot_qualify",
+    "evidence_receipt",
+    "qualify",
+]

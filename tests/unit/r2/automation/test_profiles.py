@@ -141,6 +141,43 @@ def test_storyboard_candidates_need_exactly_one_pinned_judge(policy_data):
         RunPolicy.model_validate({**policy_data, "image_judge_identity": "ollama/judge@sha256:" + "2" * 64})
 
 
+def test_a_smoke_record_needs_every_defect_rejected_and_every_clean_film_accepted():
+    from r2.automation.profiles import reviewer_is_qualified
+    from r2.contracts.automation import ReviewerQualification
+
+    def case(i: int, label: str, accepted: bool, split: str = "SMOKE") -> dict:
+        return {
+            "split": split,
+            "label": label,
+            "accepted": accepted,
+            "case_digest": "sha256:" + f"{i:064x}",
+            "receipt_ref": f"case-{i}",
+            "receipt_digest": "sha256:" + f"{i + 100:064x}",
+        }
+
+    cases = [case(0, "CLEAN", True), case(1, "CLEAN", True)] + [case(i, "CRITICAL_DEFECT", False) for i in (2, 3, 4)]
+    record = ReviewerQualification(
+        profile_digest="sha256:" + "a" * 64,
+        launch_profile_id="fiction_narration_vi_v1",
+        language="vi",
+        provider_id="local",
+        model_id="assessor-a",
+        model_identity="assessor-a@weights-v1",
+        config_digest="sha256:" + "a" * 64,
+        prompt_digest="sha256:" + "b" * 64,
+        cases=cases,
+    )
+    assert reviewer_is_qualified(record)
+    for bad in (
+        [*cases[:4], case(4, "CRITICAL_DEFECT", True)],
+        [case(0, "CLEAN", False), *cases[1:]],
+        cases[1:],
+        cases[:4],
+        [*cases[:4], case(4, "CRITICAL_DEFECT", False, split="HOLDOUT")],
+    ):
+        assert not reviewer_is_qualified(record.model_copy(update={"cases": tuple(bad)}))
+
+
 def test_an_image_judge_qualifies_only_through_its_pinned_evidence_file(tmp_path, monkeypatch):
     monkeypatch.setattr(profiles, "REPOSITORY_ROOT", tmp_path)
     evidence = {"qualified": True, "model_identity": "ollama/judge", "prompt_digest": "sha256:" + "3" * 64}

@@ -524,7 +524,7 @@ class AutomationAuthorizationV1(AutomationContract):
 
 
 class QualificationCase(AutomationContract):
-    split: Literal["CALIBRATION", "HOLDOUT"]
+    split: Literal["CALIBRATION", "HOLDOUT", "SMOKE"]
     label: Literal["CLEAN", "CRITICAL_DEFECT"]
     accepted: StrictBool
     case_digest: Digest
