@@ -263,6 +263,29 @@ SCHEMA = {
     },
 }
 
+#: The verdict schema a local reviewer's decoding grammar enforces: SCHEMA with at most ``VERDICT_FINDINGS`` findings of
+#: at most ``FINDING_CHARS`` characters each, so a model looping over findings closes its answer within
+#: ``VERDICT_TOKENS``. Like ``VERDICT_TOKENS`` it bounds the transport, not what the reviewer is asked.
+VERDICT_FINDINGS = 8
+FINDING_CHARS = 300
+BOUNDED_SCHEMA = {
+    **SCHEMA,
+    "properties": {
+        **SCHEMA["properties"],
+        "findings": {
+            **SCHEMA["properties"]["findings"],
+            "maxItems": VERDICT_FINDINGS,
+            "items": {
+                **SCHEMA["properties"]["findings"]["items"],
+                "properties": {
+                    **SCHEMA["properties"]["findings"]["items"]["properties"],
+                    "detail": {"type": "string", "maxLength": FINDING_CHARS},
+                },
+            },
+        },
+    },
+}
+
 
 QUESTIONS = "questions"
 PROBABILITIES = "probabilities"
@@ -669,7 +692,7 @@ class FrameReviewer:
                 final = await chat.ask(
                     prompt,
                     frames,
-                    schema=SCHEMA,
+                    schema=BOUNDED_SCHEMA,
                     max_tokens=VERDICT_TOKENS,
                     context_tokens=CONTEXT_TOKENS,
                     think=None,

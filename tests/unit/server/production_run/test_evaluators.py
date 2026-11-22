@@ -13,9 +13,11 @@ import pytest
 from r2.contracts.automation import ModelRoute
 from server.production_run.evaluators import (
     CONTEXT_TOKENS,
+    FINDING_CHARS,
     FRAME_COUNT,
     PROBABILITIES,
     QUESTIONS,
+    VERDICT_FINDINGS,
     VERDICT_TOKENS,
     WATCH,
     FinalEvidence,
@@ -239,6 +241,9 @@ async def test_a_probability_reviewer_reads_first_token_logprobs_per_frame(tmp_p
     assert len(sent) == 3 * FRAME_COUNT + 1
     assert all(b["logprobs"] is True and b["options"]["num_predict"] == 1 for b in sent[:-1])
     assert sent[-1]["options"]["num_predict"] == VERDICT_TOKENS
+    findings = sent[-1]["format"]["properties"]["findings"]
+    assert findings["maxItems"] == VERDICT_FINDINGS
+    assert findings["items"]["properties"]["detail"]["maxLength"] == FINDING_CHARS
 
 
 @pytest.mark.parametrize(
