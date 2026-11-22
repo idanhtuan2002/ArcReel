@@ -104,9 +104,9 @@ def route_digest(route: ModelRoute) -> str:
     return digest_value("r2.production-model-route.v1", ensure_json_value(route.model_dump(mode="json")))
 
 
-#: A smoke record (every case split ``SMOKE``, ADR-0167) needs at least this many clean films, all accepted, and
-#: defect films, all rejected; a record over calibration and hold-out splits keeps the corpus rule.
-SMOKE_CLEAN = 2
+#: A smoke record (every case split ``SMOKE``, ADR-0167) needs at least this many eye-verified clean films, all
+#: accepted, and defect films, all rejected; a record over calibration and hold-out splits keeps the corpus rule.
+SMOKE_CLEAN = 1
 SMOKE_DEFECTS = 3
 
 

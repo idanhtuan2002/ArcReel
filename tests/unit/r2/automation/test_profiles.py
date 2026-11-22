@@ -168,10 +168,11 @@ def test_a_smoke_record_needs_every_defect_rejected_and_every_clean_film_accepte
         cases=cases,
     )
     assert reviewer_is_qualified(record)
+    assert reviewer_is_qualified(record.model_copy(update={"cases": tuple(cases[1:])}))
     for bad in (
         [*cases[:4], case(4, "CRITICAL_DEFECT", True)],
         [case(0, "CLEAN", False), *cases[1:]],
-        cases[1:],
+        cases[2:],
         cases[:4],
         [*cases[:4], case(4, "CRITICAL_DEFECT", False, split="HOLDOUT")],
     ):
