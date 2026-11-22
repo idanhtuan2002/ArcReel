@@ -133,6 +133,8 @@ from lib.text_utils import strip_json_code_fences
 
 logger = logging.getLogger(__name__)
 #: A token made of letters, digits, "_", "-" or "." only: an identifier, when it holds "_" or a digit.
+#: The longest text that still reads as an episode title.
+MAX_TITLE_CHARS = 80
 _IDENTIFIER = re.compile(r"[A-Za-z0-9_.\-]+")
 
 
@@ -266,8 +268,9 @@ class ScriptGenerator:
 
     def _reads_as_title(self, value: str) -> bool:
         """Whether ``value`` reads as an episode title. Not a title: an empty value, an identifier
-        (``visual_layer_ep02``, ``episode_2``: letters, digits and ``_`` without a space), leaked reasoning or schema
-        text, or Han characters in a project in another language."""
+        (``visual_layer_ep02``, ``episode_2``: letters, digits and ``_`` without a space), text longer than
+        ``MAX_TITLE_CHARS`` or over several lines (a planner that wrote its hooks into the title), leaked reasoning or
+        schema text, or Han characters in a project in another language."""
         from lib.output_hygiene import leak_reason
         from lib.text_attestation import has_cjk
 
@@ -275,6 +278,8 @@ class ScriptGenerator:
         language = self.project_json.get("source_language")
         return not (
             not title
+            or len(title) > MAX_TITLE_CHARS
+            or "\n" in title
             or (
                 " " not in title
                 and _IDENTIFIER.fullmatch(title) is not None

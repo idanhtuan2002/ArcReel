@@ -1840,6 +1840,24 @@ class TestMergeNarrationVisual:
         merged = sg._merge_narration_visual([_script_plan_seg("E2S01", "甲")], visual, episode=2)
         assert merged["title"] == "Tập 2"
 
+    def test_a_planned_title_that_is_a_run_of_hooks_yields_to_the_model_title(self, tmp_path):
+        # drama smoke 2026-11-23: the episode planner wrote every chapter hook into one planned title
+        hooks = "Chiếc đồng hồ dừng ở chín giờ kém năm — nhưng chưa ai mở hộp thiếc. " * 3
+        sg = _bare_generator(
+            tmp_path,
+            {
+                "source_language": "vi",
+                "episodes": [{"episode": 1, "title": hooks, "script_file": "x.json", "hook": "h"}],
+            },
+        )
+        visual = {"title": "Chiếc đồng hồ của ông", "segments": [_visual_seg("E1S01")]}
+        merged = sg._merge_narration_visual([_script_plan_seg("E1S01", "甲")], visual, episode=1)
+        assert merged["title"] == "Chiếc đồng hồ của ông"
+
+        visual = {"title": "Dòng một\nDòng hai", "segments": [_visual_seg("E1S01")]}
+        merged = sg._merge_narration_visual([_script_plan_seg("E1S01", "甲")], visual, episode=1)
+        assert merged["title"] == "Tập 1"
+
     def test_a_real_model_title_is_kept(self, tmp_path):
         sg = _bare_generator(tmp_path, {"source_language": "vi"})
         visual = {"title": "Chuyến đò lúc nửa đêm", "segments": [_visual_seg("E1S01")]}
