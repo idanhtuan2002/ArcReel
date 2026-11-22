@@ -166,6 +166,8 @@ class QualityAdapter:
             }
         blocked = [v for v in verdicts.values() if v.kind == "BLOCK"]
         if blocked:
+            if any(v.reason == "ASSESSOR_FAILED" for v in blocked):
+                self._set_aside_failed(targets)
             raise OwnerBlocked(blocked[0].reason or "REQUIRED_EVIDENCE_MISSING")
         project_root = self._projects.get_project_path(run.project_name)
         try:
@@ -313,6 +315,16 @@ class QualityAdapter:
     def _review_path(evidence: FinalEvidence, role: str) -> Path:
         token = evidence.subject_digest.removeprefix("sha256:")[:16]
         return evidence.final_path.parent / "quality" / f"{token}.{role}.json"
+
+    def _set_aside_failed(self, targets: dict[int, FinalEvidence]) -> None:
+        """A failed review (the reviewer errored, e.g. out of GPU memory) is moved beside the reviews, so the run
+        blocks on it once and a resume asks that reviewer again, within the stage's attempt limit."""
+        for evidence in targets.values():
+            for role in REVIEWER_ROLES:
+                path = self._review_path(evidence, role)
+                with contextlib.suppress(OSError, ValueError):
+                    if ModelAssessment.model_validate_json(path.read_text(encoding="utf-8")).outcome == "FAILED":
+                        path.replace(path.with_suffix(".failed.json"))
 
     def _stored(self, evidence: FinalEvidence) -> tuple[ModelAssessment, ...] | None:
         found = []

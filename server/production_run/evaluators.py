@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 import math
 import subprocess
 import tempfile
@@ -46,6 +47,8 @@ from server.production_run.final_checks import (
     variety_findings,
 )
 from server.production_run.vision_chat import AccessFor, ollama_access, vision_chat
+
+logger = logging.getLogger(__name__)
 
 FRAME_COUNT = 8
 CONTEXT_TOKENS = 16384
@@ -696,6 +699,7 @@ class FrameReviewer:
                 }
             )
         except (httpx.HTTPError, KeyError, TypeError, ValueError, subprocess.SubprocessError):
+            logger.warning("review of %s by %s failed", evidence.unit_key, route.model_identity, exc_info=True)
             return ModelAssessment.model_validate(
                 {**base, "prompt_digest": prompt_digest(method, evidence.language, evidence.form), "outcome": "FAILED"}
             )

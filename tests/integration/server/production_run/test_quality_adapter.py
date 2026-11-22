@@ -265,6 +265,12 @@ async def test_reviewer_exception_never_passes_quality(quality_host):
 
     assert blocked.status is not RunStatus.SUCCEEDED
     assert (blocked.stage, blocked.reason) == (RunStage.QUALITY, "ASSESSOR_FAILED")
+    # trial 7 episode 5, 2026-11-22: the failed review stayed stored, so every resume reused it and blocked again
+    # without asking the reviewer; it is set aside, the completed one is kept, and a resume asks only again
+    root = host.projects.get_project_path("project")
+    assert list(root.rglob("quality/*.reviewer_b.failed.json"))
+    assert not list(root.rglob("quality/*.reviewer_b.json"))
+    assert list(root.rglob("quality/*.reviewer_a.json"))
 
 
 async def test_unqualified_reviewers_cannot_pass(quality_host):
