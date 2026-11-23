@@ -35,6 +35,9 @@ configuration. ArcReel/R2 is frozen and keeps serving production; no bake-off (s
 9. [Coverage matrix](../../research/2026-11-23-r2-assembly-coverage-matrix.md) — the assembly must include the old app
    and every donor; gaps filled by a donor running whole, another donor's whole unit at an extension point, or the old
    app's unit as a connector feature or post-stage.
+10. [Separate donors vs assembly](../../research/2026-11-23-r2-separate-donors-vs-assembly.md) — the assembly contains
+    "each donor alone"; single-purpose uses run on the donor's own UI, the automatic product on the assembly; huohuo's
+    film pipeline is the fallback if DramaClaw fails M2.
 
 ## Charter and plan
 

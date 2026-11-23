@@ -176,6 +176,7 @@ automation contract); the table is updated in the same commit.
 | A DramaClaw step needs a donor code change | stop, record the seam need, report (GOAL tolerance) |
 | Translation batch fails 3× | retry the batch with the next registry writer once, then stop |
 | Pinned image tag missing | build from the pinned checkout (M0) |
+| DramaClaw fails M2 acceptance | run huohuo's own film pipeline (`runDramaEpisodePipeline`) on the same story; report the comparison ([separate vs assembly](../research/2026-11-23-r2-separate-donors-vs-assembly.md)) |
 
 ## 7. How this plan keeps the direction
 
