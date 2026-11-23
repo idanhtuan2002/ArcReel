@@ -59,7 +59,15 @@
       "config": {
         "request": {
           "endpoint": "images/generations",
-          "parameters": []
+          "parameters": [
+            {
+              "key": "watermark",
+              "requestPath": "watermark",
+              "control": "switch",
+              "label": "Watermark",
+              "default": false
+            }
+          ]
         }
       }
     },
@@ -73,7 +81,15 @@
       "config": {
         "request": {
           "endpoint": "images/generations",
-          "parameters": []
+          "parameters": [
+            {
+              "key": "watermark",
+              "requestPath": "watermark",
+              "control": "switch",
+              "label": "Watermark",
+              "default": false
+            }
+          ]
         }
       }
     },
@@ -87,7 +103,15 @@
       "config": {
         "request": {
           "endpoint": "video/generations",
-          "parameters": []
+          "parameters": [
+            {
+              "key": "watermark",
+              "requestPath": "watermark",
+              "control": "switch",
+              "label": "Watermark",
+              "default": false
+            }
+          ]
         }
       }
     }

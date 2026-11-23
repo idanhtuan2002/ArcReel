@@ -26,3 +26,26 @@ One section per milestone of the [assembly plan](../ASSEMBLY_PLAN.md): what was 
   `{"audio": {"url": "http://host.docker.internal:23350/audio/<id>.mp3"}}`; the container downloaded it: MP3, 2.48 s.
 - Unit tests: `tests/unit/assembly/` 9 passed; ruff, basedpyright, deptry, test audit clean.
 - Not yet verified: DramaClaw's own TTS task using a character voice sample uploaded through its API (M2).
+
+## M1.0 — model probes through NewAPI — 2026-11-23
+
+Keys pasted by the sponsor in DramaClaw "My Config" with `assembly/config/dramaclaw-profile.json`; DramaClaw created NewAPI
+channels 1 `DC-openrouter` (type 20), 2 `DC-gemini` (24), 3 `DC-volcengine` (45, base `https://ark.ap-southeast.bytepluses.com`).
+Calls with DramaClaw's own relay token on `127.0.0.1:3000`:
+
+| Slot | Result |
+|---|---|
+| Text `DC-*-LLM` → OpenRouter `baidu/ernie-5.5-flash-preview:free` | first call 429 (upstream shared pool `tpm_rate_limit_exceeded`); retry 200, natural Vietnamese sentence |
+| Vision → Gemini `gemini-3.5-flash` | 503 "high demand" twice, then channel test success in 38 s; `gemini-3.5-flash-lite` 1.0 s and `gemini-2.5-flash` 1.6 s succeed (fallback candidates); `gemini-2.5-flash-lite` 404 for new users |
+| Embedding → Gemini `gemini-embedding-001` (768) | success 0.45 s |
+| Image `LingShan-G2` → Seedream 4.5 via **VolcEngine type** channel, `/v1/images/generations` | 200, 1440×2560 (`m1-probes/seedream-text2img.jpg`); default output carries an "AI generated" mark; the Vietnamese prompt "đồng hồ quả quýt" was drawn literally as a tangerine clock |
+| Image with **base64 reference** (`image: ["data:image/jpeg;base64,…"]`), `watermark: false` | 200, reference kept, no mark (`m1-probes/seedream-ref-base64.jpg`) |
+| DramaClaw's own reference path `/v1/images/edits` JSON, `width`/`height`, base64 reference | 200, 1440×2560 |
+
+Decisions from the probes:
+- Image route = the VolcEngine-type channel (plan D7's OpenAI-type route is not needed; the `byteplus_openai` channel holds
+  the key in DramaClaw but has no NewAPI channel).
+- `watermark: false` set as a request-schema default on `LingShan-G2`, `LingShan-NB-2`, `seedance-1.0-pro-fast`; verified
+  with DramaClaw's own `apply_media_request_schema` and in its saved mappings.
+- D28: Seedream accepts base64 references, so the inline relay is viable for images; the ComfyUI first-frame half is still
+  to probe with the Wan channel.
