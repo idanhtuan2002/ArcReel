@@ -73,7 +73,7 @@ Legend: `[x]` done · `[~]` in progress · `[ ]` to do · `[!]` blocked · **S**
 | | Task | Evidence |
 |---|---|---|
 | [ ] | Finish post-stage: captions, loudness −14 LUFS, music bed, ambience | |
-| [ ] | Review post-stage report-only (two reviewers, AIVPE guards) | plan §0 |
+| [ ] | Review post-stage report-only — first use DramaClaw's own verifiers (enabled in CE, on demand only, not called by the pipeline or the Hermes toolset): `beats/{b}/verify`, `verify-frame`, `score`/`score-batch`, `verify/consistency`, `verify/continuity`, `verify/episode-overview`; report per episode at CP3/CP5; then the two-reviewer pass where they leave gaps. Portraits have no automatic check in DramaClaw (human CP1 only) | plan §0; `verification/routes.py` |
 
 ## M6 — operations (and D25)
 
