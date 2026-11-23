@@ -13,6 +13,9 @@ services:
       INDEXTTS2_PROVIDER: "${INDEXTTS2_PROVIDER}"
       INDEXTTS2_FAL_ENDPOINT: "${INDEXTTS2_FAL_ENDPOINT}"
       FAL_API_KEY: "${FAL_API_KEY}"
+      # DramaClaw's Custom-mode feature list (frontend/src/lib/feature-models.ts) has no CHARACTER_BUILD entry, so
+      # DC-character-builder-LLM never gets a NewAPI channel; route character extraction to the mapped scene-builder name.
+      CHARACTER_BUILD_MODEL: "DC-scene-builder-LLM"
   newapi:
     image: claymorelab/dramaclaw-gateway@sha256:97df6598082b40cf135e81919da773411ecd26155864a2eb92f7a647d45d93fd
   web:
