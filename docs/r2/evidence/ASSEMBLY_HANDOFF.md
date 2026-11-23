@@ -29,6 +29,8 @@ the plan's §0 holds the corrections. No new research notes until the first film
 
 ## Next steps, in order
 
+The live tracker is [ASSEMBLY_CHECKLIST.md](../ASSEMBLY_CHECKLIST.md); this list summarises it.
+
 Sponsor answered 2026-11-23: video = local Wan through DramaClaw's ComfyUI channel (D27); GOAL amended for interface
 languages (DramaClaw Vietnamese UI allowed); no Go/Kill or quota tolerance added to GOAL; media relay decided by the
 M1.0 base64 probe (D28).

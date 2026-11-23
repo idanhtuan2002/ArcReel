@@ -11,9 +11,13 @@ decisions). Facts cite the donor checkouts: DramaClaw `b299bfd` (`~/.cache/r2-do
 From [the reconciled rounds](../research/2026-11-23-r2-independent-rounds-reconciled.md). Where this section and a
 later one differ, this section holds.
 
-- **D26 → prose stories use `spine_template = "narrated"`** (the `drama` spine rejects text without scene headers,
-  `structured_ingest.py:81-86`); the vertical size is set explicitly at configure/compose (`720x1280`). The `drama` spine
-  comes later through huohuo's `drama_script_formatter` → translation → header rewrite `INT. <nơi> - DAY`.
+- **D26 → both spines from the first films (sponsor 2026-11-23)**: prose → `spine_template = "narrated"` (the `drama`
+  spine rejects text without scene headers, `structured_ingest.py:81-86`); **dialogue drama** → huohuo's
+  `drama_script_formatter` (whole, `POST /api/v1/agent/drama_script_formatter/chat {message, drama_id, episode_id}`,
+  output `## S01 | 内/外景 · 地点 | 时段` and `角色：（神态）台词`) → translation when the source is Chinese → headers
+  rewritten to `INT./EXT. <nơi> - <thời gian>` (DramaClaw rates them standard) → `spine_template = "drama"`, so each
+  `Name: line` gets the character's voice. M2 makes one film of each from the same story. The vertical size is set
+  explicitly (`720x1280`). Progress: [checklist](ASSEMBLY_CHECKLIST.md).
 - **Connector drives DramaClaw's REST endpoints directly** (the Hermes plugin is the reference for endpoints and
   arguments, not vendored). It walks DramaClaw's step order (§5, keyed by the task types `pipeline/status` returns) and
   uses status as the completion check. **Class rule**: a "not required"/no-op answer counts as done for that episode; a
