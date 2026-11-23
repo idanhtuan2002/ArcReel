@@ -53,7 +53,7 @@ def test_a_long_title_card_wraps_inside_the_frame_and_ends_in_an_ellipsis():
     text = next(line for line in script.splitlines() if ",Title," in line).split("{\\fad(150,250)}", 1)[1]
     lines = text.split("\\N")
     assert len(lines) == 2
-    assert all(len(line) <= LINE_CHARS - 3 for line in lines)
+    assert all(len(line) <= LINE_CHARS + 1 for line in lines)  # the ellipsis may follow a full line
     assert lines[0].startswith("Tập 1 · Chiếc đồng hồ")
     assert lines[1].endswith("…")
 

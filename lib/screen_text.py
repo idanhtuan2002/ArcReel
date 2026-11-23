@@ -11,7 +11,9 @@ from __future__ import annotations
 from collections.abc import Sequence
 from dataclasses import dataclass
 
-LINE_CHARS = 32
+#: OpenMontage short-form captions: at most 30 characters a line, two lines a screen
+#: (vendor/openmontage/skills/creative/short-form.md, "Max chars/line 30", "Max lines 2").
+LINE_CHARS = 30
 LINES_PER_SCREEN = 2
 TITLE_SECONDS = 1.8
 TITLE_LINES = 2
@@ -44,7 +46,7 @@ def wrap(text: str, width: int = LINE_CHARS) -> list[str]:
 
 def title_lines(text: str) -> str:
     """The title card in at most ``TITLE_LINES`` lines inside the frame; a longer title ends in an ellipsis."""
-    lines = wrap(text, width=LINE_CHARS - 4)
+    lines = wrap(text, width=LINE_CHARS)
     if len(lines) > TITLE_LINES:
         lines = [*lines[: TITLE_LINES - 1], lines[TITLE_LINES - 1].rstrip(".,;:!?…") + "…"]
     return "\\N".join(lines)
@@ -114,7 +116,7 @@ def ass_script(
             f"{{\\fad(150,250)}}{title_lines(_escape(title_card))}"
         )
     if end_card:
-        text = "\\N".join(wrap(_escape(end_card), width=LINE_CHARS - 4))
+        text = "\\N".join(wrap(_escape(end_card), width=LINE_CHARS))
         events.append(f"Dialogue: 1,{_clock(end_start)},{_clock(duration)},End,,0,0,0,,{{\\fad(250,0)}}{text}")
     return "\n".join(
         [

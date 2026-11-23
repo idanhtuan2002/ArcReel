@@ -111,15 +111,17 @@ def film_grade(project: Mapping[str, Any]) -> str:
     return grade if isinstance(grade, str) and grade in GRADES else "neutral"
 
 
-#: A unit without speech holds its picture this long at most; a longer silent clip is dead air.
-SILENT_HOLD_US = 2_500_000
-#: A spoken unit cuts this long after its last word or caption.
-SPEECH_TAIL_US = 500_000
+#: A unit without speech holds its picture at most this long: OpenMontage short-form pacing, "No static holds: Max 3
+#: seconds" (vendor/openmontage/skills/creative/short-form.md).
+SILENT_HOLD_US = 3_000_000
+#: A spoken unit ends with its speech, as the donors cut it: DramaClaw sizes a scene to its TTS duration
+#: (`cli.py`, `adjust_video_duration`) and huohuo-drama muxes each shot's TTS with `-shortest` (`compose-ffmpeg.ts`).
+SPEECH_TAIL_US = 0
 
 
 def played_duration_us(video_us: int, speech_end_us: int) -> int:
-    """How much of a unit's clip the film plays: up to the end of its speech plus a short tail, or a short hold when
-    it has none; never more than the clip."""
+    """How much of a unit's clip the film plays: up to the end of its speech, or a short hold when it has none; never
+    more than the clip."""
     wanted = speech_end_us + SPEECH_TAIL_US if speech_end_us > 0 else SILENT_HOLD_US
     return min(video_us, wanted)
 
