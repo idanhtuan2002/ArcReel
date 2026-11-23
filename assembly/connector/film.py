@@ -134,6 +134,14 @@ class FilmRun:
         data = _ok(self.tools.request("GET", f"/projects/{self.state.project_id}/characters"), "characters")
         return data if isinstance(data, list) else data.get("characters", [])
 
+    def prepare_characters(self) -> None:
+        """Init playbook Step 5 (face prompts) and Vietnamese casting; also run on resume if not done yet."""
+        chars = self.characters()
+        if self.fill_face_prompts:
+            self.fill_face_prompts(self, [c for c in chars if not str(c.get("face_prompt") or "").strip()])
+        if self.cast_voices and not self.state.voices_cast:
+            self.cast_voices(self)
+
     def episodes(self) -> list[dict[str, Any]]:
         data = _ok(self.tools.request("GET", f"/projects/{self.state.project_id}/episodes"), "episodes")
         return data if isinstance(data, list) else data.get("episodes", [])
@@ -145,10 +153,7 @@ class FilmRun:
             chars = self.characters()
             if not chars:
                 raise RunStopped("build_characters completed with no characters (playbook: anomaly)")
-            if self.fill_face_prompts:
-                self.fill_face_prompts(self, [c for c in chars if not str(c.get("face_prompt") or "").strip()])
-            if self.cast_voices:
-                self.cast_voices(self)
+            self.prepare_characters()
             self.record(step, 0, f"{len(chars)} characters")
         elif step == "build_episodes":
             self.start("dramaclaw_plan_episodes", "plan episodes", planning_mode="chapters")
@@ -267,6 +272,8 @@ class FilmRun:
 
     def run(self, max_rounds: int = 400) -> RunState:
         last: tuple[str, int] | None = None
+        if not self.state.voices_cast and self.characters():
+            self.prepare_characters()
         for _ in range(max_rounds):
             status = self.status()
             step = str(status.get("next_step") or "")

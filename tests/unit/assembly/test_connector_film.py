@@ -83,3 +83,12 @@ def test_project_names_meet_dramaclaw_rules() -> None:
     name = project_name("Chiếc đồng hồ của ông (narrated)")
     assert name.startswith("Chiec_dong_ho_cua_ong_narrated_")
     assert all(ch.isalnum() or ch == "_" for ch in name)
+
+
+def test_a_resumed_run_prepares_existing_characters_before_the_next_step(tmp_path: Path) -> None:
+    tools = FakeTools([{"next_step": "done", "current_episode": 1}])
+    prepared: list[str] = []
+    run = _run(tools, tmp_path)
+    run.cast_voices = lambda r: prepared.append("cast")
+    run.run()
+    assert prepared == ["cast"]

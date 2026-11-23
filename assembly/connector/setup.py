@@ -104,20 +104,20 @@ TEXT_RETRIES = 3  # ASSEMBLY_PLAN §0: text calls retried 3 times, media once
 
 
 def _chat_with_retries(token: str, payload: dict[str, Any]) -> httpx.Response:
-    for attempt in range(TEXT_RETRIES + 1):
+    attempt = 0
+    while True:
         response = httpx.post(
             f"{NEWAPI_URL}/v1/chat/completions",
             headers={"Authorization": f"Bearer {token}"},
             json=payload,
             timeout=180,
         )
-        if response.status_code != 429 and response.status_code < 500:
+        retryable = response.status_code == 429 or response.status_code >= 500
+        if not retryable or attempt >= TEXT_RETRIES:
             response.raise_for_status()
             return response
-        if attempt < TEXT_RETRIES:
-            time.sleep(30 * (attempt + 1))
-    response.raise_for_status()
-    return response
+        attempt += 1
+        time.sleep(30 * attempt)
 
 
 def fill_face_prompts(run: FilmRun, missing: list[dict[str, Any]]) -> None:
