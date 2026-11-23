@@ -36,6 +36,12 @@ configuration. ArcReel/R2 is frozen and keeps serving production; no bake-off (s
    and every donor; gaps filled by a donor running whole, another donor's whole unit at an extension point, or the old
    app's unit as a connector feature or post-stage.
 
+## Charter and plan
+
+- [GOAL](../../GOAL.md) — the charter above every document.
+- [Assembly plan](../ASSEMBLY_PLAN.md) — architecture, locked decisions D1–D15, sponsor prerequisites, milestones
+  M0–M5 with acceptance, fallbacks, direction controls.
+
 ## Rules added on 2026-11-23
 
 - AGENTS.md: "Donor 整体移植" with Port / Why-not-ported sections and port lists; "资源浪费防线" (class fixes, state

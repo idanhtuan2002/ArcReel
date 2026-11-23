@@ -26,6 +26,7 @@ uv run pre-commit run --all-files actionlint && uv run pre-commit run --all-file
 
 ## 研究、决策与会话连续性
 
+- **GOAL 至上（sponsor 决定，2026-11-23）：**`docs/GOAL.md` 高于本文件之外的一切文档（ADR、冻结架构、计划、规则、评审）。与之冲突时以 GOAL 为准，并在当天向 sponsor 报告冲突条款。当前实施依据 `docs/r2/ASSEMBLY_PLAN.md`（ADR-0170）：donor 整段运行，本仓库只写 connector、模型配置、donor 模型边界上的小 adapter 与 donor 缺失的后置步骤；不新增治理机制。sponsor 询问方向或速度时，回答须点名相关文档条款并给出 Go/Kill/Hold/Recycle，不能只改流程。sponsor 只决定产品问题，技术选择由 agent 研究后决定并记入计划。
 - **Research-first：**提出或接受架构、产品、供应商、工作流或权限边界决策前，先检查当前 Git/代码/既有 ADR 与计划，再核验一手资料；主动对照相关外部项目、仓库和固定 commit 的实际源码、fixture、能力与缺陷。研究结果须区分事实、推断、未知项和备选方案；研究未完成时不得把候选方案写成已定决策。
 - **Reuse-first：**先穷尽可复用的本仓库模块、契约、测试、工具和已调研 donor，再考虑新建；复用必须验证真实调用面、版本 pin、同 fixture 行为和 authority 边界，不把仅规划或未验收的接口当作可用实现。
 - **Donor 整体移植（sponsor 决定，2026-11-22）：**采用 donor 机制时整体移植该单元——代码、prompt、默认配置、测试与 fixture，标明 donor 仓库与 commit；只自写与本仓库衔接的 adapter。重新实现须在 ADR 中写明理由（例如 donor 仅有 TypeScript 或只有 prompt）。动手新建机制前，先查 donor 本地 checkout 与 `docs/research/*donor*` 是否已有带测试的可运行单元；评审语料等辅助产物经本应用自身流水线生成，不另写旁路脚本。审计见 `docs/research/2026-11-22-r2-donor-port-audit.md`。凡采用 donor 机制的 ADR 必须有 **Port** 小节（donor 仓库 @ commit、移植的文件与测试、本仓库自写的 adapter），否则写 **Why not ported** 段落；缺少即为 review finding。donor 研究须以 **port 清单**（单元、文件、测试、adapter、规模）收尾，不能只给差距表。prompt 按原文移植（`zh` 保留原文，`vi`/`en` 由原文翻译），语言或技术栈不同只能作为改写措辞的理由，不能作为丢弃结构、规则与覆盖面的理由。原因分析见 `docs/research/2026-11-23-r2-why-donor-units-were-not-ported.md`。
