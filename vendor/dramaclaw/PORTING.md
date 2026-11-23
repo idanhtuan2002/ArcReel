@@ -79,3 +79,7 @@ e.g. `voice_prereq_required`). DramaClaw's own agent keeps using it inside Drama
 - Donor facts found by film 1 (not changed): the rewrite task type is `content_rewrite` (the Hermes references say
   `content_rewriter`); generated prose is zh or en only (`utils/source_language.py`), so the connector never calls
   `rewrite/generate` for Vietnamese stories and the script is cut from the raw Vietnamese text.
+- Donor bug found by film 1: DramaClaw 2.0.2 (`1ec0236`/`b299bfd`) `task_backend/runners/audio.py` passes a
+  non-organization task egress context to `IndexTTS2FalClient`, whose `generate` denies it (`ORG_EGRESS_DENIED`), so
+  beat audio never runs in CE tasks. Upstream fixed it in v2.1.3 (2026-10-29) by passing the context only when it is an
+  organization's.
