@@ -15,3 +15,14 @@ One section per milestone of the [assembly plan](../ASSEMBLY_PLAN.md): what was 
 - Merged compose config shows `INDEXTTS2_PROVIDER=fal`, `INDEXTTS2_FAL_ENDPOINT=http://host.docker.internal:23350/…`,
   `host.docker.internal=host-gateway` on the api service.
 - Disk after pull: 16 GB free on `/`.
+
+## M1a — Vietnamese voice path — transport verified 2026-11-23
+
+- Service: `assembly/deploy/voice-adapter.service` (user unit `voice-adapter`, active), listening on `172.17.0.1:23350`
+  (docker0; DramaClaw's container resolves `host.docker.internal` to `172.17.0.1`).
+- Probe: a 3.68 s WAV sample made by the VieNeu shim with preset "Ngọc Huyền" registered by SHA-256; from **inside**
+  `assembly-dramaclaw-api-1`, the fal request `{"audio_url": "data:audio/wav;base64,…", "prompt": "Bác ơi, bác còn sửa
+  đồng hồ cơ không ạ?"}` to `http://host.docker.internal:23350/fal-ai/index-tts-2/text-to-speech` returned
+  `{"audio": {"url": "http://host.docker.internal:23350/audio/<id>.mp3"}}`; the container downloaded it: MP3, 2.48 s.
+- Unit tests: `tests/unit/assembly/` 9 passed; ruff, basedpyright, deptry, test audit clean.
+- Not yet verified: DramaClaw's own TTS task using a character voice sample uploaded through its API (M2).

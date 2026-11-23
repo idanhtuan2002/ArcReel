@@ -1,0 +1,14 @@
+# Assembly voice adapter (ASSEMBLY_PLAN D9): DramaClaw's IndexTTS2 fal requests → VieNeu speech.
+# Listens on the docker0 bridge address only, which DramaClaw's container reaches as host.docker.internal.
+# Install: cp to ~/.config/systemd/user/ && systemctl --user daemon-reload && systemctl --user enable --now voice-adapter
+[Unit]
+Description=Assembly voice adapter (DramaClaw fal TTS -> VieNeu)
+After=vieneu-tts-shim.service
+
+[Service]
+WorkingDirectory=%h/content-production-os/.worktrees/r2-film-quality
+ExecStart=%h/content-production-os/.worktrees/r2-film-quality/.venv/bin/python -m uvicorn assembly.voice_adapter.app:app --host 172.17.0.1 --port 23350
+Restart=on-failure
+
+[Install]
+WantedBy=default.target
