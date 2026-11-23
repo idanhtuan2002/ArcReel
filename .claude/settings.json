@@ -71,6 +71,15 @@
             "command": "jq -r '.tool_response.filePath // .tool_input.file_path' | { read -r f; case \"$f\" in */frontend/*.ts|*/frontend/*.tsx) fe=\"${f%%/frontend/*}/frontend\"; (cd \"$fe\" && pnpm exec eslint --fix \"$f\");; esac; } 2>/dev/null || true"
           }
         ]
+      },
+      {
+        "matcher": "mcp__codebase-memory-mcp__.*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/codebase_memory_first.py\" mark"
+          }
+        ]
       }
     ],
     "PreToolUse": [
@@ -80,6 +89,29 @@
           {
             "type": "command",
             "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/guard_full_pytest.py\""
+          },
+          {
+            "type": "command",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/commit_rules.py\""
+          }
+        ]
+      },
+      {
+        "matcher": "Bash|Grep",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/codebase_memory_first.py\" guard"
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/rules_reminder.py\""
           }
         ]
       }
