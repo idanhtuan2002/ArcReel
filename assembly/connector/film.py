@@ -390,6 +390,7 @@ class FilmRun:
 
     def run(self, max_rounds: int = 400) -> RunState:
         last: tuple[str, int] | None = None
+        repeated = False
         if self.characters():
             self.prepare_characters()
             if self.episodes():
@@ -406,7 +407,16 @@ class FilmRun:
             if step == "done":
                 return self.state
             if (step, episode) == last:
-                raise RunStopped(f"{step} ep{episode} completed but the pipeline did not advance (playbook: anomaly)")
+                if repeated:
+                    raise RunStopped(
+                        f"{step} ep{episode} completed but the pipeline did not advance (playbook: anomaly)"
+                    )
+                # A step can complete partially when free pools fail some calls (e.g. 10/18 beats); run it once more.
+                repeated = True
+                self.log(f"[{time.strftime('%T')}] ep{episode} {step}: did not advance, one more run after a pause")
+                time.sleep(TRANSIENT_PAUSES[0])
+            else:
+                repeated = False
             last = (step, episode)
             self.run_step_with_retries(step, episode)
         raise RunStopped(f"no end after {max_rounds} rounds")

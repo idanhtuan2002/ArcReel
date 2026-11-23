@@ -59,8 +59,9 @@ def test_the_run_starts_one_task_per_status_round_and_ends_at_done(tmp_path: Pat
     assert [s["step"] for s in state.steps] == ["build_characters", "global_optimize_video"]
 
 
-def test_a_completed_step_that_does_not_advance_stops_the_run(tmp_path: Path) -> None:
-    tools = FakeTools([{"next_step": "tts", "current_episode": 1}, {"next_step": "tts", "current_episode": 1}])
+def test_a_completed_step_that_does_not_advance_stops_the_run(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(film, "TRANSIENT_PAUSES", (0,))
+    tools = FakeTools([{"next_step": "tts", "current_episode": 1}] * 3)
     with pytest.raises(RunStopped, match="did not advance"):
         _run(tools, tmp_path).run()
 
