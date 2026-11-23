@@ -6,6 +6,41 @@ decided; an implementer needs no further question except the sponsor prerequisit
 decisions). Facts cite the donor checkouts: DramaClaw `b299bfd` (`~/.cache/r2-donors/dramaclaw-full`), huohuo-drama
 `f104b85` (`~/content-os-r1-8/work/huohuo-drama`), OpenMontage `08e2151` (`~/content-os-r1-8/work/OpenMontage`).
 
+## 0. Corrections after the three independent rounds (override the sections below)
+
+From [the reconciled rounds](../research/2026-11-23-r2-independent-rounds-reconciled.md). Where this section and a
+later one differ, this section holds.
+
+- **D26 → prose stories use `spine_template = "narrated"`** (the `drama` spine rejects text without scene headers,
+  `structured_ingest.py:81-86`); the vertical size is set explicitly at configure/compose (`720x1280`). The `drama` spine
+  comes later through huohuo's `drama_script_formatter` → translation → header rewrite `INT. <nơi> - DAY`.
+- **Connector drives DramaClaw's REST endpoints directly** (the Hermes plugin is the reference for endpoints and
+  arguments, not vendored). It walks DramaClaw's step order (§5, keyed by the task types `pipeline/status` returns) and
+  uses status as the completion check. **Class rule**: a "not required"/no-op answer counts as done for that episode; a
+  step that repeats twice without progress stops the run with its reason (no endless loop).
+- **Ingest text**: the connector writes `Chapter N` markers (DramaClaw does not read `Chương N`); one episode per chapter
+  (`structured_v1`).
+- **Configure** also pins `sketch_image_selection = LingShan-G2` (Seedream); Seedream 4.0 is a second 200-image pool.
+- **Identity images for every identity** (status checks only the main character).
+- **Voices (D9/D10)**: casting after the `characters` step and per age group after `identity_plan`; the adapter decodes
+  the inline `data:` URL DramaClaw sends (`voice_clone.py:402-417`), maps by SHA-256, returns **MP3** at a
+  `host.docker.internal` URL; an unknown sample **fails loudly**.
+- **Vision (D6)**: image-carrying `DC-*-LLM` slots spread over several Gemini models (one call per beat in the global
+  optimizer); nemotron-vl removed; Groq `qwen3.8-27b` (≤ 3 images) last.
+- **Video**: free Seedance cannot finish M2 (≈ 18–23 clips / 33–93 s total at 720p). **Ken Burns is not available on the
+  API path** (test mock only). Free route = DramaClaw's **ComfyUI channel** with our local Wan workflow, set up in M1;
+  paid video is a sponsor decision before M2.
+- **Retries (D15)**: media steps 1 retry, text steps 3 (no triple re-billing of an episode-wide media step).
+- **Entry gates for M2**: media relay (Cloudinary or the approved inline seam); a video route that can finish the episode.
+- **M2b is a thin console**: run list, start form, step timeline with Continue / Pause / Redo and deep links into
+  huohuo's and DramaClaw's own screens, errors, film player — no re-implementation of donor screens.
+- **M4 review is report-only** until the sponsor approves the cost of regenerating steps.
+- **huohuo (M3)**: our compose override passes `HUOHUO_PRESET_*`, `host.docker.internal`, loopback port, random token;
+  the batch writer resumes with `mode: "remaining"` after a dropped stream.
+- **Security/maintenance**: pin donor images by digest; keep DramaClaw's media-catalog auto-update off; check the running
+  2.0.2 image against `b299bfd` once.
+- **Process**: no new research note until the first film; each milestone ends with a film or a stopping reason.
+
 ## 1. Architecture
 
 ```
@@ -188,36 +223,34 @@ seam); the old app's action, family, bedtime, storytime packs; audiobook from th
 are enforced in code (`AGENT_GUIDE.md:589`, `lib/checkpoint.py`). StoryBox's simulation lab is the one donor
 function not covered by any choice so far. Each item is its own task with a film/story acceptance.
 
-## 5. DramaClaw step → toolset handler
+## 5. DramaClaw steps (keyed by the task type `pipeline/status` returns, `api/routes/pipeline.py:18-35`)
 
-| `next_step` | Handler (vendored plugin) | Endpoint |
-|---|---|---|
-| ingest | `dramaclaw_post` ×2 | `/projects/{p}/ingest/upload`, `/ingest/start` |
-| configure | `dramaclaw_patch` | `/projects/{p}` (D14) |
-| characters | `_handle_build_characters` | `/projects/{p}/characters/build` |
-| episodes | `_handle_plan_episodes` | `/projects/{p}/episodes/plan` |
-| portraits | `_handle_generate_portrait` per main character | `/characters/{name}/portrait-async` |
-| identity_plan | `_handle_plan_identities`, then `_handle_plan_scenes`, `_handle_plan_props`, `_handle_generate_scene_master` per scene | `/episodes/{e}/identities/plan-async`, `/scenes/plan`, `/props/plan` |
-| identity_images | `_handle_generate_identity_image` per identity | `/characters/{name}/identities/{id}/generate-async` |
-| script | `_handle_generate_script` | episode script |
-| sketches | `_handle_generate_sketches` | sketches |
-| coloring | `_handle_detect_sketch_identities` | sketch identity detection |
-| global_optimize | `_handle_optimize_video_global` | `/episodes/{e}/optimize/video-global` |
-| first_frames | `_handle_render_first_frames` | render first frames |
-| tts | `_handle_generate_audio` | `/episodes/{e}/audio/generate` |
-| video | `_handle_start_single_video` per beat | `/episodes/{e}/beats/{b}/video` |
-| compose | `_handle_compose_episode` | `/episodes/{e}/videos/compose` |
-| done | `_handle_get_final_video` | `/episodes/{e}/final` |
+| Status `next_step` | Connector call (REST, `/api/v1/projects/{p}/…`) |
+|---|---|
+| `ingest_fast` | `ingest/upload` (multipart `file`), then `ingest/start {filename, spine_template:"narrated"}` |
+| `configure` | `PATCH /projects/{p}` (`ethnicity`, `narration_style`, `sketch_image_selection`) |
+| `build_characters` | `characters/build`; then voice casting (uploads) |
+| `build_episodes` | `episodes/plan` (one episode per `Chapter N`) |
+| `portraits` | `characters/{name}/portrait-async` for every character |
+| `identity_plan` | `episodes/{e}/identities/plan-async`, `scenes/plan`, `props/plan`; voice casting per age group |
+| `identity_images` | `characters/{name}/identities/{id}/generate-async` for **every** identity |
+| `script_writer` | episode script generation (endpoint from the toolset's `generate_script`) |
+| `sketch_generation` | sketches (toolset `generate_sketches`) |
+| `coloring` | sketch identity detection (toolset `detect_sketch_identities`) |
+| `global_optimize_video` | `episodes/{e}/optimize/video-global` |
+| `selected_regen` | first frames (toolset `render_first_frames`) |
+| `tts` | `episodes/{e}/audio/generate`; `audio_generation_not_required` = done |
+| `single_video` | `episodes/{e}/beats/{b}/video` per beat |
+| `compose_episode` | `episodes/{e}/videos/compose`, then `episodes/{e}/final` and download |
 
-Where the plugin's tool descriptions give a different order or extra arguments, the plugin wins (it is the donor's own
-automation contract); the table is updated in the same commit.
+Where the toolset's descriptions give different arguments, the toolset wins and this table is updated in the same commit.
 
 ## 6. Decided fallbacks (no question needed)
 
 | Event | Action |
 |---|---|
 | BytePlus image pool exhausted | switch D7 mapping to Gemini image; record in ASSEMBLY_MODELS.md |
-| BytePlus video pool exhausted | DramaClaw's still/Ken Burns path if its video step allows it; otherwise stop and report (tolerance: paid spend) |
+| BytePlus video pool exhausted | DramaClaw's ComfyUI channel with the local Wan workflow (Ken Burns is not on the API path); paid video only by sponsor decision |
 | Gemini vision 429 | NewAPI falls to the OpenRouter vision channel (D6) |
 | OpenRouter ernie fails or 429 | next free writer in the registry order (particle-1, ling-3.2-flash) |
 | A DramaClaw step needs a donor code change | stop, record the seam need, report (GOAL tolerance) |

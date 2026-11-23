@@ -22,22 +22,15 @@ Updated 2026-11-23 (late). Read with [GOAL](../../GOAL.md), [ASSEMBLY_PLAN](../A
    profile is loaded (M1).
 3. Answer: old app UI vs new control page — to be decided from research round A below.
 
-## In flight when this was written
+## Research done
 
-Re-launched after the quota reset (first launch was stopped at the usage limit). Each agent now **appends its findings
-to its own report file as it goes**; a partial file is usable and the rest can be re-run from the brief.
-
-Three independent read-only research agents (sponsor asked for at least three independent deep rounds). If their
-results are not recorded in `docs/research/2026-11-23-r2-independent-round-{a,b,c}.md`, they were lost: re-run them
-with the briefs in [assembly-research-briefs.md](assembly-research-briefs.md).
-- A — what needs to be done (plan completeness, order, estimates) + old UI vs new control page.
-- B — what it will produce (step-by-step output quality with these models; quota arithmetic per episode).
-- C — what could make it fail (pre-mortem, risk register, recurrence of the old failure patterns).
+Three independent rounds recorded and reconciled ([reconciled](../../research/2026-11-23-r2-independent-rounds-reconciled.md));
+the plan's §0 holds the corrections. No new research notes until the first film.
 
 ## Next steps, in order
 
-1. Record the three research results, reconcile them, fix the plan (sponsor sees the conflicts).
-2. Answer the UI question with evidence.
-3. M1 work that needs no keys: `assembly/config/dramaclaw-profile.json`, `docs/r2/ASSEMBLY_MODELS.md`,
+1. Sponsor answers: video money, GOAL amendment (DramaClaw Vietnamese UI), GOAL additions, Cloudinary.
+2. M1 work that needs no keys: `assembly/config/dramaclaw-profile.json`, `docs/r2/ASSEMBLY_MODELS.md`,
    `assembly/voice_adapter/`, `assembly/connector/voices.py` (+ tests).
+3. Set up DramaClaw's ComfyUI channel with the local Wan workflow (free video route).
 4. When keys/relay arrive: M1.0 probes, then the rest of M1 and M2.
