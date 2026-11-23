@@ -1,0 +1,7 @@
+# Daily cleanup of DramaClaw's Cloudinary relay folder (ASSEMBLY_PLAN D28); runs inside the DramaClaw api container.
+[Unit]
+Description=Assembly Cloudinary relay cleanup
+
+[Service]
+Type=oneshot
+ExecStart=/bin/sh -c 'docker exec -i assembly-dramaclaw-api-1 python - < %h/content-production-os/.worktrees/r2-film-quality/assembly/ops/cloudinary_cleanup.py'

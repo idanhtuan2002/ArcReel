@@ -8,7 +8,7 @@ Legend: `[x]` done · `[~]` in progress · `[ ]` to do · `[!]` blocked · **S**
 
 | | Item | Status / evidence |
 |---|---|---|
-| [x] | **S** Cloudinary account, pasted in DramaClaw → Settings → Media Storage | 2026-11-23: `/model-gateway/config` mediaRelay `source=database, provider=cloudinary, configured=true, folder=dramaclaw-relay` |
+| [!] | **S** Cloudinary account, pasted in DramaClaw → Settings → Media Storage — saved, but Cloudinary answers 401 `cloud_name mismatch`: the Cloud name field holds another value (4 chars, not a cloud name); sponsor re-enters it | 2026-11-23 cleanup job probe |
 | [x] | **S** OpenRouter, Gemini, BytePlus keys pasted in DramaClaw → Models & Channels → My Config | 2026-11-23, ASSEMBLY_ACCEPTANCE M1.0 |
 | [x] | Video route for first films = local Wan (D27) | 2026-11-23 |
 | [x] | GOAL amendment: donor interface languages allowed (DramaClaw Vietnamese UI) | `docs/GOAL.md` rule 1 |
@@ -21,7 +21,7 @@ Legend: `[x]` done · `[~]` in progress · `[ ]` to do · `[!]` blocked · **S**
 | | Task | Evidence |
 |---|---|---|
 | [x] | Release images 2.0.2, loopback ports, NewAPI initialized | ASSEMBLY_ACCEPTANCE M0 |
-| [ ] | Pin images by digest; media-catalog auto-update off; check 2.0.2 against `b299bfd` | plan §0 |
+| [x] | Pin images by digest; media-catalog auto-update off; check 2.0.2 against `b299bfd` — digests in `override.yml`, containers recreated, config kept; auto-update false; image built from `1ec0236`, which differs from `b299bfd` in 4 `src/novelvideo` files (freezone canvas paste only) | 2026-11-23 |
 
 ## M1 — models, voices, local video
 
@@ -31,10 +31,10 @@ Legend: `[x]` done · `[~]` in progress · `[ ]` to do · `[!]` blocked · **S**
 | [~] | M1a casting (`assembly/voices/`: VieNeu catalog from its own preset file, registry, casting rule by gender/region) + tests — done; sample generation and upload to DramaClaw come with the connector (M2) | `tests/unit/assembly/test_voices.py` |
 | [x] | M1a DramaClaw ComfyUI channel with the local Wan workflow (Wan2.2 TI2V 5B GGUF, `assembly/config/comfyui/wan22-5b-i2v.json`, bridge `172.17.0.1:8189`); clip through NewAPI 160 s | ASSEMBLY_ACCEPTANCE M1a Wan |
 | [x] | `assembly/config/dramaclaw-profile.json` (applied in DramaClaw "My Config"; image route = VolcEngine-type channel per probe; `watermark: false` defaults; embedding `gemini-embedding-001` 768) — (OpenRouter text, Gemini vision spread, OpenAI-type channel → BytePlus Seedream for `LingShan-G2`, Seedream 4.0 second pool, VolcEngine Seedance) | D5–D8 |
-| [ ] | `docs/r2/ASSEMBLY_MODELS.md` slot → model → pool → fallback | |
+| [x] | `docs/r2/ASSEMBLY_MODELS.md` slot → model → pool → fallback | written 2026-11-23 |
 | [x] | M1.0 probes per model incl. base64 on Seedream and the ComfyUI channel — all pass | ASSEMBLY_ACCEPTANCE M1.0, M1a Wan |
 | [ ] | Inline relay option in DramaClaw (approved donor change, rebuilt image, PORTING) — if probes allow | D28 |
-| [ ] | Cloudinary daily cleanup job | D28 |
+| [~] | Cloudinary daily cleanup job — `assembly/ops/cloudinary_cleanup.py` runs inside the api container, timer `cloudinary-cleanup.timer` 04:30 daily; first run stopped on the 401 above | D28 |
 
 ## M2 — first films from "Chiếc đồng hồ của ông", both spines
 

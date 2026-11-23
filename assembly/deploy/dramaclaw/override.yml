@@ -3,7 +3,9 @@
 # Ports stay DramaClaw's, bound to loopback through ST_API_PORT / ST_WEB_PORT, because DramaClaw CE trusts every
 # request as the owner.
 services:
+  # Images pinned by digest (2.0.2 built from DramaClaw 1ec0236; gateway dramaclaw-gateway ed1e234).
   api:
+    image: claymorelab/dramaclaw@sha256:335531e10cf5ddadc596fc1e0fe7a191fd651e4a663355f41d2f67fcec899fe0
     extra_hosts:
       - "host.docker.internal:host-gateway"
     environment:
@@ -11,3 +13,7 @@ services:
       INDEXTTS2_PROVIDER: "${INDEXTTS2_PROVIDER}"
       INDEXTTS2_FAL_ENDPOINT: "${INDEXTTS2_FAL_ENDPOINT}"
       FAL_API_KEY: "${FAL_API_KEY}"
+  newapi:
+    image: claymorelab/dramaclaw-gateway@sha256:97df6598082b40cf135e81919da773411ecd26155864a2eb92f7a647d45d93fd
+  web:
+    image: claymorelab/dramaclaw-frontend@sha256:1d3ae3f469ffe02acf47ffac83937070321c3e6b205ff056e468bc446b79d894
