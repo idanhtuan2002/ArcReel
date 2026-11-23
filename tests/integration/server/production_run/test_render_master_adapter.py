@@ -34,7 +34,7 @@ from r2.contracts.automation import OwnerReceipt, RunStage, RunStatus, StageOutc
 from server.production_run.controller import ProductionController
 from server.production_run.final_master_adapter import FinalMasterAdapter
 from server.production_run.ports import StepPlan
-from server.production_run.render_adapter import RenderAdapter
+from server.production_run.render_adapter import SPEECH_TAIL_US, RenderAdapter
 from server.services.presentation_read_model import PresentationReadModelService
 from tests.integration.server.services.test_automation_grants import delegated_host as delegated_host
 from tests.integration.server.services.test_automation_grants import interactive_env as interactive_env
@@ -271,7 +271,16 @@ async def test_exact_presentations_render_and_become_the_runs_final_master(rende
     final_path = project_path / final.receipt_ref.partition("@")[2]
     manifest = json.loads(final_path.with_name("episode_1.manifest.json").read_text(encoding="utf-8"))
     assert manifest["final_sha256"] == sha256_file(final_path)
-    assert abs(manifest["duration_seconds"] - 32.0) <= 0.12
+    # Each 8 s clip plays to the end of its narration plus the tail (render_adapter.played_duration_us).
+    played = [
+        min(
+            unit["video"]["duration_us"],
+            unit["narration"]["start_us"] + unit["narration"]["duration_us"] + SPEECH_TAIL_US,
+        )
+        for unit in manifest["units"]
+    ]
+    assert abs(manifest["duration_seconds"] - sum(played) / 1_000_000) <= 0.12
+    assert manifest["duration_seconds"] < 32.0
     assert [unit["unit_id"] for unit in manifest["units"]] == list(SEGMENTS)
     assert manifest["grade"] == {"name": "neutral", "intensity": 0.7}
 

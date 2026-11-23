@@ -111,6 +111,19 @@ def film_grade(project: Mapping[str, Any]) -> str:
     return grade if isinstance(grade, str) and grade in GRADES else "neutral"
 
 
+#: A unit without speech holds its picture this long at most; a longer silent clip is dead air.
+SILENT_HOLD_US = 2_500_000
+#: A spoken unit cuts this long after its last word or caption.
+SPEECH_TAIL_US = 500_000
+
+
+def played_duration_us(video_us: int, speech_end_us: int) -> int:
+    """How much of a unit's clip the film plays: up to the end of its speech plus a short tail, or a short hold when
+    it has none; never more than the clip."""
+    wanted = speech_end_us + SPEECH_TAIL_US if speech_end_us > 0 else SILENT_HOLD_US
+    return min(video_us, wanted)
+
+
 def render_input(project_path: Path, episode: int, materialized: MaterializedEpisode) -> RenderInput:
     moves = _planned_moves(materialized.script_snapshot)
     units: list[RenderUnit] = []
@@ -126,12 +139,18 @@ def render_input(project_path: Path, episode: int, materialized: MaterializedEpi
             raise RenderRefused("STALE_PRESENTATION", presentation.unit_id)
         if video.start_microseconds != 0:
             raise RenderRefused("INVALID_UNIT_WINDOW", presentation.unit_id)
+        speech_end_us = max(
+            [
+                narration.start_microseconds + narration.duration_microseconds if narration is not None else 0,
+                *(cue.end_microseconds for cue in presentation.subtitles),
+            ]
+        )
         units.append(
             RenderUnit(
                 unit_id=presentation.unit_id,
                 video_path=safe_join(project_path, video.media.artifact_path),
                 video_start_us=0,
-                duration_us=video.duration_microseconds,
+                duration_us=played_duration_us(video.duration_microseconds, speech_end_us),
                 video_audio=video.audio_enabled,
                 video_gain=video.gain,
                 narration_path=safe_join(project_path, narration.media.artifact_path) if narration else None,

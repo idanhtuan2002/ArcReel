@@ -97,3 +97,13 @@ def test_an_episode_has_a_title_card_and_a_next_card_only_when_another_episode_f
     assert episode_cards(project, tmp_path, 1) == ("Tập 1 · Bến sông", "Tập sau: Vị khách cuối là ai?")
     assert episode_cards(project, tmp_path, 2) == ("Tập 2", None)
     assert episode_cards({**project, "source_language": "en"}, tmp_path, 1)[0] == "Episode 1 · Bến sông"
+
+
+def test_a_unit_plays_to_the_end_of_its_speech_and_a_silent_unit_holds_briefly():
+    # drama smoke run b961dc0a: two silent 5 s clips opened the episode, first word at 10.1 s
+    from server.production_run.render_adapter import SILENT_HOLD_US, SPEECH_TAIL_US, played_duration_us
+
+    assert played_duration_us(5_041_667, 0) == SILENT_HOLD_US
+    assert played_duration_us(2_000_000, 0) == 2_000_000
+    assert played_duration_us(6_041_667, 2_720_000) == 2_720_000 + SPEECH_TAIL_US
+    assert played_duration_us(4_000_000, 3_900_000) == 4_000_000
