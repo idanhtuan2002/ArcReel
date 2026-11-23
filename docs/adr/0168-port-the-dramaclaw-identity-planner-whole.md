@@ -1,5 +1,5 @@
 ---
-status: proposed
+status: accepted
 ---
 
 # Port DramaClaw's identity planner whole for per-episode character states
@@ -47,7 +47,39 @@ per episode:
 5. **Replaces ADR-0146 item 1** (single-pass state extraction) for automatic runs once the port passes its donor tests
    and one real episode; items 2–3 (sheets, shots, judge) are reused unchanged.
 
-## Open before acceptance
+## Port
+
+- **Donor:** DramaClaw @ `b299bfd`.
+- **Taken whole:** `agents/identity_planner.py`, `models.py` and the helpers it imports (`time_of_day.py`,
+  `utils/asset_names.py`, `utils/derived_scenes.py`, `utils/source_language.py`, `utils/identity_resolver.py`,
+  `shared/env_guard.py`), prompts unchanged, and five donor test files (113 tests, all pass unedited). File list in
+  `vendor/dramaclaw/PORTING.md`. The package keeps the import name `novelvideo` (path dependency
+  `dramaclaw-identity`), so no import path was edited.
+- **Our seam:** `vendor/dramaclaw/src/novelvideo/{config,sqlite_store,knowledge_pipeline}.py` and
+  `cognee/` (listed in PORTING.md); `lib/identity_planning.py`. The planner's PydanticAI agents get a `FunctionModel`
+  (the donor tests' own seam) that sends each request, with the output tool's JSON schema, through the project's text
+  route, so routing, fallbacks and usage stay ours. `ProjectIdentityStore` answers the planner's store calls from
+  `project.json`; `apply_identity_plan` writes identities as derivatives (the identity fields kept under
+  `derivatives.<name>.identity`, the sheet edit text from them) and the episode's `identity_defaults`.
+- **Not ported:** `test_identity_runner_result.py` (DramaClaw's Celery runner) and the Cognee graph path.
+
+## Settled at port time
+
+- **Episode text:** the text script planning reads (`script_source_relpath`: the adaptation under screen mode, else
+  the episode source slice), passed as the episode's `raw_content`, as DramaClaw's `load_episode_planning_content`
+  falls back to it.
+- **Language:** the planner's own detection (Chinese or English; Vietnamese gets English descriptions). Identity names
+  become derivative names as the model writes them.
+
+## Next
+
+1. A workflow step per episode, before script planning, that runs the planner on the project's script text route and
+   applies the plan.
+2. A shot naming the bare character uses the episode's default derivative (storyboard references, cast block,
+   continuity judge).
+3. Retire ADR-0146 item 1 (states from asset extraction) for automatic runs once one real episode passes.
+
+## Open
 
 - Which story text an episode reads (`load_episode_planning_content` → our adapted episode script or its source span).
 - Vietnamese output: DramaClaw detects only Chinese or English (Vietnamese → English). Descriptions feed image
