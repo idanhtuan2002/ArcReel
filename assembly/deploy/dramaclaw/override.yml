@@ -10,9 +10,9 @@ services:
       - "host.docker.internal:host-gateway"
     environment:
       PROMPT_EXPORT_PASSWORD: "${PROMPT_EXPORT_PASSWORD}"
-      INDEXTTS2_PROVIDER: "${INDEXTTS2_PROVIDER}"
-      INDEXTTS2_FAL_ENDPOINT: "${INDEXTTS2_FAL_ENDPOINT}"
-      FAL_API_KEY: "${FAL_API_KEY}"
+      # Pipeline tasks send IndexTTS2 through NewAPI only (indextts2_fal.py refuses the fal path under a task
+      # egress context); NewAPI channel `assembly-voice` (assembly/ops/newapi_voice_channel.py) serves index-tts-2.
+      INDEXTTS2_PROVIDER: "newapi"
       # DramaClaw's Custom-mode feature list (frontend/src/lib/feature-models.ts) has no CHARACTER_BUILD entry, so
       # DC-character-builder-LLM never gets a NewAPI channel; route character extraction to the mapped scene-builder name.
       CHARACTER_BUILD_MODEL: "DC-scene-builder-LLM"

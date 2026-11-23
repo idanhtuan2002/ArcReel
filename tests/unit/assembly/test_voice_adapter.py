@@ -14,6 +14,10 @@ from assembly.voice_adapter import app as adapter
 from assembly.voices import registry
 
 
+def _read(path: str | Path) -> bytes:
+    return Path(path).read_bytes()
+
+
 def _client(seen: list[dict]) -> httpx.AsyncClient:
     def handler(request: httpx.Request) -> httpx.Response:
         seen.append(json.loads(request.content))
@@ -60,3 +64,22 @@ async def test_a_reference_that_is_neither_data_nor_http_is_refused(tmp_path: Pa
                 registry_file=tmp_path / "r.json",
             )
     assert caught.value.status_code == 422
+
+
+async def test_the_newapi_speech_route_returns_mp3_for_a_cast_sample(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.setattr(adapter, "OUT_DIR", tmp_path / "out")
+    monkeypatch.setenv("ASSEMBLY_VOICE_REGISTRY", str(tmp_path / "reg.json"))
+    registry.register(b"khang-sample", "Minh Đức", tmp_path / "reg.json")
+    sample = "data:audio/wav;base64," + base64.b64encode(b"khang-sample").decode()
+
+    real_client = httpx.AsyncClient
+
+    def fake_client(*args, **kwargs):
+        return real_client(transport=httpx.MockTransport(lambda r: httpx.Response(200, content=b"ID3-khang")))
+
+    monkeypatch.setattr(adapter.httpx, "AsyncClient", fake_client)
+    response = await adapter.newapi_speech(
+        adapter.NewApiSpeechRequest(input="Sửa được thì sửa.", metadata={"audio_url": sample})
+    )
+    assert response.media_type == "audio/mpeg"
+    assert _read(response.path) == b"ID3-khang"

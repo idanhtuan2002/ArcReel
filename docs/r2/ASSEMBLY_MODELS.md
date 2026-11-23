@@ -11,7 +11,7 @@ Source of truth for values: `assembly/config/dramaclaw-profile.json` (applied in
 | Images `LingShan-G2`, `LingShan-NB-2` | `seedream-4-5-251128`, `watermark: false` | VolcEngine type → `assembly/image_adapter` (172.17.0.1:23360, raises DramaClaw's fixed 1K sizes to Seedream 4.5's 3 686 400-pixel minimum) → BytePlus ap-southeast (ch 3) | 200 images once-only | local image adapter in front of ComfyUI (M6) |
 | Video `Wan22-5B-local` (project default) | Wan2.2 TI2V 5B Q4 GGUF, 480p, 2–5 s, first frame | ComfyUI (gateway task channel, bridge `172.17.0.1:8189`) | local GPU, ~3 min per 2 s clip | `seedance-1.0-pro-fast` |
 | Video `seedance-1.0-pro-fast` | `seedance-1-0-pro-fast-251015`, `watermark: false` | VolcEngine (ch 3) | once-only, ~18–23 clips | — |
-| Speech (IndexTTS2 fal path) | VieNeu-TTS v3 Turbo presets via `assembly/voice_adapter` | env `INDEXTTS2_PROVIDER=fal` → `host.docker.internal:23350` | local | — |
+| Speech `index-tts-2` | VieNeu-TTS v3 Turbo presets via `assembly/voice_adapter` (`/v1/audio/speech`, sample in `metadata.audio_url`) | `INDEXTTS2_PROVIDER=newapi` → NewAPI channel `assembly-voice` (`assembly/ops/newapi_voice_channel.py`) → 172.17.0.1:23350 (the fal path is refused inside tasks) | local | — |
 | Media relay | Cloudinary folder `dramaclaw-relay` | DramaClaw Media Storage | free tier | inline relay (D28, probes pass) |
 
 Aspect ratios: only `Wan22-5B-local` is limited to 9:16 (its graph renders 480×848 whatever size is requested, to fit

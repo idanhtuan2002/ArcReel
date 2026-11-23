@@ -76,6 +76,26 @@ async def text_to_speech(request: FalSpeechRequest) -> dict[str, dict[str, str]]
         return {"audio": {"url": await synthesize(request, client)}}
 
 
+class NewApiSpeechRequest(BaseModel):
+    model: str = "index-tts-2"
+    input: str
+    metadata: dict[str, object] = {}
+
+
+@app.post("/v1/audio/speech")
+async def newapi_speech(request: NewApiSpeechRequest) -> FileResponse:
+    """DramaClaw's in-pipeline IndexTTS2 path: NewAPI `audio/speech` with the sample in `metadata.audio_url`
+    (`generators/indextts2_fal.py` `_generate_via_newapi`; the direct fal path is refused inside tasks)."""
+    audio_url = str(request.metadata.get("audio_url") or "")
+    emotion = str(request.metadata.get("emotion_prompt") or "")
+    async with httpx.AsyncClient(timeout=600) as client:
+        url = await synthesize(
+            FalSpeechRequest(audio_url=audio_url, prompt=request.input, emotion_prompt=emotion), client
+        )
+    audio_id = url.rsplit("/", 1)[1].split(".", 1)[0]
+    return FileResponse(OUT_DIR / f"{audio_id}.mp3", media_type="audio/mpeg")
+
+
 @app.get("/audio/{name}")
 async def audio(name: str) -> FileResponse:
     audio_id, _, ext = name.partition(".")
