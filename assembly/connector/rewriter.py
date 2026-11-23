@@ -82,7 +82,9 @@ def translate_lines(lines: Sequence[str], names: Sequence[str], *, newapi_url: s
             except (ValueError, json.JSONDecodeError) as error:
                 problems = [f"the answer is not valid JSON: {str(error)[:200]}"]
                 continue
-            problems = check_batch(list(lines), out, target="vi", terms=list(names))
+            # check_batch's CJK test counts the full-width colon; it is checked as ":" and kept in the output.
+            checked = [line.replace("：", ":") for line in out]
+            problems = check_batch(list(lines), checked, target="vi", terms=list(names))
             problems = [p for p in problems if "must keep the name" not in p]  # source names are Chinese forms
             if not problems:
                 return out
