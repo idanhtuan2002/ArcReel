@@ -40,3 +40,24 @@ def test_no_cards_when_none_are_given():
     assert ",Title," not in script
     assert ",End," not in script
     assert "{lạ}" not in script
+
+
+def test_a_long_title_card_wraps_inside_the_frame_and_ends_in_an_ellipsis():
+    # drama smoke run b961dc0a: a hook paragraph saved as the episode title ran past both edges on one line
+    title = (
+        "Tập 1 · Chiếc đồng hồ dừng ở chín giờ kém năm — nhưng chưa ai mở hộp thiếc. "
+        "Hộp thiếc đựng gì mà cô gái phải ôm khư khư trong chiều mưa như thế?"
+    )
+    script = ass_script(width=576, height=1024, duration=28.0, cues=[], title_card=title)
+
+    text = next(line for line in script.splitlines() if ",Title," in line).split("{\\fad(150,250)}", 1)[1]
+    lines = text.split("\\N")
+    assert len(lines) == 2
+    assert all(len(line) <= LINE_CHARS - 3 for line in lines)
+    assert lines[0].startswith("Tập 1 · Chiếc đồng hồ")
+    assert lines[1].endswith("…")
+
+
+def test_a_short_title_card_stays_on_one_line():
+    script = ass_script(width=576, height=1024, duration=28.0, cues=[], title_card="Tập 1 · Hộp thiếc")
+    assert ",Title,,0,0,0,,{\\fad(150,250)}Tập 1 · Hộp thiếc" in script

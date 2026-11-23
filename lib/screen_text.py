@@ -14,6 +14,7 @@ from dataclasses import dataclass
 LINE_CHARS = 32
 LINES_PER_SCREEN = 2
 TITLE_SECONDS = 1.8
+TITLE_LINES = 2
 END_SECONDS = 2.8
 #: A face with Vietnamese and Chinese glyphs that the host has (``fc-list``); libass falls back when missing.
 FONT = "Noto Sans"
@@ -39,6 +40,14 @@ def wrap(text: str, width: int = LINE_CHARS) -> list[str]:
     if current:
         lines.append(current)
     return lines
+
+
+def title_lines(text: str) -> str:
+    """The title card in at most ``TITLE_LINES`` lines inside the frame; a longer title ends in an ellipsis."""
+    lines = wrap(text, width=LINE_CHARS - 4)
+    if len(lines) > TITLE_LINES:
+        lines = [*lines[: TITLE_LINES - 1], lines[TITLE_LINES - 1].rstrip(".,;:!?…") + "…"]
+    return "\\N".join(lines)
 
 
 def caption_screens(start: float, end: float, text: str) -> list[TimedText]:
@@ -102,7 +111,7 @@ def ass_script(
     if title_card:
         events.append(
             f"Dialogue: 1,{_clock(0.0)},{_clock(min(TITLE_SECONDS, duration))},Title,,0,0,0,,"
-            f"{{\\fad(150,250)}}{_escape(title_card)}"
+            f"{{\\fad(150,250)}}{title_lines(_escape(title_card))}"
         )
     if end_card:
         text = "\\N".join(wrap(_escape(end_card), width=LINE_CHARS - 4))
