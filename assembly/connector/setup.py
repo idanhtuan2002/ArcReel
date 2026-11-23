@@ -13,7 +13,10 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import subprocess
+import time
+import unicodedata
 from pathlib import Path
 from typing import Any
 
@@ -39,8 +42,16 @@ def api_base() -> str:
     return os.environ.get("DRAMACLAW_API_URL", DEFAULT_API_URL).rstrip("/")
 
 
-def create_project(name: str) -> str:
-    response = httpx.post(f"{api_base()}/api/v1/projects", json={"name": name[:64]}, timeout=60)
+def project_name(title: str) -> str:
+    """DramaClaw accepts letters, digits and underscores only (`validate_project_name`)."""
+    plain = unicodedata.normalize("NFKD", title.replace("đ", "d").replace("Đ", "D"))
+    plain = "".join(ch for ch in plain if not unicodedata.combining(ch))
+    slug = re.sub(r"[^A-Za-z0-9]+", "_", plain).strip("_")
+    return f"{slug[:48]}_{time.strftime('%m%d%H%M')}"
+
+
+def create_project(title: str) -> str:
+    response = httpx.post(f"{api_base()}/api/v1/projects", json={"name": project_name(title)}, timeout=60)
     response.raise_for_status()
     data = response.json()
     body = data.get("data", data)

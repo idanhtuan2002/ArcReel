@@ -13,3 +13,6 @@ Source of truth for values: `assembly/config/dramaclaw-profile.json` (applied in
 | Video `seedance-1.0-pro-fast` | `seedance-1-0-pro-fast-251015`, `watermark: false` | VolcEngine (ch 3) | once-only, ~18–23 clips | — |
 | Speech (IndexTTS2 fal path) | VieNeu-TTS v3 Turbo presets via `assembly/voice_adapter` | env `INDEXTTS2_PROVIDER=fal` → `host.docker.internal:23350` | local | — |
 | Media relay | Cloudinary folder `dramaclaw-relay` | DramaClaw Media Storage | free tier | inline relay (D28, probes pass) |
+
+Aspect ratios: only `Wan22-5B-local` is limited to 9:16 (its graph renders 480×848 whatever size is requested, to fit
+8 GB of VRAM); Seedream, Seedance and any future model keep their own ratio options.

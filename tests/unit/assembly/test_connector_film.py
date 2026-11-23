@@ -75,3 +75,11 @@ def test_an_unprepared_project_is_not_driven(tmp_path: Path) -> None:
     tools = FakeTools([{"next_step": "configure", "current_episode": None}])
     with pytest.raises(RunStopped, match="not prepared"):
         _run(tools, tmp_path).run()
+
+
+def test_project_names_meet_dramaclaw_rules() -> None:
+    from assembly.connector.setup import project_name
+
+    name = project_name("Chiếc đồng hồ của ông (narrated)")
+    assert name.startswith("Chiec_dong_ho_cua_ong_narrated_")
+    assert all(ch.isalnum() or ch == "_" for ch in name)
