@@ -99,6 +99,8 @@ later one differ, this section holds.
 | D24 | The control page binds to `127.0.0.1` only, no login (used on this machine) | sponsor decision |
 | D25 | **Vietnamese interface everywhere** (sponsor 2026-11-23): control page in Vietnamese; huohuo UI `vi`; DramaClaw UI gets a `vi` locale (donor seam: `vi` in `SUPPORTED` and default, a switcher item, `public/locales/vi/translation.json` with 5 886 strings translated, frontend image rebuilt from the pinned checkout; recorded in PORTING). Backend messages stay zh/en | sponsor requirement; verification round V6 |
 | D26 | DramaClaw spine: `spine_template = "drama"` for dialogue stories (default), `"narrated"` for narration-style stories; run option `--spine` | `api/schemas.py:124-127` |
+| D27 | **Video for the first films = local Wan** through DramaClaw's own ComfyUI channel (sponsor 2026-11-23); Seedance kept for when quality needs it | sponsor decision; reconciled rounds |
+| D28 | Media relay: decided after the M1.0 base64 probes — inline relay (donor change, needs sponsor approval) if Seedream and the ComfyUI channel accept `data:` URIs, else Cloudinary with a daily cleanup job ([verification §6](../research/2026-11-23-r2-assembly-verification-round.md)) | sponsor question 2026-11-23 |
 | D15 | Retries: each DramaClaw step and each huohuo call up to 3 attempts with 30/120/300 s waits; a step that still fails stops the run with its error recorded in the run state and `docs/r2/evidence/R2_RUN_BLOCK_LEDGER.md` | GOAL rule 3 |
 
 ## 3. Sponsor prerequisites (actions, not decisions)

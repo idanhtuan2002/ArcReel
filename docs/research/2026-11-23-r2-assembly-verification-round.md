@@ -56,3 +56,30 @@ What it does that the chosen donors do not, and how it carries over without chan
 
 D7 corrected, D25 (Vietnamese UI everywhere: control page, huohuo `vi`, DramaClaw `vi` seam — sponsor requirement) and
 D26 (spine) added; M1.0 probes include base64 acceptance; ArcReel's Jianying export added to M6/P2.
+
+## 6. Cloudinary: risks and alternatives (sponsor question, 2026-11-23)
+
+FACT (`storage/media_relay.py:185-280`): DramaClaw uploads each reference image/video to Cloudinary with the plain
+`…/{resource_type}/upload` API and uses the returned public `secure_url`; the `ttl` argument is **not used** for
+Cloudinary (it is for Aliyun OSS signed URLs). DramaClaw already sends voice samples **inline as `data:` URLs**
+(`seedance2_i2v/voice_clone.py:402-417`, round A).
+
+Risks of Cloudinary:
+1. **Permanent public copies**: every portrait, identity image and first frame sent to a cloud model stays in the
+   account, reachable by anyone holding the URL (an unguessable uuid name), until deleted by hand.
+2. **Quota fills up**: nothing is deleted, so the free tier's storage/bandwidth credits are used up over time and uploads
+   then fail mid-run.
+3. **Third-party terms and moderation** can suspend the account for some content; an outage or no internet stops every
+   step that needs a reference.
+4. The API secret lives in DramaClaw's `settings.db` (and in its backups).
+
+Alternatives:
+| Option | Third party | Donor change | Condition |
+|---|---|---|---|
+| Cloudinary + our cleanup job (Admin API: delete the relay folder's assets older than one day) | yes | no | free account |
+| **Inline relay**: a third provider in `media_relay.py` returning a `data:` URI (the voice path already does this) | **none** | yes (~30 lines, PORTING) | the receiving model accepts base64 — probe Seedream (BytePlus) and the ComfyUI channel's first frame in M1.0 |
+| Aliyun OSS (private bucket, signed URLs with TTL) | yes (Chinese cloud) | no | paid, Chinese account |
+| Own public file server through a tunnel | none, but this machine faces the internet | yes (DramaClaw cannot point elsewhere) | exposes the host |
+
+Decision path: M1.0 probes base64 input on Seedream and on the ComfyUI channel. If both accept, the **inline relay**
+(no copies outside this machine) is proposed to the sponsor as a donor change; if not, Cloudinary with the cleanup job.

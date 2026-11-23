@@ -24,7 +24,8 @@ this page. Where any of them conflicts with it, this page wins and the conflict 
 ## Rules that keep the direction
 
 1. **Take the donor's part whole; only connect and configure.** Changing code inside a donor is allowed only when a
-   required model has no substitute, and is recorded in that donor's PORTING notes with the reason.
+   required model has no substitute, **or to add an interface language the sponsor requires** (amendment
+   2026-11-23: Vietnamese UI for DramaClaw), and is recorded in that donor's PORTING notes with the reason.
 2. **Build nothing a donor already does.** Our code is: the connector, model configuration, small adapters at a donor's
    model boundary, and post-stages on a donor's output where no donor has the step.
 3. **No governance machinery.** No grants, custody, qualification, fences or authority layers. Failures are retried,
