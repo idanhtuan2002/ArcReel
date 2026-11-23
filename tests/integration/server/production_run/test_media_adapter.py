@@ -333,6 +333,21 @@ async def test_a_complete_target_episode_passes_while_more_episodes_await_planni
     assert tools.calls == []
 
 
+async def test_an_episode_without_a_separate_audio_track_is_complete_with_its_videos(media_host):
+    # drama smoke run b961dc0a, 2026-11-23: every video current, audio "not_applicable", blocked as an input change
+    sessions, controller, run, planner, tools, _ = media_host
+    artifacts = {
+        **_episode_media(),
+        "audio": {"state": "not_applicable", "current_ids": [], "missing_ids": [], "stale_ids": []},
+    }
+    planner.plans = [_plan(A.PLAN_EPISODES, artifacts=artifacts)]
+
+    passed = await _tick(sessions, controller, run)
+
+    assert (passed.stage, passed.status) == (RunStage.RENDER, RunStatus.RUNNING)
+    assert tools.calls == []
+
+
 async def test_planning_more_episodes_before_the_target_is_complete_is_an_input_change(media_host):
     sessions, controller, run, planner, _, _ = media_host
     planner.plans = [_plan(A.PLAN_EPISODES, artifacts=_episode_media(missing_video=True))]
