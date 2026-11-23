@@ -1207,6 +1207,9 @@ async def test_normalize_drama_script_preserves_draft_edited_during_model_call(
 
     class _Generator:
         async def generate(self, _request, project_name=None):
+            if isinstance(_request.response_schema, dict):
+                # Identity planning runs first on the same route; the race under test is the script call.
+                raise RuntimeError("no identity planning in this test")
             started.set()
             await release.wait()
 
@@ -1260,6 +1263,9 @@ async def test_normalize_drama_script_preserves_output_when_formal_changes_durin
 
     class _Generator:
         async def generate(self, _request, project_name=None):
+            if isinstance(_request.response_schema, dict):
+                # Identity planning runs first on the same route; the race under test is the script call.
+                raise RuntimeError("no identity planning in this test")
             started.set()
             await release.wait()
 

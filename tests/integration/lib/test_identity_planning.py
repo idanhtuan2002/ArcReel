@@ -137,3 +137,16 @@ async def test_an_episode_without_text_is_not_planned(tmp_path: Path) -> None:
 
     with pytest.raises(IdentityPlanningError, match="no text"):
         await plan_episode_identities(project_path, project, 1, generate=FakeRoute([], [], []))
+
+
+def test_bare_characters_take_the_episode_default_look_once():
+    from lib.identity_planning import apply_default_identities, episode_identity_defaults, identity_defaults_block
+
+    scenes = [{"characters_in_scene": ["Lan", "Minh", "Lan/áo cưới"]}, {"characters_in_scene": ["Lan/幼年"]}]
+    assert apply_default_identities(scenes, {"Lan": "áo cưới"}, "characters_in_scene") == 1
+    assert scenes == [{"characters_in_scene": ["Lan/áo cưới", "Minh"]}, {"characters_in_scene": ["Lan/幼年"]}]
+    assert identity_defaults_block({}) == ""
+    assert "- Lan → Lan/áo cưới" in identity_defaults_block({"Lan": "áo cưới"})
+    project = {"episodes": [{"episode": 1, IDENTITY_DEFAULTS_FIELD: {"Lan": "áo cưới"}}, {"episode": 2}]}
+    assert episode_identity_defaults(project, 1) == {"Lan": "áo cưới"}
+    assert episode_identity_defaults(project, 2) is None

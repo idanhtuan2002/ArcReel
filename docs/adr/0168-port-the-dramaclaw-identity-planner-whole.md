@@ -71,13 +71,22 @@ per episode:
 - **Language:** the planner's own detection (Chinese or English; Vietnamese gets English descriptions). Identity names
   become derivative names as the model writes them.
 
+## Wired (2026-11-23)
+
+- Drama script planning (`server/text_generation.generate_drama_script_plan`) plans the episode's identities first
+  when the episode has no `identity_defaults`, on the project's script text route, and applies the plan in one
+  project update. A plan that cannot complete is logged and the script is planned on the characters' own sheets.
+- The script prompt gets the episode's default look per character (`identity_defaults_block`), and after the model
+  answers, a bare character in `characters_in_scene` becomes `character/default` (`apply_default_identities`); the
+  speaker stays the character's own name. Storyboards, the cast block and the continuity judge already resolve
+  `owner/derivative` (ADR-0146 item 3); the workflow asks for the derivative sheets the shots name (ADR-0146
+  amendment).
+- Tests: `tests/integration/server/test_drama_script_identities.py`, `tests/integration/lib/test_identity_planning.py`.
+
 ## Next
 
-1. A workflow step per episode, before script planning, that runs the planner on the project's script text route and
-   applies the plan.
-2. A shot naming the bare character uses the episode's default derivative (storyboard references, cast block,
-   continuity judge).
-3. Retire ADR-0146 item 1 (states from asset extraction) for automatic runs once one real episode passes.
+- One real drama episode with the planner; then retire ADR-0146 item 1 (states from asset extraction) for automatic
+  runs.
 
 ## Open
 

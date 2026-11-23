@@ -58,6 +58,14 @@ from lib.episode_paths import (
 )
 from lib.formal_write import FormalWriteReceipt, formal_write_transaction, project_metadata_lock
 from lib.i18n import _ as translate
+from lib.identity_planning import (
+    apply_default_identities,
+    apply_identity_plan,
+    episode_identity_defaults,
+    identity_defaults_block,
+    plan_digest,
+    plan_episode_identities,
+)
 from lib.path_safety import PathTraversalError, safe_join
 from lib.project_manager import ProjectManager, is_reference_video_project
 from lib.prompt_builders_reference import build_reference_units_split_prompt
@@ -800,6 +808,27 @@ async def _fetch_caps_with_fallback(
     return default_int, durations
 
 
+async def _plan_episode_identities(
+    project_name: str, projects: ProjectManager, project_path: Path, project: dict[str, Any], episode: int
+) -> None:
+    """Plan the episode's character identities with DramaClaw's planner (ADR-0168) and write them to the project.
+
+    A plan that cannot complete leaves the project as it was: the script is planned on the characters' own sheets.
+    """
+    generator = await TextGenerator.create(TextTaskType.SCRIPT, project_name=project_name)
+
+    async def generate(req: BackendTextGenerationRequest) -> Any:
+        return await generator.generate(req, project_name=project_name)
+
+    try:
+        plan = await plan_episode_identities(project_path, project, episode, generate=generate)
+    except Exception as exc:  # the script never waits on identities: any failure plans it on the base sheets
+        logger.warning("episode %s identities not planned for %s: %s", episode, project_name, exc)
+        return
+    await asyncio.to_thread(projects.update_project, project_name, lambda data: apply_identity_plan(data, plan))
+    logger.info("episode %s identities planned for %s: %s", episode, project_name, plan_digest(plan))
+
+
 async def generate_drama_script_plan(
     request: TextGenerationRequest,
     *,
@@ -811,6 +840,10 @@ async def generate_drama_script_plan(
     instructions = _instructions(request.instructions)
     project_path = projects.get_project_path(project_name)
     project = await asyncio.to_thread(projects.load_project_readonly, project_name)
+    if not request.dry_run and episode_identity_defaults(project, episode) is None:
+        await _plan_episode_identities(project_name, projects, project_path, project, episode)
+        project = await asyncio.to_thread(projects.load_project_readonly, project_name)
+    identity_defaults = episode_identity_defaults(project, episode) or {}
     try:
         novel_text, prompt_inputs, script_plan_basis = await asyncio.to_thread(
             _load_script_plan_source_with_basis,
@@ -846,6 +879,7 @@ async def generate_drama_script_plan(
             source_language=cast(str | None, prompt_inputs["source_language"]),
             speech_rate_override=cast(float | None, prompt_inputs["speech_rate_override"]),
             episode_target_duration=cast(int | None, prompt_inputs["episode_target_duration"]),
+            identity_block=identity_defaults_block(identity_defaults),
         )
         prompt = append_user_instructions(prompt, instructions)
 
@@ -876,6 +910,7 @@ async def generate_drama_script_plan(
         raw_scenes = content.get("scenes")
         if not isinstance(raw_scenes, list) or not raw_scenes:
             raise ValueError("script_plan 规范化内容结构异常：scenes 必须是非空的分镜对象数组")
+        apply_default_identities(raw_scenes, identity_defaults, "characters_in_scene")
         for scene in raw_scenes:
             admission = admit_script_unit("scenes", scene, ignore_marker=True)
             if admission.allowed:

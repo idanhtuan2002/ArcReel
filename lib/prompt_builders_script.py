@@ -616,6 +616,7 @@ def build_normalize_prompt(
     episode_target_duration: int | None = None,
     episode_outline: dict | None = None,
     next_episode_outline: dict | None = None,
+    identity_block: str = "",
 ) -> str:
     """脚本规划的规范化 prompt：源文 → 结构化分镜内容（utterances + source_text + 视觉改编描述）。
 
@@ -635,6 +636,8 @@ def build_normalize_prompt(
     ``episode_target_duration`` 是项目级「单集目标时长」偏好（秒，由调用方经
     ``project_episode_target_duration`` 解析），驱动模型决定本集拆多少个场景；``None`` 即未设目标、
     不注入该段。它与 ``default_duration`` 是两个尺度（整集体量 vs 单场默认秒数），同为软偏好。
+
+    ``identity_block`` 是本集角色默认造型段（``lib.identity_planning.identity_defaults_block``），未规划时为空。
     """
     char_list = _format_names(characters, "character")
     scene_list = _format_names(scenes, "scene")
@@ -752,7 +755,7 @@ def build_normalize_prompt(
 {novel_text}
 </{source_tag}>
 
-{outline_block}# 字段写作指引
+{outline_block}{identity_block}# 字段写作指引
 
 把源文拆为有序分镜，逐条产出结构化分镜内容。当前正在生成第 {episode} 集。
 

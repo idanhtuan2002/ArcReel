@@ -310,3 +310,46 @@ def plan_digest(plan: IdentityPlan) -> str:
         ensure_ascii=False,
         sort_keys=True,
     )
+
+
+# --- script planning ------------------------------------------------------------------------------------------------
+
+
+def episode_identity_defaults(project: Mapping[str, Any], episode: int) -> dict[str, str] | None:
+    """The episode's default derivative per character, or ``None`` when its identities were never planned."""
+    for item in project.get("episodes") or ():
+        if isinstance(item, Mapping) and item.get("episode") == episode:
+            raw = item.get(IDENTITY_DEFAULTS_FIELD)
+            if isinstance(raw, Mapping):
+                return {str(k): str(v) for k, v in raw.items() if isinstance(v, str) and v}
+            return None
+    return None
+
+
+def identity_defaults_block(defaults: Mapping[str, str]) -> str:
+    """The script prompt's note on which look each character wears in this episode."""
+    if not defaults:
+        return ""
+    lines = "\n".join(f"- {name} → {name}/{derivative}" for name, derivative in defaults.items())
+    return (
+        "## 本集角色造型\n\n"
+        "以下角色在本集现实主线中的默认造型。分镜中该角色未换成其他造型时，characters_in_scene 写右侧的造型引用名"
+        "（不要写本体名）；回忆、闪回或另一造型的分镜写候选中对应的造型引用名。utterances 的 speaker 仍写角色本体名。\n"
+        f"{lines}\n"
+    )
+
+
+def apply_default_identities(scenes: list[Any], defaults: Mapping[str, str], field_name: str) -> int:
+    """Name each bare character in a unit's ``field_name`` by the episode's default derivative; returns how many."""
+    changed = 0
+    for scene in scenes:
+        names = scene.get(field_name) if isinstance(scene, dict) else None
+        if not isinstance(names, list):
+            continue
+        for index, name in enumerate(names):
+            if isinstance(name, str) and name in defaults:
+                names[index] = f"{name}/{defaults[name]}"
+                changed += 1
+        # A unit naming the character twice (bare and by its look) keeps one reference.
+        scene[field_name] = list(dict.fromkeys(names))
+    return changed
