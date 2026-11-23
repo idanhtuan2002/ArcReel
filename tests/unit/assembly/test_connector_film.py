@@ -136,3 +136,26 @@ def test_async_starts_are_awaited_on_the_type_scope_and_episode_they_report(tmp_
         == [{"task_type": "character_portrait", "episode": 0, "scope": "character:Vy:portrait", "project_id": "p1"}]
         or waited[0]["episode"] == 0
     )
+
+
+def test_cp1_stops_auto_runs_until_approved(tmp_path: Path) -> None:
+    from assembly.connector.film import CheckpointReached
+
+    tools = FakeTools([{"next_step": "identity_plan", "current_episode": 1}])
+    run = _run(tools, tmp_path)
+    with pytest.raises(CheckpointReached, match="CP1"):
+        run.run()
+    run.state.approved.append("CP1")
+    tools.statuses = [{"next_step": "identity_plan", "current_episode": 1}, {"next_step": "done", "current_episode": 1}]
+    run.run()
+
+
+def test_later_checkpoints_stop_only_in_step_mode(tmp_path: Path) -> None:
+    from assembly.connector.film import CheckpointReached
+
+    auto = _run(FakeTools([{"next_step": "done", "current_episode": 1}]), tmp_path)
+    auto.run()
+    step = _run(FakeTools([{"next_step": "done", "current_episode": 1}]), tmp_path)
+    step.state.mode = "step"
+    with pytest.raises(CheckpointReached, match="CP5-ep1"):
+        step.run()

@@ -12,7 +12,7 @@ from pathlib import Path
 
 from assembly.connector import setup
 from assembly.connector.dramaclaw_tools import DramaClawTools
-from assembly.connector.film import FilmRun, RunState, RunStopped
+from assembly.connector.film import CheckpointReached, FilmRun, RunState, RunStopped
 
 DATA = Path.home() / "assembly-data/runs"
 
@@ -38,18 +38,22 @@ def main() -> int:
     parser.add_argument("--spine", choices=["narrated", "drama"], default="narrated")
     parser.add_argument("--region", choices=["north", "central", "south"], default="north")
     parser.add_argument("--state", type=Path)
+    parser.add_argument("--mode", choices=["auto", "step"], default="auto")
+    parser.add_argument("--approve", action="append", default=[], help="checkpoint key to approve, e.g. CP1")
     args = parser.parse_args()
 
     if args.state:
         state_path = args.state
         state = RunState.load(state_path)
+        state.approved.extend(a for a in args.approve if a not in state.approved)
+        state.save(state_path)
         tools = DramaClawTools(state.project_id)
     else:
         if not args.story or not args.title:
             parser.error("--story and --title are required for a new run")
         project_id = setup.create_project(args.title)
         state_path = DATA / f"{project_id}.json"
-        state = RunState(project_id=project_id, title=args.title, spine=args.spine)
+        state = RunState(project_id=project_id, title=args.title, spine=args.spine, mode=args.mode)
         state.save(state_path)
         tools = DramaClawTools(project_id)
         print(f"project {project_id}; state {state_path}", flush=True)
@@ -66,6 +70,9 @@ def main() -> int:
     )
     try:
         run.run()
+    except CheckpointReached as point:
+        print(f"CHECKPOINT: {point}", flush=True)
+        return 3
     except RunStopped as stop:
         print(f"STOPPED: {stop}", flush=True)
         return 2

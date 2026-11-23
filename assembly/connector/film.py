@@ -33,11 +33,31 @@ class RunStopped(RuntimeError):
     """The run cannot continue without a person; the message says why."""
 
 
+class CheckpointReached(RunStopped):
+    """A Hermes playbook checkpoint: the sponsor reviews in DramaClaw's UI, then resumes with `--approve CPn`."""
+
+
+# Checkpoints of the Hermes playbooks (init.md CP1, episode.md CP2-CP5), keyed by the step they come before.
+# CP1 stops in both modes ("自动推进…到 CP1 也必须停下"); CP2-CP5 stop in step mode only.
+CHECKPOINTS: dict[str, tuple[str, str]] = {
+    "identity_plan": (
+        "CP1",
+        "chân dung nhân vật chính, phân loại nhân vật, tên các tập (DramaClaw → project → Nhân vật / Tập)",
+    ),
+    "sketch_generation": ("CP2", "danh sách beat: cảnh, hình ảnh, lời thoại (DramaClaw → tập → Beats)"),
+    "tts": ("CP3", "khung hình đầu của các beat (DramaClaw → tập → Khung hình đầu)"),
+    "single_video": ("CP4", "âm thanh và giọng từng beat (DramaClaw → tập → Âm thanh)"),
+    "done": ("CP5", "phim hoàn chỉnh của tập (file trong ~/assembly-data/runs/films/)"),
+}
+
+
 @dataclass
 class RunState:
     project_id: str
     title: str
     spine: str
+    mode: str = "auto"  # "auto" | "step" (ASSEMBLY_PLAN D21)
+    approved: list[str] = field(default_factory=list)
     episodes_done: list[int] = field(default_factory=list)
     steps: list[dict[str, Any]] = field(default_factory=list)
     voices_cast: dict[str, str] = field(default_factory=dict)
@@ -311,6 +331,16 @@ class FilmRun:
         self.state.save(self.state_path)
         return target
 
+    def checkpoint(self, step: str, episode: int) -> None:
+        point = CHECKPOINTS.get(step)
+        if not point:
+            return
+        name, what = point
+        key = name if name == "CP1" else f"{name}-ep{episode}"
+        if key in self.state.approved or (name != "CP1" and self.state.mode != "step"):
+            return
+        raise CheckpointReached(f"{key}: xem {what}; duyệt xong chạy tiếp với --approve {key}")
+
     # --- the loop ---------------------------------------------------------------------------------------------------
 
     def run(self, max_rounds: int = 400) -> RunState:
@@ -323,10 +353,13 @@ class FilmRun:
             status = self.status()
             step = str(status.get("next_step") or "")
             episode = int(status.get("current_episode") or 0)
-            if not step or step == "done":
+            if not step:
                 return self.state
             if step in {"ingest_fast", "configure", "ingest"}:
                 raise RunStopped(f"project not prepared: next_step={step}")
+            self.checkpoint(step, episode)
+            if step == "done":
+                return self.state
             if (step, episode) == last:
                 raise RunStopped(f"{step} ep{episode} completed but the pipeline did not advance (playbook: anomaly)")
             last = (step, episode)

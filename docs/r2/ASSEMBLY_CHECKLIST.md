@@ -52,6 +52,7 @@ Legend: `[x]` done · `[~]` in progress · `[ ]` to do · `[!]` blocked · **S**
 
 | | Task | Evidence |
 |---|---|---|
+| [~] | Checkpoints CP1–CP5 from the Hermes playbooks in the connector (CP1 both modes, CP2–CP5 step mode; `--mode`, `--approve CPn`); film 1 runs with CP1 waived (sponsor 2026-11-23) | `test_connector_film.py` |
 | [ ] | Run list (All / Active / Done / Failed), start form (four idea sources, setting, spine, mode auto/step) | D21, D22 |
 | [ ] | Step timeline with Continue / Pause / Redo, deep links into huohuo and DramaClaw screens, errors panel, film player | |
 | [ ] | Catalog of functions with status and where they run | |

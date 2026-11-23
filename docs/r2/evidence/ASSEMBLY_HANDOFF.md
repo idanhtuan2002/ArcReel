@@ -18,6 +18,14 @@ Updated 2026-11-23 (night), HEAD after 74fe7ac2f. Read with [GOAL](../../GOAL.md
 
 Nothing.
 
+## Film 1 (running)
+
+- Unit `assembly-film-1` (systemd --user), log `~/assembly-data/runs/film-1.log`, state
+  `~/assembly-data/runs/01M84JWC2DRNK6SAX24RX3VMG4.json`. Resume: `python -m assembly.connector --state <state> --approve CP1`
+  (sponsor waived CP1 for this film). Blocks so far: `R2_RUN_BLOCK_LEDGER.md` rows "assembly 01M84JWC".
+- Services added: `image-adapter` (172.17.0.1:23360, Seedream minimum size); NewAPI channel 1 fallback chain
+  (`assembly/ops/newapi_text_fallback.py`).
+
 ## Next steps, in order
 
 1. M2 connector core (`assembly/connector/`): DramaClaw REST client (multipart ingest upload → `ingest/start` with
