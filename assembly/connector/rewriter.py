@@ -49,32 +49,41 @@ def _parse(content: str) -> list[str]:
     return [str(p or "").strip() for p in data.get("paragraphs", [])]
 
 
+# DramaClaw model names on its NewAPI: the translator slot (free ERNIE chain) first; the vision slot (Gemini Flash)
+# when the first returns nothing usable — the free reasoning model sometimes spends its whole budget thinking.
+MODELS = ("DC-freezone-translator-LLM", "DC-freezone-vision-LLM")
+_ASCII_PUNCT = str.maketrans(
+    {"？": "?", "！": "!"}
+)  # the full-width colon "：" stays: DramaClaw's speaker parser reads it
+
+
 def translate_lines(lines: Sequence[str], names: Sequence[str], *, newapi_url: str, token: str) -> list[str]:
     problems: list[str] = []
-    for attempt in range(MAX_ATTEMPTS):
-        response = httpx.post(
-            f"{newapi_url}/v1/chat/completions",
-            headers={"Authorization": f"Bearer {token}"},
-            json={
-                "model": "DC-freezone-translator-LLM",
-                "messages": [{"role": "user", "content": build_prompt(lines, names, problems)}],
-                "max_tokens": 12000,
-            },
-            timeout=600,
-        )
-        if response.status_code == 429 or response.status_code >= 500:
-            time.sleep(30 * (attempt + 1))
-            problems = []
-            continue
-        response.raise_for_status()
-        content = str(response.json()["choices"][0]["message"].get("content") or "")
-        try:
-            out = _parse(content)
-        except (ValueError, json.JSONDecodeError) as error:
-            problems = [f"the answer is not valid JSON: {str(error)[:200]}"]
-            continue
-        problems = check_batch(list(lines), out, target="vi", terms=list(names))
-        problems = [p for p in problems if "must keep the name" not in p]  # source names are Chinese forms
-        if not problems:
-            return out
+    for model in MODELS:
+        problems = []
+        for attempt in range(MAX_ATTEMPTS):
+            response = httpx.post(
+                f"{newapi_url}/v1/chat/completions",
+                headers={"Authorization": f"Bearer {token}"},
+                json={
+                    "model": model,
+                    "messages": [{"role": "user", "content": build_prompt(lines, names, problems)}],
+                    "max_tokens": 12000,
+                },
+                timeout=600,
+            )
+            if response.status_code == 429 or response.status_code >= 500:
+                time.sleep(30 * (attempt + 1))
+                continue
+            response.raise_for_status()
+            content = str(response.json()["choices"][0]["message"].get("content") or "")
+            try:
+                out = [line.translate(_ASCII_PUNCT) for line in _parse(content)]
+            except (ValueError, json.JSONDecodeError) as error:
+                problems = [f"the answer is not valid JSON: {str(error)[:200]}"]
+                continue
+            problems = check_batch(list(lines), out, target="vi", terms=list(names))
+            problems = [p for p in problems if "must keep the name" not in p]  # source names are Chinese forms
+            if not problems:
+                return out
     raise RuntimeError("translating the narration failed its checks: " + "; ".join(problems))

@@ -196,7 +196,7 @@ def rewrite_narration(run: FilmRun, episode: int) -> None:
     )
     if started.get("ok") is False:
         raise RunStopped(f"rewrite: {started.get('error')}")
-    wait_task(run.tools, "content_rewrite", episode)
+    # The route rewrites within the request (api/routes/content.py awaits rewrite_episode_content); no task to poll.
     adapted = run.tools.request("GET", f"/projects/{project}/episodes/{episode}/adapted-content")
     zh_lines = [
         line.strip() for line in str((adapted.get("data") or {}).get("content") or "").splitlines() if line.strip()
