@@ -24,6 +24,9 @@ Updated 2026-11-23 (late). Read with [GOAL](../../GOAL.md), [ASSEMBLY_PLAN](../A
 
 ## In flight when this was written
 
+Re-launched after the quota reset (first launch was stopped at the usage limit). Each agent now **appends its findings
+to its own report file as it goes**; a partial file is usable and the rest can be re-run from the brief.
+
 Three independent read-only research agents (sponsor asked for at least three independent deep rounds). If their
 results are not recorded in `docs/research/2026-11-23-r2-independent-round-{a,b,c}.md`, they were lost: re-run them
 with the briefs in [assembly-research-briefs.md](assembly-research-briefs.md).
