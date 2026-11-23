@@ -76,3 +76,6 @@ e.g. `voice_prereq_required`). DramaClaw's own agent keeps using it inside Drama
   `frontend/src/lib/feature-models.ts` lists no `CHARACTER_BUILD` feature; character extraction then fails with
   "No available channel". Handled by configuration: `CHARACTER_BUILD_MODEL=DC-scene-builder-LLM` in
   `assembly/deploy/dramaclaw/override.yml` (the backend reads the env name first, `config.get_newapi_text_model_name`).
+- Donor facts found by film 1 (not changed): the rewrite task type is `content_rewrite` (the Hermes references say
+  `content_rewriter`); generated prose is zh or en only (`utils/source_language.py`), so the connector never calls
+  `rewrite/generate` for Vietnamese stories and the script is cut from the raw Vietnamese text.

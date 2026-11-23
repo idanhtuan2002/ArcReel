@@ -27,6 +27,7 @@ RUNNING = {"queued", "running", "pending"}
 FAILED = {"failed", "cancelled"}
 POLL_SECONDS = 10
 MAX_STEP_SECONDS = 6 * 3600
+MISSING_TASK_SECONDS = 300
 
 
 class RunStopped(RuntimeError):
@@ -107,6 +108,8 @@ def wait_task(tools: DramaClawTools, task_type: str, episode: int, **extra: Any)
             raise RunStopped(f"{task_type} ep{episode} {extra or ''} {status}: {reason}")
         if not status and isinstance(task, dict) and task.get("ok") is False:
             raise RunStopped(f"{task_type} ep{episode}: {task.get('error')}")
+        if not status and time.monotonic() - started > MISSING_TASK_SECONDS:
+            raise RunStopped(f"{task_type} ep{episode} {extra or ''}: no such task after {MISSING_TASK_SECONDS}s")
         if time.monotonic() - started > MAX_STEP_SECONDS:
             raise RunStopped(f"{task_type} ep{episode} still {status or 'unknown'} after {MAX_STEP_SECONDS}s")
         time.sleep(POLL_SECONDS)
@@ -261,12 +264,17 @@ class FilmRun:
                         identity_id=ident.get("identity_id") or ident["id"],
                     )
         elif step == "script_writer":
-            if self.state.spine == "narrated":
-                rewrite = self.tools.request(
-                    "POST", f"/projects/{self.state.project_id}/episodes/{episode}/rewrite/generate", body={}
+            # DramaClaw's rewrite step (`rewrite/generate`, task `content_rewrite`) writes zh/en narration only
+            # (`utils/source_language.py`: AssetLanguage = zh | en), and the episode playbook makes it optional. Our
+            # stories are Vietnamese text, so the script is cut from the raw text: narration keeps the author's words.
+            adapted = self.tools.request("GET", f"/projects/{self.state.project_id}/episodes/{episode}/adapted-content")
+            if str((adapted.get("data") or {}).get("content") or "").strip():
+                _ok(
+                    self.tools.request(
+                        "DELETE", f"/projects/{self.state.project_id}/episodes/{episode}/adapted-content"
+                    ),
+                    "clear adapted content",
                 )
-                _ok(rewrite, "rewrite")
-                self.wait("content_rewriter", episode)
             self.start("dramaclaw_generate_script", "script", episode=episode)
             self.wait("script_writer", episode)
         elif step == "sketch_generation":

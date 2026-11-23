@@ -159,3 +159,11 @@ def test_later_checkpoints_stop_only_in_step_mode(tmp_path: Path) -> None:
     step.state.mode = "step"
     with pytest.raises(CheckpointReached, match="CP5-ep1"):
         step.run()
+
+
+def test_waiting_on_a_task_that_never_appears_stops(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(film, "POLL_SECONDS", 0)
+    monkeypatch.setattr(film, "MISSING_TASK_SECONDS", 0)
+    tools = FakeTools([], {"content_rewriter": ""})
+    with pytest.raises(RunStopped, match="no such task"):
+        film.wait_task(tools, "content_rewriter", 1)
