@@ -1,0 +1,13 @@
+# Our only additions to DramaClaw's own docker-compose.release.yml (ASSEMBLY_PLAN M0). The values come from the
+# --env-file given by up.sh (interpolation), so they do not depend on where DramaClaw's own `env_file: .env` resolves.
+# Ports stay DramaClaw's, bound to loopback through ST_API_PORT / ST_WEB_PORT, because DramaClaw CE trusts every
+# request as the owner.
+services:
+  api:
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    environment:
+      PROMPT_EXPORT_PASSWORD: "${PROMPT_EXPORT_PASSWORD}"
+      INDEXTTS2_PROVIDER: "${INDEXTTS2_PROVIDER}"
+      INDEXTTS2_FAL_ENDPOINT: "${INDEXTTS2_FAL_ENDPOINT}"
+      FAL_API_KEY: "${FAL_API_KEY}"
