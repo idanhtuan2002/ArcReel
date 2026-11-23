@@ -167,3 +167,21 @@ def test_waiting_on_a_task_that_never_appears_stops(tmp_path: Path, monkeypatch:
     tools = FakeTools([], {"content_rewriter": ""})
     with pytest.raises(RunStopped, match="no such task"):
         film.wait_task(tools, "content_rewriter", 1)
+
+
+def test_a_rate_limited_step_is_run_again_after_a_pause(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(film, "POLL_SECONDS", 0)
+    monkeypatch.setattr(film, "TRANSIENT_PAUSES", (0,))
+    tools = FakeTools(
+        [{"next_step": "tts", "current_episode": 1}, {"next_step": "done", "current_episode": 1}],
+        {"audio_generation_indextts2": "failed"},
+    )
+    outcomes = iter(["failed", "completed"])
+
+    def get_task_status(tool: str, /, **args: Any) -> Any:
+        if tool == "dramaclaw_get_task":
+            return {"ok": True, "data": {"status": next(outcomes), "error": "status_code: 429 rate-limited"}}
+        return FakeTools.call(tools, tool, **args)
+
+    monkeypatch.setattr(tools, "call", get_task_status)
+    _run(tools, tmp_path).run()

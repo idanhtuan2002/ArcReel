@@ -28,6 +28,12 @@ FAILED = {"failed", "cancelled"}
 POLL_SECONDS = 10
 MAX_STEP_SECONDS = 6 * 3600
 MISSING_TASK_SECONDS = 300
+TRANSIENT_PAUSES = (120, 300, 600, 900)
+_TRANSIENT = ("429", "rate-limited", "rate limit", "temporarily", "input_value='error'", "503", "502", "timed out")
+
+
+def _transient(message: str) -> bool:
+    return any(marker in message for marker in _TRANSIENT)
 
 
 class RunStopped(RuntimeError):
@@ -348,6 +354,23 @@ class FilmRun:
         self.state.save(self.state_path)
         return target
 
+    def run_step_with_retries(self, step: str, episode: int) -> None:
+        """Free text pools rate-limit by the minute; a step that failed on one is run again after a pause."""
+        for pause in (*TRANSIENT_PAUSES, None):
+            try:
+                if episode <= 0:
+                    self.step_global(step)
+                else:
+                    self.step_episode(step, episode)
+                return
+            except RunStopped as stop:
+                if pause is None or not _transient(str(stop)) or isinstance(stop, CheckpointReached):
+                    raise
+                self.log(
+                    f"[{time.strftime('%T')}] ep{episode} {step}: transient failure, retry in {pause}s ({stop})"[:400]
+                )
+                time.sleep(pause)
+
     def checkpoint(self, step: str, episode: int) -> None:
         point = CHECKPOINTS.get(step)
         if not point:
@@ -380,8 +403,5 @@ class FilmRun:
             if (step, episode) == last:
                 raise RunStopped(f"{step} ep{episode} completed but the pipeline did not advance (playbook: anomaly)")
             last = (step, episode)
-            if episode <= 0:
-                self.step_global(step)
-            else:
-                self.step_episode(step, episode)
+            self.run_step_with_retries(step, episode)
         raise RunStopped(f"no end after {max_rounds} rounds")
