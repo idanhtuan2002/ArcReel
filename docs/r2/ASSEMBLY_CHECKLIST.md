@@ -13,7 +13,7 @@ Legend: `[x]` done · `[~]` in progress · `[ ]` to do · `[!]` blocked · **S**
 | [x] | Video route for first films = local Wan (D27) | 2026-11-23 |
 | [x] | GOAL amendment: donor interface languages allowed (DramaClaw Vietnamese UI) | `docs/GOAL.md` rule 1 |
 | [x] | Media relay: Cloudinary default + inline option (D28) | plan D28 |
-| [ ] | **S** After the first `vn` story: choose the Vietnamese story path (huohuo+translation / huohuo with Vietnamese seam / old engine) | [story research](../research/2026-11-23-r2-story-translated-vs-native-vietnamese.md) |
+| [x] | Story language per story: `zh` (huohuo + translation) or `vi` (old app's Vietnamese engine via ArcReel story-run API) (D29) | 2026-11-23 |
 | [ ] | **S** After the first film: budget decision (D20) | — |
 
 ## M0 — DramaClaw up
@@ -64,7 +64,8 @@ Legend: `[x]` done · `[~]` in progress · `[ ]` to do · `[!]` blocked · **S**
 | [ ] | Connector: create novel, premise, outline, memory init, generate-remaining with resume (`mode: "remaining"`), fetch chapters | |
 | [ ] | Translation with the Hán-Việt name glossary | plan M3.3 |
 | [ ] | First `original` story → read by the sponsor | |
-| [ ] | First `vn` story written both ways (huohuo+translation vs alternative) → sponsor chooses | story research §3 |
+| [ ] | Connector `vi` path: ArcReel story-run API (`draft_brief` → `start_run` → poll → `approve_run` → `export_run`) → text into the film stage | D29 |
+| [ ] | First story in each language from the same premise → the sponsor reads both | D29 |
 
 ## M4 — finish and review
 
