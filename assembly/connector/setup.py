@@ -100,16 +100,35 @@ def _relay_token() -> str:
     return out.strip().splitlines()[-1]
 
 
+TEXT_RETRIES = 3  # ASSEMBLY_PLAN §0: text calls retried 3 times, media once
+
+
+def _chat_with_retries(token: str, payload: dict[str, Any]) -> httpx.Response:
+    for attempt in range(TEXT_RETRIES + 1):
+        response = httpx.post(
+            f"{NEWAPI_URL}/v1/chat/completions",
+            headers={"Authorization": f"Bearer {token}"},
+            json=payload,
+            timeout=180,
+        )
+        if response.status_code != 429 and response.status_code < 500:
+            response.raise_for_status()
+            return response
+        if attempt < TEXT_RETRIES:
+            time.sleep(30 * (attempt + 1))
+    response.raise_for_status()
+    return response
+
+
 def fill_face_prompts(run: FilmRun, missing: list[dict[str, Any]]) -> None:
     if not missing:
         return
     token = _relay_token()
     for char in missing:
         facts = {k: char.get(k) for k in ("name", "gender", "age_group", "description", "role")}
-        response = httpx.post(
-            f"{NEWAPI_URL}/v1/chat/completions",
-            headers={"Authorization": f"Bearer {token}"},
-            json={
+        response = _chat_with_retries(
+            token,
+            {
                 "model": "DC-identity-appearance-writer-LLM",
                 "messages": [
                     {"role": "system", "content": FACE_PROMPT_RULE + " 只输出这一句描述。"},
@@ -117,9 +136,7 @@ def fill_face_prompts(run: FilmRun, missing: list[dict[str, Any]]) -> None:
                 ],
                 "max_tokens": 200,
             },
-            timeout=180,
         )
-        response.raise_for_status()
         face = str(response.json()["choices"][0]["message"]["content"]).strip()
         result = run.tools.call("dramaclaw_update_character_face_prompt", name=char["name"], face_prompt=face)
         if result.get("ok") is False:
