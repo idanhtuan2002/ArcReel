@@ -46,3 +46,18 @@ Dependency versions are the ones DramaClaw's `uv.lock` resolves (`pydantic-ai-sl
     uv run python -m pytest vendor/dramaclaw/tests -q
 
 At port time: 113 passed.
+
+## Assembly (ADR-0170): what is and is not taken from DramaClaw
+
+DramaClaw runs **whole** from its release images (`assembly/deploy/dramaclaw/`); nothing of it is copied into our code.
+
+**Why not ported: the Hermes toolset** (`.hermes/plugins/dramaclaw/__init__.py`, ~2 400 lines). It is the tool layer of
+DramaClaw's built-in chat agent (Hermes): each tool is one REST call wrapped for an LLM — results come back as JSON
+strings with chat hints in Chinese, UI render specs and truncated lists, and it needs Hermes' `tools.registry` shim to
+load. Our connector is a program, not an agent, so it calls the same REST endpoints directly and reads JSON; the
+toolset stays the reference for which endpoint and arguments each step uses (and for the error codes it recognises,
+e.g. `voice_prereq_required`). DramaClaw's own agent keeps using it inside DramaClaw.
+
+**Approved donor changes (GOAL rule 1)**, made only in a rebuilt image from the pinned checkout and listed here when done:
+- Vietnamese interface (`frontend/src/i18n/index.ts` `SUPPORTED`, header switcher, `public/locales/vi/translation.json`).
+- Inline media relay option (`storage/media_relay.py`: a provider returning a `data:` URI).
