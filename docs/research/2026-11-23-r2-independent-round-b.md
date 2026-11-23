@@ -192,3 +192,57 @@ For the M2 story (N = 29, 1 location-ish, E ≈ 3): text ≈ 40–50, vision ≈
 video ≈ **29 clips, 161–189 s**. For a translated huohuo chapter-sized episode (N ≈ 80–120): text ≈ 100–140,
 vision ≈ 85–125, images ≈ 30–40, video ≈ 6–10 min of clips.
 
+### 7. Episodes: structured_v1 means one chapter = one episode, and "Chương" is not a chapter marker
+
+- FACT (`task_backend/runners/graph_build.py:185-213`): for a `structured_v1` project (D13) episode building raises
+  `KnowledgePipelineUnsupported("structured_v1 only supports deterministic chapter/episode mapping")` unless
+  `planning_mode == "chapters"`; then `store.build_episodes_from_chapters` makes **one episode per chapter marker**
+  (`sqlite_store.py:1799-1810`). The `EpisodePlannerAgent` (graph tools, conflict/cliffhanger/3–6 cast — the
+  strength ADR-0170 §3 and the 2026-11-08 study §4 cite) runs **only on the graph track**, which D13 turns off.
+- INFER: D13 + D23 ("episode length follows the story; DramaClaw's episode planner decides") are inconsistent — with
+  D13 no planner decides; huohuo's chapter length decides. Either accept "episode = chapter" in the plan, or use the
+  graph track (needs an embedding model: `COGNEE_EMBEDDING_MODEL=DC-cognee-embedding`, `.env.example:117`; the free
+  registry has Alibaba `qwen3.7-text-embedding` 1M and BytePlus Skylark embedding 500k, both once-only).
+- FACT (`cognee/chapter_detector.py:43-46`): chapter markers recognised are `第N章`, `第N集`, `Chapter N`,
+  `Episode N`. Vietnamese `Chương N` is **not** recognised. Fix (connector text preparation, no donor change): write
+  each translated chapter under an `Episode N` / `Chapter N` heading line.
+- FACT (`huohuo …/common/novel/novel-meta.ts:18`): huohuo's default chapter target is **3,000 Chinese characters**.
+  INFER: translated, ≈3,600–4,500 Vietnamese syllables ≈ **13–19 min** of narration per chapter at 4 syl/s, ≈ 100–200
+  paragraph-beats. With "episode = chapter" one episode is a 15-minute film — far outside TikTok/YouTube Shorts forms
+  (D17) and, below, far outside the video pool. **The connector must set huohuo's chapter target small** (e.g. 600–900
+  Chinese chars ⇒ ~2–4 min episodes) — configuration of huohuo's `generate-remaining` length (band 500–20,000,
+  `novel-writing.ts:1303`), and a product decision for the sponsor (episode length was "follow the story", D23).
+
+### 8. Story stage (huohuo → translation) — what the text will be like
+
+- FACT (ADR-0170 §1; 2026-11-08 study §2): huohuo writes Chinese prose with per-book memory, change records, length
+  floor, continuity check with up to 30 rewrites (`novel-meta.ts:169-190`), genre skill folders (~18 genres).
+- INFER: with ernie-5.5-flash (Chinese-native, best free writer in the registry probe) the Chinese prose quality is
+  likely the strongest available on free tiers. Risk: `DEFAULT_CONTINUITY_REWRITE_MAX = 30` × (rewrite + audit) can burn
+  a large share of the 1,000/day OpenRouter pool on one stuck chapter — set it low (configuration) for unattended runs.
+- Calls per story (INFER): premise 1 + title 1 + brief 1 + outline 1–4 + per chapter (beat drafts 2–6 + polish 1 +
+  continuity 1 + memory 1–2 + commercial/AI-tell audits 1–3 ≈ 6–13) ⇒ a 10-chapter story ≈ 70–140 calls nominal,
+  hundreds in the worst case; translation (`lib/story_translation.py:46-47,172-195`: 4,000-char batches, ≤3 attempts)
+  ≈ 1–2 calls per 3,000-char chapter, ×1–3 on retries.
+- FACT (`lib/story_translation.py:113-115,122-145`): translation keeps paragraph count 1:1, keeps protected names
+  verbatim, rejects any CJK in the output, and checks a length band. INFER: GOAL's "no Chinese left" is enforced per
+  batch; "natural Vietnamese" is not checked by anything (only the sponsor's reading).
+- INFER: dialogue stays inside prose paragraphs (`"…," cô gái nói.`) — fine for a story, wrong shape for DramaClaw's
+  drama spine (§1) and for per-character voices (§2).
+
+### 9. Voices
+
+- FACT (`audio/indextts2_beat_audio_task.py:205-260,323,487`): narration beats use the project narrator reference
+  audio; dialogue beats use the speaker's reference audio (per age group: `voice_samples_by_age_group`, :234). Missing
+  voices are listed as prerequisite errors (`collect_indextts2_voice_prereq_errors`, :409).
+- FACT (`generators/indextts2_fal.py:315-360`): the fal body is `{audio_url, prompt, should_use_prompt_for_emotion:
+  true, emotion_prompt?}`; the response must carry an audio URL. The plan's adapter contract matches.
+- FACT (`docs/research/2026-11-13-video-quality-donor-mechanisms.md:110`): VieNeu v3 Turbo has ~25 presets over
+  North/Central/South; `style` "has no effect". INFER: **no emotion** — IndexTTS2's emotion control is dropped; every
+  line is read in the preset's neutral delivery (same as the old app). Distinct presets per character are possible for
+  casts ≤ ~10 per gender/region; the shim's own OpenAI-id map has only one female voice (`Trúc Ly`,
+  `vieneu-tts-shim/server.py:24-38`) — the connector must cast from the full `/health` list, not that map.
+- INFER: in `narrated` mode most beats are narration (one narrator voice); character voices appear only on beats the
+  LLM labels dialogue, and then speak the whole paragraph including the attribution (§2). The GOAL wording "Vietnamese
+  voices" is met; "a drama with characters speaking" is only partly met.
+

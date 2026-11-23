@@ -112,7 +112,7 @@ Findings are appended as they are found (the session may be cut off).
 - **F13. The free video pool cannot finish even the acceptance episode, let alone a series.** FACT: Seedance 1.0
   pro-fast free quota is **2M tokens, once per account, no reset** (`docs/r2/cloud-free-quota-registry.md`, BytePlus
   table). FACT: DramaClaw submits Seedance-fast at `"resolution": "720p"`, duration clamped to 4–12 s
-  (`generators/video_generator.py:~633`, `video_duration.py:60`), one clip **per beat** (`single_video` per beat,
+  (`generators/video_generator.py:633`, `video_duration.py:60`), one clip **per beat** (`single_video` per beat,
   `pipeline.py:200-201`). INFER (BytePlus token formula W×H×fps×s/1024 from provider docs, not re-verified here):
   720×1280×24×4/1024 ≈ 86k tokens per 4 s clip, ≈108k per 5 s → **≈18–23 clips for the whole pool, ever**. The
   M2 smoke story alone has 29 non-empty paragraphs / 660 words (FACT: `wc` of
@@ -316,3 +316,69 @@ tolerance (then: report to the sponsor with Go/Kill/Hold/Recycle).
 | R23 | Operator load: a non-technical operator with Chinese error messages, three UIs (DramaClaw zh/en, huohuo, control page), sudo deploys, key pasting, Cloudinary sign-up | H | M | sponsor messages asking "what does this error mean" | Control page translates the top-20 donor error codes; one start button; deploys only for host changes (assembly needs no sudo except docker group) | Collect unknown error strings into the page's map weekly |
 | R24 | DramaClaw fails acceptance and the §6 fallback (huohuo's film pipeline) is equally unproven | M | H | M2 verdict | Treat M2 as the spike: write the Go/Kill criteria into M2 before running it | Go/Kill/Hold/Recycle to the sponsor with the film |
 
+## 7. What in GOAL / ADR-0170 / ASSEMBLY_PLAN is itself a risk or missing
+
+### GOAL (`docs/GOAL.md`)
+- **G1. No resource tolerance per film.** Tolerances cover time, donor changes, spend > 0 and code size
+  (`GOAL.md:39-44`), but not the **consumption of once-only free pools**. A run can spend the whole Seedance/Seedream
+  pool — the project's only free video/image capacity, ever — inside the tolerances. Add: "a run that would consume more
+  than X % of a once-only pool is a tolerance".
+- **G2. "≥ bản gốc" has no measured baseline.** The drama acceptance is "both reviewers accept or the sponsor accepts by
+  eye" (`GOAL.md:21`); no donor film made on our free models exists, and round 4 said measuring it is "the first thing"
+  (`review-of-the-off-course-research.md` §2.2). Without a baseline, "≥ original" cannot fail, so it cannot steer.
+- **G3. "Both reviewers"** are the old app's local reviewers (ADR-0169) — acceptance depends on R2 machinery and on the
+  8 GB GPU. Either name them as optional or make the sponsor's eye the acceptance and reviewers advisory.
+- **G4. No kill criterion for the premise.** Rule 5 offers Go/Kill only when the sponsor asks. Missing: "if M2 cannot
+  produce a watchable Vietnamese episode within N days / M % of pools, the agent brings Kill/Recycle unasked".
+- **G5. Code-size tolerance is unmeasurable as written** — no counting method (tests excluded? vendored excluded?
+  config?). Define it (e.g. `cloc assembly/ --exclude-dir=tests`) or it will not trigger.
+- **G6. "Vietnamese" is defined only for voices and story text.** Nothing says on-screen text, subtitles, character /
+  scene names and the export must be Vietnamese — F11 will pass GOAL's letter and fail the sponsor's eye.
+
+### ADR-0170
+- **A1. "No bake-off, choose from the research we have"** (`0170…md:9-10`) — directly overrides the round-4 spike;
+  the ADR records no reason and no exit condition (F1). Missing a "Revisit when" clause.
+- **A2. "Nothing inside it changes except model settings"** (`0170…md:23-24`) is already false by plan: D25 Vietnamese UI
+  is a donor seam (frontend rebuild), and F11 will need a second. The ADR should say "seams expected: UI locale, asset
+  language" and that each is a tolerance report, so they are not discovered as "surprises".
+- **A3. "Video defaults already match a key we hold"** (`0170…md:27-28`) — true for the model id, silent on the pool
+  size; the ADR's feasibility claim is about naming, not capacity (F13).
+- **A4. Translation stays in ArcReel `lib/`** (`0170…md:21`) — the assembly keeps a dependency on the frozen app's
+  library and its tests; when R2 is retired this breaks unless the module is moved. Not mentioned.
+- **A5. No consequences section for operations**: disk, GPU, backups, security of CE, upgrades of three donors — all left
+  to M6 in the plan, after the films.
+
+### ASSEMBLY_PLAN
+- **AP1. Missing tasks (from this round):** quota arithmetic and a pre-`video` stop (R1–R3); asset-language probe and
+  seam (R6); "nothing to do" handling for each step (R4); fixtures recorded from the running DramaClaw (R5, P5); moving
+  the VieNeu shim out of the R2 deployment (R19); digest pins and auto-update lock (R11); image-vs-checkout diff (R12);
+  disk budget and data placement (R13); GPU serialization (R14); loopback Host-header proxy and OpenRouter credit limit
+  (R15); restore drill (R20); `NEWAPI_BASE_URL` pinned local (R21); Go/Kill criteria written into M2 (R24).
+- **AP2. Wrong or unsupported claims:** `next_step` values (F6); adapter hashing a "downloaded `audio_url`" with a file-name
+  fallback — it is a `data:` URL (F8); Ken Burns fallback (F12); vision fallback model known to fail JSON (F15); NewAPI
+  "channel priority" fallback across channels with different model names (F15).
+- **AP3. D15 retries are per step, and many steps are whole-episode batches.** Three retries of `first_frames` or
+  `video` without `missing_only` semantics can re-bill the whole step three times (F7). Retries must be per beat and
+  use the donor's `missing_only`/`sync_changed` modes (`audio/generate` default mode `sync_changed`,
+  `api/routes/generation.py:2520`).
+- **AP4. Order.** M2b (control page with D21 pause/approve/redo for every step) comes before M3 and before any proof that
+  the automatic loop holds; D21's `step` mode needs connector states that M2 does not build. Put M2b after M2's film,
+  and build only the run list + start + watch first; pause/approve/redo after a second film.
+- **AP5. D19 and D22-remake are out of reach on free tiers** and should be marked "after D20 budget", not in locked
+  decisions.
+- **AP6. Estimates.** 9.5 agent-days for M0–M6 (sum of `ASSEMBLY_PLAN.md` §4) with M0 alone consuming a day plus a
+  verification round. The 2× tolerance will trigger on M1 if any probe fails, which (F15, R2) is likely; plan the
+  fallback work into M1 rather than letting the tolerance fire.
+- **AP7. Code budgets sum to 2,700 lines** (400+600+500+400+500+300), already larger than the "connector only" spirit of
+  GOAL rule 2, with D21/D19 not budgeted at all. Expect the 50 % breach in M2b (Story 7).
+
+## 8. Bottom line (INFER)
+
+The assembly's direction is sound and much simpler than R2, but it was approved without the one measurement the
+round-4 review demanded, and the free-tier arithmetic says the product cannot make more than about one episode of
+video and two or three episodes of images on the pools it relies on. The most likely failure is not a bug: it is
+"the first film never completes, and the money question arrives late, in the middle of a half-made episode". The
+second most likely is the old pattern rebuilt inside the connector: step predicates that never become true, fixed one
+release at a time. Both are preventable this week: do the arithmetic and ask the money question now; treat M2 as the
+spike with written Go/Kill criteria; handle "nothing to do" per step as a class; record fixtures from the running
+DramaClaw; and stop writing research notes until a film exists.
