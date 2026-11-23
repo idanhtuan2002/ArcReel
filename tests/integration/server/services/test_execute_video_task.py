@@ -351,6 +351,78 @@ class TestGenerationTasks:
         assert len(fake_generator.video_calls) == 1
         assert len(seen_lane_requests) == 2
 
+    async def test_a_silent_unit_under_tts_delivery_generates_at_its_planned_tier(self, monkeypatch, tmp_path):
+        project_path = prepare_files(tmp_path)
+        fake_pm = _FakePM(project_path)
+        fake_generator = FakeGenerator()
+        # A drama scene with no utterances: nothing to voice.
+        fake_pm.script = {
+            "episode": 1,
+            "content_mode": "drama",
+            "scenes": [
+                {
+                    "scene_id": "E1S01",
+                    "duration_seconds": 4,
+                    "segment_break": False,
+                    "characters_in_scene": [],
+                    "scenes": [],
+                    "props": [],
+                    "image_prompt": "首镜头",
+                    "video_prompt": {"action": "跑", "camera_motion": "Static"},
+                    "utterances": [],
+                }
+            ],
+        }
+        seed_current_storyboard(fake_pm)
+
+        async def silent_projection(**kwargs):
+            narration = NarrationDeliveryPreparation(
+                delivery=USE_TTS,
+                unit_id="E1S01",
+                speech_mode=None,
+                tts_status=NarrationTtsStatus.NOT_APPLICABLE,
+                artifact_path="",
+                basis_digest=None,
+                actual_duration_seconds=None,
+                problems=(),
+            )
+            return prepare_narrated_video_duration(
+                narration=narration,
+                planned_duration_seconds=kwargs["planned_duration_seconds"],
+                supported_durations=kwargs["supported_durations"],
+                confirmed_request_duration_seconds=kwargs["confirmed_request_duration_seconds"],
+            )
+
+        monkeypatch.setattr(generation_tasks, "get_project_manager", lambda: fake_pm)
+        monkeypatch.setattr(
+            generation_tasks,
+            "resolve_generation_context",
+            fake_resolve_ctx(fake_generator, supported_durations=(4, 8, 12)),
+        )
+        monkeypatch.setattr(generation_tasks, "prepare_current_narrated_video_duration", silent_projection)
+        monkeypatch.setattr(generation_tasks, "tts_task_in_progress", AsyncMock(return_value=False))
+        monkeypatch.setattr(generation_tasks, "extract_video_thumbnail", async_return(None))
+        monkeypatch.setattr(generation_tasks, "emit_project_change_batch", lambda *a, **kw: None)
+        fake_queue = type("Queue", (), {})()
+        fake_queue.persist_execution_checkpoint = AsyncMock()
+        monkeypatch.setattr(generation_tasks, "get_generation_queue", lambda: fake_queue)
+
+        # The execution facts are built before the provider call; the fake generator stops short of the formal
+        # commit, whose TTS check is covered in test_video_artifact_currency.
+        with pytest.raises(RuntimeError, match="without invoking the artifact commit callback"):
+            await generation_tasks.execute_video_task(
+                "demo",
+                "E1S01",
+                {
+                    "script_file": "episode_1.json",
+                    "prompt": {"action": "跑", "camera_motion": "Static"},
+                    "narration_delivery_options": {"narration_delivery": USE_TTS},
+                },
+                task_id="task-silent-tts",
+            )
+
+        assert fake_generator.video_calls[0]["duration_seconds"] == 4
+
     async def test_execute_video_task_blocks_use_tts_when_duration_is_endpoint_fixed(self, monkeypatch, tmp_path):
         """执行期能力已变成「时长由端点固定」时，use_tts 请求按 tts_duration_endpoint_fixed 拒绝。
 

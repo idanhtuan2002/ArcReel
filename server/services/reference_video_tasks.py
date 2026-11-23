@@ -28,7 +28,7 @@ from lib.generation_queue import (
     get_generation_queue,
     without_reference_video_execution_identity,
 )
-from lib.narration_delivery import USE_TTS
+from lib.narration_delivery import USE_TTS, NarrationTtsStatus
 from lib.path_safety import safe_join
 from lib.reference_video.artifact_selection import CurrentReferenceAssets
 from lib.reference_video.execution_checkpoint import (
@@ -503,20 +503,24 @@ async def execute_reference_video_task(
 
     if request_options.narration_delivery == USE_TTS:
         narration = options.narration_preparation
-        if narration is None or narration.actual_duration_seconds is None:
+        # A silent unit has no speech audio to cover: it takes the planned tier and is generated like any other video.
+        silent = narration is not None and narration.tts_status is NarrationTtsStatus.NOT_APPLICABLE
+        if narration is None or (narration.actual_duration_seconds is None and not silent):
             raise RuntimeError("allowed TTS reference request is missing actual narration duration")
-        reused = await reuse_current_video_for_tier(
-            project_path=project_path,
-            versions=generator.versions,
-            item=unit,
-            resource_type="reference_videos",
-            resource_id=resource_id,
-            request_duration_seconds=effective_duration,
-            minimum_actual_duration_seconds=narration.actual_duration_seconds,
-            visual_basis_digest=visual_basis_digest,
-            revalidate_visual_basis_digest=_current_visual_basis_digest,
-            warnings=warnings,
-        )
+        reused = None
+        if narration.actual_duration_seconds is not None:
+            reused = await reuse_current_video_for_tier(
+                project_path=project_path,
+                versions=generator.versions,
+                item=unit,
+                resource_type="reference_videos",
+                resource_id=resource_id,
+                request_duration_seconds=effective_duration,
+                minimum_actual_duration_seconds=narration.actual_duration_seconds,
+                visual_basis_digest=visual_basis_digest,
+                revalidate_visual_basis_digest=_current_visual_basis_digest,
+                warnings=warnings,
+            )
         if reused is not None:
             return reused
 

@@ -76,6 +76,7 @@ from lib.narration_delivery import (
     USE_TTS,
     NarratedVideoDurationBlockedError,
     NarrationDeliveryRequestOptions,
+    NarrationTtsStatus,
     TtsSynthesisSettings,
     build_narration_audio_basis,
     canonical_narration_text,
@@ -2627,19 +2628,23 @@ async def execute_video_task(
         if not is_int(duration_seconds):
             raise RuntimeError("allowed TTS video projection produced a non-integer request duration")
         narration_actual_duration = delivery_projection.narration.actual_duration_seconds
-        if narration_actual_duration is None:
+        # A silent unit has no speech audio to cover: it takes the planned tier and is generated like any other video.
+        silent = delivery_projection.narration.tts_status is NarrationTtsStatus.NOT_APPLICABLE
+        if narration_actual_duration is None and not silent:
             raise RuntimeError("allowed TTS video projection is missing actual narration duration")
-        reused = await reuse_current_video_for_tier(
-            project_path=project_path,
-            versions=generator.versions,
-            item=item,
-            resource_type="videos",
-            resource_id=resource_id,
-            request_duration_seconds=duration_seconds,
-            minimum_actual_duration_seconds=narration_actual_duration,
-            visual_basis_digest=visual_basis_digest,
-            revalidate_visual_basis_digest=_current_visual_basis_digest,
-        )
+        reused = None
+        if narration_actual_duration is not None:
+            reused = await reuse_current_video_for_tier(
+                project_path=project_path,
+                versions=generator.versions,
+                item=item,
+                resource_type="videos",
+                resource_id=resource_id,
+                request_duration_seconds=duration_seconds,
+                minimum_actual_duration_seconds=narration_actual_duration,
+                visual_basis_digest=visual_basis_digest,
+                revalidate_visual_basis_digest=_current_visual_basis_digest,
+            )
         if reused is not None:
             return reused
 

@@ -464,6 +464,10 @@ class NarrationExecutionFacts:
                 or self.actual_duration_seconds is not None
             ):
                 raise ValueError("post-production narration cannot carry TTS execution facts")
+        elif self.tts_status == "not_applicable":
+            # A silent unit under TTS delivery has no speech audio, so it carries no TTS basis or duration.
+            if self.basis_digest is not None or self.actual_duration_seconds is not None:
+                raise ValueError("a silent unit under use_tts cannot carry TTS execution facts")
         elif (
             self.tts_status != "current"
             or not self.artifact_path

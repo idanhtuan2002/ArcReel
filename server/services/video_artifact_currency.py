@@ -172,14 +172,16 @@ class VideoArtifactCommitter:
         self._lane_resolved = True
         try:
             narration = NarrationExecutionFacts.from_dict(dict(raw_narration))
-            if narration.actual_duration_seconds is None:
-                raise ValueError("use_tts execution facts are missing actual duration")
-            await validate_generated_video_covers_tts_duration(
-                resource_id=self._resource_id,
-                request_duration_seconds=duration_seconds,
-                output_path=staged_file,
-                tts_actual_duration_seconds=narration.actual_duration_seconds,
-            )
+            # A silent unit has no speech audio for the video to cover.
+            if narration.tts_status != "not_applicable":
+                if narration.actual_duration_seconds is None:
+                    raise ValueError("use_tts execution facts are missing actual duration")
+                await validate_generated_video_covers_tts_duration(
+                    resource_id=self._resource_id,
+                    request_duration_seconds=duration_seconds,
+                    output_path=staged_file,
+                    tts_actual_duration_seconds=narration.actual_duration_seconds,
+                )
         except (Exception, asyncio.CancelledError) as exc:
             self.selection_error = exc
             code = getattr(exc, "code", None)

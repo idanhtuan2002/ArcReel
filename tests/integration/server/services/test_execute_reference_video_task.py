@@ -2079,6 +2079,94 @@ async def test_execute_reference_video_task_reprojects_fresh_tts_duration_and_co
 
 
 @pytest.mark.asyncio
+async def test_a_silent_reference_unit_under_tts_delivery_generates_without_speech_audio(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    proj_dir = write_project(tmp_path)
+    script_path = proj_dir / "scripts" / "episode_1.json"
+    script = json.loads(script_path.read_text(encoding="utf-8"))
+    script["video_units"][0]["text"] = "镜头1：海面"
+    script["video_units"][0]["duration_seconds"] = 8
+    script_path.write_text(json.dumps(script, ensure_ascii=False), encoding="utf-8")
+
+    from server.services import reference_video_tasks as rvt
+
+    fake_pm = MagicMock()
+    fake_pm.load_project.return_value = json.loads((proj_dir / "project.json").read_text(encoding="utf-8"))
+    fake_pm.get_project_path.return_value = proj_dir
+    fake_pm.load_script.side_effect = lambda *_a: json.loads(script_path.read_text(encoding="utf-8"))
+    _wire_locked_script(fake_pm)
+    monkeypatch.setattr(rvt, "get_project_manager", lambda: fake_pm)
+
+    captured: dict = {}
+
+    async def _fake_generate_video_async(**kwargs):
+        captured.update(kwargs)
+        await kwargs["before_submit"](45)
+        out = proj_dir / "reference_videos" / "E1U1.mp4"
+        out.parent.mkdir(parents=True, exist_ok=True)
+        out.write_bytes(b"\x00")
+        return out, 1, None, None
+
+    fake_generator = MagicMock()
+    fake_generator.generate_video_async = AsyncMock(side_effect=_fake_generate_video_async)
+    _wire_context(
+        monkeypatch,
+        rvt,
+        fake_generator,
+        backend_name="openai",
+        backend_model="sora-2",
+        max_refs=9,
+        max_duration=12,
+        supported_durations=(4, 8, 12),
+    )
+
+    from lib.artifact_manifest import ArtifactComparison, ArtifactStatus
+    from lib.narration_delivery import (
+        NarrationAudioEvidence,
+        NarrationTtsStatus,
+        TtsSynthesisSettings,
+        prepare_narration_delivery,
+    )
+    from lib.speech_composition import admit_script_unit
+
+    async def _materialize(**kwargs):
+        options = kwargs["options"]
+        preparation = admit_script_unit("video_units", kwargs["unit"]).preparation
+        delivery = prepare_narration_delivery(
+            delivery="use_tts",
+            preparation=preparation,
+            artifact_path="audio/segment_E1U1.wav",
+            settings=TtsSynthesisSettings("fake-audio", "tts-model", "voice", None),
+            evidence=NarrationAudioEvidence(
+                comparison=ArtifactComparison(status=ArtifactStatus.MISSING, artifact_path="audio/segment_E1U1.wav"),
+                present=False,
+                duration_seconds=None,
+            ),
+        )
+        assert delivery.tts_status is NarrationTtsStatus.NOT_APPLICABLE
+        assert delivery.problems == ()
+        return replace(options, narration_preparation=delivery)
+
+    monkeypatch.setattr(rvt, "prepare_current_reference_video_request_options", _materialize)
+    monkeypatch.setattr(rvt, "tts_task_in_progress", AsyncMock(return_value=False))
+    fake_queue = MagicMock()
+    fake_queue.persist_execution_checkpoint = AsyncMock()
+    monkeypatch.setattr(rvt, "get_generation_queue", lambda: fake_queue)
+
+    await rvt.execute_reference_video_task(
+        "demo",
+        "E1U1",
+        {"script_file": "scripts/episode_1.json", "reference_request_options": {"narration_delivery": "use_tts"}},
+        user_id="u1",
+        task_id="task-silent-tts",
+    )
+
+    assert captured["duration_seconds"] == 8
+
+
+@pytest.mark.asyncio
 async def test_execute_reference_video_task_reuses_same_tier_visual_without_provider_or_state_writes(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

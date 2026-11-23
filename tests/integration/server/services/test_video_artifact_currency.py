@@ -520,6 +520,54 @@ async def test_failed_formal_selection_validation_archives_paid_video_without_cu
     assert is_typed_media_version_restorable("videos", rejected) is False
 
 
+@pytest.mark.asyncio
+async def test_a_silent_unit_under_tts_delivery_has_no_speech_for_the_video_to_cover(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    project_path = tmp_path / "demo"
+    staged = project_path / "videos" / ".paid-staged.mp4"
+    staged.parent.mkdir(parents=True)
+    staged.write_bytes(b"silent-paid-video")
+
+    class _PM:
+        @staticmethod
+        def load_project_readonly(_name):
+            return {}
+
+    covers = AsyncMock()
+    monkeypatch.setattr(video_artifact_currency, "validate_generated_video_covers_tts_duration", covers)
+    monkeypatch.setattr(
+        video_artifact_currency.CurrentTtsSettingsResolver,
+        "resolve_tts_synthesis_settings",
+        AsyncMock(return_value=TtsSynthesisSettings("p", "m", "v", None)),
+    )
+    committer = VideoArtifactCommitter(
+        project_manager=_PM(),
+        project_name="demo",
+        project_path=project_path,
+        versions=VersionManager(project_path),
+        resource_type="videos",
+        resource_id="E1S01",
+        prompt="p",
+    )
+    metadata = {
+        "artifact_video_currency": _currency("frozen").to_dict(),
+        "execution_narration": NarrationExecutionFacts(
+            delivery="use_tts",
+            tts_status="not_applicable",
+            artifact_path="",
+            basis_digest=None,
+            actual_duration_seconds=None,
+        ).to_dict(),
+    }
+
+    await committer.prepare_selection(staged, 4, metadata)
+
+    assert committer.selection_error is None
+    covers.assert_not_awaited()
+
+
 @pytest.mark.parametrize("script_change", ["none", "rebound", "removed", "legacy"])
 def test_selected_video_cancellation_compensation_restores_media_manifest_and_only_video_asset_fields(
     tmp_path: Path,
