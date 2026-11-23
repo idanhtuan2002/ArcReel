@@ -185,3 +185,18 @@ def test_a_rate_limited_step_is_run_again_after_a_pause(tmp_path: Path, monkeypa
 
     monkeypatch.setattr(tools, "call", get_task_status)
     _run(tools, tmp_path).run()
+
+
+def test_a_task_not_found_by_scope_is_settled_from_the_task_list(tmp_path: Path) -> None:
+    class ListTools(FakeTools):
+        def call(self, tool: str, /, **args: Any) -> Any:
+            if tool == "dramaclaw_get_task":
+                return {"ok": True, "data": {}}
+            if tool == "dramaclaw_list_tasks":
+                return {
+                    "ok": True,
+                    "data": [{"task_type": "sketch_grid_generation", "episode": 1, "status": "completed"}],
+                }
+            return super().call(tool, **args)
+
+    assert film.wait_task(ListTools([]), "sketch_grid_generation", 1, scope="other") == {}

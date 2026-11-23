@@ -104,6 +104,17 @@ def _ok(result: Any, what: str) -> Any:
     return result.get("data", result)
 
 
+def _latest_listed_status(tools: DramaClawTools, task_type: str, episode: int) -> str:
+    """Status of the newest task of this type and episode in the project task list (scope-agnostic)."""
+    listed = tools.call("dramaclaw_list_tasks", task_type=task_type, episode=episode)
+    items = listed.get("data") if isinstance(listed, dict) else None
+    items = items if isinstance(items, list) else (items or {}).get("tasks", [])
+    for item in items:
+        if item.get("task_type") == task_type and int(item.get("episode") or 0) == episode:
+            return str(item.get("status") or "").lower()
+    return ""
+
+
 def wait_task(tools: DramaClawTools, task_type: str, episode: int, **extra: Any) -> dict[str, Any]:
     """Poll one DramaClaw task until it ends (async-tasks reference: queued/running/pending vs completed/failed)."""
     started = time.monotonic()
@@ -118,6 +129,14 @@ def wait_task(tools: DramaClawTools, task_type: str, episode: int, **extra: Any)
             raise RunStopped(f"{task_type} ep{episode} {extra or ''} {status}: {reason}")
         if not status and isinstance(task, dict) and task.get("ok") is False:
             raise RunStopped(f"{task_type} ep{episode}: {task.get('error')}")
+        if not status:
+            listed = _latest_listed_status(tools, task_type, episode)
+            if listed == "completed":
+                return data or {}
+            if listed in FAILED:
+                raise RunStopped(f"{task_type} ep{episode}: listed task {listed}")
+            if listed in RUNNING:
+                started = time.monotonic()
         if not status and time.monotonic() - started > MISSING_TASK_SECONDS:
             raise RunStopped(f"{task_type} ep{episode} {extra or ''}: no such task after {MISSING_TASK_SECONDS}s")
         if time.monotonic() - started > MAX_STEP_SECONDS:
@@ -293,22 +312,8 @@ class FilmRun:
             self.start("dramaclaw_generate_script", "script", episode=episode)
             self.wait("script_writer", episode)
         elif step == "sketch_generation":
-            _ok(
-                self.tools.request(
-                    "POST", f"/projects/{self.state.project_id}/episodes/{episode}/sketches/assign-colors", body={}
-                ),
-                "assign colors",
-            )
-            grid = 0
-            while True:
-                started = self.start(
-                    "dramaclaw_generate_sketches", f"sketch grid {grid}", episode=episode, grid_index=grid
-                )
-                self.wait("sketch_generation", episode, scope=f"grid_{grid}")
-                total = int((started or {}).get("total_grids") or (started or {}).get("grid_count") or 1)
-                grid += 1
-                if grid >= total:
-                    break
+            # The toolset assigns colours first and, with its default grid_index -1, generates every grid in one task.
+            self.start("dramaclaw_generate_sketches", "sketches", episode=episode)
         elif step == "coloring":
             self.start("dramaclaw_detect_sketch_identities", "detect identities", episode=episode)
         elif step == "global_optimize_video":
