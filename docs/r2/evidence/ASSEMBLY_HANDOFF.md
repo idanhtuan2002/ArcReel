@@ -29,8 +29,12 @@ the plan's §0 holds the corrections. No new research notes until the first film
 
 ## Next steps, in order
 
-1. Sponsor answers: video money, GOAL amendment (DramaClaw Vietnamese UI), GOAL additions, Cloudinary.
-2. M1 work that needs no keys: `assembly/config/dramaclaw-profile.json`, `docs/r2/ASSEMBLY_MODELS.md`,
-   `assembly/voice_adapter/`, `assembly/connector/voices.py` (+ tests).
-3. Set up DramaClaw's ComfyUI channel with the local Wan workflow (free video route).
-4. When keys/relay arrive: M1.0 probes, then the rest of M1 and M2.
+Sponsor answered 2026-11-23: video = local Wan through DramaClaw's ComfyUI channel (D27); GOAL amended for interface
+languages (DramaClaw Vietnamese UI allowed); no Go/Kill or quota tolerance added to GOAL; media relay decided by the
+M1.0 base64 probe (D28).
+
+1. M1a (no keys): voice adapter (`assembly/voice_adapter/`, data: URL in, MP3 out, SHA-256 map, unknown = error) and
+   casting (`assembly/connector/voices.py`, after `characters`), with tests.
+2. M1a: DramaClaw ComfyUI channel with our local Wan workflow (video), probe one clip.
+3. Sponsor keys (OpenRouter, Gemini, BytePlus) → M1.0 probes incl. base64 on Seedream and the ComfyUI channel → D28.
+4. M2 per plan §0/§5.
