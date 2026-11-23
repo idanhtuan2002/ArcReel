@@ -92,3 +92,23 @@ def test_a_resumed_run_prepares_existing_characters_before_the_next_step(tmp_pat
     run.cast_voices = lambda r: prepared.append("cast")
     run.run()
     assert prepared == ["cast"]
+
+
+def test_recurring_characters_are_graded_main_when_extraction_marked_none(tmp_path: Path) -> None:
+    patched: list[str] = []
+
+    class GradingTools(FakeTools):
+        def request(self, method: str, path: str, **kw: Any) -> dict[str, Any]:
+            if path.endswith("/characters"):
+                return {"ok": True, "data": [{"name": "ông Khang"}, {"name": "Lan"}]}
+            if path.endswith("/episodes"):
+                return {"ok": True, "data": [{"number": 1}]}
+            if path.endswith("/raw-content"):
+                return {"ok": True, "data": "Khang cười. Khang nói. Khang đi. Lan nhìn."}
+            if method == "PATCH":
+                patched.append(path.rsplit("/", 1)[1])
+            return {"ok": True, "data": {}}
+
+    tools = GradingTools([])
+    _run(tools, tmp_path).grade_characters()
+    assert patched == ["ông Khang"]

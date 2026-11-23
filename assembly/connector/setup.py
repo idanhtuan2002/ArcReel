@@ -134,10 +134,12 @@ def fill_face_prompts(run: FilmRun, missing: list[dict[str, Any]]) -> None:
                     {"role": "system", "content": FACE_PROMPT_RULE + " 只输出这一句描述。"},
                     {"role": "user", "content": json.dumps(facts, ensure_ascii=False)},
                 ],
-                "max_tokens": 200,
+                "max_tokens": 1500,
             },
         )
-        face = str(response.json()["choices"][0]["message"]["content"]).strip()
+        face = str(response.json()["choices"][0]["message"].get("content") or "").strip()
+        if not face:
+            raise RunStopped(f"face_prompt {char['name']}: the text model returned no content")
         result = run.tools.call("dramaclaw_update_character_face_prompt", name=char["name"], face_prompt=face)
         if result.get("ok") is False:
             raise RunStopped(f"face_prompt {char['name']}: {result.get('error')}")

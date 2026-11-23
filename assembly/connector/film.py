@@ -142,6 +142,28 @@ class FilmRun:
         if self.cast_voices and not self.state.voices_cast:
             self.cast_voices(self)
 
+    def grade_characters(self, min_mentions: int = 3) -> None:
+        """Init playbook Step 6.5: core and recurring named characters become `is_main` when extraction set none.
+
+        The Hermes agent grades by judgement; here a character named at least `min_mentions` times across the
+        episodes' raw content counts as recurring.
+        """
+        chars = self.characters()
+        if any(c.get("is_main") for c in chars):
+            return
+        text = ""
+        for ep in self.episodes():
+            number = ep.get("number") or ep.get("episode") or ep.get("id")
+            raw = self.tools.request("GET", f"/projects/{self.state.project_id}/episodes/{number}/raw-content")
+            text += json.dumps(raw.get("data"), ensure_ascii=False)
+        for char in chars:
+            bare = re.sub(r"^(ông|bà|anh|chị|cô|chú|bác|em|cậu|dì|thím)\s+", "", str(char["name"]), flags=re.I)
+            if text.count(bare) >= min_mentions:
+                patched = self.tools.request(
+                    "PATCH", f"/projects/{self.state.project_id}/characters/{char['name']}", body={"is_main": True}
+                )
+                _ok(patched, f"grade {char['name']}")
+
     def episodes(self) -> list[dict[str, Any]]:
         data = _ok(self.tools.request("GET", f"/projects/{self.state.project_id}/episodes"), "episodes")
         return data if isinstance(data, list) else data.get("episodes", [])
@@ -162,6 +184,7 @@ class FilmRun:
         elif step == "portraits":
             # pipeline/status counts portraits of main characters only; one-off characters are skipped (init playbook
             # Step 6.5 grading), which also spares the once-only image pool.
+            self.grade_characters()
             for char in self.characters():
                 if not char.get("is_main") or _has_media(char, "portrait"):
                     continue
@@ -272,7 +295,7 @@ class FilmRun:
 
     def run(self, max_rounds: int = 400) -> RunState:
         last: tuple[str, int] | None = None
-        if not self.state.voices_cast and self.characters():
+        if self.characters():
             self.prepare_characters()
         for _ in range(max_rounds):
             status = self.status()
