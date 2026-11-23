@@ -137,6 +137,11 @@ a start button for automatic runs or a deep link into the donor's own screen (hu
 (D21); errors with stage and donor message; resume); **results** (play the film, read the story zh/vi, verdicts after M4); **settings shortcuts**
 (DramaClaw Models & Channels, Media Storage; huohuo AI config; the model map). One path per function; the other
 donor's equivalent appears only as a named fallback. The catalog is generated from the coverage matrix table.
+Interface patterns from ComfyUI as already proven in ArcReel's run panel ([interface research](../research/2026-11-23-r2-interface-arcreel-comfyui.md)):
+run list with All / Active / Done / Failed, per-run actions, progress per step, previews, an errors panel shown only
+when there are errors, start templates. Each project links to its **DramaClaw canvas** (visual node workspace,
+`@xyflow/react`) for hands-on work. ArcReel's React run panel is not reused as code (bound to R2's production-run API);
+its layout and Vietnamese wording are.
 **Done when** the sponsor finds every function from the catalog without reading documents, starts the M2 film from
 the page and watches it there.
 

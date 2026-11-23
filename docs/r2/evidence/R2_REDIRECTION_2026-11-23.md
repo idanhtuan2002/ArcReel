@@ -41,6 +41,8 @@ configuration. ArcReel/R2 is frozen and keeps serving production; no bake-off (s
 11. [Review of the assembly plan](../../research/2026-11-23-r2-review-of-the-assembly-plan.md) — 12 defects fixed in the
     plan (UI milestone M2b, operations M6, translation of names, OpenMontage needs a driver, per-donor inclusion), one
     product question to the sponsor (Chinese-setting stories).
+12. [Interface: ArcReel, ComfyUI, DramaClaw canvas](../../research/2026-11-23-r2-interface-arcreel-comfyui.md) — no ComfyUI
+    as product UI; its patterns in the control page; DramaClaw's node canvas as the visual workspace.
 
 ## Charter and plan
 
