@@ -70,10 +70,12 @@ def prepare_project(tools: DramaClawTools, story_path: Path, *, spine: str, sett
         timeout=120,
     )
     upload.raise_for_status()
+    # The spine is project config read by ingest's format check; ingest/start accepts it only on a rebuild.
+    spined = tools.request("PATCH", f"/projects/{tools.project_id}", body={"spine_template": spine})
+    if spined.get("ok") is False:
+        raise RunStopped(f"spine: {spined.get('error')}")
     started = tools.request(
-        "POST",
-        f"/projects/{tools.project_id}/ingest/start",
-        body={"filename": filename, "rebuild": False, "spine_template": spine},
+        "POST", f"/projects/{tools.project_id}/ingest/start", body={"filename": filename, "rebuild": False}
     )
     if started.get("ok") is False:
         raise RunStopped(f"ingest start: {started.get('error')}")
