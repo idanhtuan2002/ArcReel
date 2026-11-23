@@ -49,3 +49,26 @@ Decisions from the probes:
   with DramaClaw's own `apply_media_request_schema` and in its saved mappings.
 - D28: Seedream accepts base64 references, so the inline relay is viable for images; the ComfyUI first-frame half is still
   to probe with the Wan channel.
+
+## M1a — local Wan video through DramaClaw's ComfyUI channel — 2026-11-23
+
+- Route: DramaClaw CE calls ComfyUI through the gateway's ComfyUI task channel (dramaclaw-gateway@ed1e234
+  `relay/channel/task/comfyui`), not its direct `ComfyUIVideoGenerator` (that path accepts only a loopback ComfyUI
+  address for local principals, and its GGUF workflow is Wan2.2 I2V **A14B** Q3_K_S — ~23 GB of models not on this host,
+  too heavy for 8 GB VRAM).
+- Workflow `assembly/config/comfyui/wan22-5b-i2v.json`: the Wan2.2 TI2V 5B Q4 GGUF graph proven on 2026-10-30
+  (`media-local-2026-10-30/wan-2.2`), with a `PrimitiveFloat` titled `duration` feeding `ComfyMathExpression`
+  `min(121, max(25, round(a*6)*4+1))` into `Wan22ImageToVideoLatent.length`, so the gateway's own inference binds prompt
+  (node 6 `text`), first frame (`LoadImage` 56), width/height (55), duration (60) and seed (3).
+- The gateway cannot infer a mode for non-MiniMax workflows ("generation mode cannot be inferred from workflow"); the
+  route declares `match: {modes: [image_to_video], min_duration: 2, max_duration: 5, reference_images: {max: 1}}`.
+- Network: `assembly/deploy/comfyui-bridge.service` (socat `172.17.0.1:8189` → `127.0.0.1:8188`); both DramaClaw
+  containers read `/system_stats` through it. ComfyUI itself was not restarted.
+- Direct ComfyUI run (duration 2): 49 frames 480×848, 212 s, peak GPU 6 773 MiB, success.
+- Through NewAPI `/v1/video/generations` as DramaClaw sends it (`model: Wan22-5B-local`, `image: data:image/jpeg;base64,…`,
+  `duration: 2`, `width: 480`, `height: 854`, `metadata.ratio: 9:16`): task succeeded in 160 s, MP4 H.264 480×848,
+  49 frames (`m1-probes/wan-newapi-contact.jpg`). `result_url` is `http://localhost:3000/…`; DramaClaw rewrites
+  loopback result URLs to its gateway (`video_generator.py` `_resolve_result_url`).
+- D28: the gateway accepts a base64 first frame (`decodeDataURL`), so with Seedream's base64 references both halves of
+  the inline-relay probe pass.
+- Cost per clip: ~3 min for 2 s; 5 s (121 frames) not yet timed.

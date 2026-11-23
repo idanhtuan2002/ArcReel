@@ -1,0 +1,12 @@
+# Lets DramaClaw's containers (api and the NewAPI gateway) reach the host ComfyUI, which listens on 127.0.0.1:8188
+# only. Listens on the docker0 address alone (ASSEMBLY_PLAN D27).
+# Install: cp to ~/.config/systemd/user/ && systemctl --user daemon-reload && systemctl --user enable --now comfyui-bridge
+[Unit]
+Description=Assembly ComfyUI bridge (172.17.0.1:8189 -> 127.0.0.1:8188)
+
+[Service]
+ExecStart=/usr/bin/socat TCP-LISTEN:8189,bind=172.17.0.1,reuseaddr,fork TCP:127.0.0.1:8188
+Restart=on-failure
+
+[Install]
+WantedBy=default.target
