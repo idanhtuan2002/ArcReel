@@ -61,3 +61,14 @@ e.g. `voice_prereq_required`). DramaClaw's own agent keeps using it inside Drama
 **Approved donor changes (GOAL rule 1)**, made only in a rebuilt image from the pinned checkout and listed here when done:
 - Vietnamese interface (`frontend/src/i18n/index.ts` `SUPPORTED`, header switcher, `public/locales/vi/translation.json`).
 - Inline media relay option (`storage/media_relay.py`: a provider returning a `data:` URI).
+
+## Hermes toolset and playbooks (assembly connector, 2026-11-23)
+
+- Donor: DramaClaw @ b299bfd (`.hermes/plugins/dramaclaw/`, `.hermes/skills/dramaclaw/`, `tests/test_hermes_dramaclaw_plugin.py`),
+  copied unchanged to `vendor/dramaclaw/hermes/` (the test's plugin path adjusted to the new layout only).
+- Loader: `assembly/connector/dramaclaw_tools.py` ports the registry shim and plugin loader of
+  `src/novelvideo/chat/dramaclaw_mcp.py` (DramaClaw's own bridge for external agents), minus the MCP stdio server.
+- Auth: DramaClaw's CE owner mode (`DRAMACLAW_CE_OWNER=1`, loopback `DRAMACLAW_API_URL`), which the donor documents for
+  external clients on the same machine.
+- The connector follows the skill's playbooks (`init.md`, `episode.md`, `resume.md`, `references/pipeline-details.md`)
+  in the playbooks' "auto-advance" mode: one write task per round, rounds driven by `pipeline/status.next_step`.
