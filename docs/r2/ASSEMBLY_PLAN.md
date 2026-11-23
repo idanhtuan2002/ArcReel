@@ -45,7 +45,7 @@ decisions). Facts cite the donor checkouts: DramaClaw `b299bfd` (`~/.cache/r2-do
 | D4 | DramaClaw gateway mode = **Custom** with our profile JSON (`assembly/config/dramaclaw-profile.json`, no keys in it) | `docs/en/getting-started/configuring-models.md` "My Config" |
 | D5 | Text models: all `DC-*-LLM` → OpenRouter `baidu/ernie-5.5-flash-preview:free`; Hermes/agent the same | free registry: best free writer, Vietnamese and Chinese |
 | D6 | Vision features → Gemini `gemini-3.5-flash`, fallback OpenRouter `nvidia/nemotron-3.5-super-vl:free` (NewAPI channel priority) | registry; Gemini 20/day/model |
-| D7 | Images → BytePlus `seedream-4-5-251128` (200 free) mapped to DramaClaw's image IDs (`LingShan-G2`, `LingShan-NB-2`, `newapi_gpt_image2` selections); fallback Gemini image when the pool ends | registry; `.env.example` 225–245 |
+| D7 | Images → NewAPI **OpenAI-type channel** (VolcEngine has no image capability, verification round V1) with Base URL Override `https://ark.ap-southeast.bytepluses.com/api/v3`, upstream `seedream-4-5-251128` (200 free), mapped to DramaClaw's `LingShan-G2` (DramaClaw already aliases `seedream` → `newapi_gpt_image2`); `LingShan-NB-2` → Gemini channel image model if its free tier answers, else Seedream | channel types probe; `official_media_models.json`; `config.py` image selections |
 | D8 | Video → BytePlus `seedance-1-0-pro-fast-251015` behind DramaClaw's own default `seedance-1.0-pro-fast` | `.env.example` 276–277 |
 | D9 | Voices: `INDEXTTS2_PROVIDER=fal`, `INDEXTTS2_FAL_ENDPOINT=http://host.docker.internal:23350/fal-ai/index-tts-2/text-to-speech`, `FAL_API_KEY=local`; our **voice adapter** answers DramaClaw's fal request (`{audio_url, prompt, emotion_prompt}` → `{"audio": {"url": …}}`, `generators/indextts2_fal.py:315-360`) with VieNeu speech. VieNeu has preset voices only, so the connector **casts** one preset per character and uploads a sample of it as the character's voice sample; the adapter maps a sample (by SHA-256 of the downloaded `audio_url`) back to its preset | `generators/indextts2_fal.py`; VieNeu shim `~/arcreel-v2-staging/vieneu-tts-shim/server.py` (`/v1/audio/speech`, presets) |
 | D10 | Narrator voice: a VieNeu preset sample uploaded through `POST /api/v1/projects/{p}/narrator-voice/upload`; characters through `POST …/characters/{name}/voice-samples/{slot}/upload` | `api/routes/projects.py:786`, `characters.py:1355` |
@@ -62,6 +62,8 @@ decisions). Facts cite the donor checkouts: DramaClaw `b299bfd` (`~/.cache/r2-do
 | D22 | Idea sources, all four: the sponsor's idea; the app's own idea (huohuo `generate-premise` over a genre rotation); an existing story file; a remake from another person's video (M5, the old app's video→story unit, ADR-0161) | sponsor decision |
 | D23 | Episode length follows the story (DramaClaw's episode planner decides; no forced duration) | sponsor decision |
 | D24 | The control page binds to `127.0.0.1` only, no login (used on this machine) | sponsor decision |
+| D25 | **Vietnamese interface everywhere** (sponsor 2026-11-23): control page in Vietnamese; huohuo UI `vi`; DramaClaw UI gets a `vi` locale (donor seam: `vi` in `SUPPORTED` and default, a switcher item, `public/locales/vi/translation.json` with 5 886 strings translated, frontend image rebuilt from the pinned checkout; recorded in PORTING). Backend messages stay zh/en | sponsor requirement; verification round V6 |
+| D26 | DramaClaw spine: `spine_template = "drama"` for dialogue stories (default), `"narrated"` for narration-style stories; run option `--spine` | `api/schemas.py:124-127` |
 | D15 | Retries: each DramaClaw step and each huohuo call up to 3 attempts with 30/120/300 s waits; a step that still fails stops the run with its error recorded in the run state and `docs/r2/evidence/R2_RUN_BLOCK_LEDGER.md` | GOAL rule 3 |
 
 ## 3. Sponsor prerequisites (actions, not decisions)
@@ -86,8 +88,10 @@ Estimates are working days of agent time. Our code budget is per milestone (line
 the UI opens on `:8080`.
 
 ### M1 — Models and voices (1.5 days, ≤ 400 lines)
-0. Probe first: one call per mapped model through NewAPI (text, vision, Seedream image, Seedance video); a model that
-   fails takes its §6 fallback before anything else is built (video: DramaClaw's own ComfyUI channel with our local
+0. Probe first: one call per mapped model through NewAPI (text, vision, Seedream image through the OpenAI channel,
+   Seedance video through VolcEngine with the BytePlus base URL), and whether Seedream/Seedance accept a `data:` URI
+   image (needed only if there is no Cloudinary, verification round §4); a model that fails takes its §6 fallback
+   before anything else is built (video: DramaClaw's own ComfyUI channel with our local
    Wan workflow).
 1. `assembly/config/dramaclaw-profile.json`: channels `openrouter`, `gemini`, `volcengine` (BytePlus base URL
    `https://ark.ap-southeast.bytepluses.com/api/v3` as Base URL Override); `featureModels` per D5/D6; `mediaModels`
@@ -170,6 +174,8 @@ first episode into a film with no human step.
 **Done when** a film passes through finish and review automatically and the verdicts are in the acceptance record.
 
 ### M6 — Operations (1 day, ≤ 300 lines)
+Also: the DramaClaw Vietnamese UI (D25) if not done earlier; ArcReel's Jianying draft export as a post-stage on
+DramaClaw episodes (verification round §3).
 Backups include DramaClaw's and huohuo's Docker volumes and `~/assembly-data` (three sets kept); systemd user units
 for the voice adapter and the control page; containers `restart: unless-stopped`; an alert (the old app's channel)
 when a run stops; local fallbacks (ComfyUI images/video) wired per §6. **Done when** a reboot brings everything back

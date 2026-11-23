@@ -43,6 +43,9 @@ configuration. ArcReel/R2 is frozen and keeps serving production; no bake-off (s
     product question to the sponsor (Chinese-setting stories).
 12. [Interface: ArcReel, ComfyUI, DramaClaw canvas](../../research/2026-11-23-r2-interface-arcreel-comfyui.md) — no ComfyUI
     as product UI; its patterns in the control page; DramaClaw's node canvas as the visual workspace.
+13. [Verification round](../../research/2026-11-23-r2-assembly-verification-round.md) — probes on the running DramaClaw:
+    image route corrected (OpenAI channel, not VolcEngine), relay required, spine, Vietnamese UI seam, ArcReel's
+    Jianying export, options without Cloudinary.
 
 ## Charter and plan
 
