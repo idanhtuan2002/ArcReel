@@ -1,42 +1,28 @@
 # Assembly handoff — resume here
 
-Updated 2026-11-23 (late). Read with [GOAL](../../GOAL.md), [ASSEMBLY_PLAN](../ASSEMBLY_PLAN.md),
+Updated 2026-11-23 (night), HEAD after 74fe7ac2f. Read with [GOAL](../../GOAL.md), [ASSEMBLY_PLAN](../ASSEMBLY_PLAN.md),
 [redirection index](R2_REDIRECTION_2026-11-23.md) and [acceptance record](ASSEMBLY_ACCEPTANCE.md).
 
 ## State
 
 - Branch `impl/r2-film-quality`, pushed; worktree `/home/anhtuan/content-production-os/.worktrees/r2-film-quality`.
-  No uncommitted work of this task.
-- Production: ArcReel `r2-v2.5.90`, frozen (fixes only). Drama run `010a7912` left BLOCKED on purpose.
-- **M0 accepted**: DramaClaw runs via `assembly/deploy/dramaclaw/up.sh` (project `assembly-dramaclaw`, loopback
-  8780/8080/3000), NewAPI initialized in Custom mode, root password `~/assembly-data/secrets/newapi-root` (600),
-  `.env` in `~/assembly-data/deploy/dramaclaw/`.
-- Decisions D1–D26 in the plan (latest: D25 Vietnamese UI everywhere, D26 spine drama/narrated; D7 corrected: images
-  via NewAPI OpenAI-type channel → BytePlus Seedream mapped to `LingShan-G2`).
+- Production: ArcReel `r2-v2.5.90`, frozen (fixes only).
+- Live tracker: [ASSEMBLY_CHECKLIST.md](../ASSEMBLY_CHECKLIST.md). Models: [ASSEMBLY_MODELS.md](../ASSEMBLY_MODELS.md).
+- Done: M0 (+ images pinned by digest); M1a voices (adapter service `voice-adapter`, 172.17.0.1:23350) and local Wan
+  video (`Wan22-5B-local`, ComfyUI bridge `comfyui-bridge` 172.17.0.1:8189); M1.0 probes all pass (ERNIE, Gemini,
+  embedding, Seedream incl. base64 and `/images/edits`, watermark off, Wan through NewAPI). Profile
+  `assembly/config/dramaclaw-profile.json` applied (My Config). Decisions D1–D29 in the plan.
+- Services (systemd --user): `voice-adapter`, `comfyui-bridge`, `cloudinary-cleanup.timer`.
 
 ## Waiting on the sponsor
 
-1. Cloudinary account (recommended) or approval of the "inline" relay donor seam
-   ([verification round §4](../../research/2026-11-23-r2-assembly-verification-round.md)).
-2. Keys (OpenRouter, Gemini, BytePlus) pasted into DramaClaw → Settings → Models & Channels → Custom after the
-   profile is loaded (M1).
-3. Answer: old app UI vs new control page — to be decided from research round A below.
-
-## Research done
-
-Three independent rounds recorded and reconciled ([reconciled](../../research/2026-11-23-r2-independent-rounds-reconciled.md));
-the plan's §0 holds the corrections. No new research notes until the first film.
+1. Cloudinary **Cloud name** re-entered in DramaClaw → Settings → Media Storage (Cloudinary answers 401
+   `cloud_name mismatch`; uploads of reference images would fail). Then rerun `systemctl --user start cloudinary-cleanup`.
 
 ## Next steps, in order
 
-The live tracker is [ASSEMBLY_CHECKLIST.md](../ASSEMBLY_CHECKLIST.md); this list summarises it.
-
-Sponsor answered 2026-11-23: video = local Wan through DramaClaw's ComfyUI channel (D27); GOAL amended for interface
-languages (DramaClaw Vietnamese UI allowed); no Go/Kill or quota tolerance added to GOAL; media relay decided by the
-M1.0 base64 probe (D28).
-
-1. M1a (no keys): voice adapter (`assembly/voice_adapter/`, data: URL in, MP3 out, SHA-256 map, unknown = error) and
-   casting (`assembly/connector/voices.py`, after `characters`), with tests.
-2. M1a: DramaClaw ComfyUI channel with our local Wan workflow (video), probe one clip.
-3. Sponsor keys (OpenRouter, Gemini, BytePlus) → M1.0 probes incl. base64 on Seedream and the ComfyUI channel → D28.
-4. M2 per plan §0/§5.
+1. Verify Cloudinary with the cleanup job (expect HTTP 200 listings).
+2. M2 connector core (`assembly/connector/`): DramaClaw REST client (multipart ingest upload → `ingest/start` with
+   `spine_template`), configure (`ethnicity`, `narration_style`, 720×1280, video backend `newapi_Wan22-5B-local`),
+   drive `pipeline/status.next_step` task types, run state file, resume, retries, voice casting after `characters`.
+3. First narrated film from "Chiếc đồng hồ của ông", then the drama film (huohuo formatter → headers → `drama`).
