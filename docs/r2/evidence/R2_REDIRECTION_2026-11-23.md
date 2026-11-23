@@ -46,6 +46,10 @@ configuration. ArcReel/R2 is frozen and keeps serving production; no bake-off (s
 13. [Verification round](../../research/2026-11-23-r2-assembly-verification-round.md) — probes on the running DramaClaw:
     image route corrected (OpenAI channel, not VolcEngine), relay required, spine, Vietnamese UI seam, ArcReel's
     Jianying export, options without Cloudinary.
+14. [Three independent rounds, reconciled](../../research/2026-11-23-r2-independent-rounds-reconciled.md) and
+    [final review against every expectation](../../research/2026-11-23-r2-final-review-against-expectations.md) — direction
+    complete; three limits (quality below donor showcase on free models, first films narrated, no parallel series on free
+    pools); Go with M1a.
 
 ## Charter and plan
 
