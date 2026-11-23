@@ -8,7 +8,7 @@ Legend: `[x]` done · `[~]` in progress · `[ ]` to do · `[!]` blocked · **S**
 
 | | Item | Status / evidence |
 |---|---|---|
-| [!] | **S** Cloudinary account, pasted in DramaClaw → Settings → Media Storage — saved, but Cloudinary answers 401 `cloud_name mismatch`: the Cloud name field holds another value (4 chars, not a cloud name); sponsor re-enters it | 2026-11-23 cleanup job probe |
+| [x] | **S** Cloudinary account in DramaClaw → Settings → Media Storage (cloud name corrected) | 2026-11-23: DramaClaw `upload_image_file` → `res.cloudinary.com/…/dramaclaw-relay/…`, fetched back; Admin API listings 200 |
 | [x] | **S** OpenRouter, Gemini, BytePlus keys pasted in DramaClaw → Models & Channels → My Config | 2026-11-23, ASSEMBLY_ACCEPTANCE M1.0 |
 | [x] | Video route for first films = local Wan (D27) | 2026-11-23 |
 | [x] | GOAL amendment: donor interface languages allowed (DramaClaw Vietnamese UI) | `docs/GOAL.md` rule 1 |
@@ -34,7 +34,7 @@ Legend: `[x]` done · `[~]` in progress · `[ ]` to do · `[!]` blocked · **S**
 | [x] | `docs/r2/ASSEMBLY_MODELS.md` slot → model → pool → fallback | written 2026-11-23 |
 | [x] | M1.0 probes per model incl. base64 on Seedream and the ComfyUI channel — all pass | ASSEMBLY_ACCEPTANCE M1.0, M1a Wan |
 | [ ] | Inline relay option in DramaClaw (approved donor change, rebuilt image, PORTING) — if probes allow | D28 |
-| [~] | Cloudinary daily cleanup job — `assembly/ops/cloudinary_cleanup.py` runs inside the api container, timer `cloudinary-cleanup.timer` 04:30 daily; first run stopped on the 401 above | D28 |
+| [x] | Cloudinary daily cleanup job — `assembly/ops/cloudinary_cleanup.py` runs inside the api container, timer `cloudinary-cleanup.timer` 04:30 daily; runs clean (HTTP 200), probe asset deleted with `RELAY_MAX_AGE_HOURS=0` | D28 |
 
 ## M2 — first films from "Chiếc đồng hồ của ông", both spines
 

@@ -16,13 +16,11 @@ Updated 2026-11-23 (night), HEAD after 74fe7ac2f. Read with [GOAL](../../GOAL.md
 
 ## Waiting on the sponsor
 
-1. Cloudinary **Cloud name** re-entered in DramaClaw → Settings → Media Storage (Cloudinary answers 401
-   `cloud_name mismatch`; uploads of reference images would fail). Then rerun `systemctl --user start cloudinary-cleanup`.
+Nothing.
 
 ## Next steps, in order
 
-1. Verify Cloudinary with the cleanup job (expect HTTP 200 listings).
-2. M2 connector core (`assembly/connector/`): DramaClaw REST client (multipart ingest upload → `ingest/start` with
+1. M2 connector core (`assembly/connector/`): DramaClaw REST client (multipart ingest upload → `ingest/start` with
    `spine_template`), configure (`ethnicity`, `narration_style`, 720×1280, video backend `newapi_Wan22-5B-local`),
    drive `pipeline/status.next_step` task types, run state file, resume, retries, voice casting after `characters`.
-3. First narrated film from "Chiếc đồng hồ của ông", then the drama film (huohuo formatter → headers → `drama`).
+2. First narrated film from "Chiếc đồng hồ của ông", then the drama film (huohuo formatter → headers → `drama`).
