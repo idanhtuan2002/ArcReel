@@ -52,7 +52,7 @@ OpenMontage (non-fiction and repurposing, whole). A gap is filled, in this order
 
 | Capability | Old app | Donors | In the assembly | Gap filled by |
 |---|---|---|---|---|
-| Documentary montage, explainer, animation, character animation, cinematic, talking head/avatar, clip factory, podcast, localization/dub, screen demo, hybrid | narration forms only (0162, 0163) | OpenMontage 13 pipelines (`pipeline_defs/`) | ✅ OpenMontage whole (ADR-0170 item 4) | — |
+| Documentary montage, explainer, animation, character animation, cinematic, talking head/avatar, clip factory, podcast, localization/dub, screen demo, hybrid | narration forms only (0162, 0163) | OpenMontage 13 pipelines (`pipeline_defs/`) | ⏳ OpenMontage needs an agent driver and gate approval ([review](2026-11-23-r2-review-of-the-assembly-plan.md) R7) | research the driver (M5) |
 | Facts only from sources; top list, quiz, biography, true crime forms | ✅ fact pack (0162, 0163) | — | ❌ | (3) old fact pack as the story source for OpenMontage documentary/explainer |
 | English narration with its own reviewer prompt | ✅ (0165) | OpenMontage (English) | ✅ | — |
 | News commentary, motivation quotes, music/lyric video, review-reaction | ❌ | OpenMontage partial (music tools, analysis) | ❌ | (4) not now |

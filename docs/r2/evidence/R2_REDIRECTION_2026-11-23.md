@@ -38,6 +38,9 @@ configuration. ArcReel/R2 is frozen and keeps serving production; no bake-off (s
 10. [Separate donors vs assembly](../../research/2026-11-23-r2-separate-donors-vs-assembly.md) — the assembly contains
     "each donor alone"; single-purpose uses run on the donor's own UI, the automatic product on the assembly; huohuo's
     film pipeline is the fallback if DramaClaw fails M2.
+11. [Review of the assembly plan](../../research/2026-11-23-r2-review-of-the-assembly-plan.md) — 12 defects fixed in the
+    plan (UI milestone M2b, operations M6, translation of names, OpenMontage needs a driver, per-donor inclusion), one
+    product question to the sponsor (Chinese-setting stories).
 
 ## Charter and plan
 

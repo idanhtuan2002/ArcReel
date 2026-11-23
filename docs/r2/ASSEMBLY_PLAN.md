@@ -32,6 +32,7 @@ decisions). Facts cite the donor checkouts: DramaClaw `b299bfd` (`~/.cache/r2-do
   `lib/` only `lib.story_translation` (translation) and, in M4, the finishing and review modules named there.
 - **Runtime data** outside the repo: `~/assembly-data/` (run state files, downloaded films, voice samples, local
   secrets with mode 600).
+- **One operator surface**: the Vietnamese control page (M2b) lists every function and links into the donors' screens.
 - **ArcReel stays frozen** and in production; nothing in this plan changes it except item M2.4 (one public function).
 
 ## 2. Decisions (locked)
@@ -51,7 +52,7 @@ decisions). Facts cite the donor checkouts: DramaClaw `b299bfd` (`~/.cache/r2-do
 | D11 | Media relay for reference images/audio = **Cloudinary** (free account) | donor docs "Reference media storage" |
 | D12 | huohuo text → the same NewAPI gateway (`HUOHUO_PRESET_TEXT_BASE_URL=http://host.docker.internal:3000/v1`, model `baidu/ernie-5.5-flash-preview:free`, also `HUOHUO_PRESET_AGENT_MODEL`), one key store and one usage ledger | `services/ai/ai-config-service.ts:45-75` |
 | D13 | New DramaClaw projects are `structured_v1` (no embedding model needed) | `api/routes/projects.py:630-641` |
-| D14 | Configure step: `ethnicity = "Vietnamese"`, `narration_style` = the value DramaClaw's settings UI offers for a narrator voice (read the allowed values from `project_config.py` at implementation time; default the first non-empty) | `api/routes/pipeline.py` `_user_has_configured` |
+| D14 | Configure step: `ethnicity = "Vietnamese"`, `narration_style = "third_person"` (valid: `first_person`, `third_person`) | `project_config.py:29-34`, `api/routes/pipeline.py` `_user_has_configured` |
 | D15 | Retries: each DramaClaw step and each huohuo call up to 3 attempts with 30/120/300 s waits; a step that still fails stops the run with its error recorded in the run state and `docs/r2/evidence/R2_RUN_BLOCK_LEDGER.md` | GOAL rule 3 |
 
 ## 3. Sponsor prerequisites (actions, not decisions)
@@ -76,6 +77,9 @@ Estimates are working days of agent time. Our code budget is per milestone (line
 the UI opens on `:8080`.
 
 ### M1 — Models and voices (1.5 days, ≤ 400 lines)
+0. Probe first: one call per mapped model through NewAPI (text, vision, Seedream image, Seedance video); a model that
+   fails takes its §6 fallback before anything else is built (video: DramaClaw's own ComfyUI channel with our local
+   Wan workflow).
 1. `assembly/config/dramaclaw-profile.json`: channels `openrouter`, `gemini`, `volcengine` (BytePlus base URL
    `https://ark.ap-southeast.bytepluses.com/api/v3` as Base URL Override); `featureModels` per D5/D6; `mediaModels`
    per D7/D8 keeping DramaClaw's model IDs and setting the upstream model. No embedding entry (D13).
@@ -84,7 +88,9 @@ the UI opens on `:8080`.
 3. `assembly/voice_adapter/app.py` (FastAPI, `127.0.0.1:23350` and the docker bridge address): `POST
    /fal-ai/index-tts-2/text-to-speech` (D9), `GET /audio/{id}.wav`; sample registry `~/assembly-data/voices.json`
    (`sha256 → preset`); unknown sample → narrator preset with a logged warning. Calls the VieNeu shim
-   `POST http://127.0.0.1:23340/v1/audio/speech {model, input, voice, response_format:"wav"}`.
+   `POST http://127.0.0.1:23340/v1/audio/speech {model, input, voice, response_format:"wav"}`. Samples are 4 s WAV
+   (DramaClaw accepts 1.8–15.2 s, "should be 3–5 s", `seedance2_i2v/pipeline.py:110-120`); if the media relay
+   re-encodes the bytes, the registry key falls back to the sample's file name.
    systemd user unit `assembly/deploy/voice-adapter.service`.
 4. `assembly/connector/voices.py`: preset list from the shim's `/health` (`voices`); cast rule = gender from the
    character record, then age group, northern accent by default, distinct presets for distinct characters while
@@ -114,16 +120,29 @@ step**; the agent and the sponsor watch it: Vietnamese voices for both character
 shots, picture and speech in sync. The result is recorded in `docs/r2/evidence/ASSEMBLY_ACCEPTANCE.md` with the film
 path, run time, model calls, and the verdict.
 
+### M2b — Vietnamese control page (1 day, ≤ 500 lines)
+`assembly/web/` (FastAPI + server-rendered HTML, Vietnamese): **catalog** of every product function grouped Story /
+Film / Non-fiction / Operations, each with status (available, fallback, coming in Mx, not covered) and where it runs —
+a start button for automatic runs or a deep link into the donor's own screen (huohuo `:18088`, DramaClaw `:8080`);
+**runs** (start from a story file or a premise, stage-by-stage progress from the run state, errors with stage and
+donor message, resume); **results** (play the film, read the story zh/vi, verdicts after M4); **settings shortcuts**
+(DramaClaw Models & Channels, Media Storage; huohuo AI config; the model map). One path per function; the other
+donor's equivalent appears only as a named fallback. The catalog is generated from the coverage matrix table.
+**Done when** the sponsor finds every function from the catalog without reading documents, starts the M2 film from
+the page and watches it there.
+
 ### M3 — Story stage (1.5 days, ≤ 400 lines)
-1. huohuo up: `assembly/deploy/huohuo/.env` from its `deploy/docker-compose.yml` (sqlite, `BOOTSTRAP_ADMIN_*`,
+1. huohuo up — **built from the pinned checkout** (no published image): `assembly/deploy/huohuo/.env` from its `deploy/docker-compose.yml` (sqlite, `BOOTSTRAP_ADMIN_*`,
    `CONFIG_ENCRYPTION_KEY` random, D12 presets); `docker compose up -d`.
 2. `assembly/connector/huohuo.py`: login `POST /api/v1/auth/login` (JWT); create `POST /api/v1/dramas
    {title, project_type:"novel", novel_genre, premise?, total_chapters}` (`services/drama/drama-catalog-service.ts:120-160`);
    `POST /api/v1/novel/generate-premise {keywords, genre, title, total_chapters}`; `POST
    /api/v1/novel/dramas/{id}/outline {premise}`; `POST …/memory/init`; `POST …/generate-remaining/stream {mode:"all"}`
    (read the server-sent events to the end); fetch the chapters' text.
-3. `assembly/connector/translate.py`: `translate_text(text, target="vi", terms=<character names>, generate=<NewAPI chat
-   call with JSON schema, model D5>)`.
+3. `assembly/connector/translate.py`: (a) collect the cast names from huohuo's story memory/state cards and translate
+   them once to Hán-Việt (one JSON call → glossary `zh name → vi name`, kept in the run state); (b) replace the names
+   in the Chinese text; (c) `translate_text(text, target="vi", terms=<Vietnamese names>, generate=<NewAPI chat call
+   with JSON schema, model D5>)` — the protected terms are Latin, so the no-CJK check holds.
 4. CLI: `assembly.run story-film --premise "<idea>" --genre <g> --chapters <n>` = M3 → M2.
 **Done when** a premise produces a translated Vietnamese story that the sponsor reads as natural, and M2 turns its
 first episode into a film with no human step.
@@ -136,10 +155,18 @@ first episode into a film with no human step.
    connector asks DramaClaw to regenerate the named beats (`/beats/regenerate`) once, then records the verdict.
 **Done when** a film passes through finish and review automatically and the verdicts are in the acceptance record.
 
+### M6 — Operations (1 day, ≤ 300 lines)
+Backups include DramaClaw's and huohuo's Docker volumes and `~/assembly-data` (three sets kept); systemd user units
+for the voice adapter and the control page; containers `restart: unless-stopped`; an alert (the old app's channel)
+when a run stops; local fallbacks (ComfyUI images/video) wired per §6. **Done when** a reboot brings everything back
+and an interrupted run resumes from the page.
+
 ### M5 — Coverage (rolling, after M4)
 Genre skills from shenbi (comedy, fanfic/spinoff) and ViMax (children's) as huohuo genre skill folders (recorded donor
 seam); the old app's action, family, bedtime, storytime packs; audiobook from the story; OpenMontage forms
-(coverage matrix, 2026-11-23). Each item is its own task with a film/story acceptance.
+(coverage matrix, 2026-11-23). OpenMontage first needs its driver researched: it is agent-driven and its human gates
+are enforced in code (`AGENT_GUIDE.md:589`, `lib/checkpoint.py`). StoryBox's simulation lab is the one donor
+function not covered by any choice so far. Each item is its own task with a film/story acceptance.
 
 ## 5. DramaClaw step → toolset handler
 
@@ -176,6 +203,7 @@ automation contract); the table is updated in the same commit.
 | A DramaClaw step needs a donor code change | stop, record the seam need, report (GOAL tolerance) |
 | Translation batch fails 3× | retry the batch with the next registry writer once, then stop |
 | Pinned image tag missing | build from the pinned checkout (M0) |
+| BytePlus pools (once-only) run out in production | local ComfyUI channel for video/images; any spend is a GOAL tolerance |
 | DramaClaw fails M2 acceptance | run huohuo's own film pipeline (`runDramaEpisodePipeline`) on the same story; report the comparison ([separate vs assembly](../research/2026-11-23-r2-separate-donors-vs-assembly.md)) |
 
 ## 7. How this plan keeps the direction
