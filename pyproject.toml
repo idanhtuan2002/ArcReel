@@ -51,7 +51,12 @@ dependencies = [
     "opentelemetry-sdk>=1.44.0",
     "opentelemetry-exporter-otlp-proto-http>=1.44.0",
     "yt-dlp>=2025.1",
+    # DramaClaw @ b299bfd identity planner, ported whole (vendor/dramaclaw/PORTING.md, ADR-0168).
+    "dramaclaw-identity",
 ]
+
+[tool.uv.sources]
+dramaclaw-identity = { path = "vendor/dramaclaw", editable = true }
 
 [dependency-groups]
 dev = [
@@ -516,7 +521,7 @@ DEP004 = [
 
 [tool.ruff]
 line-length = 120
-exclude = [".worktrees", ".claude/worktrees"]
+exclude = [".worktrees", ".claude/worktrees", "vendor"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "C4", "PIE", "PT", "RET", "PERF", "RUF", "SIM", "ASYNC"]

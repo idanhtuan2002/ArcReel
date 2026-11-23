@@ -51,6 +51,8 @@ ENV TZ=Asia/Shanghai
 
 # 先复制依赖和包元数据文件，利用缓存
 COPY pyproject.toml uv.lock README.md ./
+# Path dependency (DramaClaw identity planner, vendor/dramaclaw/PORTING.md) must exist before uv sync.
+COPY vendor/dramaclaw/ vendor/dramaclaw/
 RUN uv sync --no-dev --no-install-project
 
 # 复制应用代码
