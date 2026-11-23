@@ -30,7 +30,7 @@ Legend: `[x]` done · `[~]` in progress · `[ ]` to do · `[!]` blocked · **S**
 | [~] | M1a voice adapter `assembly/voice_adapter/` (data: URL in, SHA-256 → VieNeu preset, MP3 out at `host.docker.internal`, unknown = error) + tests — code, unit tests, service unit done; transport verified from inside the DramaClaw container (fal request → MP3); DramaClaw's own TTS task with an uploaded sample left for M2 | `tests/unit/assembly/test_voice_adapter.py` |
 | [~] | M1a casting (`assembly/voices/`: VieNeu catalog from its own preset file, registry, casting rule by gender/region) + tests — done; sample generation and upload to DramaClaw come with the connector (M2) | `tests/unit/assembly/test_voices.py` |
 | [ ] | M1a DramaClaw ComfyUI channel with the local Wan workflow; one clip probe | D27 |
-| [ ] | `assembly/config/dramaclaw-profile.json` (OpenRouter text, Gemini vision spread, OpenAI-type channel → BytePlus Seedream for `LingShan-G2`, Seedream 4.0 second pool, VolcEngine Seedance) | D5–D8 |
+| [~] | `assembly/config/dramaclaw-profile.json` (written; pasted as DramaClaw "My Config"; BytePlus on two channels — volcengine type and OpenAI type — until the M1.0 probe picks the working image route; embedding `gemini-embedding-001` 768) — (OpenRouter text, Gemini vision spread, OpenAI-type channel → BytePlus Seedream for `LingShan-G2`, Seedream 4.0 second pool, VolcEngine Seedance) | D5–D8 |
 | [ ] | `docs/r2/ASSEMBLY_MODELS.md` slot → model → pool → fallback | |
 | [!] | M1.0 probes per model incl. base64 on Seedream and the ComfyUI channel (needs keys) | D28 |
 | [ ] | Inline relay option in DramaClaw (approved donor change, rebuilt image, PORTING) — if probes allow | D28 |

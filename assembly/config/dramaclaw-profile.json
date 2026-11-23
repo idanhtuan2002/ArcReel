@@ -1,0 +1,95 @@
+{
+  "version": 2,
+  "name": "Assembly: OpenRouter + Gemini + BytePlus (free tiers)",
+  "channels": [
+    {
+      "id": "openrouter",
+      "provider": "openrouter",
+      "baseUrl": "",
+      "priority": 0,
+      "settings": {}
+    },
+    {
+      "id": "gemini",
+      "provider": "gemini",
+      "baseUrl": "",
+      "priority": 0,
+      "settings": {}
+    },
+    {
+      "id": "byteplus_ark",
+      "provider": "volcengine",
+      "baseUrl": "https://ark.ap-southeast.bytepluses.com",
+      "priority": 0,
+      "settings": {}
+    },
+    {
+      "id": "byteplus_openai",
+      "provider": "openai",
+      "baseUrl": "https://ark.ap-southeast.bytepluses.com/api/v3",
+      "priority": 0,
+      "settings": {}
+    }
+  ],
+  "featureModels": {
+    "text": {
+      "channel": "openrouter",
+      "model": "baidu/ernie-5.5-flash-preview:free"
+    },
+    "vision": {
+      "channel": "gemini",
+      "model": "gemini-3.5-flash"
+    },
+    "overrides": {}
+  },
+  "embedding": {
+    "channel": "gemini",
+    "model": "gemini-embedding-001",
+    "dimension": 768,
+    "batchSize": 10
+  },
+  "mediaModels": {
+    "LingShan-G2": {
+      "channel": "byteplus_ark",
+      "model": "seedream-4-5-251128",
+      "mediaType": "image",
+      "label": "LingShan-G2",
+      "enabled": true,
+      "sortOrder": 100,
+      "config": {
+        "request": {
+          "endpoint": "images/generations",
+          "parameters": []
+        }
+      }
+    },
+    "LingShan-NB-2": {
+      "channel": "byteplus_ark",
+      "model": "seedream-4-5-251128",
+      "mediaType": "image",
+      "label": "LingShan-NB-2",
+      "enabled": true,
+      "sortOrder": 100,
+      "config": {
+        "request": {
+          "endpoint": "images/generations",
+          "parameters": []
+        }
+      }
+    },
+    "seedance-1.0-pro-fast": {
+      "channel": "byteplus_ark",
+      "model": "seedance-1-0-pro-fast-251015",
+      "mediaType": "video",
+      "label": "seedance-1.0-pro-fast",
+      "enabled": true,
+      "sortOrder": 100,
+      "config": {
+        "request": {
+          "endpoint": "video/generations",
+          "parameters": []
+        }
+      }
+    }
+  }
+}
