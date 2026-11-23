@@ -29,6 +29,11 @@ uv run pre-commit run --all-files actionlint && uv run pre-commit run --all-file
 - **Research-first：**提出或接受架构、产品、供应商、工作流或权限边界决策前，先检查当前 Git/代码/既有 ADR 与计划，再核验一手资料；主动对照相关外部项目、仓库和固定 commit 的实际源码、fixture、能力与缺陷。研究结果须区分事实、推断、未知项和备选方案；研究未完成时不得把候选方案写成已定决策。
 - **Reuse-first：**先穷尽可复用的本仓库模块、契约、测试、工具和已调研 donor，再考虑新建；复用必须验证真实调用面、版本 pin、同 fixture 行为和 authority 边界，不把仅规划或未验收的接口当作可用实现。
 - **Donor 整体移植（sponsor 决定，2026-11-22）：**采用 donor 机制时整体移植该单元——代码、prompt、默认配置、测试与 fixture，标明 donor 仓库与 commit；只自写与本仓库衔接的 adapter。重新实现须在 ADR 中写明理由（例如 donor 仅有 TypeScript 或只有 prompt）。动手新建机制前，先查 donor 本地 checkout 与 `docs/research/*donor*` 是否已有带测试的可运行单元；评审语料等辅助产物经本应用自身流水线生成，不另写旁路脚本。审计见 `docs/research/2026-11-22-r2-donor-port-audit.md`。凡采用 donor 机制的 ADR 必须有 **Port** 小节（donor 仓库 @ commit、移植的文件与测试、本仓库自写的 adapter），否则写 **Why not ported** 段落；缺少即为 review finding。donor 研究须以 **port 清单**（单元、文件、测试、adapter、规模）收尾，不能只给差距表。prompt 按原文移植（`zh` 保留原文，`vi`/`en` 由原文翻译），语言或技术栈不同只能作为改写措辞的理由，不能作为丢弃结构、规则与覆盖面的理由。原因分析见 `docs/research/2026-11-23-r2-why-donor-units-were-not-ported.md`。
+- **资源浪费防线（sponsor 决定，2026-11-23）：**依据 `docs/research/2026-11-23-r2-resource-waste-audit.md`（11-10…11-23 共 91 个发布，44% 在修本仓库自建的运行治理与评审资格机制）。
+  - **按类修复：**运行被阻断时修整类问题而非单个实例：先用 codebase-memory 找出读写同一状态、模式或摘要的全部消费方，在同一发布中逐个修复并各加回归测试，commit 中列出已扫描的消费方。
+  - **新状态全量扫描：**新增状态值或交付模式（如 `not_applicable`、静音单元）时，在 ADR 或 commit 中列出每个读取它的判定点。
+  - **周期性成本须审批：**自建机制若每次运行都消耗 GPU、额度、人工步骤或可能阻断运行，须先对照 donor 的做法与成本并经 sponsor 批准（参照 ADR-0169）。
+  - **阻断台账：**每次运行阻断记一行到 `docs/r2/evidence/R2_RUN_BLOCK_LEDGER.md`（日期、run、原因码、类别、误报/真问题、修复发布）；台账每增 10 行复盘一次。
 - **License 不在范围内：**按 sponsor 明确决定，所有 license 调研、判断、证据、建议和 gate 均跳过；license 不得成为设计、复用、review 或 acceptance blocker。
 - **Quality-first, quota-efficient：**始终以可达到的最高工作质量为目标，不得因 quota 主动缩小必要研究范围、跳过证据或验证、弱化设计标准或提前下结论。额度只改变工作组织方式：复用已验证证据，使用窄而精确的查询，避免重复读取、重复扫描、无关 full suite 和非必要产物，先完成最高价值的当前 gate，并及早保存可恢复 checkpoint。
 - **后台 agent 预算：**默认由主 agent 串行完成；仅当独立研究或 review 明显提高质量时启用至多一个后台 agent，并禁止其继续派生子 agent。用户未明确要求时不做并行 fan-out；quota 紧张时先停止后台 agent，不能以降低研究或验证质量来换额度。
