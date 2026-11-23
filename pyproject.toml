@@ -499,7 +499,7 @@ forbidden_modules = [
 # 扫描范围与 basedpyright 对齐：lib server alembic scripts tests r2
 # exclude 是 deptry 默认值去掉 tests（测试的 import 也要参与依赖卫生判定）再补上 worktree 目录。
 exclude = ["venv", "\\.venv", "\\.direnv", "\\.git", "setup\\.py", "\\.worktrees", "\\.claude/worktrees"]
-known_first_party = ["lib", "server", "alembic", "scripts", "tests", "r2"]
+known_first_party = ["lib", "server", "alembic", "scripts", "tests", "r2", "assembly"]
 
 [tool.deptry.package_module_name_map]
 # Vendored DramaClaw identity planner (vendor/dramaclaw): the distribution keeps the donor's import name.
@@ -549,7 +549,7 @@ extend-immutable-calls = [
 ]
 
 [tool.basedpyright]
-include = ["lib", "server", "alembic", "tests", "scripts", "r2"]
+include = ["lib", "server", "alembic", "tests", "scripts", "r2", "assembly"]
 exclude = [
     "**/__pycache__",
     ".venv",

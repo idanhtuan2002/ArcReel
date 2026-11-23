@@ -27,8 +27,8 @@ Legend: `[x]` done · `[~]` in progress · `[ ]` to do · `[!]` blocked · **S**
 
 | | Task | Evidence |
 |---|---|---|
-| [ ] | M1a voice adapter `assembly/voice_adapter/` (data: URL in, SHA-256 → VieNeu preset, MP3 out at `host.docker.internal`, unknown = error) + tests | |
-| [ ] | M1a casting `assembly/connector/voices.py` (after `characters`; per age group after `identity_plan`; region by setting D18) + tests | |
+| [~] | M1a voice adapter `assembly/voice_adapter/` (data: URL in, SHA-256 → VieNeu preset, MP3 out at `host.docker.internal`, unknown = error) + tests — code and unit tests done; service unit and live wiring to DramaClaw left | `tests/unit/assembly/test_voice_adapter.py` |
+| [~] | M1a casting (`assembly/voices/`: VieNeu catalog from its own preset file, registry, casting rule by gender/region) + tests — done; sample generation and upload to DramaClaw come with the connector (M2) | `tests/unit/assembly/test_voices.py` |
 | [ ] | M1a DramaClaw ComfyUI channel with the local Wan workflow; one clip probe | D27 |
 | [ ] | `assembly/config/dramaclaw-profile.json` (OpenRouter text, Gemini vision spread, OpenAI-type channel → BytePlus Seedream for `LingShan-G2`, Seedream 4.0 second pool, VolcEngine Seedance) | D5–D8 |
 | [ ] | `docs/r2/ASSEMBLY_MODELS.md` slot → model → pool → fallback | |
