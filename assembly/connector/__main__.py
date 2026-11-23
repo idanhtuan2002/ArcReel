@@ -66,6 +66,7 @@ def main() -> int:
         out_dir=DATA / "films",
         cast_voices=lambda r: setup.cast_voices(r, story_region=args.region),
         fill_face_prompts=setup.fill_face_prompts,
+        rewrite_narration=setup.rewrite_narration,
         log=lambda line: print(line, flush=True),
     )
     try:

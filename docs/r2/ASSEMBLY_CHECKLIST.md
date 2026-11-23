@@ -45,6 +45,8 @@ Legend: `[x]` done · `[~]` in progress · `[ ]` to do · `[!]` blocked · **S**
 | [ ] | **Narrated film** (prose → `spine_template = narrated`) end to end | |
 | [ ] | **Drama film** (prose → huohuo `drama_script_formatter` via `POST /api/v1/agent/drama_script_formatter/chat` → headers rewritten to `INT./EXT. <nơi> - <thời gian>` → `spine_template = drama`), character voices per `Name: line` | round B §9; huohuo `agent-skills/drama_script_formatter` |
 | [ ] | Identity images for every identity; voices cast after characters | |
+| [ ] | CP1 extension (sponsor 2026-11-24): review the portrait prompts (`face_prompt`, appearance) before any portrait is generated — cheaper than regenerating images | sponsor note |
+| [~] | Narrated Vietnamese narration: DramaClaw zh rewrite (third person) → line translation with names restored (`assembly/connector/rewriter.py`) | ledger 2026-11-24 |
 | [ ] | Acceptance by eye: Vietnamese speech and subtitles, two characters consistent, sync — recorded | ASSEMBLY_ACCEPTANCE |
 | [ ] | `lib/story_translation.py`: public `translate_text` | |
 

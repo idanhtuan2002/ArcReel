@@ -83,6 +83,10 @@ def chapter_text(text: str) -> str:
     return out
 
 
+def _has_cjk(text: str) -> bool:
+    return any("\u4e00" <= ch <= "\u9fff" for ch in text)
+
+
 def _has_media(item: dict[str, Any], kind: str) -> bool:
     return any(str(v or "").strip() for k, v in item.items() if kind in k and ("url" in k or "path" in k))
 
@@ -125,6 +129,7 @@ class FilmRun:
         out_dir: Path,
         cast_voices: Callable[[FilmRun], None] | None = None,
         fill_face_prompts: Callable[[FilmRun, list[dict[str, Any]]], None] | None = None,
+        rewrite_narration: Callable[[FilmRun, int], None] | None = None,
         log: Callable[[str], None] = print,
     ) -> None:
         self.tools = tools
@@ -133,6 +138,7 @@ class FilmRun:
         self.out_dir = out_dir
         self.cast_voices = cast_voices
         self.fill_face_prompts = fill_face_prompts
+        self.rewrite_narration = rewrite_narration
         self.log = log
 
     # --- DramaClaw access -------------------------------------------------------------------------------------------
@@ -264,11 +270,14 @@ class FilmRun:
                         identity_id=ident.get("identity_id") or ident["id"],
                     )
         elif step == "script_writer":
-            # DramaClaw's rewrite step (`rewrite/generate`, task `content_rewrite`) writes zh/en narration only
-            # (`utils/source_language.py`: AssetLanguage = zh | en), and the episode playbook makes it optional. Our
-            # stories are Vietnamese text, so the script is cut from the raw text: narration keeps the author's words.
+            # DramaClaw's own rewrite writes zh/en narration only (`utils/source_language.py`); narrated films use its
+            # rewriter ported with a Vietnamese output rule (`assembly.connector.rewriter`), saved the way DramaClaw's
+            # route saves it. Drama films keep the screenplay lines (no rewrite).
             adapted = self.tools.request("GET", f"/projects/{self.state.project_id}/episodes/{episode}/adapted-content")
-            if str((adapted.get("data") or {}).get("content") or "").strip():
+            current = str((adapted.get("data") or {}).get("content") or "")
+            if self.state.spine == "narrated" and self.rewrite_narration and (not current.strip() or _has_cjk(current)):
+                self.rewrite_narration(self, episode)
+            elif self.state.spine != "narrated" and current.strip():
                 _ok(
                     self.tools.request(
                         "DELETE", f"/projects/{self.state.project_id}/episodes/{episode}/adapted-content"

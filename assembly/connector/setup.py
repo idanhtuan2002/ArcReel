@@ -184,3 +184,34 @@ def cast_voices(run: FilmRun, *, story_region: str = "north") -> None:
         )
     run.state.voices_cast = chosen
     run.state.save(run.state_path)
+
+
+def rewrite_narration(run: FilmRun, episode: int) -> None:
+    """Narrated episodes: DramaClaw's own rewrite (third person), then its lines translated to Vietnamese."""
+    from assembly.connector.rewriter import translate_lines
+
+    project = run.state.project_id
+    started = run.tools.request(
+        "POST", f"/projects/{project}/episodes/{episode}/rewrite/generate", body={"narration_style": "third_person"}
+    )
+    if started.get("ok") is False:
+        raise RunStopped(f"rewrite: {started.get('error')}")
+    wait_task(run.tools, "content_rewrite", episode)
+    adapted = run.tools.request("GET", f"/projects/{project}/episodes/{episode}/adapted-content")
+    zh_lines = [
+        line.strip() for line in str((adapted.get("data") or {}).get("content") or "").splitlines() if line.strip()
+    ]
+    if not zh_lines:
+        raise RunStopped(f"episode {episode}: rewrite completed with no lines (playbook: anomaly)")
+    names = [str(c["name"]) for c in run.characters()]
+    lines = translate_lines(zh_lines, names, newapi_url=NEWAPI_URL, token=_relay_token())
+    content = "\n".join(lines)
+    saved = run.tools.request(
+        "PUT", f"/projects/{project}/episodes/{episode}/adapted-content", body={"content": content}
+    )
+    if saved.get("ok") is False:
+        raise RunStopped(f"save adapted content: {saved.get('error')}")
+    patched = run.tools.request("PATCH", f"/projects/{project}/episodes/{episode}", body={"beat_source_text": content})
+    if patched.get("ok") is False:
+        raise RunStopped(f"save beat source: {patched.get('error')}")
+    run.log(f"ep{episode} Vietnamese narration: {len(lines)} lines")
