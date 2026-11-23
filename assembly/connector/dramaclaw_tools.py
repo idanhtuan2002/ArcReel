@@ -74,8 +74,8 @@ class DramaClawTools:
         self.plugin = _load_dramaclaw_plugin()
         self.tools = _tool_index(self.plugin)
 
-    def call(self, name: str, **args: Any) -> Any:
-        _schema, handler = self.tools[name]
+    def call(self, tool: str, /, **args: Any) -> Any:
+        _schema, handler = self.tools[tool]
         args.setdefault("project_id", self.project_id)
         raw: str = handler(args)
         return json.loads(raw)

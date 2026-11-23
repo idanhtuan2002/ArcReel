@@ -40,8 +40,8 @@ Legend: `[x]` done · `[~]` in progress · `[ ]` to do · `[!]` blocked · **S**
 
 | | Task | Evidence |
 |---|---|---|
-| [ ] | Connector core: REST client, run state file, resume, retries (media 1, text 3), class rule for no-op steps, stop on repeat | plan §0, §5 |
-| [ ] | Ingest text with `Chapter N` markers; configure (`ethnicity`, `narration_style`, `sketch_image_selection`, 720×1280) | |
+| [~] | Connector core — `assembly/connector/` on DramaClaw's own Hermes toolset (ported whole, CE owner mode), playbook auto-advance loop on `pipeline/status`, state file + `--state` resume, stop on non-advancing step, task errors surfaced; unit tests; live run pending | `tests/unit/assembly/test_connector_film.py` |
+| [~] | Ingest text with `Chapter N` markers; configure (9:16, realistic, third person, Vietnamese, Wan backend, Seedream sketches/renders, subtitles) — code done (`setup.prepare_project`) | |
 | [ ] | **Narrated film** (prose → `spine_template = narrated`) end to end | |
 | [ ] | **Drama film** (prose → huohuo `drama_script_formatter` via `POST /api/v1/agent/drama_script_formatter/chat` → headers rewritten to `INT./EXT. <nơi> - <thời gian>` → `spine_template = drama`), character voices per `Name: line` | round B §9; huohuo `agent-skills/drama_script_formatter` |
 | [ ] | Identity images for every identity; voices cast after characters | |
