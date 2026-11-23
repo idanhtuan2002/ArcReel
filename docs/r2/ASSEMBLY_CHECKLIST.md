@@ -8,7 +8,7 @@ Legend: `[x]` done · `[~]` in progress · `[ ]` to do · `[!]` blocked · **S**
 
 | | Item | Status / evidence |
 |---|---|---|
-| [ ] | **S** Cloudinary account, pasted in DramaClaw → Settings → Media Storage | D28 |
+| [x] | **S** Cloudinary account, pasted in DramaClaw → Settings → Media Storage | 2026-11-23: `/model-gateway/config` mediaRelay `source=database, provider=cloudinary, configured=true, folder=dramaclaw-relay` |
 | [ ] | **S** OpenRouter, Gemini, BytePlus keys pasted in DramaClaw → Models & Channels → Custom (after M1 profile) | M1 |
 | [x] | Video route for first films = local Wan (D27) | 2026-11-23 |
 | [x] | GOAL amendment: donor interface languages allowed (DramaClaw Vietnamese UI) | `docs/GOAL.md` rule 1 |
