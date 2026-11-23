@@ -32,6 +32,9 @@ configuration. ArcReel/R2 is frozen and keeps serving production; no bake-off (s
    assembly, D new repo, E strangler; the sponsor chose stage assembly without a bake-off.
 8. [Old app vs new assembly](../../research/2026-11-23-r2-old-app-vs-assembly.md) — what the old app does well and
    carries over without changing direction.
+9. [Coverage matrix](../../research/2026-11-23-r2-assembly-coverage-matrix.md) — the assembly must include the old app
+   and every donor; gaps filled by a donor running whole, another donor's whole unit at an extension point, or the old
+   app's unit as a connector feature or post-stage.
 
 ## Rules added on 2026-11-23
 
