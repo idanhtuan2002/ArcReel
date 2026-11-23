@@ -246,3 +246,168 @@ vision ≈ 85–125, images ≈ 30–40, video ≈ 6–10 min of clips.
   LLM labels dialogue, and then speak the whole paragraph including the attribution (§2). The GOAL wording "Vietnamese
   voices" is met; "a drama with characters speaking" is only partly met.
 
+### 10. Images: Seedream through DramaClaw's gpt-image-2-shaped calls
+
+- FACT (`config.py:903-907,944-955`): sketches and first frames default to selection `newapi_gpt_image2` → model
+  `LingShan-G2`; character/identity images default to `CHARACTER_IMAGE_MODEL = "nanobanana"` → `LingShan-NB-2`
+  (`config.py:549`, alias table `:961-968`; `generators/image_generator.py:1374-1420`). So D7's two mappings carry
+  everything: G2 → Seedream 4.5; NB-2 → Gemini image "if the free tier answers" (registry: free-tier image models
+  "not tested", `cloud-free-quota-registry.md:93-95`) else Seedream — INFER: in practice **all images hit the one
+  200-image pool**.
+- FACT (`nanobanana_grid.py:1-10,1464`, `build_regen_plan` `:2592-2640`): sketches are 3x3 grids (`ceil(N/9)`), first
+  frames are location grids from `LOCATION_POOL_TEMPLATE = ["2x4_4-3","2x3_1-1","2x2_2-3","1x2_4-3","1x1_2-3"]`, then
+  split into cells. INFER: each first frame is a cell of a ≤4K grid (≈ 500–900 px on the long side for 8-cell grids),
+  later fed to Seedance as a 720p first frame → softer than a native 720x1280 frame; and whether Seedream 4.5 draws a
+  clean 2x4 grid that DramaClaw's splitter can cut is **UNKNOWN** — DramaClaw tunes these prompts for GPT Image 2 /
+  Nano Banana (module docstring). Must be in the M1.0 probe (one real sketch grid + one render grid through Seedream).
+- FACT (`nanobanana_grid.py:92-95,565-680`, sketch modes `:1047-1083` use `"1K"`): DramaClaw sizes requests for GPT
+  Image 2 (min 655,360 px; "1K" ≈ 1024 long edge) and sends `quality` for `LingShan-G2` (`:520-528`, sketch quality
+  `low`, `config.py:899-900`). [D, from memory of BytePlus docs, not verified here] Seedream 4.5 requires a much larger
+  minimum pixel count (around 2560x1440) → 1K sketch calls may be **rejected 400** by Ark; Seedream 4.0 accepts smaller
+  sizes. Probe; fallback is configuration (map G2 sketches to Seedream 4.0, which also adds its own 200-image pool).
+
+### 11. Quota arithmetic
+
+Assumptions, labelled: Seedance tokens per second of 720x1280 video — **21,600** by the BytePlus formula
+w×h×fps×s/1024 at 24 fps [D, memory, unverified], or **60,000** by the old app's own estimate constant
+(`lib/cost_calculator.py:24-26`). 480p (480x864): ≈ 9,720/s by the same formula. Speech 4 syl/s.
+
+**Per episode**
+
+| Episode shape | Beats N | Clip seconds | Seedance tokens @720p | @480p | Seedream images | Text calls | Vision calls |
+|---|---|---|---|---|---|---|---|
+| M2 story (29 paragraphs) | 29 | 161–189 | 3.5–4.1M (formula) / 9.7–11.3M (old constant) | 1.6–1.8M | ~13 (+redo) | ~40–50 | ~31 |
+| Same story split per sentence | ~60 | ~165–175 | same seconds ⇒ same tokens (min 2 s/clip adds a little) | ~1.7M | ~20 | ~75 | ~63 |
+| huohuo default chapter (3,000 zh chars) | 100–200 | 780–1,140 | 17–25M / 47–68M | 7.6–11M | 30–50 | 120–230 | 105–210 |
+| huohuo short chapter (≈700 zh chars) | 25–45 | 180–270 | 3.9–5.8M / 11–16M | 1.7–2.6M | 12–18 | 40–60 | 27–47 |
+
+**Per pool**
+
+| Pool | Size | Kind | What it buys | Verdict |
+|---|---|---|---|---|
+| Seedance 1.0 pro-fast | 2M tokens | **once per account** | 33–93 s of 720p video *in total, forever*; ≈ 206 s at 480p | **cannot finish even the M2 episode at 720p**; at 480p roughly one M2 episode and the pool is gone |
+| Seedance 1.0 pro, 1.5 pro | 2M each | once | another ~1–2 M2 episodes at 480p if mapped as extra channels (1.0 pro: same token rule; 1.5 pro not activated, registry :164) | stop-gap only |
+| Seedream 4.5 | 200 images | once | ≈ 15 M2-size episodes, ≈ 5 chapter-size episodes; any redo costs more | runs out within the first week of D19 volume |
+| Seedream 4.0 | 200 images | once | doubles the image budget if mapped (not in the plan) | add as second channel |
+| OpenRouter `:free` | 1,000 req/day, 20/min, **shared with production ArcReel** | daily | ≈ 10–20 M2-size episodes of DramaClaw text, *or* one 10-chapter huohuo story + translation + a few episodes | adequate for 1 series/day; not "many series overnight" |
+| Gemini AI Studio | 20/model/day, shared with production reviewers | daily | the per-beat optimizer needs N per episode ⇒ < 1 episode/day per model; ≈ 3 short episodes/day if 5 Flash models are spread as channels | **daily bottleneck after video** |
+| VieNeu (local) | GPU time | unlimited | all TTS | fine; shares the GPU with ComfyUI fallbacks |
+
+INFER, headline: on free pools the assembly can produce **at most one short episode with real generated video**, and
+then has no video model. Everything after that depends on the local fallback (plan §6: NewAPI ComfyUI channel with the
+local Wan workflow) or money. D19 ("many series in parallel overnight") is not reachable on free cloud pools at all;
+it is reachable only with a local video path whose throughput (GPU minutes per clip) was not measured in any document
+read for this round (UNKNOWN).
+
+### 12. The plan's video fallback does not exist on the API path
+
+- FACT: `KenBurnsEffect` / `VideoComposer` live in `generators/video_composer.py:63-121` and are used only by the legacy
+  CLI (`cli.py:400`) — not by the API pipeline, whose video step needs one MP4 per beat
+  (`api/routes/pipeline.py:189-191` `_beat_file_series_complete(... "mp4", beats)`) and whose compose runner simply
+  **skips** a beat that has no video (`runners/video.py:510-512`).
+- INFER: plan §6 row "BytePlus video pool exhausted → DramaClaw's still/Ken Burns path if its video step allows it"
+  has no target. The real choices are (a) the NewAPI ComfyUI video channel (type 63, video-only, verification round §1)
+  in front of a local Wan i2v workflow, or (b) a small **still-clip adapter** at the model boundary: an endpoint that
+  NewAPI's channel calls and that returns a Ken Burns MP4 made from the first frame (the old app's "still-clip"
+  backend, registry :27) — GOAL rule 2 allows "small adapters at a donor's model boundary". Either must exist before
+  M2, because §11 shows the cloud pool ends inside the first episode.
+
+### 13. Step table — premise to compose (what each output will be)
+
+| # | Step (who) | Model | Output language / form | Expected quality | Main risk |
+|---|---|---|---|---|---|
+| 1 | Premise (huohuo `generate-premise`, genre skill) | ernie free | Chinese premise; `setting=vn` keywords add Vietnam | good (Chinese-native) | none significant |
+| 2 | Outline + chapters (huohuo) | ernie free | Chinese prose, default 3,000 chars/chapter, memory + change records | best free prose available | chapter length ⇒ 15-min episodes; 30-rewrite loop burns quota |
+| 3 | Translation (ours, `lib/story_translation.py`) | ernie free (D5) | Vietnamese prose, paragraphs 1:1, Hán-Việt names from glossary, no CJK | readable; "natural" unverified | dialogue stays embedded in prose |
+| 4 | Ingest (DramaClaw) | — | — | — | **`drama` spine refuses prose (§1)**; `Chương N` not a chapter marker (§7) |
+| 5 | Configure (connector) | — | ethnicity Vietnamese, third person; must also set aspect 9:16 for `narrated` | — | narrated defaults to 16:9 |
+| 6 | Characters (structured extraction) | ernie | names verbatim (Vietnamese); descriptions **in Chinese** (`source_language` → zh) | evidence-checked, conservative | aliases ("ông", "bác", "cô gái") split/merge |
+| 7 | Episodes | — (structured_v1) | one episode per chapter | deterministic | no AI planner (§7) |
+| 8 | Portraits | Seedream (via NB-2/G2) | 1 image, main character only | good | — |
+| 9 | Identity plan / images | ernie; Seedream | identity rows in Chinese; one image per identity *if the connector asks for every identity* | likely better than the old app (multi-reference) | secondary characters skipped if `next_step` is trusted (§5) |
+| 10 | Script (literal, one call per paragraph) | ernie | beat narration = the Vietnamese paragraph; `visual_description` in Chinese with `{{identity}}` markers | faithful text | dialogue beats speak the attribution; paragraph-long beats |
+| 11 | Sketches (3x3) | Seedream | grid images | UNKNOWN on Seedream | 1K size may be refused; grid adherence |
+| 12 | Coloring / detection | vision (Gemini) | identity markers per beat | ok | Gemini 20/day |
+| 13 | Global optimize (per beat, with image) | vision slot | Chinese motion prompts | ok if the slot works | **N vision calls per episode; quota stall** (§6) |
+| 14 | First frames (location grids) | Seedream | grid cells → frames | consistent within a grid | low per-cell resolution |
+| 15 | TTS | VieNeu via our fal adapter | Vietnamese speech, narrator + cast presets, no emotion | same as old app | sample-hash mapping through Cloudinary |
+| 16 | Video (first_frame i2v) | Seedance 1.0 pro-fast 720p | 2–12 s clip per beat, no audio | good motion | **pool ends inside episode 1** (§11) |
+| 17 | Compose | ffmpeg | 720x1280 MP4, H.264 CRF 23, AAC 128k, speech cut at clip end, no captions, no music, no loudness | below old app finish | SRT only in export bundle |
+| 18 | Finish post-stage (ours, M4) | old app units | -14 LUFS, music bed, ambience, burned captions from SRT | parity with old app | must always run, not "if missing" |
+
+### 14. Against GOAL's bar and the old app's films
+
+| Criterion | GOAL / old app (b961dc0a) | Assembly as planned (INFER from the above) |
+|---|---|---|
+| No human step | old app: needed many fixes but ran | blocked at ingest under D26 default; after switching to `narrated` and chapter headings: plausible |
+| Vietnamese voices | yes, VieNeu, 3 lines | yes, VieNeu; many more lines; narrator-dominant; attribution read aloud |
+| Characters consistent | failed (Vy drift, glasses) | better for characters with identity images; equal or worse for those without |
+| Length | 28.2 s | 2.5–3 min for the M2 story; 13–19 min for a default huohuo chapter |
+| Picture | 576x1024 stills/clips | 720x1280 Seedance motion (while the pool lasts); then whatever the local fallback gives |
+| Subtitles | burned, title card | none burned; SRT only |
+| Music / loudness | music bed + ambience, -14 LUFS | none, unnormalised, until M4 |
+| Both reviewers accept | REWORK | unknown; length + dead-air rules of the old reviewers will see long narration and cut speech |
+
+INFER: the assembly is a clear improvement in identity handling and motion **for the first ~90 s of video it can
+afford**, and a regression in finish until M4. It will not reach GOAL's drama bar as "characters speak their lines"
+without a prose→screenplay step, which no chosen donor stage provides in DramaClaw's header format.
+
+### 15. Executed check: which screenplay headers DramaClaw accepts (pure function, no services)
+
+Ran DramaClaw's own `assess_screenplay_scene_headers` from the pinned checkout (`python3 -I`, import only, no network):
+
+| Input first line | Result |
+|---|---|
+| huohuo `drama_script_formatter` format `## S01 \| 内景 · 便利店收银台 \| 深夜` (`huohuo …/agent-skills/drama_script_formatter/SKILL.md:40,47,61`) | **missing** (0 headers) |
+| `INT. TIỆM SỬA ĐỒNG HỒ - DAY` + `Khang: Đặt lên quầy đi cháu.` | **standard** (1/1) |
+| `Chương 1` + Vietnamese prose | **missing** |
+
+- FACT (above + `huohuo …/services/drama/drama-episode-pipeline.ts:401`): huohuo does have a donor unit that turns
+  novel text into a scene-headed screenplay (`drama_script_formatter`, 9:16 short-drama constraints, dialogue on its own
+  lines, "+20–30 % length"), but its header shape is not one DramaClaw parses.
+- INFER — the cheapest whole-donor route to a real drama: run huohuo's `drama_script_formatter` on each Chinese chapter
+  (donor unit, whole), translate the lines (ours), and have the connector rewrite only the header line
+  `## Sxx | 内景/外景 · <地点> | <时段>` → `INT./EXT. <địa điểm> - DAY/NIGHT/…` (deterministic text mapping in the
+  connector; time tokens map to DramaClaw's `ENGLISH_TIME_TOKENS`, `screenplay_scene_parser.py:38-45`), keeping
+  `Tên: lời thoại` lines that `DIALOGUE_RE` (`literal_script_writing.py:39`) splits correctly. Then `spine=drama`
+  works, dialogue beats speak only the line, silence beats exist, scenes/scene masters are built. Not verified end to
+  end; whether huohuo exposes the formatter through its API outside `runDramaEpisodePipeline` is UNKNOWN.
+- Could not run `detect_asset_language` (`langid` not installed outside DramaClaw's container); §5 stays INFER from code.
+
+## Expected shortfalls and fixes (ranked)
+
+| # | Shortfall | Severity | Evidence | Fix (kind) |
+|---|---|---|---|---|
+| S1 | Seedance free pool (2M tokens, once) buys ~33–93 s of 720p video in total; the M2 episode needs 161–189 s | **Blocker for M2 as written** | §11; registry :156; `lib/cost_calculator.py:26` | Before M2: (a) build the local video path first (NewAPI ComfyUI channel → local Wan i2v, or a still-clip adapter at the model boundary) and make it the default; keep Seedance for a 480p showcase episode (**config** `NEWAPI_VIDEO_RESOLUTION=480p` + **adapter**); (b) or **money** — sponsor decision D20 with a per-episode cost figure (measure real `usage.total_tokens` on the first Seedance call in M1.0) |
+| S2 | `spine=drama` (D26 default) refuses prose; huohuo and the M2 story are prose | **Blocker** | §1, §15 | Short term **config**: `narrated` + aspect 9:16 + resolution `720x1280` passed to compose. Proper: huohuo `drama_script_formatter` (whole donor unit) + header rewrite in the connector (§15) |
+| S3 | Plan's video fallback (DramaClaw Ken Burns) does not exist on the API path | High | §12 | Replace the §6 row with S1(a) |
+| S4 | Per-beat vision optimizer vs Gemini 20/model/day; D5/D6 ambiguous for image-carrying `DC-*-LLM` slots | High | §6 | **Config**: name the vision slots explicitly in `ASSEMBLY_MODELS.md`; spread over several Gemini Flash models as separate channels; probe ernie-with-image and Groq `qwen3.8-27b` (1 image) as fallback; drop nemotron-vl (bad JSON) |
+| S5 | Episode = chapter (structured_v1), huohuo chapter default 3,000 zh chars ⇒ 13–19-min episodes | High (product) | §7 | **Config** huohuo chapter target ~600–900 chars for short-form series; sponsor confirms episode length (replaces D23 wording); or graph track with an embedding model (once-only pools) |
+| S6 | `Chương N` not a chapter marker | High (silent: whole story one episode or windowed) | §7 | **Connector**: emit `Chapter N` heading lines |
+| S7 | Speech longer than 12 s is cut by `-shortest` | Medium | §3 | **Connector** text prep: one sentence per line in narrated mode (shorter beats); with S2's screenplay route lines are short anyway |
+| S8 | Dialogue in prose: character voice reads attribution or narrator reads lines | Medium (drama bar) | §2 | S2 proper fix |
+| S9 | No burned subtitles, no music, no loudness in DramaClaw's compose | Medium (parity) | §4 | **Post-stage** M4 finish: always burn captions from DramaClaw's SRT, -14 LUFS, music bed; make M4 part of the first accepted film, not later |
+| S10 | Secondary characters may get no identity images if `next_step` is trusted | Medium (consistency) | §5 | **Connector**: generate identity images for every identity in the episode's `identity_ids`, verify files before sketches |
+| S11 | All images on one 200-image Seedream 4.5 pool; 1K sketch sizes may be refused by 4.5; grid adherence unknown | Medium | §10 | **Config**: map sketches to Seedream 4.0 (second 200 pool, smaller sizes), renders to 4.5; M1.0 probes one sketch grid and one render grid |
+| S12 | Asset prose (descriptions, prompts) in Chinese because `source_language` is zh/en only | Low for pictures, Medium for the Vietnamese operator | §5 | Accept (pictures fine); a donor change to add `vi` is a GOAL tolerance item — not worth it now |
+| S13 | Free daily pools shared with production ArcReel (OpenRouter 1,000, Gemini 20/model) | Medium | §6 | Operations: schedule assembly runs when production idles, or give the assembly its own keys (sponsor action) |
+| S14 | No emotion in voices (VieNeu style ignored) | Low (same as old app) | §9 | Accept; later a voice model with emotion via the same fal adapter |
+| S15 | huohuo 30-rewrite continuity loop can drain the daily text pool | Low–Medium | §8 | **Config**: lower `continuityRewriteMax` for unattended runs |
+
+### Corrections this round asks of the plan (for the reconciler)
+
+1. D26: default `narrated` until the screenplay route (S2) exists; set aspect and compose resolution explicitly.
+2. D13 vs D23: state "episode = chapter" and choose huohuo's chapter target per form.
+3. §6 video fallback: replace "Ken Burns" with the local video channel/adapter, and **move it before M2**.
+4. M1.0 probes: add Seedream at 1K and as a 3x3 grid, Seedance real token usage at 480p/720p, vision with structured
+   output for each candidate vision model.
+5. M4 finish is required for parity; caption branch always fires.
+6. Connector text preparation (chapter headings, sentence-per-line or screenplay headers) is a real task with a code
+   budget; it is not in M2's ≤600 lines estimate.
+
+## Coverage limits of this round
+
+- Not run: any service, any model call, DramaClaw's container. One pure donor function was executed locally (§15).
+- Not read in depth: huohuo chapter drafting call counts (estimated), DramaClaw props reference-image generation,
+  whether `ethnicity` reaches image prompts, OpenMontage (out of scope for the drama path).
+- Seedance and Seedream numeric limits marked [D, memory] must be re-checked against BytePlus docs or a probe.
