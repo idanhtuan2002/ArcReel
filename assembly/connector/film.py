@@ -121,10 +121,11 @@ class FilmRun:
     def wait(self, task_type: str, episode: int, **extra: Any) -> dict[str, Any]:
         return wait_task(self.tools, task_type, episode, **extra)
 
-    def start(self, tool: str, what: str, **args: Any) -> Any:
-        return _ok(self.tools.call(tool, **args), what)
+    def start(self, tool: str, what: str, /, **args: Any) -> Any:
+        """Start one write task; when DramaClaw answers with a task type the task is awaited (async-tasks rule)."""
+        return self.start_and_wait(tool, what, int(args.get("episode") or 0), **args)
 
-    def start_and_wait(self, tool: str, what: str, episode: int, **args: Any) -> dict[str, Any]:
+    def start_and_wait(self, tool: str, what: str, episode: int, /, **args: Any) -> dict[str, Any]:
         """Start one async task and wait on the task type and scope its own start response names."""
         started = self.tools.call(tool, **args)
         data = _ok(started, what)
@@ -196,6 +197,7 @@ class FilmRun:
         elif step == "build_episodes":
             self.start("dramaclaw_plan_episodes", "plan episodes", planning_mode="chapters")
             self.wait("build_episodes", 0)
+            self.grade_characters()
             self.record(step, 0, f"{len(self.episodes())} episodes")
         elif step == "portraits":
             # pipeline/status counts portraits of main characters only; one-off characters are skipped (init playbook
@@ -315,6 +317,8 @@ class FilmRun:
         last: tuple[str, int] | None = None
         if self.characters():
             self.prepare_characters()
+            if self.episodes():
+                self.grade_characters()
         for _ in range(max_rounds):
             status = self.status()
             step = str(status.get("next_step") or "")
