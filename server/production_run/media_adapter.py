@@ -1076,6 +1076,9 @@ class MediaAdapter:
             collection = artifacts.get(kind)
             if not isinstance(collection, dict) or collection.get("missing_ids"):
                 return False
+            # A project whose episodes have no separate audio track reports the collection as not applicable.
+            if collection.get("state") == "not_applicable":
+                continue
             # A storyboard is the source of its video. One made stale after its video (a neighbour's chosen version
             # moved the previous-frame reference) does not hold back the episode, as the workflow itself treats it;
             # the videos and the audio, the episode's output, must be current.
