@@ -58,6 +58,10 @@ decisions). Facts cite the donor checkouts: DramaClaw `b299bfd` (`~/.cache/r2-do
 | D18 | Voices follow the story's setting (sponsor 2026-11-23): the cast picks northern or southern VieNeu presets from the story's place (setting `vn` → the region named in the premise/story, default northern; `original` → northern), and a character the story marks as from the other region gets that region's preset | sponsor decision |
 | D19 | Volume target: many series in parallel overnight (sponsor 2026-11-23) → M6 adds a run queue that starts the next queued series when a run finishes, bounded by DramaClaw's single-machine task backend and the free pools | sponsor decision |
 | D20 | Budget: decided by the sponsor after watching the first film (M2); until then free pools and local only | sponsor decision |
+| D21 | **The sponsor sees and controls every step** (2026-11-23): each run has a mode — `auto` (runs on, the sponsor may pause at any time) or `step` (waits for the sponsor's approval after each step); the control page shows every step's output (story chapters, characters and portraits, episode plan, script, storyboards, frames, voices, clips, final film) with **pause, approve, redo this step** (DramaClaw's own regenerate endpoints, huohuo's chapter regenerate) — the old app's "autonomy with oversight" design (memory `autonomy-with-oversight-design`) | sponsor decision |
+| D22 | Idea sources, all four: the sponsor's idea; the app's own idea (huohuo `generate-premise` over a genre rotation); an existing story file; a remake from another person's video (M5, the old app's video→story unit, ADR-0161) | sponsor decision |
+| D23 | Episode length follows the story (DramaClaw's episode planner decides; no forced duration) | sponsor decision |
+| D24 | The control page binds to `127.0.0.1` only, no login (used on this machine) | sponsor decision |
 | D15 | Retries: each DramaClaw step and each huohuo call up to 3 attempts with 30/120/300 s waits; a step that still fails stops the run with its error recorded in the run state and `docs/r2/evidence/R2_RUN_BLOCK_LEDGER.md` | GOAL rule 3 |
 
 ## 3. Sponsor prerequisites (actions, not decisions)
@@ -129,8 +133,8 @@ path, run time, model calls, and the verdict.
 `assembly/web/` (FastAPI + server-rendered HTML, Vietnamese): **catalog** of every product function grouped Story /
 Film / Non-fiction / Operations, each with status (available, fallback, coming in Mx, not covered) and where it runs —
 a start button for automatic runs or a deep link into the donor's own screen (huohuo `:18088`, DramaClaw `:8080`);
-**runs** (start from a story file or a premise, stage-by-stage progress from the run state, errors with stage and
-donor message, resume); **results** (play the film, read the story zh/vi, verdicts after M4); **settings shortcuts**
+**runs** (start from any D22 source; mode `auto` or `step`; every step's output shown with pause / approve / redo
+(D21); errors with stage and donor message; resume); **results** (play the film, read the story zh/vi, verdicts after M4); **settings shortcuts**
 (DramaClaw Models & Channels, Media Storage; huohuo AI config; the model map). One path per function; the other
 donor's equivalent appears only as a named fallback. The catalog is generated from the coverage matrix table.
 **Done when** the sponsor finds every function from the catalog without reading documents, starts the M2 film from
