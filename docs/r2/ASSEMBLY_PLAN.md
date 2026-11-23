@@ -53,6 +53,7 @@ decisions). Facts cite the donor checkouts: DramaClaw `b299bfd` (`~/.cache/r2-do
 | D12 | huohuo text → the same NewAPI gateway (`HUOHUO_PRESET_TEXT_BASE_URL=http://host.docker.internal:3000/v1`, model `baidu/ernie-5.5-flash-preview:free`, also `HUOHUO_PRESET_AGENT_MODEL`), one key store and one usage ledger | `services/ai/ai-config-service.ts:45-75` |
 | D13 | New DramaClaw projects are `structured_v1` (no embedding model needed) | `api/routes/projects.py:630-641` |
 | D14 | Configure step: `ethnicity = "Vietnamese"`, `narration_style = "third_person"` (valid: `first_person`, `third_person`) | `project_config.py:29-34`, `api/routes/pipeline.py` `_user_has_configured` |
+| D16 | Story setting is chosen per story (sponsor, 2026-11-23, option c): `setting = vn` adds to huohuo's premise keywords that the story is set in Vietnam with Vietnamese names and customs; `setting = original` leaves huohuo's own setting and the story is translated as is. The control page and the CLI (`--setting vn|original`, default `vn`) offer both | sponsor decision |
 | D15 | Retries: each DramaClaw step and each huohuo call up to 3 attempts with 30/120/300 s waits; a step that still fails stops the run with its error recorded in the run state and `docs/r2/evidence/R2_RUN_BLOCK_LEDGER.md` | GOAL rule 3 |
 
 ## 3. Sponsor prerequisites (actions, not decisions)
