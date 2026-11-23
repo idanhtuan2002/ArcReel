@@ -19,7 +19,7 @@
     {
       "id": "byteplus_ark",
       "provider": "volcengine",
-      "baseUrl": "https://ark.ap-southeast.bytepluses.com",
+      "baseUrl": "http://172.17.0.1:23360",
       "priority": 0,
       "settings": {}
     },
@@ -233,7 +233,22 @@
                   "_meta": {
                     "title": "frames from duration"
                   }
+                },
+                "62": {
+                  "class_type": "PrimitiveInt",
+                  "inputs": {
+                    "value": 0
+                  },
+                  "_meta": {
+                    "title": "requested size sink (unused: the graph renders 480x848)"
+                  }
                 }
+              },
+              "node_mappings": {
+                "width_node_id": "62",
+                "width_input": "value",
+                "height_node_id": "62",
+                "height_input": "value"
               }
             }
           ]
@@ -277,7 +292,8 @@
               "label": "Watermark",
               "default": false
             }
-          ]
+          ],
+          "minPixels": 3686400
         }
       }
     },
@@ -299,7 +315,8 @@
               "label": "Watermark",
               "default": false
             }
-          ]
+          ],
+          "minPixels": 3686400
         }
       }
     },
@@ -340,8 +357,7 @@
         "minDuration": 2,
         "maxDuration": 5,
         "ratioOptions": [
-          "9:16",
-          "16:9"
+          "9:16"
         ],
         "resolutionOptions": [
           "480p"

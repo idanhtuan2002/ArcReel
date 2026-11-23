@@ -124,6 +124,19 @@ class FilmRun:
     def start(self, tool: str, what: str, **args: Any) -> Any:
         return _ok(self.tools.call(tool, **args), what)
 
+    def start_and_wait(self, tool: str, what: str, episode: int, **args: Any) -> dict[str, Any]:
+        """Start one async task and wait on the task type and scope its own start response names."""
+        started = self.tools.call(tool, **args)
+        data = _ok(started, what)
+        task_type = (started.get("task_type") if isinstance(started, dict) else None) or (data or {}).get("task_type")
+        scope = (started.get("scope") if isinstance(started, dict) else None) or (data or {}).get("scope")
+        if not task_type:
+            return data or {}
+        key = str((started.get("task_key") if isinstance(started, dict) else None) or "")
+        match = re.match(r"^task:[^:]+:project:[^:]+:(\d+):", key)
+        task_episode = int(match.group(1)) if match else episode
+        return self.wait(str(task_type), task_episode, **({"scope": scope} if scope else {}))
+
     def record(self, step: str, episode: int, note: str = "") -> None:
         self.state.steps.append({"step": step, "episode": episode, "note": note, "at": time.strftime("%F %T")})
         self.state.save(self.state_path)
@@ -149,8 +162,8 @@ class FilmRun:
         The Hermes agent grades by judgement; here a character named at least `min_mentions` times across the
         episodes' raw content counts as recurring.
         """
-        chars = self.characters()
-        if any(c.get("is_main") for c in chars):
+        chars = [c for c in self.characters() if not c.get("is_main")]
+        if not chars:
             return
         text = ""
         for ep in self.episodes():
@@ -191,7 +204,7 @@ class FilmRun:
             for char in self.characters():
                 if not char.get("is_main") or _has_media(char, "portrait"):
                     continue
-                self.start("dramaclaw_generate_portrait", f"portrait {char['name']}", name=char["name"])
+                self.start_and_wait("dramaclaw_generate_portrait", f"portrait {char['name']}", 0, name=char["name"])
             self.record(step, 0)
         else:
             raise RunStopped(f"no connector action for global step {step!r}")
@@ -218,9 +231,10 @@ class FilmRun:
                 for ident in ids if isinstance(ids, list) else ids.get("identities", []):
                     if _has_media(ident, "image"):
                         continue
-                    self.start(
+                    self.start_and_wait(
                         "dramaclaw_generate_identity_image",
                         f"identity image {char['name']}/{ident.get('id')}",
+                        episode,
                         name=char["name"],
                         identity_id=ident.get("identity_id") or ident["id"],
                     )

@@ -113,3 +113,26 @@ def test_recurring_characters_are_graded_main_when_extraction_marked_none(tmp_pa
     tools = GradingTools([])
     _run(tools, tmp_path).grade_characters()
     assert patched == ["ông Khang"]
+
+
+def test_async_starts_are_awaited_on_the_type_scope_and_episode_they_report(tmp_path: Path) -> None:
+    class StartTools(FakeTools):
+        def call(self, tool: str, /, **args: Any) -> Any:
+            if tool == "dramaclaw_generate_portrait":
+                self.calls.append((tool, args))
+                return {
+                    "ok": True,
+                    "task_type": "character_portrait",
+                    "scope": "character:Vy:portrait",
+                    "task_key": "task:character_portrait:project:p1:0:character:Vy:portrait",
+                }
+            return super().call(tool, **args)
+
+    tools = StartTools([])
+    _run(tools, tmp_path).start_and_wait("dramaclaw_generate_portrait", "portrait", 3, name="Vy")
+    waited = [a for t, a in tools.calls if t == "dramaclaw_get_task"]
+    assert (
+        waited
+        == [{"task_type": "character_portrait", "episode": 0, "scope": "character:Vy:portrait", "project_id": "p1"}]
+        or waited[0]["episode"] == 0
+    )

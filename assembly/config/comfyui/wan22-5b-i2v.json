@@ -173,5 +173,14 @@
   "_meta": {
    "title": "frames from duration"
   }
+ },
+ "62": {
+  "class_type": "PrimitiveInt",
+  "inputs": {
+   "value": 0
+  },
+  "_meta": {
+   "title": "requested size sink (unused: the graph renders 480x848)"
+  }
  }
 }
