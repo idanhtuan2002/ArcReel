@@ -17,14 +17,16 @@ from pathlib import Path
 import httpx
 
 NEWAPI = "http://127.0.0.1:3000"
-RETRY_TIMES = 3
+RETRY_TIMES = 5
 VISION_NAMES = [
     "DC-video-prompt-optimizer-LLM",
     "DC-video-identity-detector-LLM",
     "DC-freezone-vision-LLM",
     "DC-style-analyzer-LLM",
 ]
-EXTRA_MODELS = ["gemini-3.5-flash-lite", "gemini-2.5-flash", "gemini-3-flash-preview"]
+# model -> NewAPI priority (higher is tried first). gemini-2.5-flash answered every call on 2026-11-24 while the
+# others returned 503s; DramaClaw's own DC-gemini channel (priority 0) is tried last.
+EXTRA_MODELS = {"gemini-2.5-flash": 20, "gemini-3.5-flash-lite": 10, "gemini-3-flash-preview": 5}
 
 
 def _session() -> tuple[httpx.Client, dict[str, str]]:
@@ -68,6 +70,7 @@ def main() -> None:
                 "models": ",".join(VISION_NAMES),
                 "model_mapping": json.dumps(dict.fromkeys(VISION_NAMES, model)),
                 "auto_ban": 0,
+                "priority": EXTRA_MODELS[model],
             }
         )
         _update(client, headers, detail)
