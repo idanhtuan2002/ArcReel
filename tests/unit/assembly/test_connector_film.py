@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 from typing import Any
+from urllib.parse import unquote
 
 import pytest
 
@@ -106,7 +107,7 @@ def test_recurring_characters_are_graded_main_when_extraction_marked_none(tmp_pa
             if path.endswith("/raw-content"):
                 return {"ok": True, "data": "Khang cười. Khang nói. Khang đi. Lan nhìn."}
             if method == "PATCH":
-                patched.append(path.rsplit("/", 1)[1])
+                patched.append(unquote(path.rsplit("/", 1)[1]))
             return {"ok": True, "data": {}}
 
     tools = GradingTools([])

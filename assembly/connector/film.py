@@ -17,6 +17,7 @@ from collections.abc import Callable
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any
+from urllib.parse import quote
 
 import httpx
 
@@ -160,7 +161,9 @@ class FilmRun:
             bare = re.sub(r"^(ông|bà|anh|chị|cô|chú|bác|em|cậu|dì|thím)\s+", "", str(char["name"]), flags=re.I)
             if text.count(bare) >= min_mentions:
                 patched = self.tools.request(
-                    "PATCH", f"/projects/{self.state.project_id}/characters/{char['name']}", body={"is_main": True}
+                    "PATCH",
+                    f"/projects/{self.state.project_id}/characters/{quote(str(char['name']), safe='')}",
+                    body={"is_main": True},
                 )
                 _ok(patched, f"grade {char['name']}")
 
@@ -207,7 +210,8 @@ class FilmRun:
             for char in [c for c in self.characters() if c.get("is_main")]:
                 ids = _ok(
                     self.tools.request(
-                        "GET", f"/projects/{self.state.project_id}/characters/{char['name']}/identities"
+                        "GET",
+                        f"/projects/{self.state.project_id}/characters/{quote(str(char['name']), safe='')}/identities",
                     ),
                     "identities",
                 )

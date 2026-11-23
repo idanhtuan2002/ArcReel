@@ -19,6 +19,7 @@ import time
 import unicodedata
 from pathlib import Path
 from typing import Any
+from urllib.parse import quote
 
 import httpx
 
@@ -176,6 +177,10 @@ def cast_voices(run: FilmRun, *, story_region: str = "north") -> None:
         preset = chosen[char["name"]]
         sample = _sample(SAMPLE_LINE.format(name=char["name"]), preset)
         registry.register(sample, preset)
-        _upload(f"/projects/{project}/characters/{char['name']}/voice-samples/default/upload", sample, "voice.wav")
+        _upload(
+            f"/projects/{project}/characters/{quote(str(char['name']), safe='')}/voice-samples/default/upload",
+            sample,
+            "voice.wav",
+        )
     run.state.voices_cast = chosen
     run.state.save(run.state_path)
