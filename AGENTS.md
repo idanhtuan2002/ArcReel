@@ -39,6 +39,12 @@ uv run pre-commit run --all-files actionlint && uv run pre-commit run --all-file
 - **Quality-first, quota-efficient：**始终以可达到的最高工作质量为目标，不得因 quota 主动缩小必要研究范围、跳过证据或验证、弱化设计标准或提前下结论。额度只改变工作组织方式：复用已验证证据，使用窄而精确的查询，避免重复读取、重复扫描、无关 full suite 和非必要产物，先完成最高价值的当前 gate，并及早保存可恢复 checkpoint。
 - **后台 agent 预算：**默认由主 agent 串行完成；仅当独立研究或 review 明显提高质量时启用至多一个后台 agent，并禁止其继续派生子 agent。用户未明确要求时不做并行 fan-out；quota 紧张时先停止后台 agent，不能以降低研究或验证质量来换额度。
 - **进度可恢复：**每个 research、ADR、spec、plan、review 和 commit gate 后，简短报告已完成、证据/结果、当前 blocker 与下一步。长任务或额度接近边界时，先停止新工作，把 exact HEAD、dirty paths、已定决策、已运行命令与结果、未完成 gate 和恢复入口写入仓库内的 durable handoff/evidence，再结束会话。
+- **防额度中断丢失（sponsor 决定，2026-11-23）：**额度随时可能耗尽，任何成果不得只存在于对话中。
+  - **边做边落盘：**每完成一个研究结论、决定或代码单元，立即写入仓库文件并 commit + push；不得把未提交的工作留到长步骤之后。
+  - **交接文件常新：**当前任务的交接文件（现为 `docs/r2/evidence/ASSEMBLY_HANDOFF.md`）在每个 gate 后更新：HEAD、已完成、进行中、等待 sponsor 的事项、下一步；记忆中的状态指针指向它。
+  - **后台 agent 写文件：**派出的研究/评审 agent 必须把结论逐段写入指定的报告文件（`docs/research/…`），而不只在最终消息中返回；其任务书先存入仓库，以便中断后原样重跑。
+  - **长任务脱离会话：**长时间作业后台运行并把日志写到磁盘，会话结束不影响其完成与查证。
+  - **Stop hook：**`.claude/hooks/uncommitted_guard.py` 在会话停止时发现本任务路径有未提交改动会提醒并要求先提交。
 - **恢复与保全：**继续旧任务时以实时 `git status`、提交历史和 durable handoff 为准，不依赖聊天记忆；保留所有无关 dirty work。提交仅包含当前 scope 的明确文件，未提交工作不得被覆盖、清理或误报为已验收。
 - **验证与沟通：**按风险运行最小充分且可复现的验证，避免重复扫描和无关 full suite；任何通过、完成或 acceptance 声明都必须绑定当前 HEAD、实际命令输出和覆盖限制。执行过程中持续更新关键进度，避免到额度耗尽时才汇报。
 
