@@ -37,8 +37,16 @@ def _recent(session: str) -> bool:
         return False
 
 
+_REPO_SOURCE = re.compile(
+    r"(?:^|[\s='\"(])(?:\./|\S*content-production-os(?:/\.worktrees/[^/\s]+)?/)?"
+    r"(?:" + "|".join(re.escape(d.rstrip("/")) for d in SOURCE_DIRS) + r")(?:/|\b)"
+)
+
+
 def _targets_source(text: str) -> bool:
-    return any(d in text for d in SOURCE_DIRS)
+    """A path of this repository's source directories (relative, or under the repository root); donor checkouts and
+    other trees with a ``server/`` or ``lib/`` of their own do not count."""
+    return bool(_REPO_SOURCE.search(text))
 
 
 def _deny(reason: str) -> None:
