@@ -23,3 +23,11 @@ app's production project files (`~/arcreel-v2-staging/data/*/project.json`) and 
 - ComfyUI models 29 G (Wan for assembly), whisper 2.9 G, mmaudio 14 G, ace-step 18 G + hf 12 G, faceid 1.3 G, media 3.6 G.
 - `infra_pios2_pgbackrest_repo` 10.7 G and other PIOS data — another project.
 - Personal folders on D (`luu tru drive` 54 G, `python` 16 G, …) — not touched.
+
+## Done (sponsor choice, 2026-11-24)
+
+Deleted: Ollama `gemma3:12b`, `qwen3-vl:8b`, `minicpm-v:8b` (manifests by `ollama rm`, 13 unreferenced blobs 19.8 G
+removed by hand — the service user could not unlink files owned by the operator; `gemma3:4b` answers afterwards),
+`ace-step-cache/uv`, `operations/clef`, 7 orphan Docker volumes, browser caches. Kept on the sponsor's word:
+`kiwi_kiwi/qwen3.8-uncensored:9b`, reviewer corpora, stopped containers, Codex history.
+Result: root 85 % (29 G free), D 77 % (65 G free).
