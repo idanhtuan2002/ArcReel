@@ -54,6 +54,8 @@ Legend: `[x]` done · `[~]` in progress · `[ ]` to do · `[!]` blocked · **S**
 | [x] | Explicit-model rule: every costly connector call names its model/backend (no donor defaults) | ledger 2026-11-24 |
 | [ ] | **S** D20: paid text/vision (and video) models, with film 1's call counts | research 2026-11-24 §4.2 |
 
+| [~] | Xia Director chat agent enabled (Codex via `assembly-agent` channel); answers in Vietnamese; unreliable on the free model (1/2 turns empty); next: try `director-auto` on the drama film | ASSEMBLY_ACCEPTANCE Xia Director |
+
 ## M2b — thin Vietnamese console
 
 | | Task | Evidence |

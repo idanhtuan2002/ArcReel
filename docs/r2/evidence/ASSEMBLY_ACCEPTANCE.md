@@ -83,3 +83,18 @@ Decisions from the probes:
   9:16), plain white studio backgrounds on several beats, garbled sign text ("MANLEQ"), at least one split frame showing
   two images side by side. Audio, subtitles and sync not yet reviewed.
 - Acceptance: pending the sponsor's viewing (GOAL: both reviewers accept or the sponsor accepts by eye).
+
+## Xia Director (DramaClaw chat agent, Codex backend) — enabled 2026-11-24
+
+- Codex is bundled in the 2.1.3 image (`/usr/local/bin/codex-dramaclaw`, `DRAMACLAW_CHAT_BACKEND=codex`). In CE Custom
+  mode it calls `DC-codex-agent-LLM` through NewAPI with the Responses API; the Custom feature list maps only the retired
+  `DC-hermes-LLM`, so `assembly/ops/newapi_agent_channel.py` keeps a server-side clone of the OpenRouter channel
+  (`assembly-agent`, ch 9) serving `DC-codex-agent-LLM` with ERNIE + the OpenRouter fallback chain; zero internal price.
+- Probe (film 1 project, chat in the UI): turn 1 "kiểm tra tiến độ tập 1…" → the model reasoned (180 tokens) and ended
+  with no tool call or text ("已执行，但没有返回正文"); turn 2 → it called the pipeline-status tool and answered in correct
+  Vietnamese (episode complete, steps listed). Each turn sends ~14.5–16.4 k prompt tokens.
+- The Codex log's "bubblewrap needs access to create user namespaces" does not block the agent: DramaClaw forces a
+  read-only sandbox per thread and pre-approves only its own MCP tools (`chat/backend_sdk.py`), and the MCP server
+  started with its tools. The Codex sandbox was therefore left as it is (no security setting changed).
+- Assessment: works on the free model but unreliably (1 of 2 turns empty); each turn costs ~15 k tokens of the shared
+  free text pool. `director-auto` (whole-episode runs) not yet tried.

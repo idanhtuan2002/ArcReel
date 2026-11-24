@@ -98,3 +98,5 @@ e.g. `voice_prereq_required`). DramaClaw's own agent keeps using it inside Drama
   filled for every age group. Not used: `director-auto` episode runs (they need the chat agent backend, Codex/Hermes),
   `start_video_batch` (one local GPU, beats run one by one).
 - `feature-models.ts` now lists `CHARACTER_BUILD`; the `CHARACTER_BUILD_MODEL` env override stays harmless.
+- Chat agent (v2.1.3): Codex calls `DC-codex-agent-LLM`, which Custom mode cannot map (feature list has only the
+  retired `DC-hermes-LLM`); served by NewAPI channel `assembly-agent` (`assembly/ops/newapi_agent_channel.py`).
