@@ -14,7 +14,8 @@ Priority 2 tasks ([research](../research/2026-11-24-r2-remake-and-ads-donors.md)
 
 | | Task | Evidence |
 |---|---|---|
-| [~] | Remake as a new story: ADR-0161 unit reused in the connector (`--from-video <url|file>`), local faster-whisper large-v3 on drive D (film 1 transcribed: vi, 18 segments, 10 s); waiting for a sponsor source video for a full run | research §4.1 |
+| [x] | Remake as a new story: ADR-0161 unit reused in the connector (`--from-video <url|file>`), local faster-whisper large-v3 on drive D; film 2 produced from the sponsor's wordless Short (51.5 s) | [film 2 review](../research/2026-11-24-r2-film-2-quality-review.md) |
+| [ ] | **Deferred (sponsor 2026-11-24): film quality fixes from the film 2 review** — animal characters in DramaClaw sketch→frame, global props, music/SFX, captions, pacing for wordless sources, video model, listen check | [film 2 review §3](../research/2026-11-24-r2-film-2-quality-review.md) |
 | [x] | **S** OpenMontage driver: both prepared (sponsor 2026-11-24); `python -m assembly.openmontage.run --driver claude|codex`, resumable at checkpoints | ASSEMBLY_ACCEPTANCE OpenMontage drivers |
 | [~] | OpenMontage installed pinned (`4f682c8`); `localization-dub` probed to the first checkpoint with both drivers; next: finish one dub and a product ad from stills | research §4.2 |
 | [ ] | Publishing to TikTok/YouTube via Postiz with affiliate links (per-post sponsor approval) | research §4.3 |
