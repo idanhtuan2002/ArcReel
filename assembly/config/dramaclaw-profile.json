@@ -320,28 +320,6 @@
         }
       }
     },
-    "seedance-1.0-pro-fast": {
-      "channel": "byteplus_ark",
-      "model": "seedance-1-0-pro-fast-251015",
-      "mediaType": "video",
-      "label": "seedance-1.0-pro-fast",
-      "enabled": true,
-      "sortOrder": 100,
-      "config": {
-        "request": {
-          "endpoint": "video/generations",
-          "parameters": [
-            {
-              "key": "watermark",
-              "requestPath": "watermark",
-              "control": "switch",
-              "label": "Watermark",
-              "default": false
-            }
-          ]
-        }
-      }
-    },
     "Wan22-5B-local": {
       "channel": "comfyui",
       "model": "Wan22-5B-local",

@@ -333,11 +333,23 @@ class FilmRun:
             self.start("dramaclaw_generate_audio", "audio", episode=episode)
             self.wait("audio_generation_indextts2", episode)
         elif step == "single_video":
+            # The beat video route falls back to its schema default (newapi_seedance-1.0-pro-fast) when the request
+            # names no backend; the project's backend is always sent (pipeline-details Step 15 body).
+            project = _ok(self.tools.request("GET", f"/projects/{self.state.project_id}"), "project")
+            backend = str((project.get("config") or project).get("video_backend") or "")
+            if not backend:
+                raise RunStopped("project has no video_backend; refusing to fall back to the route default")
             for beat in self.beats(episode):
                 number = int(beat.get("beat_number") or 0)
                 if number <= 0 or beat.get("video_url") or beat.get("video_path"):
                     continue
-                self.start("dramaclaw_start_single_video", f"video beat {number}", episode=episode, beat=number)
+                self.start(
+                    "dramaclaw_start_single_video",
+                    f"video beat {number}",
+                    episode=episode,
+                    beat=number,
+                    video_backend=backend,
+                )
                 self.wait("single_video", episode, beat_num=number)
         elif step == "compose_episode":
             self.start("dramaclaw_compose_episode", "compose", episode=episode)

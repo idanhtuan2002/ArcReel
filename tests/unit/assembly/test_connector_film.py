@@ -201,3 +201,20 @@ def test_a_task_not_found_by_scope_is_settled_from_the_task_list(tmp_path: Path)
             return super().call(tool, **args)
 
     assert film.wait_task(ListTools([]), "sketch_grid_generation", 1, scope="other") == {}
+
+
+def test_beat_videos_are_started_with_the_project_backend(tmp_path: Path) -> None:
+    class VideoTools(FakeTools):
+        def request(self, method: str, path: str, **kw: Any) -> dict[str, Any]:
+            if path == "/projects/p1":
+                return {"ok": True, "data": {"config": {"video_backend": "newapi_Wan22-5B-local"}}}
+            if path.endswith("/beats"):
+                return {"ok": True, "data": [{"beat_number": 1}, {"beat_number": 2, "video_url": "/v.mp4"}]}
+            return super().request(method, path, **kw)
+
+    tools = VideoTools(
+        [{"next_step": "single_video", "current_episode": 1}, {"next_step": "done", "current_episode": 1}]
+    )
+    _run(tools, tmp_path).run()
+    starts = [a for t, a in tools.calls if t == "dramaclaw_start_single_video"]
+    assert starts == [{"episode": 1, "beat": 1, "video_backend": "newapi_Wan22-5B-local"}]
