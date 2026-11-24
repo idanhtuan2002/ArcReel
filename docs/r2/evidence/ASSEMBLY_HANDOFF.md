@@ -51,6 +51,16 @@ Nothing.
 - Research: `docs/research/2026-11-24-r2-affiliate-ad-video-donors.md`; film 2 review deferred:
   `docs/research/2026-11-24-r2-film-2-quality-review.md`.
 
+## M2b console and M4 post-stages (2026-11-24 evening)
+
+- Control page http://127.0.0.1:8790 (user unit `assembly-console`, `assembly/web/`); Backlot http://127.0.0.1:4750
+  (`openmontage-backlot`). Both are transient user units: restart after a reboot (autostart is an M6 item).
+- Finish (`assembly/finish.py`) ran on film 2: `/mnt/arcreel/D/ArcReel/assembly/films/01M863VMJQECF8PC9Z6FVNT6AV-ep01-finished/`
+  (captions, ACE-Step music, −13.96 LUFS). Review (`assembly/review.py`) not yet successful: Gemini 3 503.
+- DramaClaw API recreated with `MODEL_NAME=DC-verifier-LLM` (override.yml); NewAPI vision pool re-applied.
+- Timers: `assembly-ad-1` 2026-11-25 07:10 (ad resume); `assembly-m4-morning` 07:40 (finish film 1, review films 1
+  and 2; log `~/assembly-data/runs/m4-morning.log`).
+
 ## Next steps, in order
 
 Sponsor priorities 2026-11-24 (film 1 produced, low quality but working):
