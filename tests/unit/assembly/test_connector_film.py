@@ -54,7 +54,8 @@ def test_the_run_starts_one_task_per_status_round_and_ends_at_done(tmp_path: Pat
         ]
     )
     state = _run(tools, tmp_path).run()
-    started = [c[0] for c in tools.calls if c[0] not in {"dramaclaw_pipeline_status", "dramaclaw_get_task"}]
+    reads = {"dramaclaw_pipeline_status", "dramaclaw_get_task", "dramaclaw_list_tasks"}
+    started = [c[0] for c in tools.calls if c[0] not in reads]
     assert started == ["dramaclaw_build_characters", "dramaclaw_optimize_video_global"]
     assert [s["step"] for s in state.steps] == ["build_characters", "global_optimize_video"]
 
@@ -234,3 +235,25 @@ def test_first_frames_are_requested_in_batches_of_nine(tmp_path: Path) -> None:
     _run(tools, tmp_path).run()
     batches = [a["beat_indices"] for t, a in tools.calls if t == "dramaclaw_render_first_frames"]
     assert batches == [list(range(1, 10)), list(range(10, 19))]
+
+
+def test_a_step_waits_for_every_task_it_fanned_out(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(film, "POLL_SECONDS", 0)
+    rounds = iter([["completed", "running"], ["completed", "completed"]])
+
+    class FanTools(FakeTools):
+        def call(self, tool: str, /, **args: Any) -> Any:
+            if tool == "dramaclaw_list_tasks":
+                self.calls.append((tool, args))
+                statuses = next(rounds)
+                return {
+                    "ok": True,
+                    "data": [
+                        {"task_type": "selected_regen", "episode": 1, "status": s, "created_at": 9e12} for s in statuses
+                    ],
+                }
+            return super().call(tool, **args)
+
+    tools = FanTools([])
+    film.wait_task(tools, "selected_regen", 1, since=0.0)
+    assert [t for t, _ in tools.calls].count("dramaclaw_list_tasks") == 2

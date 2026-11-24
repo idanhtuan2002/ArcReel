@@ -15,6 +15,7 @@ import re
 import time
 from collections.abc import Callable
 from dataclasses import asdict, dataclass, field
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 from urllib.parse import quote
@@ -30,7 +31,18 @@ MAX_STEP_SECONDS = 6 * 3600
 MISSING_TASK_SECONDS = 300
 TRANSIENT_PAUSES = (120, 300, 600, 900)
 FIRST_FRAME_BATCH = 9
-_TRANSIENT = ("429", "rate-limited", "rate limit", "temporarily", "input_value='error'", "503", "502", "timed out")
+_TRANSIENT = (
+    "队列任务已满",
+    "queue is full",
+    "429",
+    "rate-limited",
+    "rate limit",
+    "temporarily",
+    "input_value='error'",
+    "503",
+    "502",
+    "timed out",
+)
 
 
 def _transient(message: str) -> bool:
@@ -116,9 +128,50 @@ def _latest_listed_status(tools: DramaClawTools, task_type: str, episode: int) -
     return ""
 
 
-def wait_task(tools: DramaClawTools, task_type: str, episode: int, **extra: Any) -> dict[str, Any]:
-    """Poll one DramaClaw task until it ends (async-tasks reference: queued/running/pending vs completed/failed)."""
+def _epoch(value: Any) -> float:
+    if isinstance(value, (int, float)):
+        return float(value)
+    try:
+        return datetime.fromisoformat(str(value).replace("Z", "+00:00")).timestamp()
+    except ValueError:
+        return 0.0
+
+
+def tasks_since(tools: DramaClawTools, task_type: str, episode: int, since: float) -> list[dict[str, Any]]:
+    """Every task of this type and episode created at or after `since` (a start can fan out into per-beat tasks)."""
+    listed = tools.call("dramaclaw_list_tasks", task_type=task_type, episode=episode)
+    items = listed.get("data") if isinstance(listed, dict) else None
+    items = items if isinstance(items, list) else (items or {}).get("tasks", [])
+    return [
+        item
+        for item in items
+        if item.get("task_type") == task_type
+        and int(item.get("episode") or 0) == episode
+        and _epoch(item.get("created_at")) >= since
+    ]
+
+
+def wait_task(
+    tools: DramaClawTools, task_type: str, episode: int, since: float | None = None, **extra: Any
+) -> dict[str, Any]:
+    """Wait until DramaClaw's tasks for this step end (async-tasks reference: queued/running/pending vs
+    completed/failed). With `since`, every task of the type and episode created after the start is awaited."""
     started = time.monotonic()
+    while since is not None:
+        items = tasks_since(tools, task_type, episode, since)
+        if not items:
+            break
+        statuses = [str(item.get("status") or "").lower() for item in items]
+        if any(status in RUNNING for status in statuses):
+            if time.monotonic() - started > MAX_STEP_SECONDS:
+                raise RunStopped(f"{task_type} ep{episode} still running after {MAX_STEP_SECONDS}s")
+            time.sleep(POLL_SECONDS)
+            continue
+        failed = [item for item in items if str(item.get("status") or "").lower() in FAILED]
+        if failed:
+            reason = failed[0].get("chat_error") or failed[0].get("error") or failed[0].get("error_code")
+            raise RunStopped(f"{task_type} ep{episode}: {len(failed)}/{len(items)} tasks failed: {reason}")
+        return items[0]
     while True:
         task = tools.call("dramaclaw_get_task", task_type=task_type, episode=episode, **extra)
         data = task.get("data") if isinstance(task, dict) else None
@@ -166,6 +219,7 @@ class FilmRun:
         self.fill_face_prompts = fill_face_prompts
         self.rewrite_narration = rewrite_narration
         self.log = log
+        self._last_start: float | None = None
 
     # --- DramaClaw access -------------------------------------------------------------------------------------------
 
@@ -173,8 +227,8 @@ class FilmRun:
         args = {"episode": episode} if episode else {}
         return _ok(self.tools.call("dramaclaw_pipeline_status", **args), "pipeline status")
 
-    def wait(self, task_type: str, episode: int, **extra: Any) -> dict[str, Any]:
-        return wait_task(self.tools, task_type, episode, **extra)
+    def wait(self, task_type: str, episode: int, since: float | None = None, **extra: Any) -> dict[str, Any]:
+        return wait_task(self.tools, task_type, episode, since if since is not None else self._last_start, **extra)
 
     def start(self, tool: str, what: str, /, **args: Any) -> Any:
         """Start one write task; when DramaClaw answers with a task type the task is awaited (async-tasks rule)."""
@@ -182,6 +236,7 @@ class FilmRun:
 
     def start_and_wait(self, tool: str, what: str, episode: int, /, **args: Any) -> dict[str, Any]:
         """Start one async task and wait on the task type and scope its own start response names."""
+        self._last_start = time.time() - 5
         started = self.tools.call(tool, **args)
         data = _ok(started, what)
         task_type = (started.get("task_type") if isinstance(started, dict) else None) or (data or {}).get("task_type")
@@ -191,7 +246,7 @@ class FilmRun:
         key = str((started.get("task_key") if isinstance(started, dict) else None) or "")
         match = re.match(r"^task:[^:]+:project:[^:]+:(\d+):", key)
         task_episode = int(match.group(1)) if match else episode
-        return self.wait(str(task_type), task_episode, **({"scope": scope} if scope else {}))
+        return self.wait(str(task_type), task_episode, self._last_start, **({"scope": scope} if scope else {}))
 
     def record(self, step: str, episode: int, note: str = "") -> None:
         self.state.steps.append({"step": step, "episode": episode, "note": note, "at": time.strftime("%F %T")})
