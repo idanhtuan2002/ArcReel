@@ -20,7 +20,7 @@ Legend: `[x]` done · `[~]` in progress · `[ ]` to do · `[!]` blocked · **S**
 
 | | Task | Evidence |
 |---|---|---|
-| [x] | Release images 2.0.2, loopback ports, NewAPI initialized | ASSEMBLY_ACCEPTANCE M0 |
+| [x] | Release images (upgraded 2.0.2 → **2.1.3** on 2026-11-24, sponsor decision), loopback ports, NewAPI initialized | ASSEMBLY_ACCEPTANCE M0; PORTING upgrade section |
 | [x] | Pin images by digest; media-catalog auto-update off; check 2.0.2 against `b299bfd` — digests in `override.yml`, containers recreated, config kept; auto-update false; image built from `1ec0236`, which differs from `b299bfd` in 4 `src/novelvideo` files (freezone canvas paste only) | 2026-11-23 |
 
 ## M1 — models, voices, local video

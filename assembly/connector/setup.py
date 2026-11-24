@@ -29,6 +29,7 @@ from assembly.voices import registry
 from assembly.voices.casting import CastMember, cast
 from assembly.voices.catalog import load_voices
 
+VOICE_SLOTS = ("default", "child", "youth", "middle", "elder")  # api/routes/characters.py VOICE_SAMPLE_SLOTS
 VIENEU_URL = os.environ.get("VIENEU_SHIM_URL", "http://127.0.0.1:23340")
 NEWAPI_URL = os.environ.get("ASSEMBLY_NEWAPI_URL", "http://127.0.0.1:3000")
 SAMPLE_LINE = "Xin chào, tôi là {name}. Hôm nay trời trong, tôi kể bạn nghe một câu chuyện nhỏ của gia đình mình."
@@ -177,11 +178,14 @@ def cast_voices(run: FilmRun, *, story_region: str = "north") -> None:
         preset = chosen[char["name"]]
         sample = _sample(SAMPLE_LINE.format(name=char["name"]), preset)
         registry.register(sample, preset)
-        _upload(
-            f"/projects/{project}/characters/{quote(str(char['name']), safe='')}/voice-samples/default/upload",
-            sample,
-            "voice.wav",
-        )
+        # One preset for every slot DramaClaw keys voices by (default and the age groups of its identities),
+        # so a character keeps one Vietnamese voice across identities.
+        for slot in VOICE_SLOTS:
+            _upload(
+                f"/projects/{project}/characters/{quote(str(char['name']), safe='')}/voice-samples/{slot}/upload",
+                sample,
+                "voice.wav",
+            )
     run.state.voices_cast = chosen
     run.state.save(run.state_path)
 

@@ -23,6 +23,7 @@ Nothing.
 - Unit `assembly-film-1` (systemd --user), log `~/assembly-data/runs/film-1.log`, state
   `~/assembly-data/runs/01M84JWC2DRNK6SAX24RX3VMG4.json`. Resume: `python -m assembly.connector --state <state> --approve CP1`
   (sponsor waived CP1 for this film). Blocks so far: `R2_RUN_BLOCK_LEDGER.md` rows "assembly 01M84JWC".
+- DramaClaw is **v2.1.3** (digests in `override.yml`); data backup of 2.0.2 in `~/assembly-data/backups/`.
 - Services added: `image-adapter` (172.17.0.1:23360, Seedream minimum size); NewAPI channel 1 fallback chain
   (`assembly/ops/newapi_text_fallback.py`).
 

@@ -83,3 +83,18 @@ e.g. `voice_prereq_required`). DramaClaw's own agent keeps using it inside Drama
   non-organization task egress context to `IndexTTS2FalClient`, whose `generate` denies it (`ORG_EGRESS_DENIED`), so
   beat audio never runs in CE tasks. Upstream fixed it in v2.1.3 (2026-10-29) by passing the context only when it is an
   organization's.
+
+## Upgrade to DramaClaw v2.1.3 (sponsor decision 2026-11-24)
+
+- Why: 2.0.2 could not voice beats in CE tasks (`ORG_EGRESS_DENIED`); v2.1.3 carries the upstream fix. No donor code is
+  changed by us.
+- Images pinned by digest in `assembly/deploy/dramaclaw/override.yml` (api/web 2.1.3 = `1277795`, gateway
+  `v1.0.0-rc.24-dramaclaw.3`); `up.sh` checks the checkout at the full v2.1.3 hash. Data volumes backed up before the
+  upgrade under `~/assembly-data/backups/dramaclaw-2.0.2-*`; settings, channels, media models and the film-1 project
+  survived the migration.
+- Hermes toolset and skills re-vendored from v2.1.3 (no tool removed; 11 added). The donor test's repository paths
+  are adjusted to the vendored layout; 27 tests pass.
+- New in v2.1.3 used by the connector: `pipeline/status` step `voice_setup` (missing voice references); voice slots
+  filled for every age group. Not used: `director-auto` episode runs (they need the chat agent backend, Codex/Hermes),
+  `start_video_batch` (one local GPU, beats run one by one).
+- `feature-models.ts` now lists `CHARACTER_BUILD`; the `CHARACTER_BUILD_MODEL` env override stays harmless.

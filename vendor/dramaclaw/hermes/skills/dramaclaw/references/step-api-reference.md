@@ -1,6 +1,8 @@
-# DramaClaw 虾导 流水线详情
+# DramaClaw 步骤 API 参考
 
-每个步骤的 API 调用必须以后端当前 FastAPI routes 为准。
+本文件只记录各步骤的端点、参数和任务类型，不拥有流程顺序决策权。Steps 1-7 的顺序以
+`playbooks/init.md` 为准，Steps 8-16 的顺序以 `playbooks/episode.md` 为准；恢复定位以
+`playbooks/resume.md` 为准。每个 API 调用必须以后端当前 FastAPI routes 为准。
 
 变量约定：
 - `$PID` = 当前 `DRAMACLAW_PROJECT_ID`
@@ -239,10 +241,14 @@ SSE /projects/$PID/tasks/global_optimize_video/$EP/stream
 
 ```
 POST /projects/$PID/episodes/$EP/beats/regenerate
-Body: {"beat_indices": [1,2,3], "style": "...", "model": "nanobanana"}
+Body: {"beat_indices": [1], "style": "...", "model": "nanobanana",
+       "batch_id": "first-frame-...", "batch_size": 9}
 
-GET /projects/$PID/tasks/selected_regen/$EP
-SSE /projects/$PID/tasks/selected_regen/$EP/stream
+一次 `dramaclaw_render_first_frames` 最多为 9 个 beat 分别提交一个独立任务，共用 batch_id；
+省略 beat_indices 时自动选择接下来 9 个缺少首帧的 beat。图片队列最多并发执行 3 个，
+其余任务排队；每个任务独立计时并独立保存。
+
+GET /projects/$PID/tasks?task_type=selected_regen&episode=$EP
 ```
 
 ### Step 14: 音频生成 [ASYNC -> audio_generation_indextts2]
@@ -267,7 +273,7 @@ POST /projects/$PID/episodes/$EP/beats/$BEAT/audio
 
 当前后端没有 `/projects/$PID/episodes/$EP/videos/generate` 整集批量视频路由。
 
-**单轮限制**：本步骤一次用户消息最多启动 1 个 beat 的 `single_video` 任务。用户首次说“完成第 N 集视频生成 / 生成第 N 集视频 / 整集视频”这类笼统目标时，先按主 skill 的“大任务先澄清拆解”回复，不读取状态、不启动任务。用户确认要列进度后，才读取 beats 和 pipeline 状态，只说明缺哪些前置或建议先启动哪个 beat；不要在同一轮遍历所有 beat，不要连续 POST 多个 beat，也不要启动后继续 compose。
+**单轮限制**：本步骤一次用户消息只调用一次视频启动工具。存在多个 eligible beat 时，优先调用 `dramaclaw_start_video_batch`；工具默认从缺少视频且已有首帧的 beat 中自动补足并按顺序提交最多 9 个独立任务。共享视频队列最多并发执行 3 个，其余排队。只有用户明确指定单个 beat 时调用 `dramaclaw_start_single_video`；明确指定少量 beat 时才传 `auto_fill=false`。用户首次说“完成第 N 集视频生成 / 生成第 N 集视频 / 整集视频”这类笼统目标时，先按根 Skill 的“大任务先澄清拆解”处理。启动后不要继续 compose。
 
 生成单个 beat 视频：
 
@@ -281,11 +287,14 @@ SSE /projects/$PID/tasks/single_video/$EP/stream?beat_num=$BEAT
 
 启动接口返回 `ok:false` 或 HTTP 错误时，直接向用户反馈接口错误。启动成功后如果任务状态为 `failed` / `cancelled`，直接向用户反馈 `task.error`、`error_code` 或最近日志中的失败原因；不要把失败收口成“已重做完成”。
 
-如果用户要求“整集生成视频片段”，先 `GET /projects/$PID/episodes/$EP/beats`，选择第一个未完成且前置满足的 beat，最多启动这一个 beat；如果没有满足前置的 beat，只汇报缺项。不要调用不存在的 `/videos/generate`。
+如果用户要求“整集生成视频片段”，先读取 beats，选择最前面最多 9 个未完成且前置满足的 beat，通过批量业务工具提交；没有满足前置的 beat 时只汇报缺项。不要调用不存在的 `/videos/generate`，也不要通过通用 POST 循环模拟批量。
 
 ### Step 16: 合成 [ASYNC -> compose_episode]
 
 合成只能在本集所有 beat 视频都已完成后启动。启动 `compose_episode` 后立即收口；不要在同一轮先启动视频再启动合成，也不要等待合成完成后继续展示成片。
+
+优先调用 `dramaclaw_compose_episode(episode=$EP)`。专用工具内部使用下面的规范请求体；它没有
+暴露 body 参数是预期行为，不得因此改用 `dramaclaw_post`，也不得在启动前重复查询同一状态。
 
 ```
 POST /projects/$PID/episodes/$EP/videos/compose

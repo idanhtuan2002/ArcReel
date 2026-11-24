@@ -272,7 +272,13 @@ class FilmRun:
         return data if isinstance(data, list) else data.get("beats", [])
 
     def step_episode(self, step: str, episode: int) -> None:
-        if step == "identity_plan":
+        if step == "voice_setup":
+            # pipeline/status (v2.1.3) stops here while a narrator or character voice reference is missing.
+            if not self.cast_voices:
+                raise RunStopped("voice references missing and no casting configured")
+            self.state.voices_cast = {}
+            self.cast_voices(self)
+        elif step == "identity_plan":
             self.start("dramaclaw_plan_identities", "plan identities", episode=episode)
             self.start("dramaclaw_plan_props", "plan props", episode=episode)
         elif step == "identity_images":
