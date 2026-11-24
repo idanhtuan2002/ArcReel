@@ -7,6 +7,7 @@ the project id, casting and downloaded finals).
 from __future__ import annotations
 
 import argparse
+import os
 import sys
 import time
 from pathlib import Path
@@ -16,6 +17,8 @@ from assembly.connector.dramaclaw_tools import DramaClawTools
 from assembly.connector.film import CheckpointReached, FilmRun, RunState, RunStopped
 
 DATA = Path.home() / "assembly-data/runs"
+# Finished films live on drive D with the other local media (sponsor 2026-11-24).
+FILMS = Path(os.environ.get("ASSEMBLY_FILMS_DIR", "/mnt/arcreel/D/ArcReel/assembly/films"))
 
 # Project settings (ASSEMBLY_PLAN D17 vertical, D27 local Wan, D7 Seedream for sketches/renders).
 SETTINGS = {
@@ -75,7 +78,7 @@ def main() -> int:
         tools,
         state,
         state_path,
-        out_dir=DATA / "films",
+        out_dir=FILMS,
         cast_voices=lambda r: setup.cast_voices(r, story_region=args.region),
         fill_face_prompts=setup.fill_face_prompts,
         rewrite_narration=setup.rewrite_narration,
