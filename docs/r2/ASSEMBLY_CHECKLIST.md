@@ -19,6 +19,7 @@ Priority 2 tasks ([research](../research/2026-11-24-r2-remake-and-ads-donors.md)
 | [x] | **S** OpenMontage driver: both prepared (sponsor 2026-11-24); `python -m assembly.openmontage.run --driver claude|codex`, resumable at checkpoints | ASSEMBLY_ACCEPTANCE OpenMontage drivers |
 | [~] | OpenMontage installed pinned (`4f682c8`); `localization-dub` probed to the first checkpoint with both drivers; next: finish one dub and a product ad from stills | research §4.2 |
 | [~] | Affiliate ad, first probe: fictional product "LUMA 500 ml" (4 stills by local FLUX.2 klein reference workflow, `~/assembly-data/inbox/san-pham-thu/`), OpenMontage on the Codex driver (sponsor choice), unit `assembly-ad-1`, log `~/assembly-data/runs/ad-1.log`; not for publishing | [ads research](../research/2026-11-24-r2-affiliate-ad-video-donors.md) |
+| [~] | OpenMontage UI: Backlot (upstream `2e003e6`, ported whole, 54 donor tests pass) on http://127.0.0.1:4750 — script, storyboard, media, renders; full stage rail and autostart after the OpenMontage pin upgrade | `assembly/openmontage/README.md` |
 | [ ] | Publishing to TikTok/YouTube via Postiz with affiliate links (per-post sponsor approval) | research §4.3 |
 
 ## Sponsor items
