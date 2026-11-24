@@ -27,13 +27,19 @@ Nothing.
 - Services added: `image-adapter` (172.17.0.1:23360, Seedream minimum size); NewAPI channel 1 fallback chain
   (`assembly/ops/newapi_text_fallback.py`).
 
-## Film 2 (remake test, at CP1)
+## Film 2 (remake test, produced 2026-11-24 15:45, awaiting the sponsor's viewing)
 
 - Source: sponsor's local copy of a wordless Netflix Brasil Short (copyright: test only, not for publishing as is);
   story told from 24 frames (`~/assembly-data/runs/video-sources/20261124-132736/story.txt`).
-- Project `01M863VMJQECF8PC9Z6FVNT6AV`, unit `assembly-film-2`, log `~/assembly-data/runs/film-2.log`; stopped at CP1.
-- CP1 finding: the portrait shows a furry human child, not an animal (style `realistic`, ethnicity Vietnamese).
-  Resume after the fix: `python -m assembly.connector --state ~/assembly-data/runs/01M863VMJQECF8PC9Z6FVNT6AV.json --approve CP1`.
+- Project `01M863VMJQECF8PC9Z6FVNT6AV`; film `/mnt/arcreel/D/ArcReel/assembly/films/01M863VMJQECF8PC9Z6FVNT6AV-ep01.mp4`
+  (51.5 s, 720×1280, audio mean −20 dB). Finished films now go to drive D (`ASSEMBLY_FILMS_DIR`).
+- CP1: sponsor chose "realistic animal"; character re-described as a real red squirrel without clothes (DramaClaw's
+  portrait template still adds a black T-shirt edge). Lesson: animal characters need "animal, no clothes" in the
+  description before portraits (part of the deferred CP1 prompt review).
+- Blocks fixed on the way (ledger rows 2026-11-24): first frames in batches of 9; waits cover every fanned-out task;
+  full queue is transient; gateway disk guard (disk cleaned, `DISK_AUDIT_2026-11-24.md`).
+- Visible defects: style drifts between beats (white sketch-like backgrounds, one magenta glove, a nut-shell hat),
+  a few dark/near-empty frames; squirrel identity holds across beats.
 
 ## Next steps, in order
 
