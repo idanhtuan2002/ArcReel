@@ -10,6 +10,15 @@ Legend: `[x]` done · `[~]` in progress · `[ ]` to do · `[!]` blocked · **S**
 2. Remake from an existing video (D22) and advertising / affiliate-marketing videos for TikTok and YouTube first.
 3. The rest of M2–M6 after these.
 
+Priority 2 tasks ([research](../research/2026-11-24-r2-remake-and-ads-donors.md)):
+
+| | Task | Evidence |
+|---|---|---|
+| [ ] | Remake as a new story: old app ADR-0161 transcript (`video-sources`) → connector `--from-video <url>` → DramaClaw film | research §4.1 |
+| [ ] | **S** OpenMontage driver: Claude Code headless (subscription quota) or Codex with free models | research §3 |
+| [ ] | OpenMontage installed pinned; probe `localization-dub` (Vietnamese dub) and a product ad from stills | research §4.2 |
+| [ ] | Publishing to TikTok/YouTube via Postiz with affiliate links (per-post sponsor approval) | research §4.3 |
+
 ## Sponsor items
 
 | | Item | Status / evidence |
