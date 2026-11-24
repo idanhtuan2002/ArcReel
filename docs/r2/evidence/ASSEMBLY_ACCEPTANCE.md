@@ -72,3 +72,14 @@ Decisions from the probes:
 - D28: the gateway accepts a base64 first frame (`decodeDataURL`), so with Seedream's base64 references both halves of
   the inline-relay probe pass.
 - Cost per clip: ~3 min for 2 s; 5 s (121 frames) not yet timed.
+
+## M2 — film 1 produced (narrated, "Chiếc đồng hồ của ông") — 2026-11-24, not yet accepted
+
+- File: `~/assembly-data/runs/films/01M84JWC2DRNK6SAX24RX3VMG4-ep01.mp4` — 53.3 s, H.264 720×1280 24 fps, AAC, 12.8 MB.
+  Contact sheet (one frame every 8 s): `m1-probes/film1-contact.jpg`.
+- Pipeline: DramaClaw v2.1.3 driven end to end by the connector; 18 beats; Vietnamese narration (DramaClaw zh rewrite →
+  translation) and VieNeu voices per speaker; beats 1–14 video on Seedance (accident, see ledger), 15–18 on local Wan.
+- Visible defects on the contact sheet (to confirm by the sponsor's viewing): letterboxed frames (black bars inside
+  9:16), plain white studio backgrounds on several beats, garbled sign text ("MANLEQ"), at least one split frame showing
+  two images side by side. Audio, subtitles and sync not yet reviewed.
+- Acceptance: pending the sponsor's viewing (GOAL: both reviewers accept or the sponsor accepts by eye).

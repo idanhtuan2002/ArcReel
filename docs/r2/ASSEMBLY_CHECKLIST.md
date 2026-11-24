@@ -42,7 +42,7 @@ Legend: `[x]` done · `[~]` in progress · `[ ]` to do · `[!]` blocked · **S**
 |---|---|---|
 | [~] | Connector core — `assembly/connector/` on DramaClaw's own Hermes toolset (ported whole, CE owner mode), playbook auto-advance loop on `pipeline/status`, state file + `--state` resume, stop on non-advancing step, task errors surfaced; unit tests; live run pending | `tests/unit/assembly/test_connector_film.py` |
 | [~] | Ingest text with `Chapter N` markers; configure (9:16, realistic, third person, Vietnamese, Wan backend, Seedream sketches/renders, subtitles) — code done (`setup.prepare_project`) | |
-| [ ] | **Narrated film** (prose → `spine_template = narrated`) end to end | |
+| [~] | **Narrated film** (prose → `spine_template = narrated`) end to end — produced 2026-11-24 (53 s); visible defects; awaiting the sponsor's viewing | ASSEMBLY_ACCEPTANCE M2 film 1 |
 | [ ] | **Drama film** (prose → huohuo `drama_script_formatter` via `POST /api/v1/agent/drama_script_formatter/chat` → headers rewritten to `INT./EXT. <nơi> - <thời gian>` → `spine_template = drama`), character voices per `Name: line` | round B §9; huohuo `agent-skills/drama_script_formatter` |
 | [ ] | Identity images for every identity; voices cast after characters | |
 | [ ] | CP1 extension: review the portrait prompts (`face_prompt`, appearance) before any portrait is generated — **deferred by the sponsor 2026-11-24** (portraits generated as now) | sponsor note |
