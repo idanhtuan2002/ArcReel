@@ -28,3 +28,20 @@ def test_a_local_file_becomes_a_story_with_its_origin(tmp_path: Path, monkeypatc
     assert origin["language"] == "en"
     assert origin["use"].startswith("transformed variant only")
     assert json.loads((tmp_path / "work" / "origin.json").read_text(encoding="utf-8"))["segments"] == 1
+
+
+def test_a_wordless_video_gets_its_story_from_its_frames(tmp_path: Path) -> None:
+    frames = []
+    for i in range(3):
+        frame = tmp_path / f"f{i}.jpg"
+        frame.write_bytes(b"jpeg")
+        frames.append(frame)
+    seen: list[list[dict]] = []
+
+    def fake_call(content: list[dict]) -> str:
+        seen.append(content)
+        return "  Chú chó nhỏ nhìn ra biển.  "
+
+    assert from_video.visual_story(frames, step=3.0, call=fake_call) == "Chú chó nhỏ nhìn ra biển."
+    assert seen[0][0]["type"] == "text"
+    assert [c["type"] for c in seen[0][1:]] == ["image_url"] * 3
