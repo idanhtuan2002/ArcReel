@@ -41,6 +41,16 @@ Nothing.
 - Visible defects: style drifts between beats (white sketch-like backgrounds, one magenta glove, a nut-shell hat),
   a few dark/near-empty frames; squirrel identity holds across beats.
 
+## Ad probe 1 (fictional product LUMA 500 ml, OpenMontage + Codex), paused for OpenRouter's daily quota
+
+- Inputs `~/assembly-data/inbox/san-pham-thu/` (4 FLUX.2 klein stills, `san-pham.md`, `brief.txt`, `approve-1.txt`);
+  project `~/assembly-data/openmontage/projects/luma-500-tiktok/` (proposal, script, scene plan, voice, music, word
+  subtitles done; only a 4 s landscape test render). Codex session `01a20ce9-4e0a-7b10-9a3e-0b65277f3fcb`.
+- Sponsor: decide ad checkpoints myself for the best real quality (memory `decide-ad-checkpoints-myself`).
+- Resume is scheduled by the user timer `assembly-ad-1` at 2026-11-25 07:10 (after the OpenRouter daily reset).
+- Research: `docs/research/2026-11-24-r2-affiliate-ad-video-donors.md`; film 2 review deferred:
+  `docs/research/2026-11-24-r2-film-2-quality-review.md`.
+
 ## Next steps, in order
 
 Sponsor priorities 2026-11-24 (film 1 produced, low quality but working):
