@@ -100,3 +100,5 @@ e.g. `voice_prereq_required`). DramaClaw's own agent keeps using it inside Drama
 - `feature-models.ts` now lists `CHARACTER_BUILD`; the `CHARACTER_BUILD_MODEL` env override stays harmless.
 - Chat agent (v2.1.3): Codex calls `DC-codex-agent-LLM`, which Custom mode cannot map (feature list has only the
   retired `DC-hermes-LLM`); served by NewAPI channel `assembly-agent` (`assembly/ops/newapi_agent_channel.py`).
+- Vietnamese UI (D25): v2.1.3 ships `frontend/public/locales/vi/translation.json` (7 138 keys, same as en/zh) and lists
+  `vi` in `SUPPORTED`; the planned donor change (translating the UI ourselves) is no longer needed.

@@ -93,7 +93,7 @@ Legend: `[x]` done · `[~]` in progress · `[ ]` to do · `[!]` blocked · **S**
 
 | | Task | Evidence |
 |---|---|---|
-| [ ] | DramaClaw Vietnamese UI (translate 5 886 strings, `SUPPORTED`, switcher, rebuild web image) | D25 |
+| [x] | DramaClaw Vietnamese UI — **shipped by the donor in v2.1.3** (`locales/vi`, 7 138/7 138 keys; `SUPPORTED = zh, en, vi, pt`); switch once with `?lng=vi` or the account menu (kept per browser); no donor change needed | 2026-11-24, Chrome check |
 | [ ] | Backups of three stacks (keys excluded) + restore drill; autostart; alerts | |
 | [ ] | Run queue for parallel series (bounded by pools) | D19 |
 | [ ] | Jianying draft export post-stage (ArcReel) | verification §3 |
