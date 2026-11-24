@@ -50,6 +50,10 @@ Legend: `[x]` done · `[~]` in progress · `[ ]` to do · `[!]` blocked · **S**
 | [ ] | Acceptance by eye: Vietnamese speech and subtitles, two characters consistent, sync — recorded | ASSEMBLY_ACCEPTANCE |
 | [ ] | `lib/story_translation.py`: public `translate_text` | |
 
+| [ ] | Upgrade smoke procedure: on each donor upgrade re-vendor the toolset, run donor tests, M1 probes and a two-beat smoke film before real runs | research 2026-11-24 §4.3 |
+| [x] | Explicit-model rule: every costly connector call names its model/backend (no donor defaults) | ledger 2026-11-24 |
+| [ ] | **S** D20: paid text/vision (and video) models, with film 1's call counts | research 2026-11-24 §4.2 |
+
 ## M2b — thin Vietnamese console
 
 | | Task | Evidence |
