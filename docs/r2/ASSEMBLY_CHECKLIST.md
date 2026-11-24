@@ -14,7 +14,7 @@ Priority 2 tasks ([research](../research/2026-11-24-r2-remake-and-ads-donors.md)
 
 | | Task | Evidence |
 |---|---|---|
-| [ ] | Remake as a new story: old app ADR-0161 transcript (`video-sources`) → connector `--from-video <url>` → DramaClaw film | research §4.1 |
+| [~] | Remake as a new story: ADR-0161 unit reused in the connector (`--from-video <url|file>`), local faster-whisper large-v3 on drive D (film 1 transcribed: vi, 18 segments, 10 s); waiting for a sponsor source video for a full run | research §4.1 |
 | [x] | **S** OpenMontage driver: both prepared (sponsor 2026-11-24); `python -m assembly.openmontage.run --driver claude|codex`, resumable at checkpoints | ASSEMBLY_ACCEPTANCE OpenMontage drivers |
 | [~] | OpenMontage installed pinned (`4f682c8`); `localization-dub` probed to the first checkpoint with both drivers; next: finish one dub and a product ad from stills | research §4.2 |
 | [ ] | Publishing to TikTok/YouTube via Postiz with affiliate links (per-post sponsor approval) | research §4.3 |

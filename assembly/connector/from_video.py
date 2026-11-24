@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import os
 import subprocess
 from pathlib import Path
 from typing import Any
@@ -17,11 +18,25 @@ from lib.video_ingest import SourceInfo, audio_chunks, download_audio, origin_re
 
 OPENMONTAGE_PYTHON = Path.home() / "assembly-data/openmontage/.venv/bin/python"
 WHISPER_SCRIPT = Path(__file__).with_name("whisper_local.py")
+# CTranslate2 needs CUDA 12 cuBLAS/cuDNN; MMAudio's venv on drive D already carries them (no extra download).
+CUDA_LIBS = Path("/mnt/arcreel/D/ArcReel/mmaudio/.venv/lib/python3.11/site-packages/nvidia")
+
+
+def _whisper_env() -> dict[str, str]:
+    env = dict(os.environ)
+    libs = ":".join(str(p) for p in sorted(CUDA_LIBS.glob("*/lib")))
+    env["LD_LIBRARY_PATH"] = f"{libs}:{env.get('LD_LIBRARY_PATH', '')}"
+    return env
 
 
 async def _whisper(chunk: Path) -> dict[str, Any]:
     proc = await asyncio.create_subprocess_exec(
-        str(OPENMONTAGE_PYTHON), str(WHISPER_SCRIPT), str(chunk), stdout=subprocess.PIPE, stderr=subprocess.PIPE
+        str(OPENMONTAGE_PYTHON),
+        str(WHISPER_SCRIPT),
+        str(chunk),
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        env=_whisper_env(),
     )
     out, err = await proc.communicate()
     if proc.returncode != 0:
