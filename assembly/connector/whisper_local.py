@@ -16,7 +16,7 @@ MODEL_DIR = os.environ.get("WHISPER_MODEL_DIR", "/mnt/arcreel/D/ArcReel/whisper/
 
 def _pcm(path: str):
     """16 kHz mono float32 decoded by ffmpeg (OpenMontage pins a PyAV older than faster-whisper's decoder expects)."""
-    import numpy as np  # pyright: ignore[reportMissingImports]
+    import numpy as np
 
     raw = subprocess.run(
         ["ffmpeg", "-v", "error", "-i", path, "-f", "s16le", "-ac", "1", "-ar", "16000", "-"],
