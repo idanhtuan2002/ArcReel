@@ -98,3 +98,20 @@ Decisions from the probes:
   started with its tools. The Codex sandbox was therefore left as it is (no security setting changed).
 - Assessment: works on the free model but unreliably (1 of 2 turns empty); each turn costs ~15 k tokens of the shared
   free text pool. `director-auto` (whole-episode runs) not yet tried.
+
+## OpenMontage drivers — same task, both drivers (2026-11-24)
+
+Task: `localization-dub` on film 1 (Vietnamese, 53 s) → English SRT only; stop at the first human checkpoint.
+Working copy `~/assembly-data/openmontage` @ `4f682c8`; logs `~/assembly-data/openmontage-runs/20261124-110811-codex.log`,
+`…-111031-claude.log`.
+
+| | Codex + free NewAPI (`DC-codex-agent-LLM` → ERNIE chain) | Claude Code headless |
+|---|---|---|
+| Time | 121 s, 41 shell commands | 78 s, 12 turns |
+| Tokens / cost | 1.46 M input (1.32 M cached), 10 k output; $0 | 624 k input (cache), 7 k output; $0.70 equivalent on the subscription |
+| Followed AGENT_GUIDE, wrote brief + decision log + checkpoint | yes (also installed missing `pillow` in the venv) | yes |
+| Checkpoint summary in Vietnamese | yes: scope, languages, tools, duration risk, budget | yes, fuller: SRT standard (42 chars × 2 lines, 17 cps), optional vi SRT / burned-in variant with a recommendation, glossary plan, reviewers, risks |
+| Project | `projects/vie-ep01-english-subs` | `projects/vie-ep01-english-subs-claude` |
+
+Both are usable up to the first checkpoint; Claude's plan is more complete. Next stages (transcribe, translate, SRT)
+not yet run.
