@@ -107,7 +107,7 @@ Priority 2 tasks ([research](../research/2026-11-24-r2-remake-and-ads-donors.md)
 |---|---|---|
 | [x] | DramaClaw Vietnamese UI — **shipped by the donor in v2.1.3** (`locales/vi`, 7 138/7 138 keys; `SUPPORTED = zh, en, vi, pt`); switch once with `?lng=vi` or the account menu (kept per browser); no donor change needed | 2026-11-24, Chrome check |
 | [ ] | Backups of three stacks (keys excluded) + restore drill; autostart; alerts | |
-| [ ] | Disk watch: both disks at 90–94 % (root 21 GB, D 18 GB free on 2026-11-24); NewAPI refuses requests above 95 % disk — alert at 90 %, periodic cleanup of temp/beat media; finished films on D (`ASSEMBLY_FILMS_DIR`) | ledger 2026-11-24 |
+| [ ] | Disk watch: after the 2026-11-24 cleanup root 85 % (29 GB free), D 77 % (65 GB free) — `DISK_AUDIT_2026-11-24.md`; NewAPI refuses requests above 95 % disk — alert at 90 %, periodic cleanup of temp/beat media; finished films on D (`ASSEMBLY_FILMS_DIR`) | ledger 2026-11-24 |
 | [ ] | Run queue for parallel series (bounded by pools) | D19 |
 | [ ] | Jianying draft export post-stage (ArcReel) | verification §3 |
 | [ ] | Local image adapter in front of ComfyUI (when pools run out) | plan §0 |
@@ -117,5 +117,5 @@ Priority 2 tasks ([research](../research/2026-11-24-r2-remake-and-ads-donors.md)
 | | Task | Evidence |
 |---|---|---|
 | [ ] | shenbi comedy/fanfic skills, ViMax children's adaptation as huohuo genre skills; old app's packs where no donor has them | coverage matrix |
-| [ ] | Audiobook from a story; remake from another video (old app's ADR-0161 unit) | D22 |
-| [ ] | OpenMontage driver research, then its forms | |
+| [ ] | Audiobook from a story (remake from another video: done, film 2) | D22 |
+| [~] | OpenMontage drivers ready (Claude, Codex); forms: affiliate ad probe running; dub, clip-factory next | |
