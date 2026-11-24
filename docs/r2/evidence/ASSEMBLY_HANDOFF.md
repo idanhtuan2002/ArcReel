@@ -29,7 +29,7 @@ Nothing.
 
 ## Next steps, in order
 
-1. M2 connector core (`assembly/connector/`): DramaClaw REST client (multipart ingest upload → `ingest/start` with
-   `spine_template`), configure (`ethnicity`, `narration_style`, 720×1280, video backend `newapi_Wan22-5B-local`),
-   drive `pipeline/status.next_step` task types, run state file, resume, retries, voice casting after `characters`.
-2. First narrated film from "Chiếc đồng hồ của ông", then the drama film (huohuo formatter → headers → `drama`).
+Sponsor priorities 2026-11-24 (film 1 produced, low quality but working):
+1. DramaClaw Vietnamese UI (D25) and Vietnamese control.
+2. Remake from an existing video; advertising / affiliate videos for TikTok and YouTube first.
+3. Then the rest of the checklist.

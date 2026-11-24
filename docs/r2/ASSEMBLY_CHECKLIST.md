@@ -4,6 +4,12 @@ The single tracker of the assembly ([GOAL](../GOAL.md), [plan](ASSEMBLY_PLAN.md)
 [acceptance](evidence/ASSEMBLY_ACCEPTANCE.md)). Update the box and the evidence column in the same commit as the work.
 Legend: `[x]` done · `[~]` in progress · `[ ]` to do · `[!]` blocked · **S** = needs the sponsor.
 
+## Current priorities (sponsor 2026-11-24, after film 1)
+
+1. Vietnamese interface and control: DramaClaw UI in Vietnamese (D25), Xia Director usable in Vietnamese.
+2. Remake from an existing video (D22) and advertising / affiliate-marketing videos for TikTok and YouTube first.
+3. The rest of M2–M6 after these.
+
 ## Sponsor items
 
 | | Item | Status / evidence |
