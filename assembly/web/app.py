@@ -213,7 +213,8 @@ def _find(project_id: str) -> runs.Run:
 
 @app.get("/film/{project_id}/{episode}")
 def film(project_id: str, episode: str) -> FileResponse:
-    path = _find(project_id).finals.get(episode)
+    run = _find(project_id)
+    path = (run.state.get("finished") or {}).get(episode, {}).get("final") or run.finals.get(episode)
     if not path or not Path(path).is_file():
         raise HTTPException(404)
     return FileResponse(path, media_type="video/mp4")

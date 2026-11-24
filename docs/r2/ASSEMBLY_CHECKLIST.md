@@ -98,7 +98,7 @@ Priority 2 tasks ([research](../research/2026-11-24-r2-remake-and-ads-donors.md)
 
 | | Task | Evidence |
 |---|---|---|
-| [ ] | Finish post-stage: captions, loudness −14 LUFS, music bed, ambience | |
+| [~] | Finish post-stage (`assembly/finish.py`, runs after each finished episode): the old app's `render_presentations` on DramaClaw's film — burned Vietnamese captions per beat (compose burns none: `add_subtitles` only recorded), ACE-Step music bed from a text-model caption, ducked, −14 LUFS; film 2: −20.2 → −13.96 LUFS, 85 s. Ambience (MMAudio per scene) not yet: needs per-scene prompts | `test_finish.py`, `test_finish_render.py` |
 | [ ] | Review post-stage report-only — first use DramaClaw's own verifiers (enabled in CE, on demand only, not called by the pipeline or the Hermes toolset): `beats/{b}/verify`, `verify-frame`, `score`/`score-batch`, `verify/consistency`, `verify/continuity`, `verify/episode-overview`; report per episode at CP3/CP5; then the two-reviewer pass where they leave gaps. Portraits have no automatic check in DramaClaw (human CP1 only) | plan §0; `verification/routes.py` |
 
 ## M6 — operations (and D25)

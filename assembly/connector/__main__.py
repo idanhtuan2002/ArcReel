@@ -92,6 +92,15 @@ def main() -> int:
     except RunStopped as stop:
         print(f"STOPPED: {stop}", flush=True)
         return 2
+    for episode in sorted(set(state.finals) - set(state.finished), key=int):
+        # Finish post-stage (M4): captions, music bed, loudness; a failure keeps DramaClaw's film as the result.
+        from assembly import finish
+
+        try:
+            finish.main(["--state", str(state_path), "--episode", episode])
+        except Exception as error:
+            print(f"finish ep{episode} failed: {error}", flush=True)
+        state = RunState.load(state_path)
     print(f"DONE: {state.finals}", flush=True)
     return 0
 
