@@ -27,6 +27,14 @@ Nothing.
 - Services added: `image-adapter` (172.17.0.1:23360, Seedream minimum size); NewAPI channel 1 fallback chain
   (`assembly/ops/newapi_text_fallback.py`).
 
+## Film 2 (remake test, at CP1)
+
+- Source: sponsor's local copy of a wordless Netflix Brasil Short (copyright: test only, not for publishing as is);
+  story told from 24 frames (`~/assembly-data/runs/video-sources/20261124-132736/story.txt`).
+- Project `01M863VMJQECF8PC9Z6FVNT6AV`, unit `assembly-film-2`, log `~/assembly-data/runs/film-2.log`; stopped at CP1.
+- CP1 finding: the portrait shows a furry human child, not an animal (style `realistic`, ethnicity Vietnamese).
+  Resume after the fix: `python -m assembly.connector --state ~/assembly-data/runs/01M863VMJQECF8PC9Z6FVNT6AV.json --approve CP1`.
+
 ## Next steps, in order
 
 Sponsor priorities 2026-11-24 (film 1 produced, low quality but working):
