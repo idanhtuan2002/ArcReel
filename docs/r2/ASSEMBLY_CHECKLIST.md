@@ -27,8 +27,8 @@ Legend: `[x]` done · `[~]` in progress · `[ ]` to do · `[!]` blocked · **S**
 
 | | Task | Evidence |
 |---|---|---|
-| [~] | M1a voice adapter `assembly/voice_adapter/` (data: URL in, SHA-256 → VieNeu preset, MP3 out at `host.docker.internal`, unknown = error) + tests — code, unit tests, service unit done; transport verified from inside the DramaClaw container (fal request → MP3); DramaClaw's own TTS task with an uploaded sample left for M2 | `tests/unit/assembly/test_voice_adapter.py` |
-| [~] | M1a casting (`assembly/voices/`: VieNeu catalog from its own preset file, registry, casting rule by gender/region) + tests — done; sample generation and upload to DramaClaw come with the connector (M2) | `tests/unit/assembly/test_voices.py` |
+| [x] | M1a voice adapter `assembly/voice_adapter/` (data: URL in, SHA-256 → VieNeu preset, MP3 out at `host.docker.internal`, unknown = error) + tests — code, unit tests, service unit done; transport verified from inside the DramaClaw container (fal request → MP3); DramaClaw's own TTS task with an uploaded sample left for M2 | film 1: DramaClaw's own TTS task voiced all 18 beats via NewAPI `assembly-voice` (2026-11-24) |
+| [x] | M1a casting (`assembly/voices/`: VieNeu catalog from its own preset file, registry, casting rule by gender/region) + tests — done; sample generation and upload to DramaClaw come with the connector (M2) | film 1: narrator + 3 characters cast and uploaded to every voice slot |
 | [x] | M1a DramaClaw ComfyUI channel with the local Wan workflow (Wan2.2 TI2V 5B GGUF, `assembly/config/comfyui/wan22-5b-i2v.json`, bridge `172.17.0.1:8189`); clip through NewAPI 160 s | ASSEMBLY_ACCEPTANCE M1a Wan |
 | [x] | `assembly/config/dramaclaw-profile.json` (applied in DramaClaw "My Config"; image route = VolcEngine-type channel per probe; `watermark: false` defaults; embedding `gemini-embedding-001` 768) — (OpenRouter text, Gemini vision spread, OpenAI-type channel → BytePlus Seedream for `LingShan-G2`, Seedream 4.0 second pool, VolcEngine Seedance) | D5–D8 |
 | [x] | `docs/r2/ASSEMBLY_MODELS.md` slot → model → pool → fallback | written 2026-11-23 |
@@ -40,13 +40,13 @@ Legend: `[x]` done · `[~]` in progress · `[ ]` to do · `[!]` blocked · **S**
 
 | | Task | Evidence |
 |---|---|---|
-| [~] | Connector core — `assembly/connector/` on DramaClaw's own Hermes toolset (ported whole, CE owner mode), playbook auto-advance loop on `pipeline/status`, state file + `--state` resume, stop on non-advancing step, task errors surfaced; unit tests; live run pending | `tests/unit/assembly/test_connector_film.py` |
-| [~] | Ingest text with `Chapter N` markers; configure (9:16, realistic, third person, Vietnamese, Wan backend, Seedream sketches/renders, subtitles) — code done (`setup.prepare_project`) | |
+| [x] | Connector core — `assembly/connector/` on DramaClaw's own Hermes toolset (ported whole, CE owner mode), playbook auto-advance loop on `pipeline/status`, state file + `--state` resume, stop on non-advancing step, task errors surfaced; unit tests; live run pending | film 1 produced end to end (2026-11-24); `test_connector_film.py` |
+| [x] | Ingest text with `Chapter N` markers; configure (9:16, realistic, third person, Vietnamese, Wan backend, Seedream sketches/renders, subtitles) — code done (`setup.prepare_project`) | film 1 |
 | [~] | **Narrated film** (prose → `spine_template = narrated`) end to end — produced 2026-11-24 (53 s); visible defects; awaiting the sponsor's viewing | ASSEMBLY_ACCEPTANCE M2 film 1 |
 | [ ] | **Drama film** (prose → huohuo `drama_script_formatter` via `POST /api/v1/agent/drama_script_formatter/chat` → headers rewritten to `INT./EXT. <nơi> - <thời gian>` → `spine_template = drama`), character voices per `Name: line` | round B §9; huohuo `agent-skills/drama_script_formatter` |
-| [ ] | Identity images for every identity; voices cast after characters | |
+| [x] | Identity images for every identity; voices cast after characters | film 1: 3 main characters, 5 identities, images generated |
 | [ ] | CP1 extension: review the portrait prompts (`face_prompt`, appearance) before any portrait is generated — **deferred by the sponsor 2026-11-24** (portraits generated as now) | sponsor note |
-| [~] | Narrated Vietnamese narration: DramaClaw zh rewrite (third person) → line translation with names restored (`assembly/connector/rewriter.py`) | ledger 2026-11-24 |
+| [x] | Narrated Vietnamese narration: DramaClaw zh rewrite (third person) → line translation with names restored (`assembly/connector/rewriter.py`) | film 1: 18 Vietnamese lines, speakers kept |
 | [ ] | Acceptance by eye: Vietnamese speech and subtitles, two characters consistent, sync — recorded | ASSEMBLY_ACCEPTANCE |
 | [ ] | `lib/story_translation.py`: public `translate_text` | |
 
