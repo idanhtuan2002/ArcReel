@@ -9,4 +9,4 @@
     (free models), sandbox `workspace-write`.
 - Human checkpoints: OpenMontage stops at stage approvals (`skills/meta/checkpoint-protocol.md`); continue with
   `--resume <session> --message "Đã duyệt, tiếp tục"`. Logs: `~/assembly-data/openmontage-runs/`.
-- Live board: `cd ~/assembly-data/openmontage && .venv/bin/python -m backlot open <project-id>`.
+- No live board at `4f682c8` (no `backlot` module). Progress is visible in `projects/<id>/` (artifacts, assets, renders), `pipelines/<id>/checkpoint_*.json` and the driver log `~/assembly-data/openmontage-runs/`.
