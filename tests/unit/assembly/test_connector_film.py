@@ -219,3 +219,18 @@ def test_beat_videos_are_started_with_the_project_backend(tmp_path: Path) -> Non
     _run(tools, tmp_path).run()
     starts = [a for t, a in tools.calls if t == "dramaclaw_start_single_video"]
     assert starts == [{"episode": 1, "beat": 1, "video_backend": "newapi_Wan22-5B-local"}]
+
+
+def test_first_frames_are_requested_in_batches_of_nine(tmp_path: Path) -> None:
+    class FrameTools(FakeTools):
+        def request(self, method: str, path: str, **kw: Any) -> dict[str, Any]:
+            if path.endswith("/beats"):
+                return {"ok": True, "data": [{"beat_number": n} for n in range(1, 19)]}
+            return super().request(method, path, **kw)
+
+    tools = FrameTools(
+        [{"next_step": "selected_regen", "current_episode": 1}, {"next_step": "done", "current_episode": 1}]
+    )
+    _run(tools, tmp_path).run()
+    batches = [a["beat_indices"] for t, a in tools.calls if t == "dramaclaw_render_first_frames"]
+    assert batches == [list(range(1, 10)), list(range(10, 19))]

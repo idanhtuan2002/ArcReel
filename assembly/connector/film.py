@@ -29,6 +29,7 @@ POLL_SECONDS = 10
 MAX_STEP_SECONDS = 6 * 3600
 MISSING_TASK_SECONDS = 300
 TRANSIENT_PAUSES = (120, 300, 600, 900)
+FIRST_FRAME_BATCH = 9
 _TRANSIENT = ("429", "rate-limited", "rate limit", "temporarily", "input_value='error'", "503", "502", "timed out")
 
 
@@ -327,8 +328,16 @@ class FilmRun:
             self.wait("global_optimize_video", episode)
         elif step == "selected_regen":
             beats = [int(b["beat_number"]) for b in self.beats(episode) if int(b.get("beat_number") or 0) > 0]
-            self.start("dramaclaw_render_first_frames", "first frames", episode=episode, beat_indices=beats)
-            self.wait("selected_regen", episode)
+            # v2.1.3 accepts at most FIRST_FRAME_BATCH beats per first-frame request; batches run one after another.
+            for start in range(0, len(beats), FIRST_FRAME_BATCH):
+                batch = beats[start : start + FIRST_FRAME_BATCH]
+                self.start(
+                    "dramaclaw_render_first_frames",
+                    f"first frames {batch[0]}-{batch[-1]}",
+                    episode=episode,
+                    beat_indices=batch,
+                )
+                self.wait("selected_regen", episode)
         elif step == "tts":
             self.start("dramaclaw_generate_audio", "audio", episode=episode)
             self.wait("audio_generation_indextts2", episode)
