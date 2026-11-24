@@ -16,6 +16,10 @@ services:
       # DramaClaw's Custom-mode feature list (frontend/src/lib/feature-models.ts) has no CHARACTER_BUILD entry, so
       # DC-character-builder-LLM never gets a NewAPI channel; route character extraction to the mapped scene-builder name.
       CHARACTER_BUILD_MODEL: "DC-scene-builder-LLM"
+      # The default model (config.get_pydantic_model without override: 7 verifiers, cognee event extractor,
+      # episode/character fixers and reviewers) falls back to doubao-seed-1-6-251015, which has no channel here;
+      # route it to the newer Gemini models (vision; they follow the verifiers' JSON schema), assembly/ops/newapi_vision_pool.py.
+      MODEL_NAME: "DC-verifier-LLM"
   newapi:
     image: claymorelab/dramaclaw-gateway@sha256:c9b8a5572189281a960f1c3a2ad04e67b5af79271e83d5527198c8a159ce8c8e
   web:

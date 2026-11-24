@@ -196,10 +196,30 @@ def run_page(project_id: str) -> HTMLResponse:
         f'<a href="{dc}/episodes" target="_blank">Mở trong DramaClaw</a> · '
         f'<a href="{dc}/freezone" target="_blank">Canvas</a> · <a href="{dc}/tasks" target="_blank">Tác vụ</a></p>'
         f"<p>{actions}</p>{waiting}{error}<h2>Phim</h2>{films or '<p>Chưa có phim.</p>'}"
+        f"{_reviews(run)}"
         f"<h2>Các bước (tập 1)</h2><table>{steps}</table><p>Giọng: {voices or '—'}</p>"
         f"<h2>Nhật ký bước</h2><table>{notes}</table><h2>Log gần nhất</h2><pre>{e(tail)}</pre>"
     )
     return page(run.title, body, refresh=run.status == "running")
+
+
+def _reviews(run: runs.Run) -> str:
+    out = ""
+    for episode, checks in (run.state.get("reviews") or {}).items():
+        out += f"<h3>Đánh giá tập {e(episode)} (chỉ báo cáo)</h3><table>"
+        for item in checks.values():
+            verdict = ("Đạt" if item.get("passed") else "Có vấn đề") if item.get("ok") else "Chưa chạy được"
+            detail = item.get("report") or item.get("error") or ""
+            out += (
+                f"<tr><td>{e(str(item.get('label')))}</td><td>{e(verdict)}</td>"
+                f"<td><pre>{e(str(detail)[:2500])}</pre></td></tr>"
+            )
+        out += "</table>"
+    for episode, done in (run.state.get("finished") or {}).items():
+        loud = (done.get("loudness") or {}).get("output_lufs")
+        music = "có nhạc nền" if done.get("music") else "không nhạc nền"
+        out += f"<p>Tập {e(episode)} đã hoàn thiện: phụ đề, {music}, âm lượng {e(str(loud))} LUFS.</p>"
+    return f"<h2>Hoàn thiện và đánh giá</h2>{out}" if out else ""
 
 
 def _find(project_id: str) -> runs.Run:

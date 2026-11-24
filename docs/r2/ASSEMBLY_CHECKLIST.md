@@ -99,7 +99,7 @@ Priority 2 tasks ([research](../research/2026-11-24-r2-remake-and-ads-donors.md)
 | | Task | Evidence |
 |---|---|---|
 | [~] | Finish post-stage (`assembly/finish.py`, runs after each finished episode): the old app's `render_presentations` on DramaClaw's film — burned Vietnamese captions per beat (compose burns none: `add_subtitles` only recorded), ACE-Step music bed from a text-model caption, ducked, −14 LUFS; film 2: −20.2 → −13.96 LUFS, 85 s. Ambience (MMAudio per scene) not yet: needs per-scene prompts | `test_finish.py`, `test_finish_render.py` |
-| [ ] | Review post-stage report-only — first use DramaClaw's own verifiers (enabled in CE, on demand only, not called by the pipeline or the Hermes toolset): `beats/{b}/verify`, `verify-frame`, `score`/`score-batch`, `verify/consistency`, `verify/continuity`, `verify/episode-overview`; report per episode at CP3/CP5; then the two-reviewer pass where they leave gaps. Portraits have no automatic check in DramaClaw (human CP1 only) | plan §0; `verification/routes.py` |
+| [~] | Review post-stage report-only (`assembly/review.py`, after finish): DramaClaw verifiers `verify/episode-overview`, `verify/consistency` (frame), `verify/continuity`; transient model errors retried; results in `RunState.reviews`, shown on the control page. FACT: verifiers use DramaClaw's default model, which fell back to `doubao-seed-1-6-251015` (no channel) → `MODEL_NAME=DC-verifier-LLM` on gemini-3-flash-preview / 3.5-flash-lite (2.5-flash broke the overview schema). First real run pending (Gemini 3 "high demand" 503 on 2026-11-24) | `test_review.py`; override.yml |
 
 ## M6 — operations (and D25)
 

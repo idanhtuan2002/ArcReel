@@ -100,6 +100,13 @@ def main() -> int:
             finish.main(["--state", str(state_path), "--episode", episode])
         except Exception as error:
             print(f"finish ep{episode} failed: {error}", flush=True)
+        # Review post-stage (M4, report only): DramaClaw's verifiers; nothing is regenerated.
+        from assembly import review
+
+        try:
+            review.main(["--state", str(state_path), "--episode", episode])
+        except Exception as error:
+            print(f"review ep{episode} failed: {error}", flush=True)
         state = RunState.load(state_path)
     print(f"DONE: {state.finals}", flush=True)
     return 0

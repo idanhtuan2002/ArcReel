@@ -84,6 +84,8 @@ class RunState:
     finals: dict[str, str] = field(default_factory=dict)
     # Finish post-stage results per episode (assembly.finish): finished film, subtitles, manifest, loudness, music.
     finished: dict[str, dict[str, Any]] = field(default_factory=dict)
+    # Review post-stage reports per episode (assembly.review): DramaClaw verifier results, report only.
+    reviews: dict[str, dict[str, Any]] = field(default_factory=dict)
 
     def save(self, path: Path) -> None:
         path.parent.mkdir(parents=True, exist_ok=True)

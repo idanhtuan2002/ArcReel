@@ -27,6 +27,11 @@ VISION_NAMES = [
 # model -> NewAPI priority (higher is tried first). gemini-2.5-flash answered every call on 2026-11-24 while the
 # others returned 503s; DramaClaw's own DC-gemini channel (priority 0) is tried last.
 EXTRA_MODELS = {"gemini-2.5-flash": 20, "gemini-3.5-flash-lite": 10, "gemini-3-flash-preview": 5}
+# DramaClaw's default model (MODEL_NAME, used by its verifiers, which ask for a strict JSON schema). gemini-2.5-flash
+# returned list items as strings instead of objects on the episode overview (2026-11-24), so this name is served only
+# by the newer models.
+VERIFIER_NAME = "DC-verifier-LLM"
+VERIFIER_MODELS = {"gemini-3-flash-preview", "gemini-3.5-flash-lite"}
 
 
 def _session() -> tuple[httpx.Client, dict[str, str]]:
@@ -64,11 +69,12 @@ def main() -> None:
             ]
             existing = next(c for c in items if c["name"] == f"DC-gemini-{model}")
         detail = client.get(f"/api/channel/{existing['id']}", headers=headers).json()["data"]
+        names = VISION_NAMES + ([VERIFIER_NAME] if model in VERIFIER_MODELS else [])
         detail.update(
             {
                 "name": name,
-                "models": ",".join(VISION_NAMES),
-                "model_mapping": json.dumps(dict.fromkeys(VISION_NAMES, model)),
+                "models": ",".join(names),
+                "model_mapping": json.dumps(dict.fromkeys(names, model)),
                 "auto_ban": 0,
                 "priority": EXTRA_MODELS[model],
             }
