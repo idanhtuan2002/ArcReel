@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import argparse
 import sys
+import time
 from pathlib import Path
 
 from assembly.connector import setup
@@ -34,6 +35,7 @@ SETTINGS = {
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--story", type=Path)
+    parser.add_argument("--from-video", help="URL or local file: the video's transcript becomes the story (ADR-0161)")
     parser.add_argument("--title")
     parser.add_argument("--spine", choices=["narrated", "drama"], default="narrated")
     parser.add_argument("--region", choices=["north", "central", "south"], default="north")
@@ -49,8 +51,18 @@ def main() -> int:
         state.save(state_path)
         tools = DramaClawTools(state.project_id)
     else:
+        if args.from_video:
+            from assembly.connector.from_video import story_from_video
+
+            workdir = DATA / "video-sources" / time.strftime("%Y%m%d-%H%M%S")
+            args.story, origin = story_from_video(args.from_video, workdir)
+            args.title = args.title or str(origin.get("title") or "Video remake")
+            print(
+                f"story from video: {args.story} ({origin.get('language')}, {origin.get('segments')} segments)",
+                flush=True,
+            )
         if not args.story or not args.title:
-            parser.error("--story and --title are required for a new run")
+            parser.error("--story/--from-video and --title are required for a new run")
         project_id = setup.create_project(args.title)
         state_path = DATA / f"{project_id}.json"
         state = RunState(project_id=project_id, title=args.title, spine=args.spine, mode=args.mode)

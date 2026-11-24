@@ -185,7 +185,8 @@ def test_a_rate_limited_step_is_run_again_after_a_pause(tmp_path: Path, monkeypa
         return FakeTools.call(tools, tool, **args)
 
     monkeypatch.setattr(tools, "call", get_task_status)
-    _run(tools, tmp_path).run()
+    state = _run(tools, tmp_path).run()
+    assert [s["step"] for s in state.steps] == ["tts"]
 
 
 def test_a_task_not_found_by_scope_is_settled_from_the_task_list(tmp_path: Path) -> None:
