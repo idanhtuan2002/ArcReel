@@ -79,9 +79,9 @@ Priority 2 tasks ([research](../research/2026-11-24-r2-remake-and-ads-donors.md)
 | | Task | Evidence |
 |---|---|---|
 | [~] | Checkpoints CP1–CP5 from the Hermes playbooks in the connector (CP1 both modes, CP2–CP5 step mode; `--mode`, `--approve CPn`); film 1 runs with CP1 waived (sponsor 2026-11-23) | `test_connector_film.py` |
-| [ ] | Run list (All / Active / Done / Failed), start form (four idea sources, setting, spine, mode auto/step) | D21, D22 |
-| [ ] | Step timeline with Continue / Pause / Redo, deep links into huohuo and DramaClaw screens, errors panel, film player | |
-| [ ] | Catalog of functions with status and where they run | |
+| [x] | Run list (Tất cả / Đang chạy / Chờ duyệt / Hoàn tất / Thất bại), start form (story text or video now; huohuo ideas with M3), spine, voice region, mode auto/step — http://127.0.0.1:8790 (unit `assembly-console`) | `assembly/web/`, `test_web.py` |
+| [x] | Step timeline (15 DramaClaw steps) with Duyệt / Chạy tiếp / Tạm dừng, redo via a deep link per step into DramaClaw's screen, errors and checkpoint panels, film player, step log, voices; huohuo links come with M3 | `assembly/web/README.md` |
+| [x] | Catalog of functions with status, where they run and links (`assembly/web/catalog.py`, from the coverage matrix brought to 2026-11-24) | |
 
 ## M3 — story stage
 
