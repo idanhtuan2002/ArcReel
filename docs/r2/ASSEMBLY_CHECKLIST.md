@@ -18,6 +18,7 @@ Priority 2 tasks ([research](../research/2026-11-24-r2-remake-and-ads-donors.md)
 | [ ] | **Deferred (sponsor 2026-11-24): film quality fixes from the film 2 review** — animal characters in DramaClaw sketch→frame, global props, music/SFX, captions, pacing for wordless sources, video model, listen check | [film 2 review §3](../research/2026-11-24-r2-film-2-quality-review.md) |
 | [x] | **S** OpenMontage driver: both prepared (sponsor 2026-11-24); `python -m assembly.openmontage.run --driver claude|codex`, resumable at checkpoints | ASSEMBLY_ACCEPTANCE OpenMontage drivers |
 | [~] | OpenMontage installed pinned (`4f682c8`); `localization-dub` probed to the first checkpoint with both drivers; next: finish one dub and a product ad from stills | research §4.2 |
+| [~] | Affiliate ad, first probe: fictional product "LUMA 500 ml" (4 stills by local FLUX.2 klein reference workflow, `~/assembly-data/inbox/san-pham-thu/`), OpenMontage on the Codex driver (sponsor choice), unit `assembly-ad-1`, log `~/assembly-data/runs/ad-1.log`; not for publishing | [ads research](../research/2026-11-24-r2-affiliate-ad-video-donors.md) |
 | [ ] | Publishing to TikTok/YouTube via Postiz with affiliate links (per-post sponsor approval) | research §4.3 |
 
 ## Sponsor items
