@@ -69,6 +69,15 @@ Nothing.
 - Ad resume failed: OpenRouter 400 "Request path cannot be relayed" on all OpenRouter channels (ledger). Waiting for the
   sponsor to check the OpenRouter key; the Codex agent and DramaClaw's text steps both depend on it.
 
+## OpenRouter refused (2026-11-25), text on Gemini
+
+- OpenRouter answers 400 "Request path cannot be relayed" to every inference call of the account (new key, positive
+  balance, direct call outside the gateway, five free models); cause unknown (ledger).
+- Sponsor choice: DramaClaw's 18 text slots served by the `assembly-gemini-*` channels and `DC-openrouter` disabled:
+  `python -m assembly.ops.newapi_text_to_gemini --apply` (done 11:5x); undo with `--revert` once OpenRouter works.
+  Gemini free requests are per model per day, shared with vision and the verifiers.
+- The Codex agent channel `assembly-agent` still points at OpenRouter: the LUMA ad stays paused.
+
 ## Next steps, in order
 
 Sponsor priorities 2026-11-24 (film 1 produced, low quality but working):
