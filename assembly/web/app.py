@@ -61,7 +61,7 @@ def page(title: str, body: str, refresh: bool = False) -> HTMLResponse:
     meta = '<meta http-equiv="refresh" content="15">' if refresh else ""
     nav = (
         f'<nav><a href="/">Bàn điều khiển</a><a href="/#catalog">Chức năng</a>'
-        f'<a href="{DRAMACLAW}" target="_blank">DramaClaw</a><a href="{BACKLOT}" target="_blank">Backlot</a></nav>'
+        f'<a href="{DRAMACLAW}">DramaClaw</a><a href="{BACKLOT}">Backlot</a></nav>'
     )
     return HTMLResponse(
         f'<!doctype html><html lang="vi"><head><meta charset="utf-8">{meta}<title>{e(title)}</title>'
@@ -102,7 +102,7 @@ def _openmontage() -> str:
                     [r.name for r in (project / "renders").glob("*.mp4")] if (project / "renders").exists() else []
                 )
                 rows += (
-                    f'<tr><td><a href="{BACKLOT}/p/{e(project.name)}" target="_blank">{e(project.name)}</a></td>'
+                    f'<tr><td><a href="{BACKLOT}/p/{e(project.name)}">{e(project.name)}</a></td>'
                     f"<td>{e(', '.join(renders) or 'chưa có bản dựng')}</td></tr>"
                 )
     return f"<h2>Video ngắn (OpenMontage)</h2><table><tr><th>Dự án</th><th>Bản dựng</th></tr>{rows}</table>"
@@ -114,8 +114,7 @@ def _catalog() -> str:
         if grp != group:
             body += f"<tr><th colspan=4>{e(grp)}</th></tr>"
             group = grp
-        target = "" if link.startswith("#") else ' target="_blank"'
-        label = f'<a href="{e(link)}"{target}>{e(name)}</a>' if link else e(name)
+        label = f'<a href="{e(link)}">{e(name)}</a>' if link else e(name)
         body += (
             f'<tr><td>{label}</td><td><span class="tag {status}">{STATUS[status]}</span></td>'
             f"<td>{e(where)}</td><td>{e(note)}</td></tr>"
@@ -155,7 +154,7 @@ def run_page(project_id: str) -> HTMLResponse:
     dc = f"{DRAMACLAW}/projects/{project_id}"
     steps = "".join(
         f"<tr><td>{'✅' if s['done'] else '⬜'}</td><td>{e(s['label'])}</td>"
-        f'<td><a href="{dc}/{"episodes/1/" + s["page"] if s["scope"] == "episode" else s["page"]}" target="_blank">'
+        f'<td><a href="{dc}/{"episodes/1/" + s["page"] if s["scope"] == "episode" else s["page"]}">'
         f"Xem / làm lại trong DramaClaw</a></td></tr>"
         for s in runs.timeline(project_id)
     )
@@ -193,8 +192,8 @@ def run_page(project_id: str) -> HTMLResponse:
         tail = "\n".join(run.log.read_text(encoding="utf-8", errors="replace").splitlines()[-15:])
     body = (
         f"<h1>{e(run.title)} {_tag(run.status)}</h1><p>Dự án <code>{project_id}</code> · "
-        f'<a href="{dc}/episodes" target="_blank">Mở trong DramaClaw</a> · '
-        f'<a href="{dc}/freezone" target="_blank">Canvas</a> · <a href="{dc}/tasks" target="_blank">Tác vụ</a></p>'
+        f'<a href="{dc}/episodes">Mở trong DramaClaw</a> · '
+        f'<a href="{dc}/freezone">Canvas</a> · <a href="{dc}/tasks">Tác vụ</a></p>'
         f"<p>{actions}</p>{waiting}{error}<h2>Phim</h2>{films or '<p>Chưa có phim.</p>'}"
         f"{_reviews(run)}"
         f"<h2>Các bước (tập 1)</h2><table>{steps}</table><p>Giọng: {voices or '—'}</p>"

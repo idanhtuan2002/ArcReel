@@ -22,4 +22,7 @@ Labels: **FACT**, **INFER**.
 | C | Inside DramaClaw: add menu entries and pages (runs, finish/review, OpenMontage, models) to DramaClaw's React frontend, rebuild its image | yes (frontend fork) | each DramaClaw upgrade: re-apply, rebuild, retest | literally "in DramaClaw's UI"; against GOAL rule 2 (donor whole) unless the sponsor accepts the fork |
 
 INFER: B gives the single centred interface without forking a donor; C matches the wording but adds a fork to every
+
+**Decision (sponsor, 2026-11-25): A** — every link from the control page opens in the same tab; the control page
+is the start page (http://127.0.0.1:8790).
 upgrade (DramaClaw moved 2.0.2 → 2.1.3 in one day of this project).
