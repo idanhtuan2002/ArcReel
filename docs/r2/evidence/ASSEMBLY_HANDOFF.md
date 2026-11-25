@@ -61,6 +61,14 @@ Nothing.
 - Timers: `assembly-ad-1` 2026-11-25 07:10 (ad resume); `assembly-m4-morning` 07:40 (finish film 1, review films 1
   and 2; log `~/assembly-data/runs/m4-morning.log`).
 
+## 2026-11-25 morning
+
+- `assembly-m4-morning` ran: film 1 finished (−13.99 LUFS, captions, piano music bed); reviews of films 1 and 2:
+  overview ran (both 5.8/10, not passed; film 2 style unity 2/10), consistency "no characters to check", continuity
+  failed (schema retries). Results in the run state files and on the control page.
+- Ad resume failed: OpenRouter 400 "Request path cannot be relayed" on all OpenRouter channels (ledger). Waiting for the
+  sponsor to check the OpenRouter key; the Codex agent and DramaClaw's text steps both depend on it.
+
 ## Next steps, in order
 
 Sponsor priorities 2026-11-24 (film 1 produced, low quality but working):
