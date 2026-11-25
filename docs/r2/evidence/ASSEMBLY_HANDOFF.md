@@ -78,6 +78,18 @@ Nothing.
   Gemini free requests are per model per day, shared with vision and the verifiers.
 - The Codex agent channel `assembly-agent` still points at OpenRouter: the LUMA ad stays paused.
 
+## Session end 2026-11-25 16:40 — resume here
+
+- HEAD on `impl/r2-film-quality` (pushed). Running user units: `assembly-console` (:8790), `openmontage-backlot`
+  (:4750); both transient (restart after reboot). No timers left.
+- OpenRouter: still 400 "Request path cannot be relayed" at 16:36 for every inference call; other users report the same
+  (GitHub RuoJi6/ARTEX#187, BaaRai/ARTEX#528, linux.do topic 3238418). Sponsor to contact OpenRouter support
+  (draft in the session). Text slots run on Gemini (`newapi_text_to_gemini --apply`); OpenRouter channel 1 disabled.
+- Next, in order: (1) when OpenRouter answers, `python -m assembly.ops.newapi_text_to_gemini --revert`, then resume the
+  LUMA ad: `python -m assembly.openmontage.run --driver codex --resume 01a20ce9-4e0a-7b10-9a3e-0b65277f3fcb --message
+  "<approve-1 corrections + vertical 1080x1920 reminder>"`; (2) review it myself (memory decide-ad-checkpoints-myself);
+  (3) continuity verifier schema failure; ambience post-stage; M6 autostart for the two web units.
+
 ## Next steps, in order
 
 Sponsor priorities 2026-11-24 (film 1 produced, low quality but working):
